@@ -1,0 +1,16 @@
+manifest:
+  version: "1.2"
+
+  remotes:
+    - name: zephyrproject
+      url-base: https://github.com/zephyrproject-rtos
+
+  projects:
+    - name: zephyr
+      remote: zephyrproject
+      revision: v4.4.0
+      path: zephyr
+      import: true
+
+  self:
+    path: k-fsw
