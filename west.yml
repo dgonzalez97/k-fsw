@@ -5,12 +5,25 @@ manifest:
     - name: zephyrproject
       url-base: https://github.com/zephyrproject-rtos
 
+    - name: kfsw
+      url-base: git@github.com:dgonzalez97
+
   projects:
     - name: zephyr
       remote: zephyrproject
       revision: v4.4.0
       path: zephyr
       import: true
+
+    - name: kfsw-platform
+      remote: kfsw
+      revision: a6a504a8bda4ca1022e3123eba1bd5c416523a75
+      path: kfsw-platform
+
+    - name: kfsw-services
+      remote: kfsw
+      revision: a129e68835ed87a44ffa686c32e37e6e5e4d00bf
+      path: kfsw-services
 
   self:
     path: k-fsw

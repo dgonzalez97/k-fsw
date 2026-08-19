@@ -1,0 +1,40 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "K-FSW: Build",
+            "type": "shell",
+            "command": "${workspaceFolder}/tools/build.sh",
+            "args": ["nucleo_l496zg"],
+            "options": {
+                "cwd": "${workspaceFolder}/.."
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "K-FSW: Flash",
+            "type": "shell",
+            "command": "${workspaceFolder}/tools/flash.sh",
+            "args": ["nucleo_l496zg"],
+            "options": {
+                "cwd": "${workspaceFolder}/.."
+            },
+            "dependsOn": "K-FSW: Build",
+            "problemMatcher": []
+        },
+        {
+            "label": "K-FSW: HIL smoke test",
+            "type": "shell",
+            "command": "${workspaceFolder}/tools/hil-smoke.sh",
+            "args": ["nucleo_l496zg"],
+            "options": {
+                "cwd": "${workspaceFolder}/.."
+            },
+            "problemMatcher": []
+        }
+    ]
+}

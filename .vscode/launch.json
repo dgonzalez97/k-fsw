@@ -1,0 +1,24 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "K-FSW: Debug NUCLEO-L496ZG",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "openocd",
+            "cwd": "${workspaceFolder}/..",
+            "executable": "${workspaceFolder}/../build/nucleo_l496zg/zephyr/zephyr.elf",
+            "device": "STM32L496ZG",
+            "gdbPath": "/home/dgonzalez/zephyr-sdk-1.0.1/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb",
+            "serverpath": "/home/dgonzalez/zephyr-sdk-1.0.1/hosttools/sysroots/x86_64-pokysdk-linux/usr/bin/openocd",
+            "searchDir": [
+                "/home/dgonzalez/zephyr-sdk-1.0.1/hosttools/sysroots/x86_64-pokysdk-linux/usr/share/openocd/scripts"
+            ],
+            "configFiles": [
+                "${workspaceFolder}/../zephyr/boards/st/nucleo_l496zg/support/openocd.cfg"
+            ],
+            "runToEntryPoint": "main",
+            "preLaunchTask": "K-FSW: Build"
+        }
+    ]
+}
