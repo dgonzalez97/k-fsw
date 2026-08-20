@@ -9,7 +9,7 @@ get_filename_component(KFSW_WORKSPACE_ROOT
 list(APPEND ZEPHYR_EXTRA_MODULES
     "${KFSW_WORKSPACE_ROOT}/kfsw-platform"
     "${KFSW_WORKSPACE_ROOT}/kfsw-services"
-    "${KFSW_WORKSPACE_ROOT}/libcsp"
+    "${KFSW_WORKSPACE_ROOT}/kfsw-comms/third_party/libcsp"
     "${KFSW_WORKSPACE_ROOT}/kfsw-comms"
 )
 

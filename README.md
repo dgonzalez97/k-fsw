@@ -47,8 +47,8 @@ node and do not encode that topology.
 | `kfsw-modules` | Reusable spacecraft equipment and subsystem clients |
 
 libcsp remains a separate upstream west project. `west.yml` pins its exact
-revision, and `kfsw-comms` integrates it through the same Zephyr module
-composition used by every profile.
+revision and checks it out at `kfsw-comms/third_party/libcsp`; `kfsw-comms`
+integrates it through the same Zephyr module composition used by every profile.
 
 ## Profiles and current status
 
