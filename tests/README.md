@@ -27,6 +27,31 @@ Current:
 - NUCLEO boot/readiness HIL smoke test
 - physical FTDI-to-NUCLEO CSP UART HIL test
 
+## Robot Framework HIL
+
+Robot wraps the proven physical smoke scripts under `tests/hil/`; it does not
+duplicate their flash, serial, or PTY bridge control. Install its pinned Python
+dependency and validate suite discovery without hardware:
+
+```bash
+pip install -r ./k-fsw/tests/hil/requirements.txt
+./k-fsw/tests/hil/run.sh --dryrun
+```
+
+Run the smoke-tagged physical suite with explicit device paths:
+
+```bash
+KFSW_DEBUG_SERIAL=/dev/ttyACM0 \
+KFSW_FTDI_DEVICE=/dev/serial/by-id/usb-FTDI_DEVICE-if00-port0 \
+./k-fsw/tests/hil/run.sh --include smoke
+```
+
+`boot.robot` verifies `@BOOT` and `@READY` through `hil-smoke.sh`.
+`uart.robot` verifies the debug shell, `kfsw status`, bidirectional CSP ping,
+and UART transport checks through `uart-csp-smoke.sh`. Reports are written to
+`build/robot/` by default. Tags are `smoke`, `nucleo`, `shell`, `csp`, `uart`,
+and `physical`.
+
 Planned:
 
 - fake clocks for deterministic time injection

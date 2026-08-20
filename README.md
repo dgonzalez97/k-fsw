@@ -93,6 +93,19 @@ Memcheck logs remain under `build/valgrind/`.
 `tools/ci/all.sh` runs all four software stages and never requires physical
 hardware.
 
+Physical HIL remains separate. Robot Framework wraps the existing smoke
+scripts and accepts hardware paths through the environment:
+
+```bash
+KFSW_DEBUG_SERIAL=/dev/ttyACM0 \
+KFSW_FTDI_DEVICE=/dev/serial/by-id/usb-FTDI_DEVICE-if00-port0 \
+./k-fsw/tests/hil/run.sh --include smoke
+```
+
+Use `./k-fsw/tests/hil/run.sh --dryrun` for hardware-free syntax and discovery
+validation. GitHub-hosted runners perform only that dry run, never physical
+HIL.
+
 ## KFSW-Linux command console
 
 From the west workspace root, build and run KFSW-Linux with:

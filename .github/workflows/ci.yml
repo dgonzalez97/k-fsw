@@ -144,3 +144,32 @@ jobs:
           name: valgrind-diagnostics
           path: build/valgrind/*.log
           if-no-files-found: ignore
+
+  robot-validation:
+    name: Robot HIL validation
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out K-FSW
+        uses: actions/checkout@v4
+        with:
+          path: k-fsw
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Robot Framework
+        run: pip install -r k-fsw/tests/hil/requirements.txt
+
+      - name: Validate Robot HIL suites
+        run: ./k-fsw/tests/hil/run.sh --dryrun
+
+      - name: Upload Robot diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: robot-diagnostics
+          path: build/robot/
+          if-no-files-found: ignore
