@@ -18,15 +18,30 @@ if [[ ! -f "$KFSW_PROFILE_FILE" ]]; then
 fi
 
 source "$KFSW_PROFILE_FILE"
-source "$KFSW_ROOT/.venv/bin/activate"
+
+KFSW_VENV_DIR="${KFSW_VENV_DIR:-$KFSW_ROOT/.venv}"
+
+if [[ -f "$KFSW_VENV_DIR/bin/activate" ]]; then
+    source "$KFSW_VENV_DIR/bin/activate"
+fi
+
+if ! command -v west >/dev/null 2>&1; then
+    echo "ERROR: west is not available. Activate the Zephyr environment first."
+    exit 1
+fi
 
 export KFSW_PROFILE
 export KFSW_ROOT
 export ZEPHYR_BASE="$KFSW_ROOT/zephyr"
 
-export ZEPHYR_SDK_INSTALL_DIR="${ZEPHYR_SDK_INSTALL_DIR:-$HOME/zephyr-sdk-1.0.1}"
+if [[ -z "${ZEPHYR_SDK_INSTALL_DIR:-}" && \
+      -d "$HOME/zephyr-sdk-1.0.1" ]]; then
+    export ZEPHYR_SDK_INSTALL_DIR="$HOME/zephyr-sdk-1.0.1"
+fi
 
-export PATH="$ZEPHYR_SDK_INSTALL_DIR/gnu/arm-zephyr-eabi/bin:$PATH"
+if [[ -n "${ZEPHYR_SDK_INSTALL_DIR:-}" ]]; then
+    export PATH="$ZEPHYR_SDK_INSTALL_DIR/gnu/arm-zephyr-eabi/bin:$PATH"
+fi
 
 export KFSW_BUILD_DIR="$KFSW_ROOT/build/$KFSW_PROFILE"
 

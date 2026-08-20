@@ -6,7 +6,7 @@ manifest:
       url-base: https://github.com/zephyrproject-rtos
 
     - name: kfsw
-      url-base: git@github.com:dgonzalez97
+      url-base: https://github.com/dgonzalez97
 
     - name: libcsp
       url-base: https://github.com/libcsp

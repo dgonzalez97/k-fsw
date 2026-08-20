@@ -65,6 +65,19 @@ implemented and has passed physical testing. CAN/CFP work is parked until a
 replacement CAN transceiver is available; CAN is not currently claimed as a
 working transport.
 
+## Software CI
+
+Run the complete software build matrix locally from the west workspace root:
+
+```bash
+./k-fsw/tools/ci/build.sh
+```
+
+The matrix builds pristine `linux`, `linux_uart`, `nucleo_l496zg`, and
+`nucleo_l496zg_uart` profiles. Pass one or more profile names to run a subset.
+GitHub Actions uses this same entry point after recreating the pinned west
+workspace and installing the Zephyr SDK selected by Zephyr 4.4.
+
 ## KFSW-Linux command console
 
 From the west workspace root, build and run KFSW-Linux with:
