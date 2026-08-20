@@ -14,10 +14,14 @@ echo "Board   : $ZEPHYR_BOARD"
 echo "Build   : $KFSW_BUILD_DIR"
 echo
 
-cmake_args=()
+west_args=()
 
 if [[ -n "${KFSW_EXTRA_CONF_FILE:-}" ]]; then
-    cmake_args+=(-- "-DEXTRA_CONF_FILE=$KFSW_EXTRA_CONF_FILE")
+	west_args+=(--extra-conf "$KFSW_EXTRA_CONF_FILE")
+fi
+
+if [[ -n "${KFSW_EXTRA_DTC_OVERLAY_FILE:-}" ]]; then
+	west_args+=(--extra-dtc-overlay "$KFSW_EXTRA_DTC_OVERLAY_FILE")
 fi
 
 west build \
@@ -25,4 +29,4 @@ west build \
     -b "$ZEPHYR_BOARD" \
     "$KFSW_ROOT/k-fsw/app" \
     -d "$KFSW_BUILD_DIR" \
-    "${cmake_args[@]}"
+	"${west_args[@]}"

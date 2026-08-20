@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-node=1
+node=""
+profile=""
 
-if [[ "${1:-}" == "--node" ]]; then
+if [[ "${1:-}" == "--profile" ]]; then
+	if [[ $# -lt 2 ]]; then
+		echo "ERROR: --profile requires a Linux profile name"
+		exit 1
+	fi
+
+	profile="$2"
+	shift 2
+elif [[ "${1:-}" == "--node" ]]; then
     if [[ $# -lt 2 ]]; then
         echo "ERROR: --node requires address 1 or 2"
         exit 1
@@ -13,18 +22,26 @@ if [[ "${1:-}" == "--node" ]]; then
     shift 2
 fi
 
-case "$node" in
-    1)
-        profile=linux
-        ;;
-    2)
-        profile=linux_node2
-        ;;
-    *)
-        echo "ERROR: supported Linux CSP nodes are 1 and 2"
-        exit 1
-        ;;
-esac
+if [[ -z "$profile" ]]; then
+	case "${node:-1}" in
+		1)
+			profile=linux
+			;;
+		2)
+			profile=linux_node2
+			;;
+		*)
+			echo "ERROR: supported Linux CSP nodes are 1 and 2"
+			exit 1
+			;;
+	esac
+fi
+
+if [[ "$profile" != linux && "$profile" != linux_node2 &&
+	  "$profile" != linux_uart ]]; then
+	echo "ERROR: unsupported Linux profile: $profile"
+	exit 1
+fi
 
 source "$(dirname "$0")/_common.sh" "$profile"
 
