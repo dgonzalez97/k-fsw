@@ -29,7 +29,7 @@
         {
             "label": "K-FSW: HIL smoke test",
             "type": "shell",
-            "command": "${workspaceFolder}/tools/hil-smoke.sh",
+            "command": "${workspaceFolder}/tests/hil-smoke.sh",
             "args": ["nucleo_l496zg"],
             "options": {
                 "cwd": "${workspaceFolder}/.."

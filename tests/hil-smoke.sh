@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 KFSW_PROFILE="${1:-nucleo_l496zg}"
 
-source "$(dirname "$0")/_common.sh" "$KFSW_PROFILE"
+source "$(dirname "$0")/../tools/_common.sh" "$KFSW_PROFILE"
 
 capture_file="$(mktemp)"
 capture_pid=""

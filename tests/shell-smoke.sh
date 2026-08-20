@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-source "$(dirname "$0")/_common.sh" linux
+source "$(dirname "$0")/../tools/_common.sh" linux
 
 executable="$KFSW_BUILD_DIR/zephyr/zephyr.exe"
 capture_file="$(mktemp)"

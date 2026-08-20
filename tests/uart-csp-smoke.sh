@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-source "$(dirname "$0")/_common.sh" nucleo_l496zg_uart
+source "$(dirname "$0")/../tools/_common.sh" nucleo_l496zg_uart
 
 ftdi_device=""
 debug_serial="$KFSW_SERIAL"

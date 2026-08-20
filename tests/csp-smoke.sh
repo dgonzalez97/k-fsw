@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-source "$(dirname "$0")/_common.sh" linux
+source "$(dirname "$0")/../tools/_common.sh" linux
 
 node1_executable="$KFSW_ROOT/build/linux/zephyr/zephyr.exe"
 node2_executable="$KFSW_ROOT/build/linux_node2/zephyr/zephyr.exe"

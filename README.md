@@ -104,7 +104,7 @@ The software-only two-node CSP regression creates and connects the native KISS
 PTYs automatically, pings both nodes, and cleans up its processes:
 
 ```bash
-./k-fsw/tools/csp-smoke.sh
+./k-fsw/tests/csp-smoke.sh
 ```
 
 ## NUCLEO-L496ZG
@@ -201,7 +201,7 @@ must be replaced when a different cable is used.
 ```bash
 ls -l /dev/serial/by-id/
 
-./k-fsw/tools/uart-csp-smoke.sh \
+./k-fsw/tests/uart-csp-smoke.sh \
   --ftdi /dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AL05JTP2-if00-port0 \
   --serial /dev/ttyACM0
 ```
@@ -228,9 +228,9 @@ performance guarantees.
 Run these from the workspace root after the corresponding profiles are built:
 
 ```bash
-./k-fsw/tools/shell-smoke.sh
-./k-fsw/tools/csp-smoke.sh
+./k-fsw/tests/shell-smoke.sh
+./k-fsw/tests/csp-smoke.sh
 ```
 
-`uart-csp-smoke.sh` is a hardware-in-the-loop test that flashes the board and
-requires the wired NUCLEO and FTDI setup described above.
+`tests/uart-csp-smoke.sh` is a hardware-in-the-loop test that flashes the board
+and requires the wired NUCLEO and FTDI setup described above.

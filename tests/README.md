@@ -1,6 +1,14 @@
-# K-FSW Test Support
+# K-FSW Tests
 
-Host and HIL infrastructure.
+Host and HIL test runners. Developer build, run, flash, debug, and serial
+utilities remain in `tools/`.
+
+Run test scripts from the west workspace root, for example:
+
+```bash
+./k-fsw/tests/shell-smoke.sh
+./k-fsw/tests/csp-smoke.sh
+```
 
 Current:
 
