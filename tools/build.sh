@@ -14,8 +14,15 @@ echo "Board   : $ZEPHYR_BOARD"
 echo "Build   : $KFSW_BUILD_DIR"
 echo
 
+cmake_args=()
+
+if [[ -n "${KFSW_EXTRA_CONF_FILE:-}" ]]; then
+    cmake_args+=(-- "-DEXTRA_CONF_FILE=$KFSW_EXTRA_CONF_FILE")
+fi
+
 west build \
     -p auto \
     -b "$ZEPHYR_BOARD" \
     "$KFSW_ROOT/k-fsw/app" \
-    -d "$KFSW_BUILD_DIR"
+    -d "$KFSW_BUILD_DIR" \
+    "${cmake_args[@]}"

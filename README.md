@@ -21,6 +21,39 @@ Build and run KFSW-Linux:
 ./k-fsw/tools/run-linux.sh
 ```
 
+## CSP development link
+
+The Linux image enables libcsp node 1 by default. A second build profile sets
+node address 2 without duplicating the application:
+
+```bash
+./k-fsw/tools/build.sh linux
+./k-fsw/tools/build.sh linux_node2
+```
+
+Launch each node in a separate terminal:
+
+```bash
+./k-fsw/tools/run-linux.sh --node 1 --device_id=1
+./k-fsw/tools/run-linux.sh --node 2 --device_id=2
+```
+
+Each process prints a PTY for `uart_1`. Connect those two paths with libcsp's
+USART/KISS byte link (replace the example PTYs with the printed values):
+
+```bash
+socat /dev/pts/7,raw,echo=0 /dev/pts/9,raw,echo=0
+```
+
+Then use the shell console on node 1 to run `kfsw csp ping 2`. The deterministic
+integration test builds missing profiles, discovers and bridges the CSP PTYs,
+checks the CSP shell commands, pings in both directions, and cleans up every
+process:
+
+```bash
+./k-fsw/tools/csp-smoke.sh
+```
+
 ## Debug shell
 
 The development configuration enables a small Zephyr serial shell rooted at

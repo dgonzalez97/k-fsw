@@ -8,6 +8,9 @@ manifest:
     - name: kfsw
       url-base: git@github.com:dgonzalez97
 
+    - name: libcsp
+      url-base: https://github.com/libcsp
+
   projects:
     - name: zephyr
       remote: zephyrproject
@@ -24,6 +27,16 @@ manifest:
       remote: kfsw
       revision: a7982a90b29bdefec4d3e4ebf9b166b7ae3f4d2e
       path: kfsw-services
+
+    - name: kfsw-comms
+      remote: kfsw
+      revision: b7859cea1f0302183c79981e3e8b625ad4aa0296
+      path: kfsw-comms
+
+    - name: libcsp
+      remote: libcsp
+      revision: 097a039701c85e4ceb98e91f380810662e23878a
+      path: libcsp
 
   self:
     path: k-fsw
