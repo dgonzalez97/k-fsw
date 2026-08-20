@@ -23,6 +23,7 @@ printf '%s\n' \
     'kfsw status' \
     'kfsw time' \
     'kfsw version' \
+    'kfsw uart info' \
     'kfsw log test' |
     "$executable" --uart_stdinout --stop_at=1.0 --no-color >"$capture_file" 2>&1
 
@@ -39,6 +40,14 @@ expected_output=(
     'K-FSW: kfsw-dev'
     'Zephyr: 4.4.0'
     'Board: native_sim/native/64'
+    'UART transport'
+    'device: uart_1'
+    'baudrate: 115200'
+    'configuration: 8N1, flow control none'
+    'ready: yes'
+    'CSP interface: KISS'
+    'CSP node: 1'
+    'CSP peer: 2'
     '[ERROR] K-FSW shell log test: error'
     '[WARNING] K-FSW shell log test: warning'
     '[INFO] K-FSW shell log test: info'

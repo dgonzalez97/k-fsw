@@ -109,18 +109,28 @@ wait_for_output "$work_dir/socat.log" "starting data transfer loop" \
     "$bridge_pid" || fail "the CSP UART bridge did not become ready"
 
 printf 'kfsw csp \t\n' >&3
+printf 'kfsw uart \t\n' >&3
 printf '%s\n' \
     'kfsw csp info' \
     'kfsw csp interfaces' \
     'kfsw csp routes' \
-    'kfsw csp ping 2' >&3
+    'kfsw csp ping 2' \
+    'kfsw uart info' \
+    'kfsw uart test' >&3
 
-printf '%s\n' 'kfsw csp ping 1' >&4
+printf '%s\n' \
+    'kfsw csp ping 1' \
+    'kfsw uart info' \
+    'kfsw uart test' >&4
 
 wait_for_output "$work_dir/node1.log" "CSP ping 2: success" \
     "$node1_pid" || fail "node 1 could not ping CSP node 2"
 wait_for_output "$work_dir/node2.log" "CSP ping 1: success" \
     "$node2_pid" || fail "node 2 could not ping CSP node 1"
+wait_for_output "$work_dir/node1.log" "UART CSP test: PASS" \
+    "$node1_pid" || fail "node 1 UART transport test did not pass"
+wait_for_output "$work_dir/node2.log" "UART CSP test: PASS" \
+    "$node2_pid" || fail "node 2 UART transport test did not pass"
 
 node1_expected=(
     "CSP node: 1"
@@ -130,7 +140,17 @@ node1_expected=(
     "LOOP addr=1/14"
     "KISS addr=1/0"
     "0/0 -> KISS direct"
+    "UART transport"
+    "device: uart_1"
+    "baudrate: 115200"
+    "configuration: 8N1, flow control none"
+    "ready: yes"
+    "CSP interface: KISS"
+    "CSP peer: 2"
+    "UART CSP test: PASS"
+    "interface: KISS"
     "  info"
+    "  test"
     "interfaces"
     "ping"
     "routes"
