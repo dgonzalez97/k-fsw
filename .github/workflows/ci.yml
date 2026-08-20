@@ -109,3 +109,38 @@ jobs:
             build/twister/testplan.json
             build/twister/**/handler.log
           if-no-files-found: ignore
+
+  valgrind:
+    name: Valgrind
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out K-FSW
+        uses: actions/checkout@v4
+        with:
+          path: k-fsw
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up the west workspace and Zephyr SDK
+        uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          app-path: k-fsw
+          toolchains: arm-zephyr-eabi
+
+      - name: Install Valgrind
+        run: sudo apt-get install --yes valgrind
+
+      - name: Run Valgrind
+        run: ./k-fsw/tools/ci/valgrind.sh
+
+      - name: Upload Valgrind diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: valgrind-diagnostics
+          path: build/valgrind/*.log
+          if-no-files-found: ignore

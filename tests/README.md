@@ -7,6 +7,7 @@ Run test scripts from the west workspace root, for example:
 
 ```bash
 ./k-fsw/tools/ci/unit.sh
+./k-fsw/tools/ci/valgrind.sh
 ./k-fsw/tests/shell-smoke.sh
 ./k-fsw/tests/csp-smoke.sh
 ```
@@ -14,6 +15,8 @@ Run test scripts from the west workspace root, for example:
 `tools/ci/unit.sh` runs the ztest suites under `tests/unit/` through Zephyr
 Twister on `native_sim/native/64`. Results and logs are kept under
 `build/twister/` by default; set `KFSW_TWISTER_OUT_DIR` to override it.
+`tools/ci/valgrind.sh` runs a bounded KFSW-Linux boot under Memcheck and keeps
+its logs under `build/valgrind/`.
 
 Current:
 

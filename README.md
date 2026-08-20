@@ -73,6 +73,8 @@ Run the complete software build matrix locally from the west workspace root:
 ./k-fsw/tools/ci/build.sh
 ./k-fsw/tools/ci/quality.sh
 ./k-fsw/tools/ci/unit.sh
+./k-fsw/tools/ci/valgrind.sh
+./k-fsw/tools/ci/all.sh
 ```
 
 The matrix builds pristine `linux`, `linux_uart`, `nucleo_l496zg`, and
@@ -85,6 +87,11 @@ two tools before running it locally.
 
 The unit entry point runs the project-owned ztest suites through Twister on
 `native_sim/native/64` and keeps its reports under `build/twister/`.
+The Valgrind entry point builds KFSW-Linux, boots it to `@READY`, and exits at
+one simulated second; install Valgrind before running it locally. Program and
+Memcheck logs remain under `build/valgrind/`.
+`tools/ci/all.sh` runs all four software stages and never requires physical
+hardware.
 
 ## KFSW-Linux command console
 
