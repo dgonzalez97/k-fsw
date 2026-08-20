@@ -37,26 +37,22 @@ static int cmd_kfsw_csp_info(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
-static bool print_csp_interface(
-	const struct kfsw_csp_interface_info *interface_info, void *context)
+static bool print_csp_interface(const struct kfsw_csp_interface_info *interface_info, void *context)
 {
 	const struct shell *sh = context;
 
 	shell_print(sh,
 		    "%s addr=%u/%u default=%s tx=%u rx=%u txerr=%u "
 		    "rxerr=%u drop=%u",
-		    interface_info->name, interface_info->address,
-		    interface_info->prefix_length,
-		    interface_info->is_default ? "yes" : "no",
-		    interface_info->tx_packets, interface_info->rx_packets,
-		    interface_info->tx_errors, interface_info->rx_errors,
-		    interface_info->dropped_packets);
+		    interface_info->name, interface_info->address, interface_info->prefix_length,
+		    interface_info->is_default ? "yes" : "no", interface_info->tx_packets,
+		    interface_info->rx_packets, interface_info->tx_errors,
+		    interface_info->rx_errors, interface_info->dropped_packets);
 
 	return true;
 }
 
-static int cmd_kfsw_csp_interfaces(const struct shell *sh, size_t argc,
-				   char **argv)
+static int cmd_kfsw_csp_interfaces(const struct shell *sh, size_t argc, char **argv)
 {
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
@@ -65,26 +61,22 @@ static int cmd_kfsw_csp_interfaces(const struct shell *sh, size_t argc,
 	return 0;
 }
 
-static bool print_csp_route(const struct kfsw_csp_route_info *route_info,
-			    void *context)
+static bool print_csp_route(const struct kfsw_csp_route_info *route_info, void *context)
 {
 	const struct shell *sh = context;
 
 	if (route_info->has_via) {
 		shell_print(sh, "%u/%u -> %s via %u", route_info->address,
-			    route_info->prefix_length,
-			    route_info->interface_name, route_info->via);
+			    route_info->prefix_length, route_info->interface_name, route_info->via);
 	} else {
 		shell_print(sh, "%u/%u -> %s direct", route_info->address,
-			    route_info->prefix_length,
-			    route_info->interface_name);
+			    route_info->prefix_length, route_info->interface_name);
 	}
 
 	return true;
 }
 
-static int cmd_kfsw_csp_routes(const struct shell *sh, size_t argc,
-			       char **argv)
+static int cmd_kfsw_csp_routes(const struct shell *sh, size_t argc, char **argv)
 {
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
@@ -108,15 +100,14 @@ static int cmd_kfsw_csp_ping(const struct shell *sh, size_t argc, char **argv)
 		return -EINVAL;
 	}
 
-	result = kfsw_csp_ping((uint16_t)node, KFSW_CSP_PING_TIMEOUT_MS,
-			       KFSW_CSP_PING_PAYLOAD_SIZE, &round_trip_ms);
+	result = kfsw_csp_ping((uint16_t)node, KFSW_CSP_PING_TIMEOUT_MS, KFSW_CSP_PING_PAYLOAD_SIZE,
+			       &round_trip_ms);
 	if (result != 0) {
 		shell_error(sh, "CSP ping %lu: failed (%d)", node, result);
 		return result;
 	}
 
-	shell_print(sh, "CSP ping %lu: success, rtt_ms=%u", node,
-		    round_trip_ms);
+	shell_print(sh, "CSP ping %lu: success, rtt_ms=%u", node, round_trip_ms);
 	return 0;
 }
 
@@ -152,9 +143,9 @@ static int cmd_kfsw_uart_info(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "CSP interface: %s", info.interface_name);
 	shell_print(sh, "CSP node: %u", info.node);
 	shell_print(sh, "CSP peer: %u", info.peer);
-	shell_print(sh, "KISS tx=%u rx=%u txerr=%u rxerr=%u drop=%u frame=%u",
-		    info.tx_packets, info.rx_packets, info.tx_errors,
-		    info.rx_errors, info.dropped_packets, info.frame_errors);
+	shell_print(sh, "KISS tx=%u rx=%u txerr=%u rxerr=%u drop=%u frame=%u", info.tx_packets,
+		    info.rx_packets, info.tx_errors, info.rx_errors, info.dropped_packets,
+		    info.frame_errors);
 
 	return 0;
 }
@@ -197,8 +188,7 @@ static int cmd_kfsw_status(const struct shell *sh, size_t argc, char **argv)
 
 	shell_print(sh, "K-FSW status");
 	shell_print(sh, "board: %s", CONFIG_BOARD_TARGET);
-	shell_print(sh, "uptime_ms: %llu",
-		    (unsigned long long)kfsw_time_monotonic_ms());
+	shell_print(sh, "uptime_ms: %llu", (unsigned long long)kfsw_time_monotonic_ms());
 
 	return 0;
 }
@@ -208,10 +198,8 @@ static int cmd_kfsw_time(const struct shell *sh, size_t argc, char **argv)
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 
-	shell_print(sh, "monotonic_ms: %llu",
-		    (unsigned long long)kfsw_time_monotonic_ms());
-	shell_print(sh, "monotonic_us: %llu",
-		    (unsigned long long)kfsw_time_monotonic_us());
+	shell_print(sh, "monotonic_ms: %llu", (unsigned long long)kfsw_time_monotonic_ms());
+	shell_print(sh, "monotonic_us: %llu", (unsigned long long)kfsw_time_monotonic_us());
 
 	return 0;
 }

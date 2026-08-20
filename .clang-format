@@ -1,0 +1,20 @@
+---
+BasedOnStyle: LLVM
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+BreakBeforeBraces: Linux
+ColumnLimit: 100
+ContinuationIndentWidth: 8
+IndentCaseLabels: false
+IndentWidth: 8
+SortIncludes: Never
+UseTab: ForContinuationAndIndentation
+WhitespaceSensitiveMacros:
+  - SHELL_CMD
+  - SHELL_CMD_ARG
+  - SHELL_CMD_REGISTER
+  - SHELL_STATIC_SUBCMD_SET_CREATE
+  - SHELL_SUBCMD_SET_END

@@ -46,3 +46,30 @@ jobs:
 
       - name: Build profile
         run: ./k-fsw/tools/ci/build.sh "${{ matrix.profile }}"
+
+  quality:
+    name: Source quality
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out K-FSW
+        uses: actions/checkout@v4
+        with:
+          path: k-fsw
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up the west workspace and Zephyr SDK
+        uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          app-path: k-fsw
+          toolchains: arm-zephyr-eabi
+
+      - name: Install cppcheck
+        run: sudo apt-get install --yes cppcheck
+
+      - name: Check source quality
+        run: ./k-fsw/tools/ci/quality.sh

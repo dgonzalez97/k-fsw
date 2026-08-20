@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+KFSW_QUALITY_TOOL="$(readlink -f "${BASH_SOURCE[0]}")"
+KFSW_CI_DIR="$(dirname "$KFSW_QUALITY_TOOL")"
+KFSW_REPO_DIR="$(dirname "$(dirname "$KFSW_CI_DIR")")"
+KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
+
+clang_format=""
+
+if [[ -x "$KFSW_WORKSPACE_ROOT/.venv/bin/clang-format" ]]; then
+	clang_format="$KFSW_WORKSPACE_ROOT/.venv/bin/clang-format"
+elif command -v clang-format >/dev/null 2>&1; then
+	clang_format="$(command -v clang-format)"
+else
+	echo "ERROR: clang-format is required"
+	exit 1
+fi
+
+if ! command -v cppcheck >/dev/null 2>&1; then
+	echo "ERROR: cppcheck is required"
+	exit 1
+fi
+
+format_roots=("$KFSW_REPO_DIR/app/src")
+[[ -d "$KFSW_REPO_DIR/tests/unit" ]] && \
+	format_roots+=("$KFSW_REPO_DIR/tests/unit")
+
+mapfile -d '' format_sources < <(
+	find "${format_roots[@]}" -type f \( -name '*.c' -o -name '*.h' \) \
+		-print0 | sort -z
+)
+
+echo "QUALITY: clang-format (${#format_sources[@]} files)"
+"$clang_format" --dry-run --Werror "${format_sources[@]}"
+
+analysis_roots=(
+	"$KFSW_REPO_DIR/app/src"
+	"$KFSW_WORKSPACE_ROOT/kfsw-platform/src"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src"
+	"$KFSW_WORKSPACE_ROOT/kfsw-comms/src"
+)
+
+mapfile -d '' analysis_sources < <(
+	find "${analysis_roots[@]}" -type f -name '*.c' -print0 | sort -z
+)
+
+echo "QUALITY: cppcheck (${#analysis_sources[@]} files)"
+cppcheck \
+	--enable=warning,performance,portability \
+	--error-exitcode=1 \
+	--force \
+	--inline-suppr \
+	--language=c \
+	--quiet \
+	--std=c11 \
+	--suppress=missingIncludeSystem \
+	--suppress=unknownMacro \
+	-DCONFIG_KFSW_CSP=1 \
+	-DCONFIG_KFSW_CSP_KISS_UART=1 \
+	-DCONFIG_KFSW_CSP_UART_INTERRUPT_DRIVEN=1 \
+	-DCONFIG_KFSW_LOG_MIN_LEVEL=0 \
+	-I "$KFSW_WORKSPACE_ROOT/kfsw-platform/include" \
+	-I "$KFSW_WORKSPACE_ROOT/kfsw-services/include" \
+	-I "$KFSW_WORKSPACE_ROOT/kfsw-comms/include" \
+	"${analysis_sources[@]}"
+
+echo "QUALITY RESULT: PASS"
