@@ -6,6 +6,7 @@ KFSW_HIL_DIR="$(dirname "$KFSW_ROBOT_RUNNER")"
 KFSW_TESTS_DIR="$(dirname "$KFSW_HIL_DIR")"
 KFSW_REPO_DIR="$(dirname "$KFSW_TESTS_DIR")"
 KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
+KFSW_TERMINAL_RUNNER="$KFSW_TESTS_DIR/platform/robot-terminal-runner"
 
 robot_command=""
 
@@ -19,7 +20,14 @@ else
 	exit 1
 fi
 
+if [[ ! -f "$KFSW_TERMINAL_RUNNER/src/tmux_interaction_lib.py" ]]; then
+	echo "ERROR: robot-terminal-runner submodule is not initialized"
+	echo "Run: git -C $KFSW_REPO_DIR submodule update --init --recursive"
+	exit 1
+fi
+
 export KFSW_REPO_DIR
+export PYTHONPATH="$KFSW_TERMINAL_RUNNER/src${PYTHONPATH:+:$PYTHONPATH}"
 
 output_dir="${KFSW_ROBOT_OUT_DIR:-$KFSW_WORKSPACE_ROOT/build/robot}"
 

@@ -1,0 +1,3 @@
+[submodule "tests/platform/robot-terminal-runner"]
+	path = tests/platform/robot-terminal-runner
+	url = https://github.com/dgonzalez97/robot-terminal-runner.git

@@ -3,15 +3,29 @@ set -Eeuo pipefail
 
 source "$(dirname "$0")/../tools/_common.sh" linux
 
+mode="smoke"
+
+if [[ "${1:-}" == "--terminal" ]]; then
+    mode="terminal"
+    shift
+fi
+
+if [[ $# -ne 0 ]]; then
+    echo "ERROR: unknown argument: $1"
+    exit 1
+fi
+
 node1_executable="$KFSW_ROOT/build/linux/zephyr/zephyr.exe"
 node2_executable="$KFSW_ROOT/build/linux_node2/zephyr/zephyr.exe"
 work_dir="$(mktemp -d /tmp/kfsw-csp-smoke.XXXXXX)"
 node1_pid=""
 node2_pid=""
 bridge_pid=""
+relay_pid=""
 
 cleanup()
 {
+    [[ -n "$relay_pid" ]] && kill "$relay_pid" 2>/dev/null || true
     [[ -n "$bridge_pid" ]] && kill "$bridge_pid" 2>/dev/null || true
     [[ -n "$node1_pid" ]] && kill "$node1_pid" 2>/dev/null || true
     [[ -n "$node2_pid" ]] && kill "$node2_pid" 2>/dev/null || true
@@ -58,6 +72,8 @@ wait_for_output()
 }
 
 trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 if ! command -v socat >/dev/null 2>&1; then
     fail "socat is required to bridge the two native_sim CSP UARTs"
@@ -107,6 +123,18 @@ bridge_pid=$!
 
 wait_for_output "$work_dir/socat.log" "starting data transfer loop" \
     "$bridge_pid" || fail "the CSP UART bridge did not become ready"
+
+if [[ "$mode" == "terminal" ]]; then
+    tail -n 0 -F "$work_dir/node1.log" &
+    relay_pid=$!
+
+    echo "KFSW CSP TERMINAL: READY"
+    while IFS= read -r command; do
+        printf '%s\n' "$command" >&3
+    done
+
+    exit 0
+fi
 
 printf 'kfsw csp \t\n' >&3
 printf 'kfsw uart \t\n' >&3

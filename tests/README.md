@@ -50,7 +50,26 @@ KFSW_FTDI_DEVICE=/dev/serial/by-id/usb-FTDI_DEVICE-if00-port0 \
 `uart.robot` verifies the debug shell, `kfsw status`, bidirectional CSP ping,
 and UART transport checks through `uart-csp-smoke.sh`. Reports are written to
 `build/robot/` by default. Tags are `smoke`, `nucleo`, `shell`, `csp`, `uart`,
-and `physical`.
+`physical`, and `terminal`.
+
+### Terminal runner submodule
+
+[`robot-terminal-runner`](https://github.com/dgonzalez97/robot-terminal-runner)
+is an external Git submodule at `tests/platform/robot-terminal-runner`. It
+provides the generic process/terminal interaction used by Robot to operate the
+KFSW-Linux console and, later, the physical NUCLEO shell. Initialize it after
+cloning K-FSW:
+
+```bash
+git submodule update --init --recursive
+```
+
+The initial terminal-tagged test controls a two-node native K-FSW CSP setup
+through the KFSW-Linux shell, including an operator-style `kfsw csp ping 2`:
+
+```bash
+./k-fsw/tests/hil/run.sh --include terminal
+```
 
 Planned:
 
