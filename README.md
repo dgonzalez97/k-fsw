@@ -1,115 +1,236 @@
 # K Flight Software — K-FSW
 
-K-FSW is an open-source flight software framework for satellites, built
-around Zephyr RTOS.
+K-FSW is an open-source flight-software framework for satellites and satellite
+subsystems. The application runs on Zephyr RTOS and composes reusable platform,
+service, communications, and subsystem modules from the west workspace.
 
-This composition repository owns the application, west manifest, board
-configuration, developer tools, test support, CI.
+## Architecture
 
-Supported profiles:
+`k-fsw` is the composition repository. Board profiles select configuration and
+hardware backends without replacing the application or its modules.
 
-- `nucleo_l496zg`: STM32 NUCLEO-L496ZG
-- `nucleo_l496zg_uart`: NUCLEO with CSP KISS on USART3 PD8/PD9
-- `linux`: Zephyr `native_sim/native/64`
-- `linux_uart`: Linux CSP node 1 for a physical UART bridge
+KFSW-Linux is the `native_sim/native/64` profile of that same application. It is
+a first-class development and operations node, not a separate flight-software
+implementation or a POSIX rewrite. Its local Zephyr shell provides a convenient
+command console while the normal K-FSW services and communications code remain
+in use.
 
-Both targets run the same K-FSW application and services on Zephyr RTOS
-4.4.0.
-
-Build and run KFSW-Linux:
-
-```bash
-./k-fsw/tools/build.sh linux
-./k-fsw/tools/run-linux.sh
+```text
+local kfsw shell
+       |
+       v
+K-FSW service/comms APIs
+       |
+       v
+     libcsp
+       |
+       +-- KISS / UART       implemented
+       +-- CFP / CAN         deferred
+       +-- future transports
 ```
 
-## Dedicated CSP UART
+The shell is a user interface. Commands such as `kfsw csp ping 2` call a K-FSW
+API, which uses libcsp to reach the selected node. Future parameter, file,
+housekeeping, or command operations should follow the same boundary and use
+defined CSP services; K-FSW does not send shell command strings to remote
+nodes. Node 2 is used by the current demo, but generic commands accept a target
+node and do not encode that topology.
 
-The UART profile keeps the Zephyr shell on the NUCLEO ST-LINK VCP at
-`/dev/ttyACM0` (LPUART1 PG7/PG8). CSP uses a separate 115200 8N1 KISS link on
-USART3: D1/PD8 is TX and D0/PD9 is RX.
+## Workspace repositories
 
-Configure the YP-05 FT232RL for **3.3 V logic** and connect only:
+| Repository | Responsibility |
+| --- | --- |
+| `k-fsw` | Application composition, west manifest, profiles, tools, and integration tests |
+| `kfsw-platform` | Zephyr-backed platform capabilities such as time and reset cause |
+| `kfsw-services` | Reusable boot, readiness, logging, and future flight services |
+| `kfsw-comms` | CSP lifecycle, routing, and transport APIs |
+| `kfsw-modules` | Reusable spacecraft equipment and subsystem clients |
 
-- NUCLEO D1 / PD8 / USART3_TX to YP-05 RX
-- NUCLEO D0 / PD9 / USART3_RX to YP-05 TX
-- NUCLEO GND to YP-05 GND
+libcsp remains a separate upstream west project. `west.yml` pins its exact
+revision, and `kfsw-comms` integrates it through the same Zephyr module
+composition used by every profile.
 
-Do not connect VCC, DTR, or CTS. Keep the NUCLEO powered through ST-LINK and
-the YP-05 powered through its own USB cable. Prefer its stable
-`/dev/serial/by-id/...` path, then run:
+## Profiles and current status
 
-```bash
-./k-fsw/tools/uart-csp-smoke.sh --ftdi /dev/serial/by-id/<FT232RL>
-```
+| Profile | Purpose | Status |
+| --- | --- | --- |
+| `linux` | KFSW-Linux command console, CSP node 1 by default | Working; software verified |
+| `linux_node2` | Second native simulator node for integration tests | Working; software verified |
+| `linux_uart` | KFSW-Linux node used by the physical UART bridge test | Physically verified |
+| `nucleo_l496zg` | Base NUCLEO-L496ZG image | Build and boot verified |
+| `nucleo_l496zg_uart` | NUCLEO with CSP KISS on USART3 PD8/PD9 | Physically verified |
 
-The tool builds and flashes the UART profile, discovers the KFSW-Linux KISS
-PTY, bridges it to the FTDI device with `socat`, exercises CSP in both
-directions, runs the permanent UART transport test, checks KISS statistics,
-and cleans up all child processes.
+The debug shell and basic CSP routing/ping are working. KISS over UART is
+implemented and has passed physical testing. CAN/CFP work is parked until a
+replacement CAN transceiver is available; CAN is not currently claimed as a
+working transport.
 
-## CSP development link
+## KFSW-Linux command console
 
-The Linux image enables libcsp node 1 by default. A second build profile sets
-node address 2 without duplicating the application:
-
-```bash
-./k-fsw/tools/build.sh linux
-./k-fsw/tools/build.sh linux_node2
-```
-
-Launch each node in a separate terminal:
-
-```bash
-./k-fsw/tools/run-linux.sh --node 1 --device_id=1
-./k-fsw/tools/run-linux.sh --node 2 --device_id=2
-```
-
-Each process prints a PTY for `uart_1`. Connect those two paths with libcsp's
-USART/KISS byte link (replace the example PTYs with the printed values):
+From the west workspace root, build and run KFSW-Linux with:
 
 ```bash
-socat /dev/pts/7,raw,echo=0 /dev/pts/9,raw,echo=0
+./k-fsw/tools/kfsw-linux build
+./k-fsw/tools/kfsw-linux run
 ```
 
-Then use the shell console on node 1 to run `kfsw csp ping 2`. The deterministic
-integration test builds missing profiles, discovers and bridges the CSP PTYs,
-checks the CSP shell commands, pings in both directions, and cleans up every
-process:
+`run` builds the `linux` profile automatically if its executable is missing.
+It attaches the local Zephyr shell directly to the current terminal, so no
+PTY discovery or `picocom` session is needed. Startup ends at:
+
+```text
+@BOOT sw=kfsw-dev board=native_sim/native/64 ...
+@READY uptime_ms=...
+
+kfsw:~$
+```
+
+The preceding `uart_1 connected to pseudotty: ...` line identifies the CSP
+KISS transport, not the user shell. It is used by bridge and integration tools.
+Press `Ctrl-C` to stop KFSW-Linux.
+
+Useful commands include:
+
+```text
+kfsw status
+kfsw version
+kfsw csp info
+kfsw csp interfaces
+kfsw csp routes
+kfsw csp ping <node>
+```
+
+The software-only two-node CSP regression creates and connects the native KISS
+PTYs automatically, pings both nodes, and cleans up its processes:
 
 ```bash
 ./k-fsw/tools/csp-smoke.sh
 ```
 
-## Debug shell
+## NUCLEO-L496ZG
 
-The development configuration enables a small Zephyr serial shell rooted at
-`kfsw`. To use it on KFSW-Linux, start the simulator and note the PTY printed
-on its first line:
+Build the normal board profile from the workspace root:
 
 ```bash
-./k-fsw/tools/run-linux.sh
-# uart connected to pseudotty: /dev/pts/7
+./k-fsw/tools/build.sh nucleo_l496zg
 ```
 
-In another terminal, connect to the reported path:
+With a board attached through ST-LINK, flash it with:
 
 ```bash
-picocom /dev/pts/7
+./k-fsw/tools/flash.sh nucleo_l496zg
 ```
 
-Exit picocom with `Ctrl-A`, then `Ctrl-X`, and stop the simulator with
-`Ctrl-C`. For a non-interactive check of the initial command set, run:
-
-```bash
-./k-fsw/tools/shell-smoke.sh
-```
-
-On the NUCLEO-L496ZG, connect to the existing console UART after flashing:
+The debug shell and boot log use the ST-LINK virtual COM port at 115200 baud;
+the current default is `/dev/ttyACM0`:
 
 ```bash
 picocom --baud 115200 /dev/ttyACM0
 ```
 
-The shell shares that UART with boot markers and K-FSW log output. Exit
-picocom with `Ctrl-A`, then `Ctrl-X`.
+Exit `picocom` with `Ctrl-A`, then `Ctrl-X`.
+
+## Verified CSP UART bench demo
+
+The physical demo connects KFSW-Linux CSP node 1 to a NUCLEO-L496ZG CSP node 2
+through an FTDI TTL-232R-3V3 cable. CSP uses a dedicated UART; the NUCLEO shell
+and logs remain on ST-LINK.
+
+### Hardware and wiring
+
+The verified FTDI device is an FT232 Serial with USB ID `0403:6001`. Configure
+the link for 115200 baud, 8 data bits, no parity, one stop bit, and no flow
+control.
+
+Connect only these signals:
+
+```text
+FTDI ORANGE TXD  -> NUCLEO D0 / PD9 / USART3_RX
+FTDI YELLOW RXD  <- NUCLEO D1 / PD8 / USART3_TX
+FTDI BLACK GND   -> NUCLEO GND
+```
+
+Leave FTDI RED VCC, CTS, and RTS unconnected. Power and debug the NUCLEO through
+ST-LINK. The two serial paths have distinct jobs:
+
+```text
+FTDI UART  -> CSP KISS data
+ST-LINK    -> /dev/ttyACM0 -> Zephyr shell and logs
+```
+
+### Topology
+
+```text
++-----------------------+
+| KFSW-Linux            |
+| CSP node 1            |
+|                       |
+| kfsw:~$               |
++-----------+-----------+
+            |
+          libcsp
+            |
+           KISS
+            |
+     native_sim PTY
+            |
+          socat
+            |
+    FTDI TTL-232R-3V3
+            |
+      115200 baud, 8N1
+            |
+   USART3 PD8 / PD9
+            |
++-----------+-----------+
+| NUCLEO-L496ZG         |
+| CSP node 2            |
++-----------------------+
+
+At the same time:
+
+ST-LINK -> /dev/ttyACM0 -> Zephyr shell
+```
+
+### Reproduce the demo
+
+Prefer a stable `/dev/serial/by-id/` path for the FTDI cable. The current bench
+path is shown below as a working example; its serial number is not required and
+must be replaced when a different cable is used.
+
+```bash
+ls -l /dev/serial/by-id/
+
+./k-fsw/tools/uart-csp-smoke.sh \
+  --ftdi /dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AL05JTP2-if00-port0 \
+  --serial /dev/ttyACM0
+```
+
+The test builds both UART profiles, flashes the NUCLEO, captures its ST-LINK
+console, starts KFSW-Linux, bridges the native CSP PTY to the FTDI cable with
+`socat`, and exercises the link in both directions. It restores terminal
+settings and terminates its child processes on exit.
+
+The verified bench result was:
+
+- KFSW-Linux to NUCLEO: `CSP ping 2` succeeded.
+- NUCLEO to KFSW-Linux: `CSP ping 1` succeeded.
+- The permanent UART CSP test passed in both directions.
+- The transport test used a 128-byte CSP payload with CRC32.
+- Final observed KISS transmit/receive errors, frame errors, and drops were
+  zero.
+
+Observed round-trip times are diagnostic results for a particular run, not
+performance guarantees.
+
+## Regression helpers
+
+Run these from the workspace root after the corresponding profiles are built:
+
+```bash
+./k-fsw/tools/shell-smoke.sh
+./k-fsw/tools/csp-smoke.sh
+```
+
+`uart-csp-smoke.sh` is a hardware-in-the-loop test that flashes the board and
+requires the wired NUCLEO and FTDI setup described above.

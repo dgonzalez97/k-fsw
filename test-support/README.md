@@ -2,9 +2,15 @@
 
 Host and HIL infrastructure.
 
+Current:
+
+- native K-FSW shell smoke test
+- two-node native CSP/KISS integration test
+- NUCLEO boot/readiness HIL smoke test
+- physical FTDI-to-NUCLEO CSP UART HIL test
+
 Planned:
 
-- automated board tests
 - fake clocks
 - fake devices
 - SocketCAN/vcan
