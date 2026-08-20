@@ -1,0 +1,11 @@
+---
+tests:
+  kfsw.comms.csp_state:
+    tags:
+      - unit
+      - comms
+      - csp
+    platform_allow:
+      - native_sim/native/64
+    integration_platforms:
+      - native_sim/native/64

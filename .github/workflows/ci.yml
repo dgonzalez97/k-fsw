@@ -73,3 +73,39 @@ jobs:
 
       - name: Check source quality
         run: ./k-fsw/tools/ci/quality.sh
+
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out K-FSW
+        uses: actions/checkout@v4
+        with:
+          path: k-fsw
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up the west workspace and Zephyr SDK
+        uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          app-path: k-fsw
+          toolchains: arm-zephyr-eabi
+
+      - name: Run unit tests
+        run: ./k-fsw/tools/ci/unit.sh
+
+      - name: Upload Twister diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: twister-diagnostics
+          path: |
+            build/twister/twister.log
+            build/twister/twister.json
+            build/twister/testplan.json
+            build/twister/**/handler.log
+          if-no-files-found: ignore
