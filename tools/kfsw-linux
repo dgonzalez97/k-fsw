@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+KFSW_LINUX_TOOL="$(readlink -f "${BASH_SOURCE[0]}")"
+KFSW_LINUX_TOOLS_DIR="$(dirname "$KFSW_LINUX_TOOL")"
+KFSW_LINUX_REPO_DIR="$(dirname "$KFSW_LINUX_TOOLS_DIR")"
+KFSW_LINUX_WORKSPACE="$(dirname "$KFSW_LINUX_REPO_DIR")"
+KFSW_LINUX_EXECUTABLE="$KFSW_LINUX_WORKSPACE/build/linux/zephyr/zephyr.exe"
+
+usage()
+{
+	printf '%s\n' \
+		'Usage: tools/kfsw-linux <command> [arguments]' \
+		'' \
+		'Commands:' \
+		'  build    Build the KFSW-Linux profile' \
+		'  run      Run KFSW-Linux with its shell on this terminal' \
+		'  help     Show this help'
+}
+
+command="${1:-}"
+
+case "$command" in
+	build)
+		shift
+		if [[ $# -ne 0 ]]; then
+			echo "ERROR: build does not accept arguments"
+			exit 1
+		fi
+
+		exec "$KFSW_LINUX_TOOLS_DIR/build.sh" linux
+		;;
+	run)
+		shift
+		if [[ ! -x "$KFSW_LINUX_EXECUTABLE" ]]; then
+			echo "KFSW-Linux is not built; building it now."
+			"$KFSW_LINUX_TOOLS_DIR/build.sh" linux
+		fi
+
+		exec "$KFSW_LINUX_TOOLS_DIR/run-linux.sh" \
+			--profile linux --uart_stdinout "$@"
+		;;
+	help|-h|--help)
+		usage
+		;;
+	"")
+		usage
+		exit 1
+		;;
+	*)
+		echo "ERROR: unknown command: $command"
+		usage
+		exit 1
+		;;
+esac

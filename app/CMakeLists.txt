@@ -5,7 +5,7 @@ get_filename_component(KFSW_WORKSPACE_ROOT
     ABSOLUTE
 )
 
-# Use local modules until published revisions are added to west.yml.
+# Keep the west-managed module composition explicit for every build profile.
 list(APPEND ZEPHYR_EXTRA_MODULES
     "${KFSW_WORKSPACE_ROOT}/kfsw-platform"
     "${KFSW_WORKSPACE_ROOT}/kfsw-services"
