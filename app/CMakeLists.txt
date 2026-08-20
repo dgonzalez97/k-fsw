@@ -24,6 +24,10 @@ target_sources(app PRIVATE
     src/main.c
 )
 
+target_sources_ifdef(CONFIG_KFSW_DEBUG_SHELL app PRIVATE
+    src/debug_shell.c
+)
+
 target_link_libraries(app PRIVATE
     kfsw::services
 )

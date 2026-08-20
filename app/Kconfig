@@ -1,0 +1,25 @@
+mainmenu "K-FSW Configuration"
+
+menu "K-FSW application"
+
+config KFSW_DEBUG_SHELL
+	bool "K-FSW debug command shell"
+	select SHELL
+	select SHELL_MINIMAL
+	select SHELL_BACKEND_SERIAL
+	select SHELL_TAB
+	select SHELL_TAB_AUTOCOMPLETION
+	select SHELL_HISTORY
+	select SHELL_METAKEYS
+	select SHELL_HELP
+	help
+	  Enable the serial developer/debug shell and K-FSW command tree.
+	  Disable this option for release builds that must not include the
+	  interactive shell.
+
+endmenu
+
+config SHELL_PROMPT_UART
+	default "kfsw:~$ " if KFSW_DEBUG_SHELL
+
+source "Kconfig.zephyr"
