@@ -10,6 +10,7 @@ Run test scripts from the west workspace root, for example:
 ./k-fsw/tools/ci/integration.sh
 ./k-fsw/tools/ci/valgrind.sh
 ./k-fsw/tools/ci/robot.sh
+./k-fsw/tools/ci/docs.sh
 ./k-fsw/tools/ci/all.sh
 ```
 
@@ -22,7 +23,7 @@ its logs under `build/valgrind/`.
 CSP, PARAM, persistence, storage, and FTP integration scripts.
 `tools/ci/robot.sh` validates every Robot suite and then runs all scenarios
 except those tagged `physical`. `tools/ci/all.sh` composes these software-only
-checks with the build, quality, unit, and memory gates.
+checks with the build, quality, unit, memory, and documentation gates.
 
 Current:
 

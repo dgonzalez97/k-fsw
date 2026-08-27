@@ -14,3 +14,4 @@ west manifest --validate
 "$KFSW_CI_DIR/integration.sh"
 "$KFSW_CI_DIR/valgrind.sh"
 "$KFSW_CI_DIR/robot.sh"
+"$KFSW_CI_DIR/docs.sh"

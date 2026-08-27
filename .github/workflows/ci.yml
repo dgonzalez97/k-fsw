@@ -210,3 +210,30 @@ jobs:
           name: robot-diagnostics
           path: build/robot/
           if-no-files-found: ignore
+
+  docs:
+    name: DOCS / Doxygen
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out K-FSW
+        uses: actions/checkout@v4
+        with:
+          path: k-fsw
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up the west workspace
+        uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          app-path: k-fsw
+          toolchains: arm-zephyr-eabi
+
+      - name: Install Doxygen
+        run: sudo apt-get install --yes doxygen
+
+      - name: Build and validate SDK documentation
+        run: ./k-fsw/tools/ci/docs.sh

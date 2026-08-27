@@ -1,0 +1,53 @@
+/**
+ * @file ../kfsw-platform/include/kfsw/platform/time.h
+ * @brief Monotonic elapsed-time API.
+ * @ingroup kfsw_platform_time
+ */
+
+/**
+ * @file ../kfsw-platform/include/kfsw/platform/storage.h
+ * @brief LittleFS storage lifecycle and capacity API.
+ * @ingroup kfsw_platform_storage
+ */
+
+/**
+ * @file ../kfsw-platform/include/kfsw/platform/reset.h
+ * @brief Hardware reset-cause API.
+ * @ingroup kfsw_platform_reset
+ */
+
+/**
+ * @file ../kfsw-comms/include/kfsw/comms/csp.h
+ * @brief CSP lifecycle, route, interface, and ping API.
+ * @ingroup kfsw_comms_csp
+ */
+
+/**
+ * @file ../kfsw-comms/include/kfsw/comms/uart.h
+ * @brief Dedicated UART/KISS status and verification API.
+ * @ingroup kfsw_comms_uart
+ */
+
+/**
+ * @file ../kfsw-services/include/kfsw/services/boot.h
+ * @brief Boot and readiness marker API.
+ * @ingroup kfsw_services_boot
+ */
+
+/**
+ * @file ../kfsw-services/include/kfsw/services/log.h
+ * @brief Runtime-filtered logging API.
+ * @ingroup kfsw_services_logging
+ */
+
+/**
+ * @file ../kfsw-services/include/kfsw/services/parameter.h
+ * @brief Local, remote, and persistent parameter API.
+ * @ingroup kfsw_services_param
+ */
+
+/**
+ * @file ../kfsw-services/include/kfsw/services/ftp.h
+ * @brief Sandboxed CSP/RDP file-transfer API.
+ * @ingroup kfsw_services_ftp
+ */

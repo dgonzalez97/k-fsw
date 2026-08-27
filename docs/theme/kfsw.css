@@ -1,0 +1,164 @@
+:root {
+  --kfsw-black: #101416;
+  --kfsw-dark: #1c2326;
+  --kfsw-green: #28a96b;
+  --kfsw-green-dark: #187747;
+  --kfsw-gray-050: #f7f8f8;
+  --kfsw-gray-100: #eef1f1;
+  --kfsw-gray-300: #c9d0d0;
+  --kfsw-gray-700: #445052;
+}
+
+body {
+  color: #202628;
+  font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+#top {
+  background: var(--kfsw-black);
+  border-bottom: 3px solid var(--kfsw-green);
+}
+
+#titlearea {
+  background: transparent;
+  border: 0;
+  color: #fff;
+  padding: 8px 16px;
+}
+
+#projectname {
+  color: #fff;
+  font-size: 190%;
+  font-weight: 650;
+  letter-spacing: 0.035em;
+}
+
+#projectbrief,
+#projectnumber {
+  color: #bfc8c8;
+}
+
+#main-nav,
+.sm-dox {
+  background: var(--kfsw-dark);
+}
+
+.sm-dox a,
+.sm-dox a:focus,
+.sm-dox a:hover,
+.sm-dox a:active {
+  background: var(--kfsw-dark);
+  color: #f4f7f6;
+  text-shadow: none;
+}
+
+.sm-dox a:hover,
+.sm-dox a:focus,
+.sm-dox a.highlighted {
+  background: #263033;
+  color: #fff;
+}
+
+.sm-dox a.current,
+.sm-dox a.current:hover {
+  background: var(--kfsw-green-dark);
+  color: #fff;
+}
+
+#side-nav,
+#nav-tree {
+  background: var(--kfsw-gray-050);
+}
+
+#nav-tree .selected {
+  background: var(--kfsw-green-dark);
+  text-shadow: none;
+}
+
+#nav-tree .selected a {
+  color: #fff;
+}
+
+.contents {
+  line-height: 1.56;
+  max-width: 1180px;
+}
+
+div.header {
+  background: var(--kfsw-gray-050);
+  border-bottom: 1px solid var(--kfsw-gray-300);
+}
+
+.title {
+  color: #182022;
+  font-weight: 650;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: #182022;
+  font-weight: 650;
+}
+
+h2 {
+  border-bottom: 2px solid var(--kfsw-green);
+  padding-bottom: 0.22em;
+}
+
+a,
+.contents a:visited,
+a.el,
+a.el:visited {
+  color: var(--kfsw-green-dark);
+}
+
+table.markdownTable,
+table.fieldtable,
+table.memberdecls {
+  border: 1px solid var(--kfsw-gray-300);
+  border-collapse: collapse;
+  box-shadow: none;
+}
+
+table.markdownTable th,
+table.fieldtable th {
+  background: var(--kfsw-gray-100);
+  color: #1f292b;
+  font-weight: 650;
+}
+
+table.markdownTable td,
+table.markdownTable th,
+table.fieldtable td,
+table.fieldtable th {
+  border: 1px solid var(--kfsw-gray-300);
+  padding: 0.42em 0.65em;
+}
+
+div.fragment,
+pre.fragment,
+code {
+  background: #f1f3f3;
+  border-color: #cbd2d2;
+  color: #182022;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+dl.note,
+dl.warning,
+dl.attention {
+  border-left: 4px solid var(--kfsw-green);
+  box-shadow: none;
+}
+
+@media (max-width: 767px) {
+  #projectname {
+    font-size: 145%;
+  }
+
+  .contents {
+    padding: 0 10px;
+  }
+}
