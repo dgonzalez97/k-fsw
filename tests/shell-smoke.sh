@@ -24,6 +24,12 @@ printf '%s\n' \
     'kfsw time' \
     'kfsw version' \
     'kfsw uart info' \
+    'kfsw param list' \
+    'kfsw param get test_u32' \
+    'kfsw param set test_u32 1234' \
+    'kfsw param get test_u32' \
+    'kfsw param set node_id 2' \
+    'kfsw param get missing' \
     'kfsw log test' |
     "$executable" --uart_stdinout --stop_at=1.0 --no-color >"$capture_file" 2>&1
 
@@ -48,6 +54,15 @@ expected_output=(
     'CSP interface: KISS'
     'CSP node: 1'
     'CSP peer: 2'
+    '0:0 node_id'
+    '0:1 log_level'
+    '0:2 test_u32'
+    '0:3 test_i32'
+    '0:4 test_float'
+    'test_u32 = 42'
+    'test_u32 = 1234'
+    "set: parameter 'node_id' is read-only"
+    "get: parameter 'missing' not found"
     '[ERROR] K-FSW shell log test: error'
     '[WARNING] K-FSW shell log test: warning'
     '[INFO] K-FSW shell log test: info'

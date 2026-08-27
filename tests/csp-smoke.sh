@@ -143,6 +143,12 @@ printf '%s\n' \
     'kfsw csp interfaces' \
     'kfsw csp routes' \
     'kfsw csp ping 2' \
+    'kfsw param list 2' \
+    'kfsw param get 2 test_u32' \
+    'kfsw param set 2 test_u32 1234' \
+    'kfsw param get 2 test_u32' \
+    'kfsw param get 2 missing' \
+    'kfsw param set 2 node_id 7' \
     'kfsw uart info' \
     'kfsw uart test' >&3
 
@@ -159,6 +165,14 @@ wait_for_output "$work_dir/node1.log" "UART CSP test: PASS" \
     "$node1_pid" || fail "node 1 UART transport test did not pass"
 wait_for_output "$work_dir/node2.log" "UART CSP test: PASS" \
     "$node2_pid" || fail "node 2 UART transport test did not pass"
+wait_for_output "$work_dir/node1.log" "2:test_u32 = 1234" \
+    "$node1_pid" || fail "remote parameter set/readback did not pass"
+wait_for_output "$work_dir/node1.log" \
+    "get: parameter 'missing' not found" "$node1_pid" || \
+    fail "invalid remote parameter was not rejected"
+wait_for_output "$work_dir/node1.log" \
+    "set: parameter 'node_id' is read-only" "$node1_pid" || \
+    fail "remote read-only parameter write was not rejected"
 
 node1_expected=(
     "CSP node: 1"
@@ -176,6 +190,11 @@ node1_expected=(
     "CSP interface: KISS"
     "CSP peer: 2"
     "UART CSP test: PASS"
+    "2:0 node_id"
+    "2:test_u32 = 42"
+    "2:test_u32 = 1234"
+    "get: parameter 'missing' not found"
+    "set: parameter 'node_id' is read-only"
     "interface: KISS"
     "  info"
     "  test"

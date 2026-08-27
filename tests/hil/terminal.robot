@@ -12,3 +12,16 @@ KFSW Linux Can Command Remote CSP Node
     Execute KFSW Command    kfsw csp info    CSP node: 1
     Execute KFSW Command    kfsw csp routes    0/0 -> KISS direct
     Execute KFSW Command    kfsw csp ping 2    CSP ping 2: success
+    Execute KFSW Command    kfsw param get 2 test_u32    2:test_u32 = 42
+    Execute KFSW Command    kfsw param set 2 test_u32 1234    2:test_u32 = 1234
+    Execute KFSW Command    kfsw param get 2 test_u32    2:test_u32 = 1234
+
+KFSW Linux Rejects Invalid Remote Parameter Operations
+    [Tags]    terminal    shell    csp    param
+    Open KFSW Linux CSP Console
+    Execute KFSW Command
+    ...    kfsw param get 2 missing
+    ...    get: parameter 'missing' not found
+    Execute KFSW Command
+    ...    kfsw param set 2 node_id 7
+    ...    set: parameter 'node_id' is read-only

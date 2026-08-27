@@ -22,8 +22,9 @@ Current:
 
 - platform monotonic-time ztests
 - CSP pre-initialization state and error-contract ztests
-- native K-FSW shell smoke test
-- two-node native CSP/KISS integration test
+- parameter lifecycle, validation, and serialization ztests
+- native K-FSW shell and local-parameter smoke test
+- two-node native CSP/KISS parameter integration test
 - NUCLEO boot/readiness HIL smoke test
 - physical FTDI-to-NUCLEO CSP UART HIL test
 
@@ -64,8 +65,9 @@ cloning K-FSW:
 git submodule update --init --recursive
 ```
 
-The initial terminal-tagged test controls a two-node native K-FSW CSP setup
-through the KFSW-Linux shell, including an operator-style `kfsw csp ping 2`:
+The terminal-tagged tests control a two-node native K-FSW CSP setup through the
+KFSW-Linux shell. They cover an operator-style `kfsw csp ping 2`, remote
+parameter get/set/readback, invalid-name handling, and read-only rejection:
 
 ```bash
 ./k-fsw/tests/hil/run.sh --include terminal
