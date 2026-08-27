@@ -29,12 +29,12 @@ K-FSW service/comms APIs
        +-- future transports
 ```
 
-The shell is a user interface. Commands such as `kfsw csp ping 2` call a K-FSW
-API, which uses libcsp to reach the selected node. Future parameter, file,
-housekeeping, or command operations should follow the same boundary and use
-defined CSP services; K-FSW does not send shell command strings to remote
-nodes. Node 2 is used by the current demo, but generic commands accept a target
-node and do not encode that topology.
+The shell is a user interface. Commands such as `kfsw csp ping 2` and
+`kfsw param get 2 test_u32` call K-FSW APIs, which use libcsp to reach the
+selected node. File, housekeeping, or command operations should follow the
+same boundary and use defined CSP services; K-FSW does not send shell command
+strings to remote nodes. Node 2 is used by the current demo, but generic
+commands accept a target node and do not encode that topology.
 
 ## Workspace repositories
 
@@ -49,6 +49,9 @@ node and do not encode that topology.
 libcsp remains a separate upstream west project. `west.yml` pins its exact
 revision and checks it out at `kfsw-comms/third_party/libcsp`; `kfsw-comms`
 integrates it through the same Zephyr module composition used by every profile.
+The manifest likewise pins Space Inventor libparam at
+`kfsw-services/third_party/libparam`; `kfsw-services` compiles its selected core
+sources directly through Zephyr/CMake, without invoking upstream Meson.
 
 ## Profiles and current status
 
@@ -139,10 +142,23 @@ kfsw csp info
 kfsw csp interfaces
 kfsw csp routes
 kfsw csp ping <node>
+kfsw param list
+kfsw param get <name>
+kfsw param set <name> <value>
+kfsw param list <node>
+kfsw param get <node> <name>
+kfsw param set <node> <name> <value>
 ```
 
+The initial table contains read-only `node_id` plus writable `log_level`,
+`test_u32`, `test_i32`, and `test_float` examples. Parameter pull/push traffic
+uses CSP port 10 and parameter-list traffic uses port 12; both ports are Kconfig
+options. Current upstream libparam hard-codes those ports, which is the reason
+K-FSW uses 10/12 instead of the older RPARAM port 7 convention.
+
 The software-only two-node CSP regression creates and connects the native KISS
-PTYs automatically, pings both nodes, and cleans up its processes:
+PTYs automatically, pings both nodes, performs remote parameter list/get/set,
+checks readback and error cases, and cleans up its processes:
 
 ```bash
 ./k-fsw/tests/csp-smoke.sh

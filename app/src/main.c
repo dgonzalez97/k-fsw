@@ -8,13 +8,30 @@
 #endif
 #include <kfsw/services/boot.h>
 #include <kfsw/services/log.h>
+#if CONFIG_KFSW_PARAM
+#include <kfsw/services/parameter.h>
+#endif
 
 int main(void)
 {
+#if CONFIG_KFSW_CSP
+	int result;
+#endif
+
 	kfsw_log_info("K-FSW application starting");
 
+#if CONFIG_KFSW_PARAM
+	result = kfsw_param_init();
+
+	if (result != 0) {
+		kfsw_log_error("Failed to initialize parameters: %d", result);
+	} else {
+		kfsw_log_info("Parameter table initialized");
+	}
+#endif
+
 #if CONFIG_KFSW_CSP
-	int result = kfsw_csp_init();
+	result = kfsw_csp_init();
 
 	if (result != 0) {
 		kfsw_log_error("Failed to initialize CSP: %d", result);
@@ -27,6 +44,16 @@ int main(void)
 		kfsw_uart_get_info(&uart_info);
 		kfsw_log_info("CSP KISS UART initialized on %s at %u baud", uart_info.device_name,
 			      uart_info.baudrate);
+#endif
+
+#if CONFIG_KFSW_PARAM
+		result = kfsw_param_server_start();
+		if (result != 0) {
+			kfsw_log_error("Failed to start parameter server: %d", result);
+		} else {
+			kfsw_log_info("Parameter server started on CSP port %d",
+				      CONFIG_KFSW_PARAM_PORT);
+		}
 #endif
 
 		result = kfsw_csp_start();

@@ -11,6 +11,9 @@ manifest:
     - name: libcsp
       url-base: https://github.com/libcsp
 
+    - name: spaceinventor
+      url-base: https://github.com/spaceinventor
+
   projects:
     - name: zephyr
       remote: zephyrproject
@@ -25,7 +28,7 @@ manifest:
 
     - name: kfsw-services
       remote: kfsw
-      revision: a7982a90b29bdefec4d3e4ebf9b166b7ae3f4d2e
+      revision: d876f661b81885718ec0c95e1a7d3597dd9c07a9
       path: kfsw-services
 
     - name: kfsw-comms
@@ -37,6 +40,11 @@ manifest:
       remote: libcsp
       revision: 097a039701c85e4ceb98e91f380810662e23878a
       path: kfsw-comms/third_party/libcsp
+
+    - name: libparam
+      remote: spaceinventor
+      revision: c296dfb6055a3c360f44dcbbd6ad108e98c76640
+      path: kfsw-services/third_party/libparam
 
   self:
     path: k-fsw

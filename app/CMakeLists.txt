@@ -8,9 +8,9 @@ get_filename_component(KFSW_WORKSPACE_ROOT
 # Keep the west-managed module composition explicit for every build profile.
 list(APPEND ZEPHYR_EXTRA_MODULES
     "${KFSW_WORKSPACE_ROOT}/kfsw-platform"
-    "${KFSW_WORKSPACE_ROOT}/kfsw-services"
     "${KFSW_WORKSPACE_ROOT}/kfsw-comms/third_party/libcsp"
     "${KFSW_WORKSPACE_ROOT}/kfsw-comms"
+    "${KFSW_WORKSPACE_ROOT}/kfsw-services"
 )
 
 # Apply K-FSW's initial libcsp feature policy before Zephyr loads the module.
