@@ -15,6 +15,11 @@ implementation or a POSIX rewrite. Its local Zephyr shell provides a convenient
 command console while the normal K-FSW services and communications code remain
 in use.
 
+Filesystem storage follows the same rule. Both NUCLEO and KFSW-Linux mount
+LittleFS at `/kfsw` through the `kfsw-platform` lifecycle and Zephyr's flash
+map. KFSW-Linux uses native_sim's persistent simulated-flash file rather than a
+host-only `fopen()` backend.
+
 ```text
 local kfsw shell
        |
@@ -148,6 +153,8 @@ kfsw param set <name> <value>
 kfsw param list <node>
 kfsw param get <node> <name>
 kfsw param set <node> <name> <value>
+kfsw storage info
+kfsw storage test
 ```
 
 The initial table contains read-only `node_id` plus writable `log_level`,
@@ -162,6 +169,14 @@ checks readback and error cases, and cleans up its processes:
 
 ```bash
 ./k-fsw/tests/csp-smoke.sh
+```
+
+The storage integration test creates, writes, reads, overwrites, and deletes a
+small file, then writes a known value in one native_sim process and verifies it
+from a second process using the same simulated flash image:
+
+```bash
+./k-fsw/tests/storage-smoke.sh
 ```
 
 ## NUCLEO-L496ZG

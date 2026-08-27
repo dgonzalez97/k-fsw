@@ -1,0 +1,24 @@
+/ {
+	chosen {
+		zephyr,code-partition = &kfsw_app_partition;
+		kfsw,storage-partition = &kfsw_storage_partition;
+	};
+};
+
+&flash0 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		kfsw_app_partition: partition@0 {
+			label = "kfsw-app";
+			reg = <0x00000000 0x000f0000>;
+		};
+
+		kfsw_storage_partition: partition@f0000 {
+			label = "kfsw-storage";
+			reg = <0x000f0000 0x00010000>;
+		};
+	};
+};

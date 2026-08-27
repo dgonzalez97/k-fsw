@@ -6,6 +6,9 @@
 #if CONFIG_KFSW_CSP_KISS_UART
 #include <kfsw/comms/uart.h>
 #endif
+#if CONFIG_KFSW_STORAGE
+#include <kfsw/platform/storage.h>
+#endif
 #include <kfsw/services/boot.h>
 #include <kfsw/services/log.h>
 #if CONFIG_KFSW_PARAM
@@ -14,11 +17,21 @@
 
 int main(void)
 {
-#if CONFIG_KFSW_CSP
 	int result;
-#endif
 
 	kfsw_log_info("K-FSW application starting");
+
+#if CONFIG_KFSW_STORAGE
+	result = kfsw_storage_init();
+	if (result == 0) {
+		result = kfsw_storage_mount();
+	}
+	if (result != 0) {
+		kfsw_log_error("Failed to mount storage: %d", result);
+	} else {
+		kfsw_log_info("Storage mounted at %s", KFSW_STORAGE_MOUNT_POINT);
+	}
+#endif
 
 #if CONFIG_KFSW_PARAM
 	result = kfsw_param_init();

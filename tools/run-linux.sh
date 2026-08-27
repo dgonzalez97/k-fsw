@@ -53,4 +53,17 @@ if [[ ! -x "$executable" ]]; then
     exit 1
 fi
 
-exec "$executable" "$@"
+has_flash_path=false
+for argument in "$@"; do
+	if [[ "$argument" == -flash=* ]]; then
+		has_flash_path=true
+		break
+	fi
+done
+
+flash_arguments=()
+if ! $has_flash_path; then
+	flash_arguments+=("-flash=$KFSW_BUILD_DIR/kfsw-storage.bin")
+fi
+
+exec "$executable" "${flash_arguments[@]}" "$@"

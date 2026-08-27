@@ -3,17 +3,25 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <zephyr/shell/shell.h>
 #include <zephyr/shell/shell_string_conv.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/version.h>
 
+#if CONFIG_KFSW_STORAGE
+#include <zephyr/fs/fs.h>
+#endif
+
 #if CONFIG_KFSW_CSP
 #include <kfsw/comms/csp.h>
 #endif
 #if CONFIG_KFSW_CSP_KISS_UART
 #include <kfsw/comms/uart.h>
+#endif
+#if CONFIG_KFSW_STORAGE
+#include <kfsw/platform/storage.h>
 #endif
 #include <kfsw/platform/time.h>
 #include <kfsw/services/log.h>
@@ -499,6 +507,184 @@ SHELL_STATIC_SUBCMD_SET_CREATE(kfsw_uart_commands,
 );
 #endif
 
+#if CONFIG_KFSW_STORAGE
+#define KFSW_STORAGE_TEST_PATH KFSW_STORAGE_MOUNT_POINT "/.storage-test"
+#define KFSW_STORAGE_PERSISTENCE_PATH KFSW_STORAGE_MOUNT_POINT "/.persistence-test"
+#define KFSW_STORAGE_TEST_VALUE_MAX_SIZE 48U
+
+static int storage_write_file(const char *path, const char *value)
+{
+	struct fs_file_t file;
+	const size_t value_size = strlen(value);
+	ssize_t written;
+	int close_result;
+	int result;
+
+	fs_file_t_init(&file);
+	result = fs_open(&file, path, FS_O_CREATE | FS_O_WRITE | FS_O_TRUNC);
+	if (result != 0) {
+		return result;
+	}
+
+	written = fs_write(&file, value, value_size);
+	if (written == (ssize_t)value_size) {
+		result = fs_sync(&file);
+	} else {
+		result = (written < 0) ? (int)written : -EIO;
+	}
+
+	close_result = fs_close(&file);
+	return (result != 0) ? result : close_result;
+}
+
+static int storage_read_file(const char *path, const char *expected)
+{
+	struct fs_file_t file;
+	char value[KFSW_STORAGE_TEST_VALUE_MAX_SIZE + 1U];
+	const size_t expected_size = strlen(expected);
+	ssize_t bytes_read;
+	int close_result;
+	int result = 0;
+
+	if (expected_size > KFSW_STORAGE_TEST_VALUE_MAX_SIZE) {
+		return -EMSGSIZE;
+	}
+
+	fs_file_t_init(&file);
+	result = fs_open(&file, path, FS_O_READ);
+	if (result != 0) {
+		return result;
+	}
+
+	bytes_read = fs_read(&file, value, sizeof(value));
+	if (bytes_read < 0) {
+		result = (int)bytes_read;
+	} else if ((size_t)bytes_read != expected_size) {
+		result = -EIO;
+	} else {
+		value[bytes_read] = '\0';
+		if (memcmp(value, expected, expected_size) != 0) {
+			result = -EIO;
+		}
+	}
+
+	close_result = fs_close(&file);
+	return (result != 0) ? result : close_result;
+}
+
+static int cmd_kfsw_storage_info(const struct shell *sh, size_t argc, char **argv)
+{
+	struct kfsw_storage_info info;
+	int result;
+
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+	result = kfsw_storage_get_info(&info);
+	if (result != 0) {
+		shell_error(sh, "Storage info: FAIL (%d)", result);
+		return result;
+	}
+
+	shell_print(sh, "K-FSW storage");
+	shell_print(sh, "filesystem: %s", info.filesystem);
+	shell_print(sh, "backend: %s", info.backend);
+	shell_print(sh, "mount_point: %s", info.mount_point);
+	shell_print(sh, "ready: %s", info.ready ? "yes" : "no");
+	shell_print(sh, "total_bytes: %" PRIu64, info.total_bytes);
+	shell_print(sh, "free_bytes: %" PRIu64, info.free_bytes);
+	return 0;
+}
+
+static int storage_basic_test(const struct shell *sh)
+{
+	static const char initial_value[] = "kfsw-storage-create";
+	static const char overwritten_value[] = "kfsw-storage-overwrite";
+	int result;
+
+	result = storage_write_file(KFSW_STORAGE_TEST_PATH, initial_value);
+	if (result == 0) {
+		result = storage_write_file(KFSW_STORAGE_TEST_PATH, overwritten_value);
+	}
+	if (result == 0) {
+		result = storage_read_file(KFSW_STORAGE_TEST_PATH, overwritten_value);
+	}
+	if (result == 0) {
+		result = fs_unlink(KFSW_STORAGE_TEST_PATH);
+	}
+
+	if (result != 0) {
+		(void)fs_unlink(KFSW_STORAGE_TEST_PATH);
+		shell_error(sh, "Storage test: FAIL (%d)", result);
+		return result;
+	}
+
+	shell_print(sh, "Storage test: PASS");
+	return 0;
+}
+
+static int storage_persistence_test(const struct shell *sh, const char *operation,
+				    const char *value)
+{
+	int result;
+
+	if ((value[0] == '\0') || (strlen(value) > KFSW_STORAGE_TEST_VALUE_MAX_SIZE)) {
+		shell_error(sh, "Storage persistence value must contain 1..%u characters",
+			    KFSW_STORAGE_TEST_VALUE_MAX_SIZE);
+		return -EMSGSIZE;
+	}
+
+	if (strcmp(operation, "write") == 0) {
+		result = storage_write_file(KFSW_STORAGE_PERSISTENCE_PATH, value);
+		if (result == 0) {
+			shell_print(sh, "Storage persistence write: PASS");
+			return 0;
+		}
+	} else if (strcmp(operation, "read") == 0) {
+		result = storage_read_file(KFSW_STORAGE_PERSISTENCE_PATH, value);
+		if (result == 0) {
+			result = fs_unlink(KFSW_STORAGE_PERSISTENCE_PATH);
+		}
+		if (result == 0) {
+			shell_print(sh, "Storage persistence read: PASS");
+			return 0;
+		}
+	} else {
+		shell_error(sh, "Usage: kfsw storage test [write|read <value>]");
+		return -EINVAL;
+	}
+
+	shell_error(sh, "Storage persistence %s: FAIL (%d)", operation, result);
+	return result;
+}
+
+static int cmd_kfsw_storage_test(const struct shell *sh, size_t argc, char **argv)
+{
+	if (!kfsw_storage_is_ready()) {
+		shell_error(sh, "Storage test: FAIL (not ready)");
+		return -EACCES;
+	}
+
+	if (argc == 1U) {
+		return storage_basic_test(sh);
+	}
+	if (argc == 3U) {
+		return storage_persistence_test(sh, argv[1], argv[2]);
+	}
+
+	shell_error(sh, "Usage: kfsw storage test [write|read <value>]");
+	return -EINVAL;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(
+	kfsw_storage_commands,
+	SHELL_CMD_ARG(info, NULL, "Show K-FSW filesystem storage status.",
+		      cmd_kfsw_storage_info, 1, 0),
+	SHELL_CMD_ARG(test, NULL, "Run storage test: test [write|read <value>].",
+		      cmd_kfsw_storage_test, 1, 2),
+	SHELL_SUBCMD_SET_END);
+#endif
+
 static int cmd_kfsw_status(const struct shell *sh, size_t argc, char **argv)
 {
 	ARG_UNUSED(argc);
@@ -563,6 +749,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(kfsw_commands,
 #endif
 #if CONFIG_KFSW_PARAM
 	SHELL_CMD(param, &kfsw_param_commands, "K-FSW parameter commands.", NULL),
+#endif
+#if CONFIG_KFSW_STORAGE
+	SHELL_CMD(storage, &kfsw_storage_commands, "K-FSW filesystem storage commands.", NULL),
 #endif
 	SHELL_CMD(log, &kfsw_log_commands, "K-FSW logging commands.", NULL),
 	SHELL_CMD_ARG(status, NULL, "Show basic K-FSW runtime status.",

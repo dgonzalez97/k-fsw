@@ -43,6 +43,7 @@ target_sources_ifdef(CONFIG_KFSW_DEBUG_SHELL app PRIVATE
 )
 
 target_link_libraries(app PRIVATE
+    kfsw::platform
     kfsw::services
     kfsw::comms
 )
