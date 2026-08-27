@@ -13,3 +13,6 @@ Debug Shell And Physical UART CSP Link Succeed
     Should Contain    ${result.stdout}    UART CSP test: PASS
     Should Contain    ${result.stdout}    mount_point: /kfsw
     Should Contain    ${result.stdout}    Storage test: PASS
+    Should Contain    ${result.stdout}    destination=/hil/hil-4k.bin: PASS bytes=4096
+    Should Contain    ${result.stdout}    destination=/hil/hil-16k.bin: PASS bytes=16384
+    Should Contain    ${result.stdout}    second=/build/hil-16k-returned.bin: PASS

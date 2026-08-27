@@ -1,0 +1,12 @@
+tests:
+  kfsw.services.ftp:
+    tags:
+      - unit
+      - services
+      - ftp
+      - storage
+      - csp
+    platform_allow:
+      - native_sim/native/64
+    integration_platforms:
+      - native_sim/native/64

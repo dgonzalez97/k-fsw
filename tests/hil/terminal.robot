@@ -33,6 +33,35 @@ KFSW Linux Storage Is Ready And Writable
     Execute KFSW Command    kfsw storage info    ready: yes
     Execute KFSW Command    kfsw storage test    Storage test: PASS
 
+KFSW Linux Transfers Files Through Remote CSP Node
+    [Tags]    terminal    shell    csp    ftp    storage
+    Open KFSW Linux CSP Console
+    Execute KFSW Command
+    ...    kfsw ftp generate /build/robot.bin 1024
+    ...    FTP generate path=/build/robot.bin: PASS bytes=1024
+    Execute KFSW Command    ftp 2 mkdir /robot    FTP mkdir node=2 path=/robot: PASS
+    Execute KFSW Command
+    ...    kfsw ftp put 2 /build/robot.bin /robot/upload.bin
+    ...    FTP put node=2 source=/build/robot.bin destination=/robot/upload.bin: PASS bytes=1024
+    Execute KFSW Command
+    ...    kfsw ftp stat 2 /robot/upload.bin
+    ...    FTP stat node=2 path=/robot/upload.bin type=file bytes=1024
+    Execute KFSW Command    ftp 2 ls /robot    FTP list: PASS entries=1
+    Execute KFSW Command
+    ...    kfsw ftp get 2 /robot/upload.bin /build/robot-returned.bin
+    ...    FTP get node=2 source=/robot/upload.bin destination=/build/robot-returned.bin: PASS bytes=1024
+    Execute KFSW Command
+    ...    kfsw ftp verify /build/robot.bin /build/robot-returned.bin
+    ...    FTP verify first=/build/robot.bin second=/build/robot-returned.bin: PASS
+    Execute KFSW Command
+    ...    kfsw ftp get 2 /robot/missing.bin /build/missing.bin
+    ...    FTP get node=2 path=/robot/missing.bin: not found
+    Execute KFSW Command
+    ...    kfsw ftp stat 2 ../params/parameters.dat
+    ...    invalid path/request
+    Execute KFSW Command    kfsw csp ping 2    CSP ping 2: success
+    Execute KFSW Command    kfsw param get 2 test_u32    2:test_u32 = 42
+
 KFSW Linux Persists Parameters Across Restart
     [Tags]    terminal    shell    storage    param    persistence
     Open KFSW Linux Persistence Console

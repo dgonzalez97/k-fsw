@@ -76,7 +76,7 @@ wait_for_output()
 	local expected="$2"
 	local process_pid="$3"
 
-	for _ in {1..300}; do
+	for _ in {1..1200}; do
 		grep -Fq "$expected" "$file" 2>/dev/null && return 0
 		kill -0 "$process_pid" 2>/dev/null || return 1
 		sleep 0.05
@@ -211,7 +211,7 @@ ftdi_stty="$(stty -F "$ftdi_device" -g)" || \
 
 stty -F "$debug_serial" "$debug_baud" cs8 -cstopb -parenb -crtscts raw -echo
 
-timeout 60s cat "$debug_serial" >"$work_dir/nucleo.log" &
+timeout 180s cat "$debug_serial" >"$work_dir/nucleo.log" &
 debug_capture_pid=$!
 
 west flash -d "$nucleo_build_dir" --runner openocd || \
@@ -297,6 +297,37 @@ wait_for_output "$work_dir/nucleo.log" "UART CSP test: PASS" \
 printf '%s\n' 'kfsw uart test' 'kfsw uart info' >&3
 wait_for_output "$work_dir/linux.log" "UART CSP test: PASS" "$linux_pid" || \
 	fail "KFSW-Linux UART transport test did not pass"
+
+printf '%s\n' \
+	'kfsw ftp generate /build/hil-4k.bin 4096' \
+	'ftp 2 mkdir /hil' \
+	'kfsw ftp put 2 /build/hil-4k.bin /hil/hil-4k.bin' \
+	'kfsw ftp stat 2 /hil/hil-4k.bin' \
+	'ftp 2 ls /hil' \
+	'kfsw ftp get 2 /hil/hil-4k.bin /build/hil-4k-returned.bin' \
+	'kfsw ftp verify /build/hil-4k.bin /build/hil-4k-returned.bin' \
+	'kfsw ftp generate /build/hil-16k.bin 16384' \
+	'kfsw ftp put 2 /build/hil-16k.bin /hil/hil-16k.bin' \
+	'kfsw ftp get 2 /hil/hil-16k.bin /build/hil-16k-returned.bin' \
+	'kfsw ftp verify /build/hil-16k.bin /build/hil-16k-returned.bin' \
+	'kfsw csp ping 2' \
+	'kfsw param get 2 test_u32' \
+	'kfsw uart info' >&3
+
+wait_for_output "$work_dir/linux.log" \
+	"FTP put node=2 source=/build/hil-4k.bin destination=/hil/hil-4k.bin: PASS bytes=4096" \
+	"$linux_pid" || fail "4 KiB physical FTP upload did not pass"
+wait_for_output "$work_dir/linux.log" \
+	"FTP verify first=/build/hil-4k.bin second=/build/hil-4k-returned.bin: PASS" \
+	"$linux_pid" || fail "4 KiB physical FTP round trip did not match"
+wait_for_output "$work_dir/linux.log" \
+	"FTP put node=2 source=/build/hil-16k.bin destination=/hil/hil-16k.bin: PASS bytes=16384" \
+	"$linux_pid" || fail "16 KiB physical FTP upload did not pass"
+wait_for_output "$work_dir/linux.log" \
+	"FTP verify first=/build/hil-16k.bin second=/build/hil-16k-returned.bin: PASS" \
+	"$linux_pid" || fail "16 KiB physical FTP round trip did not match"
+wait_for_output "$work_dir/linux.log" "2:test_u32 = 42" "$linux_pid" || \
+	fail "PARAM did not work after physical FTP transfers"
 
 for log_file in linux.log nucleo.log; do
 	last_stats="$(grep -F 'KISS tx=' "$work_dir/$log_file" | tail -1 || true)"

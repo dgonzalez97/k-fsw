@@ -151,6 +151,30 @@ printf '%s\n' \
     'kfsw param get 2 test_u32' \
     'kfsw param get 2 missing' \
     'kfsw param set 2 node_id 7' \
+	'kfsw ftp generate /build/empty.bin 0' \
+	'kfsw ftp generate /build/single.bin 128' \
+	'kfsw ftp generate /build/multi.bin 1024' \
+	'kfsw ftp generate /build/large.bin 8192' \
+	'ftp 2 mkdir /flash' \
+	'kfsw ftp put 2 /build/empty.bin /flash/empty.bin' \
+	'kfsw ftp put 2 /build/single.bin /flash/single.bin' \
+	'kfsw ftp put 2 /build/multi.bin /flash/multi.bin' \
+	'kfsw ftp put 2 /build/large.bin /flash/large.bin' \
+	'kfsw ftp stat 2 /flash/large.bin' \
+	'ftp 2 ls /flash' \
+	'kfsw ftp get 2 /flash/empty.bin /build/empty-returned.bin' \
+	'kfsw ftp get 2 /flash/single.bin /build/single-returned.bin' \
+	'kfsw ftp get 2 /flash/multi.bin /build/multi-returned.bin' \
+	'kfsw ftp get 2 /flash/large.bin /build/large-returned.bin' \
+	'kfsw ftp verify /build/empty.bin /build/empty-returned.bin' \
+	'kfsw ftp verify /build/single.bin /build/single-returned.bin' \
+	'kfsw ftp verify /build/multi.bin /build/multi-returned.bin' \
+	'kfsw ftp verify /build/large.bin /build/large-returned.bin' \
+	'kfsw ftp get 2 /flash/missing.bin /build/missing.bin' \
+	'kfsw ftp stat 2 ../params/parameters.dat' \
+	'kfsw csp ping 2' \
+	'kfsw param get 2 test_u32' \
+	'kfsw csp info' \
     'kfsw uart info' \
     'kfsw uart test' >&3
 
@@ -175,6 +199,15 @@ wait_for_output "$work_dir/node1.log" \
 wait_for_output "$work_dir/node1.log" \
     "set: parameter 'node_id' is read-only" "$node1_pid" || \
     fail "remote read-only parameter write was not rejected"
+wait_for_output "$work_dir/node1.log" \
+	"FTP verify first=/build/large.bin second=/build/large-returned.bin: PASS" \
+	"$node1_pid" || fail "8 KiB FTP round trip did not pass"
+wait_for_output "$work_dir/node1.log" \
+	"FTP get node=2 path=/flash/missing.bin: not found" \
+	"$node1_pid" || fail "missing remote FTP file was not rejected"
+wait_for_output "$work_dir/node1.log" \
+	"FTP stat node=2 path=../params/parameters.dat: invalid path/request" \
+	"$node1_pid" || fail "FTP path traversal was not rejected"
 
 node1_expected=(
     "CSP node: 1"
@@ -197,6 +230,22 @@ node1_expected=(
     "2:test_u32 = 1234"
     "get: parameter 'missing' not found"
     "set: parameter 'node_id' is read-only"
+	"FTP generate path=/build/empty.bin: PASS bytes=0 crc32=00000000"
+	"FTP mkdir node=2 path=/flash: PASS"
+	"FTP put node=2 source=/build/empty.bin destination=/flash/empty.bin: PASS bytes=0"
+	"FTP put node=2 source=/build/single.bin destination=/flash/single.bin: PASS bytes=128"
+	"FTP put node=2 source=/build/multi.bin destination=/flash/multi.bin: PASS bytes=1024"
+	"FTP put node=2 source=/build/large.bin destination=/flash/large.bin: PASS bytes=8192"
+	"FTP stat node=2 path=/flash/large.bin type=file bytes=8192"
+	"FTP list node=2 path=/flash"
+	"FTP list: PASS entries=4"
+	"FTP get node=2 source=/flash/large.bin destination=/build/large-returned.bin: PASS bytes=8192"
+	"FTP verify first=/build/empty.bin second=/build/empty-returned.bin: PASS"
+	"FTP verify first=/build/single.bin second=/build/single-returned.bin: PASS"
+	"FTP verify first=/build/multi.bin second=/build/multi-returned.bin: PASS"
+	"FTP verify first=/build/large.bin second=/build/large-returned.bin: PASS"
+	"FTP get node=2 path=/flash/missing.bin: not found"
+	"FTP stat node=2 path=../params/parameters.dat: invalid path/request"
     "interface: KISS"
     "  info"
     "  test"
