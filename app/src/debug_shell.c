@@ -1096,7 +1096,7 @@ static int storage_persistence_test(const struct shell *sh, const char *operatio
 			return 0;
 		}
 	} else {
-		shell_error(sh, "Usage: kfsw storage test [write|read <value>]");
+		shell_error(sh, "Usage: storage test [write|read <value>]");
 		return -EINVAL;
 	}
 
@@ -1118,7 +1118,7 @@ static int cmd_kfsw_storage_test(const struct shell *sh, size_t argc, char **arg
 		return storage_persistence_test(sh, argv[1], argv[2]);
 	}
 
-	shell_error(sh, "Usage: kfsw storage test [write|read <value>]");
+	shell_error(sh, "Usage: storage test [write|read <value>]");
 	return -EINVAL;
 }
 
@@ -1186,37 +1186,25 @@ SHELL_STATIC_SUBCMD_SET_CREATE(kfsw_log_commands,
 	SHELL_SUBCMD_SET_END
 );
 
-SHELL_STATIC_SUBCMD_SET_CREATE(kfsw_commands,
 #if CONFIG_KFSW_CSP_KISS_UART
-	SHELL_CMD(uart, &kfsw_uart_commands, "K-FSW CSP UART commands.", NULL),
+SHELL_CMD_REGISTER(uart, &kfsw_uart_commands, "K-FSW CSP UART commands.", NULL);
 #endif
 #if CONFIG_KFSW_CSP
-	SHELL_CMD(csp, &kfsw_csp_commands, "K-FSW CSP commands.", NULL),
+SHELL_CMD_REGISTER(csp, &kfsw_csp_commands, "K-FSW CSP commands.", NULL);
 #endif
 #if CONFIG_KFSW_PARAM
-	SHELL_CMD(param, &kfsw_param_commands, "K-FSW parameter commands.", NULL),
+SHELL_CMD_REGISTER(param, &kfsw_param_commands, "K-FSW parameter commands.", NULL);
 #endif
 #if CONFIG_KFSW_FTP
-	SHELL_CMD(ftp, &kfsw_ftp_commands, "K-FSW CSP file transfer commands.", NULL),
-#endif
-#if CONFIG_KFSW_STORAGE
-	SHELL_CMD(storage, &kfsw_storage_commands, "K-FSW filesystem storage commands.", NULL),
-#endif
-	SHELL_CMD(log, &kfsw_log_commands, "K-FSW logging commands.", NULL),
-	SHELL_CMD_ARG(status, NULL, "Show basic K-FSW runtime status.",
-		      cmd_kfsw_status, 1, 0),
-	SHELL_CMD_ARG(time, NULL, "Show K-FSW monotonic time.",
-		      cmd_kfsw_time, 1, 0),
-	SHELL_CMD_ARG(version, NULL, "Show K-FSW build information.",
-		      cmd_kfsw_version, 1, 0),
-	SHELL_SUBCMD_SET_END
-);
-
-SHELL_CMD_REGISTER(kfsw, &kfsw_commands,
-		   "K-FSW developer/debug commands.", NULL);
-
-#if CONFIG_KFSW_FTP
-SHELL_CMD_ARG_REGISTER(ftp, NULL,
-		       "Compatibility syntax: ftp <node> <ls|stat|mkdir|put|get> [paths].",
+SHELL_CMD_ARG_REGISTER(ftp, &kfsw_ftp_commands,
+		       "K-FSW file transfer: ftp <command> ... or ftp <node> <command> ...",
 		       cmd_ftp_compat, 3, 2);
 #endif
+#if CONFIG_KFSW_STORAGE
+SHELL_CMD_REGISTER(storage, &kfsw_storage_commands, "K-FSW filesystem storage commands.",
+		   NULL);
+#endif
+SHELL_CMD_REGISTER(log, &kfsw_log_commands, "K-FSW logging commands.", NULL);
+SHELL_CMD_ARG_REGISTER(status, NULL, "Show basic K-FSW runtime status.", cmd_kfsw_status, 1, 0);
+SHELL_CMD_ARG_REGISTER(time, NULL, "Show K-FSW monotonic time.", cmd_kfsw_time, 1, 0);
+SHELL_CMD_ARG_REGISTER(version, NULL, "Show K-FSW build information.", cmd_kfsw_version, 1, 0);

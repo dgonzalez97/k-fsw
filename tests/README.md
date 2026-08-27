@@ -59,7 +59,7 @@ KFSW_FTDI_DEVICE=/dev/serial/by-id/usb-FTDI_DEVICE-if00-port0 \
 ```
 
 `boot.robot` verifies `@BOOT` and `@READY` through `hil-smoke.sh`.
-`uart.robot` verifies the debug shell, `kfsw status`, bidirectional CSP ping,
+`uart.robot` verifies the debug shell, `status`, bidirectional CSP ping,
 and UART transport checks through `uart-csp-smoke.sh`. Reports are written to
 `build/robot/` by default. Tags are `smoke`, `nucleo`, `shell`, `csp`, `uart`,
 `physical`, `terminal`, `storage`, `param`, and `persistence`.
@@ -77,12 +77,12 @@ git submodule update --init --recursive
 ```
 
 The terminal-tagged tests control a two-node native K-FSW CSP setup through the
-KFSW-Linux shell. They cover an operator-style `kfsw csp ping 2`, remote
+KFSW-Linux shell. They cover an operator-style `csp ping 2`, remote
 parameter get/set/readback, invalid-name handling, read-only rejection, and
-observable `kfsw storage info` / `kfsw storage test` behavior.
+observable `storage info` / `storage test` behavior.
 
-The same two-node terminal setup exercises `kfsw ftp` and the compact
-`ftp <node> ...` syntax over CSP/RDP. It generates a local exchange file,
+The same two-node terminal setup exercises the root `ftp` command, including
+`ftp <node> ...` syntax, over CSP/RDP. It generates a local exchange file,
 creates a remote directory, uploads, lists/stats, downloads, compares the
 returned bytes, and checks missing-file and traversal errors. The default
 `tests/csp-smoke.sh` run includes zero-byte, single-packet, multi-packet, and

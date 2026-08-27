@@ -223,12 +223,12 @@ wait_for_output "$work_dir/nucleo.log" "@READY " "$debug_capture_pid" || \
 	fail "NUCLEO did not report @READY on the ST-LINK UART"
 
 printf '%s\r\n' \
-	'kfsw status' \
-	'kfsw storage info' \
-	'kfsw storage test' \
-	'kfsw uart info' >"$debug_serial"
+	'status' \
+	'storage info' \
+	'storage test' \
+	'uart info' >"$debug_serial"
 wait_for_output "$work_dir/nucleo.log" "K-FSW status" \
-	"$debug_capture_pid" || fail "NUCLEO debug shell did not answer kfsw status"
+	"$debug_capture_pid" || fail "NUCLEO debug shell did not answer status"
 wait_for_output "$work_dir/nucleo.log" "board: nucleo_l496zg/stm32l496xx" \
 	"$debug_capture_pid" || fail "NUCLEO status reported an unexpected board"
 wait_for_output "$work_dir/nucleo.log" "mount_point: /kfsw" \
@@ -280,39 +280,39 @@ bridge_pid=$!
 wait_for_output "$work_dir/socat.log" "starting data transfer loop" \
 	"$bridge_pid" || fail "PTY to FTDI bridge did not become ready"
 
-printf '%s\n' 'kfsw csp ping 2' >&3
+printf '%s\n' 'csp ping 2' >&3
 wait_for_output "$work_dir/linux.log" "CSP ping 2: success" "$linux_pid" || \
 	fail "KFSW-Linux could not ping NUCLEO CSP node 2"
 
 printf '%s\r\n' \
-	'kfsw csp ping 1' \
-	'kfsw uart test' \
-	'kfsw uart info' >"$debug_serial"
+	'csp ping 1' \
+	'uart test' \
+	'uart info' >"$debug_serial"
 
 wait_for_output "$work_dir/nucleo.log" "CSP ping 1: success" \
 	"$debug_capture_pid" || fail "NUCLEO could not ping KFSW-Linux CSP node 1"
 wait_for_output "$work_dir/nucleo.log" "UART CSP test: PASS" \
 	"$debug_capture_pid" || fail "NUCLEO UART transport test did not pass"
 
-printf '%s\n' 'kfsw uart test' 'kfsw uart info' >&3
+printf '%s\n' 'uart test' 'uart info' >&3
 wait_for_output "$work_dir/linux.log" "UART CSP test: PASS" "$linux_pid" || \
 	fail "KFSW-Linux UART transport test did not pass"
 
 printf '%s\n' \
-	'kfsw ftp generate /build/hil-4k.bin 4096' \
+	'ftp generate /build/hil-4k.bin 4096' \
 	'ftp 2 mkdir /hil' \
-	'kfsw ftp put 2 /build/hil-4k.bin /hil/hil-4k.bin' \
-	'kfsw ftp stat 2 /hil/hil-4k.bin' \
+	'ftp put 2 /build/hil-4k.bin /hil/hil-4k.bin' \
+	'ftp stat 2 /hil/hil-4k.bin' \
 	'ftp 2 ls /hil' \
-	'kfsw ftp get 2 /hil/hil-4k.bin /build/hil-4k-returned.bin' \
-	'kfsw ftp verify /build/hil-4k.bin /build/hil-4k-returned.bin' \
-	'kfsw ftp generate /build/hil-16k.bin 16384' \
-	'kfsw ftp put 2 /build/hil-16k.bin /hil/hil-16k.bin' \
-	'kfsw ftp get 2 /hil/hil-16k.bin /build/hil-16k-returned.bin' \
-	'kfsw ftp verify /build/hil-16k.bin /build/hil-16k-returned.bin' \
-	'kfsw csp ping 2' \
-	'kfsw param get 2 test_u32' \
-	'kfsw uart info' >&3
+	'ftp get 2 /hil/hil-4k.bin /build/hil-4k-returned.bin' \
+	'ftp verify /build/hil-4k.bin /build/hil-4k-returned.bin' \
+	'ftp generate /build/hil-16k.bin 16384' \
+	'ftp put 2 /build/hil-16k.bin /hil/hil-16k.bin' \
+	'ftp get 2 /hil/hil-16k.bin /build/hil-16k-returned.bin' \
+	'ftp verify /build/hil-16k.bin /build/hil-16k-returned.bin' \
+	'csp ping 2' \
+	'param get 2 test_u32' \
+	'uart info' >&3
 
 wait_for_output "$work_dir/linux.log" \
 	"FTP put node=2 source=/build/hil-4k.bin destination=/hil/hil-4k.bin: PASS bytes=4096" \

@@ -37,9 +37,9 @@ if [[ ! -x "$executable" ]]; then
 fi
 
 printf '%s\n' \
-	'kfsw storage info' \
-	'kfsw storage test' \
-	"kfsw storage test write $persistent_value" |
+	'storage info' \
+	'storage test' \
+	"storage test write $persistent_value" |
 	"$executable" --uart_stdinout --stop_at=1.0 --no-color \
 		-flash="$flash_image" >"$write_log" 2>&1
 
@@ -54,8 +54,8 @@ grep -Fq 'Storage persistence write: PASS' "$write_log" || \
 	fail "persistence write failed"
 
 printf '%s\n' \
-	'kfsw storage info' \
-	"kfsw storage test read $persistent_value" |
+	'storage info' \
+	"storage test read $persistent_value" |
 	"$executable" --uart_stdinout --stop_at=1.0 --no-color \
 		-flash="$flash_image" >"$read_log" 2>&1
 

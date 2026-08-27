@@ -21,26 +21,30 @@ if [[ ! -x "$executable" ]]; then
     exit 1
 fi
 
-printf '%s\n' \
-    'kfsw status' \
-    'kfsw time' \
-    'kfsw version' \
-    'kfsw uart info' \
-    'kfsw param list' \
-    'kfsw param get test_u32' \
-    'kfsw param set test_u32 1234' \
-    'kfsw param get test_u32' \
-    'kfsw param set node_id 2' \
-    'kfsw param get missing' \
-	'kfsw param save' \
-	'kfsw param defaults' \
-	'kfsw param get test_u32' \
-	'kfsw param load' \
-	'kfsw param get test_u32' \
-	'kfsw param clear' \
-	'kfsw storage info' \
-	'kfsw storage test' \
-    'kfsw log test' |
+{
+	printf 'pa\t g\t test_u32\n'
+	printf '%s\n' \
+		'help' \
+		'status' \
+		'time' \
+		'version' \
+		'uart info' \
+		'param list' \
+		'param get test_u32' \
+		'param set test_u32 1234' \
+		'param get test_u32' \
+		'param set node_id 2' \
+		'param get missing' \
+		'param save' \
+		'param defaults' \
+		'param get test_u32' \
+		'param load' \
+		'param get test_u32' \
+		'param clear' \
+		'storage info' \
+		'storage test' \
+		'log test'
+} |
 	"$executable" --uart_stdinout --stop_at=1.0 --no-color \
 		-flash="$flash_image" >"$capture_file" 2>&1
 
@@ -49,6 +53,14 @@ cat "$capture_file"
 expected_output=(
     '@BOOT '
     '@READY '
+    'kfsw:~$ param  get  test_u32'
+	'Available commands:'
+	'csp      : K-FSW CSP commands.'
+	'ftp      : K-FSW file transfer:'
+	'param    : K-FSW parameter commands.'
+	'status   : Show basic K-FSW runtime status.'
+	'storage  : K-FSW filesystem storage commands.'
+	'version  : Show K-FSW build information.'
     'K-FSW status'
     'board: native_sim/native/64'
     'uptime_ms: '
@@ -97,5 +109,11 @@ for expected in "${expected_output[@]}"; do
         exit 1
     fi
 done
+
+if grep -Eq '^  kfsw +:' "$capture_file"; then
+	echo "SHELL RESULT: FAIL"
+	echo "  kfsw must be a prompt, not a root command"
+	exit 1
+fi
 
 echo "SHELL RESULT: PASS"

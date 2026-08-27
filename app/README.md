@@ -65,24 +65,24 @@ the native host filesystem.
 The primary shell syntax is:
 
 ```text
-kfsw ftp mkdir <node> <remote-directory>
-kfsw ftp list <node> [remote-directory]
-kfsw ftp stat <node> <remote-path>
-kfsw ftp put <node> <local-path> <remote-path>
-kfsw ftp get <node> <remote-path> <local-path>
+ftp <node> mkdir <remote-directory>
+ftp <node> ls [remote-directory]
+ftp <node> stat <remote-path>
+ftp <node> put <local-path> <remote-path>
+ftp <node> get <remote-path> <local-path>
 ```
 
-For operator familiarity, `ls` aliases `list`, and the compact compatibility
-form `ftp <node> <ls|stat|mkdir|put|get> [paths]` is also registered. For
-example:
+The same root command also exposes Zephyr static subcommands in verb-first
+form, such as `ftp put <node> ...`, so normal subcommand tab completion works.
+`ls` aliases `list`. For example:
 
 ```text
-kfsw ftp put 7 /build/sample.txt /flash/sample.txt
+ftp 7 put /build/sample.txt /flash/sample.txt
 ftp 7 ls /flash
 ```
 
-The debug shell also provides `kfsw ftp generate <path> <bytes>` for bounded,
-deterministic test fixtures and `kfsw ftp verify <first> <second>` for a
+The debug shell also provides `ftp generate <path> <bytes>` for bounded,
+deterministic test fixtures and `ftp verify <first> <second>` for a
 byte-for-byte local comparison. These helpers still use the same Zephyr
 filesystem and FTP sandbox.
 

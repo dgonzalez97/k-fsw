@@ -57,9 +57,9 @@ if [[ ! -x "$executable" ]]; then
 fi
 
 run_kfsw "$persistence_flash" "$work_dir/execution-a.log" yes \
-	'kfsw param get test_u32' \
-	'kfsw param set test_u32 1234' \
-	'kfsw param save'
+	'param get test_u32' \
+	'param set test_u32 1234' \
+	'param save'
 expect "$work_dir/execution-a.log" 'test_u32 = 42' \
 	"execution A did not start from the compiled default"
 expect "$work_dir/execution-a.log" 'test_u32 = 1234' \
@@ -68,12 +68,12 @@ expect "$work_dir/execution-a.log" 'Parameter snapshot save: PASS' \
 	"execution A did not save the snapshot"
 
 run_kfsw "$persistence_flash" "$work_dir/execution-b.log" no \
-	'kfsw param get test_u32' \
-	'kfsw param defaults' \
-	'kfsw param get test_u32' \
-	'kfsw param load' \
-	'kfsw param get test_u32' \
-	'kfsw param clear'
+	'param get test_u32' \
+	'param defaults' \
+	'param get test_u32' \
+	'param load' \
+	'param get test_u32' \
+	'param clear'
 expect "$work_dir/execution-b.log" 'Persistent parameters restored' \
 	"execution B did not automatically restore the snapshot"
 [[ "$(grep -Fc 'test_u32 = 1234' "$work_dir/execution-b.log")" -eq 2 ]] || \
@@ -88,8 +88,8 @@ expect "$work_dir/execution-b.log" 'Parameter snapshot clear: PASS (RAM unchange
 	"snapshot clear failed"
 
 run_kfsw "$persistence_flash" "$work_dir/execution-c.log" no \
-	'kfsw param get test_u32' \
-	'kfsw param load'
+	'param get test_u32' \
+	'param load'
 expect "$work_dir/execution-c.log" 'No parameter snapshot; using compiled defaults' \
 	"cleared snapshot was unexpectedly restored"
 expect "$work_dir/execution-c.log" 'test_u32 = 42' \
@@ -98,15 +98,15 @@ expect "$work_dir/execution-c.log" 'Parameter snapshot load: no saved snapshot' 
 	"missing snapshot was not reported"
 
 run_kfsw "$corruption_flash" "$work_dir/corrupt-write.log" yes \
-	'kfsw param set test_u32 1234' \
-	'kfsw param save'
+	'param set test_u32 1234' \
+	'param save'
 expect "$work_dir/corrupt-write.log" 'Parameter snapshot save: PASS' \
 	"corruption fixture snapshot was not saved"
 
 "$KFSW_ROOT/k-fsw/tests/corrupt-param-flash.py" "$corruption_flash"
 
 run_kfsw "$corruption_flash" "$work_dir/corrupt-read.log" no \
-	'kfsw param get test_u32'
+	'param get test_u32'
 expect "$work_dir/corrupt-read.log" 'Parameter snapshot restore failed' \
 	"corrupt snapshot error was not visible"
 expect "$work_dir/corrupt-read.log" 'using defaults' \

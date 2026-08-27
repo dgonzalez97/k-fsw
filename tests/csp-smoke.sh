@@ -138,50 +138,53 @@ if [[ "$mode" == "terminal" ]]; then
     exit 0
 fi
 
-printf 'kfsw csp \t\n' >&3
-printf 'kfsw uart \t\n' >&3
+printf 'csp \t\n' >&3
+printf 'uart \t\n' >&3
 printf '%s\n' \
-    'kfsw csp info' \
-    'kfsw csp interfaces' \
-    'kfsw csp routes' \
-    'kfsw csp ping 2' \
-    'kfsw param list 2' \
-    'kfsw param get 2 test_u32' \
-    'kfsw param set 2 test_u32 1234' \
-    'kfsw param get 2 test_u32' \
-    'kfsw param get 2 missing' \
-    'kfsw param set 2 node_id 7' \
-	'kfsw ftp generate /build/empty.bin 0' \
-	'kfsw ftp generate /build/single.bin 128' \
-	'kfsw ftp generate /build/multi.bin 1024' \
-	'kfsw ftp generate /build/large.bin 8192' \
+	'csp info' \
+	'csp interfaces' \
+	'csp routes' \
+	'csp ping 2' \
+	$'csp p\t 2' \
+	'param list 2' \
+	'param get 2 test_u32' \
+	'param set 2 test_u32 1234' \
+	'param get 2 test_u32' \
+	$'pa\t g\t 2 test_u32' \
+	'param get 2 missing' \
+	'param set 2 node_id 7' \
+	'ftp generate /build/empty.bin 0' \
+	'ftp generate /build/single.bin 128' \
+	'ftp generate /build/multi.bin 1024' \
+	'ftp generate /build/large.bin 8192' \
 	'ftp 2 mkdir /flash' \
-	'kfsw ftp put 2 /build/empty.bin /flash/empty.bin' \
-	'kfsw ftp put 2 /build/single.bin /flash/single.bin' \
-	'kfsw ftp put 2 /build/multi.bin /flash/multi.bin' \
-	'kfsw ftp put 2 /build/large.bin /flash/large.bin' \
-	'kfsw ftp stat 2 /flash/large.bin' \
+	'ftp 2 put /build/empty.bin /flash/empty.bin' \
+	'ftp put 2 /build/single.bin /flash/single.bin' \
+	$'ftp p\t 2 /build/single.bin /flash/single.bin' \
+	'ftp put 2 /build/multi.bin /flash/multi.bin' \
+	'ftp put 2 /build/large.bin /flash/large.bin' \
+	'ftp stat 2 /flash/large.bin' \
 	'ftp 2 ls /flash' \
-	'kfsw ftp get 2 /flash/empty.bin /build/empty-returned.bin' \
-	'kfsw ftp get 2 /flash/single.bin /build/single-returned.bin' \
-	'kfsw ftp get 2 /flash/multi.bin /build/multi-returned.bin' \
-	'kfsw ftp get 2 /flash/large.bin /build/large-returned.bin' \
-	'kfsw ftp verify /build/empty.bin /build/empty-returned.bin' \
-	'kfsw ftp verify /build/single.bin /build/single-returned.bin' \
-	'kfsw ftp verify /build/multi.bin /build/multi-returned.bin' \
-	'kfsw ftp verify /build/large.bin /build/large-returned.bin' \
-	'kfsw ftp get 2 /flash/missing.bin /build/missing.bin' \
-	'kfsw ftp stat 2 ../params/parameters.dat' \
-	'kfsw csp ping 2' \
-	'kfsw param get 2 test_u32' \
-	'kfsw csp info' \
-    'kfsw uart info' \
-    'kfsw uart test' >&3
+	'ftp 2 get /flash/empty.bin /build/empty-returned.bin' \
+	'ftp get 2 /flash/single.bin /build/single-returned.bin' \
+	'ftp get 2 /flash/multi.bin /build/multi-returned.bin' \
+	'ftp get 2 /flash/large.bin /build/large-returned.bin' \
+	'ftp verify /build/empty.bin /build/empty-returned.bin' \
+	'ftp verify /build/single.bin /build/single-returned.bin' \
+	'ftp verify /build/multi.bin /build/multi-returned.bin' \
+	'ftp verify /build/large.bin /build/large-returned.bin' \
+	'ftp get 2 /flash/missing.bin /build/missing.bin' \
+	'ftp stat 2 ../params/parameters.dat' \
+	'csp ping 2' \
+	'param get 2 test_u32' \
+	'csp info' \
+	'uart info' \
+	'uart test' >&3
 
 printf '%s\n' \
-    'kfsw csp ping 1' \
-    'kfsw uart info' \
-    'kfsw uart test' >&4
+	'csp ping 1' \
+	'uart info' \
+	'uart test' >&4
 
 wait_for_output "$work_dir/node1.log" "CSP ping 2: success" \
     "$node1_pid" || fail "node 1 could not ping CSP node 2"
