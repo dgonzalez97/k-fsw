@@ -32,6 +32,12 @@ printf '%s\n' \
     'kfsw param get test_u32' \
     'kfsw param set node_id 2' \
     'kfsw param get missing' \
+	'kfsw param save' \
+	'kfsw param defaults' \
+	'kfsw param get test_u32' \
+	'kfsw param load' \
+	'kfsw param get test_u32' \
+	'kfsw param clear' \
 	'kfsw storage info' \
 	'kfsw storage test' \
     'kfsw log test' |
@@ -68,6 +74,11 @@ expected_output=(
     'test_u32 = 1234'
     "set: parameter 'node_id' is read-only"
     "get: parameter 'missing' not found"
+	'Parameter snapshot save: PASS'
+	'Parameter defaults: PASS (saved snapshot unchanged)'
+	'test_u32 = 42'
+	'Parameter snapshot load: PASS'
+	'Parameter snapshot clear: PASS (RAM unchanged)'
 	'K-FSW storage'
 	'filesystem: LittleFS'
 	'mount_point: /kfsw'

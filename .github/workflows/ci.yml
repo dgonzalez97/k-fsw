@@ -49,7 +49,9 @@ jobs:
 
       - name: Run storage integration test
         if: matrix.profile == 'linux'
-        run: ./k-fsw/tests/storage-smoke.sh
+        run: |
+          ./k-fsw/tests/storage-smoke.sh
+          ./k-fsw/tests/param-persistence-smoke.sh
 
   quality:
     name: Source quality

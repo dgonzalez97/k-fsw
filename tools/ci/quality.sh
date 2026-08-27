@@ -34,6 +34,12 @@ mapfile -d '' format_sources < <(
 format_sources+=(
 	"$KFSW_WORKSPACE_ROOT/kfsw-platform/include/kfsw/platform/storage.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-platform/src/storage.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/log.h"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/parameter.h"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/log.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter_internal.h"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter_persistence.c"
 )
 
 echo "QUALITY: clang-format (${#format_sources[@]} files)"
@@ -67,6 +73,7 @@ cppcheck \
 	-DCONFIG_KFSW_CSP_UART_INTERRUPT_DRIVEN=1 \
 	-DCONFIG_KFSW_LOG_MIN_LEVEL=0 \
 	-DCONFIG_KFSW_STORAGE=1 \
+	-DCONFIG_KFSW_PARAM_PERSISTENCE=1 \
 	-I "$KFSW_WORKSPACE_ROOT/kfsw-platform/include" \
 	-I "$KFSW_WORKSPACE_ROOT/kfsw-services/include" \
 	-I "$KFSW_WORKSPACE_ROOT/kfsw-comms/include" \

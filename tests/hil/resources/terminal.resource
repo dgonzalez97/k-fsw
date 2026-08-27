@@ -16,6 +16,24 @@ Open KFSW Linux CSP Console
     ...    KFSW Terminal Output Should Contain
     ...    KFSW CSP TERMINAL: READY
 
+Open KFSW Linux Persistence Console
+    TerminalRunner.Start Program
+    ...    ${KFSW_REPO_DIR}/tests/param-persistence-terminal.sh
+    ...    wait_time=0
+    Wait Until Keyword Succeeds
+    ...    60s
+    ...    250ms
+    ...    KFSW Terminal Output Should Contain
+    ...    KFSW PARAM TERMINAL: READY
+
+Restart KFSW Persistence Console
+    TerminalRunner.Send Command    __KFSW_RESTART__
+    Wait Until Keyword Succeeds
+    ...    60s
+    ...    250ms
+    ...    KFSW Terminal Output Should Contain
+    ...    KFSW PARAM TERMINAL: RESTARTED
+
 Execute KFSW Command
     [Arguments]    ${command}    ${expected}
     TerminalRunner.Send Command    ${command}

@@ -11,6 +11,7 @@ Run test scripts from the west workspace root, for example:
 ./k-fsw/tests/shell-smoke.sh
 ./k-fsw/tests/csp-smoke.sh
 ./k-fsw/tests/storage-smoke.sh
+./k-fsw/tests/param-persistence-smoke.sh
 ```
 
 `tools/ci/unit.sh` runs the ztest suites under `tests/unit/` through Zephyr
@@ -28,6 +29,8 @@ Current:
 - native K-FSW shell and local-parameter smoke test
 - native LittleFS create/write/read/overwrite/delete integration test
 - LittleFS persistence across two separate native_sim executions
+- explicit parameter save/load/defaults/clear semantics across native processes
+- corrupt parameter-snapshot boot fallback without filesystem corruption
 - two-node native CSP/KISS parameter integration test
 - NUCLEO boot/readiness HIL smoke test
 - physical FTDI-to-NUCLEO CSP UART HIL test
@@ -55,7 +58,7 @@ KFSW_FTDI_DEVICE=/dev/serial/by-id/usb-FTDI_DEVICE-if00-port0 \
 `uart.robot` verifies the debug shell, `kfsw status`, bidirectional CSP ping,
 and UART transport checks through `uart-csp-smoke.sh`. Reports are written to
 `build/robot/` by default. Tags are `smoke`, `nucleo`, `shell`, `csp`, `uart`,
-`physical`, and `terminal`.
+`physical`, `terminal`, `storage`, `param`, and `persistence`.
 
 ### Terminal runner submodule
 
@@ -72,7 +75,11 @@ git submodule update --init --recursive
 The terminal-tagged tests control a two-node native K-FSW CSP setup through the
 KFSW-Linux shell. They cover an operator-style `kfsw csp ping 2`, remote
 parameter get/set/readback, invalid-name handling, read-only rejection, and
-observable `kfsw storage info` / `kfsw storage test` behavior:
+observable `kfsw storage info` / `kfsw storage test` behavior.
+
+The terminal suite also starts KFSW-Linux with an isolated persistent flash
+image, saves a parameter, restarts the simulator process, verifies automatic
+restore, and checks the distinct `defaults`, `load`, and `clear` semantics.
 
 ```bash
 ./k-fsw/tests/hil/run.sh --include terminal

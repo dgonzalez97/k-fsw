@@ -7,6 +7,7 @@ KFSW_REPO_DIR="$(dirname "$(dirname "$KFSW_CI_DIR")")"
 
 "$KFSW_CI_DIR/build.sh"
 "$KFSW_REPO_DIR/tests/storage-smoke.sh"
+"$KFSW_REPO_DIR/tests/param-persistence-smoke.sh"
 "$KFSW_CI_DIR/quality.sh"
 "$KFSW_CI_DIR/unit.sh"
 "$KFSW_CI_DIR/valgrind.sh"

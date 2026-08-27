@@ -32,3 +32,19 @@ KFSW Linux Storage Is Ready And Writable
     Execute KFSW Command    kfsw storage info    mount_point: /kfsw
     Execute KFSW Command    kfsw storage info    ready: yes
     Execute KFSW Command    kfsw storage test    Storage test: PASS
+
+KFSW Linux Persists Parameters Across Restart
+    [Tags]    terminal    shell    storage    param    persistence
+    Open KFSW Linux Persistence Console
+    Execute KFSW Command    kfsw param get test_u32    test_u32 = 42
+    Execute KFSW Command    kfsw param set test_u32 1234    test_u32 = 1234
+    Execute KFSW Command    kfsw param save    Parameter snapshot save: PASS
+    Restart KFSW Persistence Console
+    Execute KFSW Command    kfsw param get test_u32    test_u32 = 1234
+    Execute KFSW Command    kfsw param defaults    saved snapshot unchanged
+    Execute KFSW Command    kfsw param get test_u32    test_u32 = 42
+    Execute KFSW Command    kfsw param load    Parameter snapshot load: PASS
+    Execute KFSW Command    kfsw param get test_u32    test_u32 = 1234
+    Execute KFSW Command    kfsw param clear    RAM unchanged
+    Restart KFSW Persistence Console
+    Execute KFSW Command    kfsw param get test_u32    test_u32 = 42
