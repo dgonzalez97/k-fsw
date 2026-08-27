@@ -4,11 +4,13 @@ set -Eeuo pipefail
 source "$(dirname "$0")/../tools/_common.sh" linux
 
 executable="$KFSW_BUILD_DIR/zephyr/zephyr.exe"
-capture_file="$(mktemp)"
+work_dir="$(mktemp -d /tmp/kfsw-shell-smoke.XXXXXX)"
+capture_file="$work_dir/output.log"
+flash_image="$work_dir/flash.bin"
 
 cleanup()
 {
-    rm -f "$capture_file"
+	rm -rf -- "$work_dir"
 }
 
 trap cleanup EXIT
@@ -30,8 +32,11 @@ printf '%s\n' \
     'kfsw param get test_u32' \
     'kfsw param set node_id 2' \
     'kfsw param get missing' \
+	'kfsw storage info' \
+	'kfsw storage test' \
     'kfsw log test' |
-    "$executable" --uart_stdinout --stop_at=1.0 --no-color >"$capture_file" 2>&1
+	"$executable" --uart_stdinout --stop_at=1.0 --no-color \
+		-flash="$flash_image" >"$capture_file" 2>&1
 
 cat "$capture_file"
 
@@ -63,6 +68,12 @@ expected_output=(
     'test_u32 = 1234'
     "set: parameter 'node_id' is read-only"
     "get: parameter 'missing' not found"
+	'K-FSW storage'
+	'filesystem: LittleFS'
+	'mount_point: /kfsw'
+	'ready: yes'
+	'total_bytes: 65536'
+	'Storage test: PASS'
     '[ERROR] K-FSW shell log test: error'
     '[WARNING] K-FSW shell log test: warning'
     '[INFO] K-FSW shell log test: info'

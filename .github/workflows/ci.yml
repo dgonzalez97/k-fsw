@@ -47,6 +47,10 @@ jobs:
       - name: Build profile
         run: ./k-fsw/tools/ci/build.sh "${{ matrix.profile }}"
 
+      - name: Run storage integration test
+        if: matrix.profile == 'linux'
+        run: ./k-fsw/tests/storage-smoke.sh
+
   quality:
     name: Source quality
     runs-on: ubuntu-24.04

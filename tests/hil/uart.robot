@@ -11,3 +11,5 @@ Debug Shell And Physical UART CSP Link Succeed
     Should Contain    ${result.stdout}    CSP ping 2: success
     Should Contain    ${result.stdout}    CSP ping 1: success
     Should Contain    ${result.stdout}    UART CSP test: PASS
+    Should Contain    ${result.stdout}    mount_point: /kfsw
+    Should Contain    ${result.stdout}    Storage test: PASS

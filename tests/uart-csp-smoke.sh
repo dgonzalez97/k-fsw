@@ -222,11 +222,19 @@ wait_for_output "$work_dir/nucleo.log" "@BOOT " "$debug_capture_pid" || \
 wait_for_output "$work_dir/nucleo.log" "@READY " "$debug_capture_pid" || \
 	fail "NUCLEO did not report @READY on the ST-LINK UART"
 
-printf '%s\r\n' 'kfsw status' 'kfsw uart info' >"$debug_serial"
+printf '%s\r\n' \
+	'kfsw status' \
+	'kfsw storage info' \
+	'kfsw storage test' \
+	'kfsw uart info' >"$debug_serial"
 wait_for_output "$work_dir/nucleo.log" "K-FSW status" \
 	"$debug_capture_pid" || fail "NUCLEO debug shell did not answer kfsw status"
 wait_for_output "$work_dir/nucleo.log" "board: nucleo_l496zg/stm32l496xx" \
 	"$debug_capture_pid" || fail "NUCLEO status reported an unexpected board"
+wait_for_output "$work_dir/nucleo.log" "mount_point: /kfsw" \
+	"$debug_capture_pid" || fail "NUCLEO storage mount point was not reported"
+wait_for_output "$work_dir/nucleo.log" "Storage test: PASS" \
+	"$debug_capture_pid" || fail "NUCLEO storage test did not pass"
 wait_for_output "$work_dir/nucleo.log" "device: usart3" \
 	"$debug_capture_pid" || fail "NUCLEO did not report USART3 UART status"
 wait_for_output "$work_dir/nucleo.log" "ready: yes" \
@@ -242,6 +250,7 @@ mkfifo "$work_dir/linux.in"
 exec 3<>"$work_dir/linux.in"
 
 "$linux_executable" --uart_stdinout --device_id=1 --no-color \
+	-flash="$work_dir/linux-flash.bin" \
 	<&3 >"$work_dir/linux.log" 2>&1 &
 linux_pid=$!
 

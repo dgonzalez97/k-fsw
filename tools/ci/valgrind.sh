@@ -33,6 +33,7 @@ valgrind \
 	--show-leak-kinds=definite,indirect \
 	--track-origins=yes \
 	"$executable" --uart_stdinout --stop_at=1.0 --no-color \
+	-flash="$output_dir/kfsw-storage.bin" -flash_erase -flash_rm \
 	</dev/null >"$program_log" 2>&1
 result=$?
 set -e

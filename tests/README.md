@@ -10,6 +10,7 @@ Run test scripts from the west workspace root, for example:
 ./k-fsw/tools/ci/valgrind.sh
 ./k-fsw/tests/shell-smoke.sh
 ./k-fsw/tests/csp-smoke.sh
+./k-fsw/tests/storage-smoke.sh
 ```
 
 `tools/ci/unit.sh` runs the ztest suites under `tests/unit/` through Zephyr
@@ -23,7 +24,10 @@ Current:
 - platform monotonic-time ztests
 - CSP pre-initialization state and error-contract ztests
 - parameter lifecycle, validation, and serialization ztests
+- storage lifecycle, format-policy, information, and file-operation ztests
 - native K-FSW shell and local-parameter smoke test
+- native LittleFS create/write/read/overwrite/delete integration test
+- LittleFS persistence across two separate native_sim executions
 - two-node native CSP/KISS parameter integration test
 - NUCLEO boot/readiness HIL smoke test
 - physical FTDI-to-NUCLEO CSP UART HIL test
@@ -67,7 +71,8 @@ git submodule update --init --recursive
 
 The terminal-tagged tests control a two-node native K-FSW CSP setup through the
 KFSW-Linux shell. They cover an operator-style `kfsw csp ping 2`, remote
-parameter get/set/readback, invalid-name handling, and read-only rejection:
+parameter get/set/readback, invalid-name handling, read-only rejection, and
+observable `kfsw storage info` / `kfsw storage test` behavior:
 
 ```bash
 ./k-fsw/tests/hil/run.sh --include terminal

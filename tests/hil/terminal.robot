@@ -25,3 +25,10 @@ KFSW Linux Rejects Invalid Remote Parameter Operations
     Execute KFSW Command
     ...    kfsw param set 2 node_id 7
     ...    set: parameter 'node_id' is read-only
+
+KFSW Linux Storage Is Ready And Writable
+    [Tags]    terminal    shell    storage
+    Open KFSW Linux CSP Console
+    Execute KFSW Command    kfsw storage info    mount_point: /kfsw
+    Execute KFSW Command    kfsw storage info    ready: yes
+    Execute KFSW Command    kfsw storage test    Storage test: PASS

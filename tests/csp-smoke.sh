@@ -94,10 +94,12 @@ exec 3<>"$work_dir/node1.in"
 exec 4<>"$work_dir/node2.in"
 
 "$node1_executable" --uart_stdinout --device_id=1 --no-color \
+	-flash="$work_dir/node1-flash.bin" \
     <&3 >"$work_dir/node1.log" 2>&1 &
 node1_pid=$!
 
 "$node2_executable" --uart_stdinout --device_id=2 --no-color \
+	-flash="$work_dir/node2-flash.bin" \
     <&4 >"$work_dir/node2.log" 2>&1 &
 node2_pid=$!
 
