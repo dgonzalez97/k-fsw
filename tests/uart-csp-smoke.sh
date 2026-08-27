@@ -76,7 +76,7 @@ wait_for_output()
 	local expected="$2"
 	local process_pid="$3"
 
-	for _ in {1..300}; do
+	for _ in {1..1200}; do
 		grep -Fq "$expected" "$file" 2>/dev/null && return 0
 		kill -0 "$process_pid" 2>/dev/null || return 1
 		sleep 0.05
@@ -211,7 +211,7 @@ ftdi_stty="$(stty -F "$ftdi_device" -g)" || \
 
 stty -F "$debug_serial" "$debug_baud" cs8 -cstopb -parenb -crtscts raw -echo
 
-timeout 60s cat "$debug_serial" >"$work_dir/nucleo.log" &
+timeout 180s cat "$debug_serial" >"$work_dir/nucleo.log" &
 debug_capture_pid=$!
 
 west flash -d "$nucleo_build_dir" --runner openocd || \
@@ -223,12 +223,12 @@ wait_for_output "$work_dir/nucleo.log" "@READY " "$debug_capture_pid" || \
 	fail "NUCLEO did not report @READY on the ST-LINK UART"
 
 printf '%s\r\n' \
-	'kfsw status' \
-	'kfsw storage info' \
-	'kfsw storage test' \
-	'kfsw uart info' >"$debug_serial"
+	'status' \
+	'storage info' \
+	'storage test' \
+	'uart info' >"$debug_serial"
 wait_for_output "$work_dir/nucleo.log" "K-FSW status" \
-	"$debug_capture_pid" || fail "NUCLEO debug shell did not answer kfsw status"
+	"$debug_capture_pid" || fail "NUCLEO debug shell did not answer status"
 wait_for_output "$work_dir/nucleo.log" "board: nucleo_l496zg/stm32l496xx" \
 	"$debug_capture_pid" || fail "NUCLEO status reported an unexpected board"
 wait_for_output "$work_dir/nucleo.log" "mount_point: /kfsw" \
@@ -280,23 +280,54 @@ bridge_pid=$!
 wait_for_output "$work_dir/socat.log" "starting data transfer loop" \
 	"$bridge_pid" || fail "PTY to FTDI bridge did not become ready"
 
-printf '%s\n' 'kfsw csp ping 2' >&3
+printf '%s\n' 'csp ping 2' >&3
 wait_for_output "$work_dir/linux.log" "CSP ping 2: success" "$linux_pid" || \
 	fail "KFSW-Linux could not ping NUCLEO CSP node 2"
 
 printf '%s\r\n' \
-	'kfsw csp ping 1' \
-	'kfsw uart test' \
-	'kfsw uart info' >"$debug_serial"
+	'csp ping 1' \
+	'uart test' \
+	'uart info' >"$debug_serial"
 
 wait_for_output "$work_dir/nucleo.log" "CSP ping 1: success" \
 	"$debug_capture_pid" || fail "NUCLEO could not ping KFSW-Linux CSP node 1"
 wait_for_output "$work_dir/nucleo.log" "UART CSP test: PASS" \
 	"$debug_capture_pid" || fail "NUCLEO UART transport test did not pass"
 
-printf '%s\n' 'kfsw uart test' 'kfsw uart info' >&3
+printf '%s\n' 'uart test' 'uart info' >&3
 wait_for_output "$work_dir/linux.log" "UART CSP test: PASS" "$linux_pid" || \
 	fail "KFSW-Linux UART transport test did not pass"
+
+printf '%s\n' \
+	'ftp generate /build/hil-4k.bin 4096' \
+	'ftp 2 mkdir /hil' \
+	'ftp put 2 /build/hil-4k.bin /hil/hil-4k.bin' \
+	'ftp stat 2 /hil/hil-4k.bin' \
+	'ftp 2 ls /hil' \
+	'ftp get 2 /hil/hil-4k.bin /build/hil-4k-returned.bin' \
+	'ftp verify /build/hil-4k.bin /build/hil-4k-returned.bin' \
+	'ftp generate /build/hil-16k.bin 16384' \
+	'ftp put 2 /build/hil-16k.bin /hil/hil-16k.bin' \
+	'ftp get 2 /hil/hil-16k.bin /build/hil-16k-returned.bin' \
+	'ftp verify /build/hil-16k.bin /build/hil-16k-returned.bin' \
+	'csp ping 2' \
+	'param get 2 test_u32' \
+	'uart info' >&3
+
+wait_for_output "$work_dir/linux.log" \
+	"FTP put node=2 source=/build/hil-4k.bin destination=/hil/hil-4k.bin: PASS bytes=4096" \
+	"$linux_pid" || fail "4 KiB physical FTP upload did not pass"
+wait_for_output "$work_dir/linux.log" \
+	"FTP verify first=/build/hil-4k.bin second=/build/hil-4k-returned.bin: PASS" \
+	"$linux_pid" || fail "4 KiB physical FTP round trip did not match"
+wait_for_output "$work_dir/linux.log" \
+	"FTP put node=2 source=/build/hil-16k.bin destination=/hil/hil-16k.bin: PASS bytes=16384" \
+	"$linux_pid" || fail "16 KiB physical FTP upload did not pass"
+wait_for_output "$work_dir/linux.log" \
+	"FTP verify first=/build/hil-16k.bin second=/build/hil-16k-returned.bin: PASS" \
+	"$linux_pid" || fail "16 KiB physical FTP round trip did not match"
+wait_for_output "$work_dir/linux.log" "2:test_u32 = 42" "$linux_pid" || \
+	fail "PARAM did not work after physical FTP transfers"
 
 for log_file in linux.log nucleo.log; do
 	last_stats="$(grep -F 'KISS tx=' "$work_dir/$log_file" | tail -1 || true)"

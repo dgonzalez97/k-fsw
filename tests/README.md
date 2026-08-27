@@ -32,6 +32,10 @@ Current:
 - explicit parameter save/load/defaults/clear semantics across native processes
 - corrupt parameter-snapshot boot fallback without filesystem corruption
 - two-node native CSP/KISS parameter integration test
+- K-FSW FTP protocol/path/CRC/atomic-commit ztests
+- two-node CSP/RDP file transfer for zero-byte through 8 KiB files
+- LIST/STAT/PUT/GET, byte comparison, missing-file, and traversal checks
+- Robot operator-level remote file transfer through the KFSW-Linux shell
 - NUCLEO boot/readiness HIL smoke test
 - physical FTDI-to-NUCLEO CSP UART HIL test
 
@@ -55,7 +59,7 @@ KFSW_FTDI_DEVICE=/dev/serial/by-id/usb-FTDI_DEVICE-if00-port0 \
 ```
 
 `boot.robot` verifies `@BOOT` and `@READY` through `hil-smoke.sh`.
-`uart.robot` verifies the debug shell, `kfsw status`, bidirectional CSP ping,
+`uart.robot` verifies the debug shell, `status`, bidirectional CSP ping,
 and UART transport checks through `uart-csp-smoke.sh`. Reports are written to
 `build/robot/` by default. Tags are `smoke`, `nucleo`, `shell`, `csp`, `uart`,
 `physical`, `terminal`, `storage`, `param`, and `persistence`.
@@ -73,9 +77,16 @@ git submodule update --init --recursive
 ```
 
 The terminal-tagged tests control a two-node native K-FSW CSP setup through the
-KFSW-Linux shell. They cover an operator-style `kfsw csp ping 2`, remote
+KFSW-Linux shell. They cover an operator-style `csp ping 2`, remote
 parameter get/set/readback, invalid-name handling, read-only rejection, and
-observable `kfsw storage info` / `kfsw storage test` behavior.
+observable `storage info` / `storage test` behavior.
+
+The same two-node terminal setup exercises the root `ftp` command, including
+`ftp <node> ...` syntax, over CSP/RDP. It generates a local exchange file,
+creates a remote directory, uploads, lists/stats, downloads, compares the
+returned bytes, and checks missing-file and traversal errors. The default
+`tests/csp-smoke.sh` run includes zero-byte, single-packet, multi-packet, and
+8 KiB transfers, then verifies CSP ping, PARAM access, and CSP buffer recovery.
 
 The terminal suite also starts KFSW-Linux with an isolated persistent flash
 image, saves a parameter, restarts the simulator process, verifies automatic

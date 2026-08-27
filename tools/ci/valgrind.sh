@@ -27,7 +27,7 @@ mkdir -p "$output_dir"
 echo "MEMORY: Valgrind log: $valgrind_log"
 echo "MEMORY: Program log: $program_log"
 
-printf '%s\n' 'kfsw param set test_u32 1234' 'kfsw param save' |
+printf '%s\n' 'param set test_u32 1234' 'param save' |
 	"$executable" --uart_stdinout --stop_at=1.0 --no-color \
 		-flash="$corrupt_flash" -flash_erase \
 		>"$output_dir/corrupt-fixture.log" 2>&1

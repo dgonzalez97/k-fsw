@@ -48,3 +48,48 @@ writable values, a versioned header, portable name/type/value entries, and an
 IEEE CRC32. Saves write and sync `parameters.tmp` before LittleFS atomically
 renames it over the active file. `param defaults` changes RAM only; `param
 clear` deletes saved state only.
+
+## CSP file transfer
+
+The application enables the K-FSW file-transfer service after storage is
+mounted and the CSP router is running, before `@READY`. The service listens on
+configurable CSP port 9 and requires libcsp RDP plus CSP CRC32. It does not own
+another router and is independent of the underlying KISS/UART transport.
+
+Remote and KFSW-Linux client paths are virtual paths below `/kfsw/ftp`. The
+service creates `/kfsw/ftp/build` as the local exchange directory, so the
+operator path `/build/sample.txt` refers to
+`/kfsw/ftp/build/sample.txt` inside the Zephyr filesystem. It does not expose
+the native host filesystem.
+
+The primary shell syntax is:
+
+```text
+ftp <node> mkdir <remote-directory>
+ftp <node> ls [remote-directory]
+ftp <node> stat <remote-path>
+ftp <node> put <local-path> <remote-path>
+ftp <node> get <remote-path> <local-path>
+```
+
+The same root command also exposes Zephyr static subcommands in verb-first
+form, such as `ftp put <node> ...`, so normal subcommand tab completion works.
+`ls` aliases `list`. For example:
+
+```text
+ftp 7 put /build/sample.txt /flash/sample.txt
+ftp 7 ls /flash
+```
+
+The debug shell also provides `ftp generate <path> <bytes>` for bounded,
+deterministic test fixtures and `ftp verify <first> <second>` for a
+byte-for-byte local comparison. These helpers still use the same Zephyr
+filesystem and FTP sandbox.
+
+Protocol version 1 uses a 96-byte maximum virtual path and 192-byte streaming
+chunks. PUT/GET validate total size and IEEE CRC32, and receivers commit a
+synced `.part` file with atomic rename only after validation. Successful PUT
+replaces an existing final file; failed transfers preserve it. One request is
+active per server, overlapping clients receive `busy`, and resume is not
+supported in version 1. This K-FSW-owned protocol does not claim GomSpace or
+other FTP/TFTP wire compatibility.

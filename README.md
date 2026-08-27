@@ -34,8 +34,8 @@ K-FSW service/comms APIs
        +-- future transports
 ```
 
-The shell is a user interface. Commands such as `kfsw csp ping 2` and
-`kfsw param get 2 test_u32` call K-FSW APIs, which use libcsp to reach the
+The shell is a user interface. Commands such as `csp ping 2` and
+`param get 2 test_u32` call K-FSW APIs, which use libcsp to reach the
 selected node. File, housekeeping, or command operations should follow the
 same boundary and use defined CSP services; K-FSW does not send shell command
 strings to remote nodes. Node 2 is used by the current demo, but generic
@@ -141,25 +141,33 @@ Press `Ctrl-C` to stop KFSW-Linux.
 Useful commands include:
 
 ```text
-kfsw status
-kfsw version
-kfsw csp info
-kfsw csp interfaces
-kfsw csp routes
-kfsw csp ping <node>
-kfsw param list
-kfsw param get <name>
-kfsw param set <name> <value>
-kfsw param save
-kfsw param load
-kfsw param defaults
-kfsw param clear
-kfsw param list <node>
-kfsw param get <node> <name>
-kfsw param set <node> <name> <value>
-kfsw storage info
-kfsw storage test
+status
+version
+csp info
+csp interfaces
+csp routes
+csp ping <node>
+param list
+param get <name>
+param set <name> <value>
+param save
+param load
+param defaults
+param clear
+param list <node>
+param get <node> <name>
+param set <node> <name> <value>
+storage info
+storage test
+ftp <node> ls [remote-directory]
+ftp <node> mkdir <remote-directory>
+ftp <node> put <local-path> <remote-path>
+ftp <node> get <remote-path> <local-path>
 ```
+
+`kfsw:~$ ` is the standard Zephyr UART shell prompt, not a command namespace.
+Root commands and their static subcommands use Zephyr's built-in tab
+completion, history, and line editing.
 
 The initial table contains read-only `node_id` plus writable `log_level`,
 `test_u32`, `test_i32`, and `test_float` examples. Parameter pull/push traffic
@@ -178,10 +186,10 @@ and do not prevent boot.
 For example:
 
 ```text
-kfsw param set test_u32 1234
-kfsw param save
+param set test_u32 1234
+param save
 # restart K-FSW
-kfsw param get test_u32
+param get test_u32
 test_u32 = 1234
 ```
 

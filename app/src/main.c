@@ -12,6 +12,9 @@
 #include <kfsw/platform/storage.h>
 #endif
 #include <kfsw/services/boot.h>
+#if CONFIG_KFSW_FTP
+#include <kfsw/services/ftp.h>
+#endif
 #include <kfsw/services/log.h>
 #if CONFIG_KFSW_PARAM
 #include <kfsw/services/parameter.h>
@@ -57,6 +60,8 @@ int main(void)
 #endif
 
 #if CONFIG_KFSW_CSP
+	bool csp_started = false;
+
 	result = kfsw_csp_init();
 
 	if (result != 0) {
@@ -86,12 +91,28 @@ int main(void)
 		if (result != 0) {
 			kfsw_log_error("Failed to start CSP router: %d", result);
 		} else {
+			csp_started = true;
 			kfsw_log_info("CSP router started");
 #if CONFIG_KFSW_CSP_KISS_UART
 			kfsw_log_info("CSP UART interface started");
 #endif
 		}
 	}
+
+#if CONFIG_KFSW_FTP
+	if (csp_started) {
+		result = kfsw_ftp_init();
+		if (result == 0) {
+			result = kfsw_ftp_start();
+		}
+		if (result != 0) {
+			kfsw_log_error("Failed to start FTP service: %d", result);
+		} else {
+			kfsw_log_info("FTP service started on CSP port %d",
+				      CONFIG_KFSW_FTP_CSP_PORT);
+		}
+	}
+#endif
 #endif
 
 	kfsw_boot_service_start();
