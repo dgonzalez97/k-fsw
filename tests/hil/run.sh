@@ -31,8 +31,8 @@ export PYTHONPATH="$KFSW_TERMINAL_RUNNER/src${PYTHONPATH:+:$PYTHONPATH}"
 
 output_dir="${KFSW_ROBOT_OUT_DIR:-$KFSW_WORKSPACE_ROOT/build/robot}"
 
-echo "ROBOT HIL: output: $output_dir"
-echo "ROBOT HIL: debug UART: ${KFSW_DEBUG_SERIAL:-/dev/ttyACM0}"
-echo "ROBOT HIL: FTDI UART: ${KFSW_FTDI_DEVICE:-auto-discover}"
+echo "ROBOT: output: $output_dir"
+echo "ROBOT: debug UART: ${KFSW_DEBUG_SERIAL:-/dev/ttyACM0}"
+echo "ROBOT: FTDI UART: ${KFSW_FTDI_DEVICE:-auto-discover}"
 
 exec "$robot_command" --outputdir "$output_dir" "$@" "$KFSW_HIL_DIR"
