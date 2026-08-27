@@ -327,13 +327,97 @@ static int cmd_kfsw_param_set(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
+#if CONFIG_KFSW_PARAM_PERSISTENCE
+static int cmd_kfsw_param_save(const struct shell *sh, size_t argc, char **argv)
+{
+	int result;
+
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+	result = kfsw_param_persist_save();
+	if (result != 0) {
+		shell_error(sh, "Parameter snapshot save: FAIL (%d)", result);
+		return result;
+	}
+	shell_print(sh, "Parameter snapshot save: PASS");
+	return 0;
+}
+
+static int cmd_kfsw_param_load(const struct shell *sh, size_t argc, char **argv)
+{
+	int result;
+
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+	result = kfsw_param_persist_load();
+	if (result == -ENOENT) {
+		shell_error(sh, "Parameter snapshot load: no saved snapshot");
+		return result;
+	}
+	if (result != 0) {
+		shell_error(sh, "Parameter snapshot load: FAIL (%d)", result);
+		return result;
+	}
+	shell_print(sh, "Parameter snapshot load: PASS");
+	return 0;
+}
+
+static int cmd_kfsw_param_defaults(const struct shell *sh, size_t argc, char **argv)
+{
+	int result;
+
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+	result = kfsw_param_restore_defaults();
+	if (result != 0) {
+		shell_error(sh, "Parameter defaults: FAIL (%d)", result);
+		return result;
+	}
+	shell_print(sh, "Parameter defaults: PASS (saved snapshot unchanged)");
+	return 0;
+}
+
+static int cmd_kfsw_param_clear(const struct shell *sh, size_t argc, char **argv)
+{
+	int result;
+
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+	result = kfsw_param_persist_clear();
+	if (result != 0) {
+		shell_error(sh, "Parameter snapshot clear: FAIL (%d)", result);
+		return result;
+	}
+	shell_print(sh, "Parameter snapshot clear: PASS (RAM unchanged)");
+	return 0;
+}
+#endif
+
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	kfsw_param_commands,
+#if CONFIG_KFSW_PARAM_PERSISTENCE
+	SHELL_CMD_ARG(clear, NULL, "Delete the saved snapshot; RAM is unchanged.",
+		      cmd_kfsw_param_clear, 1, 0),
+	SHELL_CMD_ARG(defaults, NULL, "Restore compiled defaults in RAM only.",
+		      cmd_kfsw_param_defaults, 1, 0),
+#endif
 	SHELL_CMD_ARG(get, NULL,
 		      "Get local or remote value: get [node] <name>.",
 		      cmd_kfsw_param_get, 2, 1),
+#if CONFIG_KFSW_PARAM_PERSISTENCE
+	SHELL_CMD_ARG(load, NULL, "Reload the saved snapshot into RAM.",
+		      cmd_kfsw_param_load, 1, 0),
+#endif
 	SHELL_CMD_ARG(list, NULL, "List local or remote parameters: list [node].",
 		      cmd_kfsw_param_list, 1, 1),
+#if CONFIG_KFSW_PARAM_PERSISTENCE
+	SHELL_CMD_ARG(save, NULL, "Atomically save persistent RAM values.",
+		      cmd_kfsw_param_save, 1, 0),
+#endif
 	SHELL_CMD_ARG(set, NULL,
 		      "Set local or remote value: set [node] <name> <value>.",
 		      cmd_kfsw_param_set, 3, 1),

@@ -1,3 +1,5 @@
+#include <errno.h>
+
 #include <zephyr/kernel.h>
 
 #if CONFIG_KFSW_CSP
@@ -40,6 +42,17 @@ int main(void)
 		kfsw_log_error("Failed to initialize parameters: %d", result);
 	} else {
 		kfsw_log_info("Parameter table initialized");
+#if CONFIG_KFSW_PARAM_PERSISTENCE
+		result = kfsw_param_persist_load();
+		if (result == -ENOENT) {
+			kfsw_log_info("No parameter snapshot; using compiled defaults");
+		} else if (result != 0) {
+			kfsw_log_error("Parameter snapshot restore failed (%d); using defaults",
+				       result);
+		} else {
+			kfsw_log_info("Persistent parameters restored");
+		}
+#endif
 	}
 #endif
 

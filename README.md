@@ -150,6 +150,10 @@ kfsw csp ping <node>
 kfsw param list
 kfsw param get <name>
 kfsw param set <name> <value>
+kfsw param save
+kfsw param load
+kfsw param defaults
+kfsw param clear
 kfsw param list <node>
 kfsw param get <node> <name>
 kfsw param set <node> <name> <value>
@@ -162,6 +166,24 @@ The initial table contains read-only `node_id` plus writable `log_level`,
 uses CSP port 10 and parameter-list traffic uses port 12; both ports are Kconfig
 options. Current upstream libparam hard-codes those ports, which is the reason
 K-FSW uses 10/12 instead of the older RPARAM port 7 convention.
+
+The four writable values are explicitly persistent; read-only `node_id` is
+not. `set` changes RAM only, `save` atomically replaces the snapshot at
+`/kfsw/params/parameters.dat`, and a valid snapshot is restored before the CSP
+parameter server starts. `defaults` restores compiled values in RAM without
+deleting the snapshot, while `clear` deletes the snapshot without changing
+RAM. Invalid headers, versions, lengths, or CRCs leave compiled defaults active
+and do not prevent boot.
+
+For example:
+
+```text
+kfsw param set test_u32 1234
+kfsw param save
+# restart K-FSW
+kfsw param get test_u32
+test_u32 = 1234
+```
 
 The software-only two-node CSP regression creates and connects the native KISS
 PTYs automatically, pings both nodes, performs remote parameter list/get/set,
@@ -177,6 +199,12 @@ from a second process using the same simulated flash image:
 
 ```bash
 ./k-fsw/tests/storage-smoke.sh
+```
+
+Parameter persistence has a separate two-execution and corruption regression:
+
+```bash
+./k-fsw/tests/param-persistence-smoke.sh
 ```
 
 ## NUCLEO-L496ZG

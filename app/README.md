@@ -35,3 +35,16 @@ native_sim's simulated flash. `tools/run-linux.sh` gives each Linux profile a
 persistent backing image under its build directory. Tests pass explicit
 temporary flash images so parallel nodes do not share media and transient test
 data is cleaned up.
+
+## Persistent parameters
+
+Profiles with PARAM and storage enabled restore the service-owned snapshot
+after the parameter table is initialized and before its CSP server starts. A
+missing or invalid snapshot leaves compiled defaults active and does not stop
+the application. Runtime `set` operations never write flash automatically.
+
+The single `/kfsw/params/parameters.dat` file contains explicitly selected
+writable values, a versioned header, portable name/type/value entries, and an
+IEEE CRC32. Saves write and sync `parameters.tmp` before LittleFS atomically
+renames it over the active file. `param defaults` changes RAM only; `param
+clear` deletes saved state only.
