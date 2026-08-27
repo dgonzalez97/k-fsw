@@ -13,10 +13,10 @@ list(APPEND ZEPHYR_EXTRA_MODULES
     "${KFSW_WORKSPACE_ROOT}/kfsw-services"
 )
 
-# Apply K-FSW's initial libcsp feature policy before Zephyr loads the module.
-# RDP, HMAC, and promiscuous capture are deliberately deferred from this issue.
+# Apply K-FSW's libcsp feature policy before Zephyr loads the module. The FTP
+# service uses RDP for bounded flow control and retransmission.
 set(CSP_REPRODUCIBLE_BUILDS ON CACHE BOOL "" FORCE)
-set(CSP_USE_RDP OFF CACHE BOOL "" FORCE)
+set(CSP_USE_RDP ON CACHE BOOL "" FORCE)
 set(CSP_USE_HMAC OFF CACHE BOOL "" FORCE)
 set(CSP_USE_PROMISC OFF CACHE BOOL "" FORCE)
 
