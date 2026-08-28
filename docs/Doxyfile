@@ -1,6 +1,6 @@
-PROJECT_NAME           = "K-FSW SDK"
-PROJECT_NUMBER         = "main"
-PROJECT_BRIEF          = "K Flight Software SDK and Operator Manual"
+PROJECT_NAME           = "K-FSW"
+PROJECT_NUMBER         =
+PROJECT_BRIEF          = "Flight software framework built on Zephyr and CSP"
 
 OUTPUT_DIRECTORY       = ../build/docs
 CREATE_SUBDIRS         = NO

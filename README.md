@@ -1,47 +1,25 @@
 # K Flight Software — K-FSW
 
 [![Software CI](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml)
-[![Documentation](https://img.shields.io/badge/docs-K--FSW_SDK-28a96b)](https://dgonzalez97.github.io/k-fsw/)
+[![Documentation](https://img.shields.io/badge/docs-K--FSW-168cff)](https://dgonzalez97.github.io/k-fsw/)
 
-K-FSW is an open-source flight-software framework for satellites and satellite
-subsystems. It runs on Zephyr RTOS and composes reusable platform, service, and
-communications modules through a reproducible west workspace.
+K-FSW is an open-source flight-software framework built on Zephyr RTOS. The
+same application runs in native simulation and on the NUCLEO-L496ZG, with
+reusable platform, service, and communications modules pinned in a west
+workspace.
 
-The [K-FSW SDK and Operator Manual](https://dgonzalez97.github.io/k-fsw/)
-contains setup, architecture, command, testing, development, and public API
-documentation.
+[Read the documentation](https://dgonzalez97.github.io/k-fsw/) for setup,
+architecture, operations, testing, development, and the public C API.
 
-## Architecture
+## Current capabilities
 
-`k-fsw` is the composition repository. Profiles select a board and
-configuration without replacing the application or reusable modules.
+- Zephyr shell on KFSW-Linux and NUCLEO-L496ZG
+- CSP routing with UART/KISS and RDP
+- typed parameters with persistent storage
+- LittleFS storage and CSP/RDP file transfer
+- ztest/Twister, Valgrind, Robot Framework, and physical HIL paths
 
-```text
-                    +----------------------+
-operator / system ->| Zephyr shell         |
-                    +----------+-----------+
-                               |
-                    +----------v-----------+
-                    | K-FSW application    |
-                    | lifecycle/composition|
-                    +----+---------+-------+
-                         |         |
-              +----------v--+   +--v----------------+
-              | platform    |   | services          |
-              | time/storage|   | log/PARAM/FTP     |
-              +-------------+   +---------+----------+
-                                           |
-                                +----------v----------+
-                                | communications      |
-                                | CSP + UART/KISS/RDP |
-                                +---------------------+
-```
-
-KFSW-Linux is the same application built for Zephyr
-`native_sim/native/64`. It is a first-class development and operations node,
-not a separate POSIX implementation.
-
-## Quick start
+## Try KFSW-Linux
 
 From a configured west workspace root:
 
@@ -51,76 +29,56 @@ west manifest --validate
 ./k-fsw/tools/kfsw-linux run
 ```
 
-Startup reaches the standard Zephyr prompt:
+The application starts at the standard Zephyr prompt:
 
 ```text
-@BOOT sw=kfsw-dev board=native_sim/native/64 ...
-@READY uptime_ms=...
-
 kfsw:~$ status
 kfsw:~$ csp ping 2
 kfsw:~$ param get test_u32
 kfsw:~$ storage info
 ```
 
-`kfsw` is the shell prompt identity, not a root command namespace.
-
 ## Supported profiles
 
-| Profile | Target | Status |
+| Profile | Target | Use |
 | --- | --- | --- |
-| `linux` | `native_sim/native/64` | Software verified |
+| `linux` | `native_sim/native/64` | Primary simulated node |
 | `linux_node2` | `native_sim/native/64` | Software integration peer |
-| `linux_uart` | `native_sim/native/64` | Physical UART bridge profile |
-| `nucleo_l496zg` | NUCLEO-L496ZG | Build and boot verified |
-| `nucleo_l496zg_uart` | NUCLEO-L496ZG | Physical UART/KISS verified |
+| `linux_uart` | `native_sim/native/64` | Physical UART bridge |
+| `nucleo_l496zg` | NUCLEO-L496ZG | Base embedded image |
+| `nucleo_l496zg_uart` | NUCLEO-L496ZG | Embedded UART/KISS node |
 
-The current software includes the Zephyr shell, CSP, UART/KISS, RDP,
-parameters and persistence, LittleFS storage, and FTP. Hosted CI does not need
-physical hardware.
+## Project layout
 
-## Workspace repositories
+`k-fsw` composes the application and owns profiles, tools, integration tests,
+and the aggregate documentation. Reusable code lives in three west-pinned
+repositories:
 
 | Repository | Responsibility |
 | --- | --- |
-| [`k-fsw`](https://github.com/dgonzalez97/k-fsw) | Composition, west manifest, profiles, tools, integration tests, and aggregate docs |
-| [`kfsw-platform`](https://github.com/dgonzalez97/kfsw-platform) | Zephyr-backed platform capabilities |
-| [`kfsw-services`](https://github.com/dgonzalez97/kfsw-services) | Reusable software services |
+| [`kfsw-platform`](https://github.com/dgonzalez97/kfsw-platform) | Zephyr-backed time, storage, and platform capabilities |
+| [`kfsw-services`](https://github.com/dgonzalez97/kfsw-services) | Logging, parameters, persistence, and file-transfer services |
 | [`kfsw-comms`](https://github.com/dgonzalez97/kfsw-comms) | CSP lifecycle, routing, and transports |
-| [`kfsw-modules`](https://github.com/dgonzalez97/kfsw-modules) | Reusable spacecraft equipment and subsystem clients |
 
-Exact dependency commits are pinned in [`west.yml`](west.yml). A dependency
-commit must be published before hosted CI can reproduce a composition PR that
-pins it.
+Exact dependency commits are recorded in [`west.yml`](west.yml).
 
-## Local checks
+## Development
 
-Run the complete software-only CI sequence from the workspace root:
+Run the software-only CI sequence from the workspace root:
 
 ```bash
 ./k-fsw/tools/ci/all.sh
 ```
 
-Individual entry points are available for the build matrix, quality, Twister,
-integration, Valgrind, Robot, and Doxygen checks under `tools/ci/`. Physical HIL
-is explicitly selected and never runs on a GitHub-hosted runner.
-
-Build the documentation locally with:
+Build and serve the documentation locally:
 
 ```bash
 ./k-fsw/tools/docs/build.sh
 ./k-fsw/tools/docs/serve.sh
 ```
 
-Generated HTML is written to `build/docs/html/` at the workspace root.
+Generated HTML is written to `build/docs/html/`. Physical HIL is selected
+explicitly and requires local hardware.
 
-## Contributing
-
-Development follows issue → branch → commits → pull request → CI → review →
-merge commit → `main`. Use `feature/`, `fix/`, `test/`, `ci/`, or `docs/`
-branches containing the GitHub issue number. See the
-[development manual](https://dgonzalez97.github.io/k-fsw/development.html) for
-the PR policy and multi-repository west workflow.
-
-K-FSW is currently in an infrastructure-hardening phase. Keep changes focused
-on their issue and do not add unplanned flight functionality.
+See the [development guide](https://dgonzalez97.github.io/k-fsw/development.html)
+for contribution policy and coordinated west-pinned changes.
