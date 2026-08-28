@@ -56,13 +56,15 @@ The second Linux CSP node is an integration-test configuration under
 
 `k-fsw` composes the application and owns targets, tools, integration tests,
 and the aggregate documentation. Reusable code lives in three west-pinned
-repositories:
+repositories. Their pinned revisions are validated together by K-FSW's
+Software CI workflow.
 
-| Repository | Responsibility |
-| --- | --- |
-| [`kfsw-platform`](https://github.com/dgonzalez97/kfsw-platform) | Zephyr-backed time, storage, and platform capabilities |
-| [`kfsw-services`](https://github.com/dgonzalez97/kfsw-services) | Logging, parameters, persistence, and file-transfer services |
-| [`kfsw-comms`](https://github.com/dgonzalez97/kfsw-comms) | CSP lifecycle, routing, and transports |
+| Repository | Responsibility | CI status |
+| --- | --- | --- |
+| [`k-fsw`](https://github.com/dgonzalez97/k-fsw) | Application composition, supported targets, integration tests, documentation, and CI | [![Software CI](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml) |
+| [`kfsw-platform`](https://github.com/dgonzalez97/kfsw-platform) | Zephyr-backed time, storage, and platform capabilities | [![Software CI](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml) |
+| [`kfsw-services`](https://github.com/dgonzalez97/kfsw-services) | Logging, parameters, persistence, and file-transfer services | [![Software CI](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml) |
+| [`kfsw-comms`](https://github.com/dgonzalez97/kfsw-comms) | CSP lifecycle, routing, and transports | [![Software CI](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml) |
 
 Exact dependency commits are recorded in [`west.yml`](west.yml).
 
