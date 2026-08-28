@@ -8,8 +8,9 @@ The current reference integration supports Zephyr RTOS in native simulation
 and on the NUCLEO-L496ZG. Platform, service, and communications modules are
 versioned independently and pinned in a west workspace.
 
-CSP support lives in the optional `kfsw-comms` module and is enabled only by
-profiles that need packet routing or CSP-based services.
+CSP support lives in the optional `kfsw-comms` module. Each supported target
+has a tested default configuration, while Kconfig and devicetree keep the
+transport selectable for other compositions.
 
 [Read the documentation](https://dgonzalez97.github.io/k-fsw/) for setup,
 architecture, operations, testing, development, and the public C API.
@@ -41,19 +42,19 @@ kfsw:~$ param get test_u32
 kfsw:~$ storage info
 ```
 
-## Supported profiles
+## Supported targets
 
-| Profile | Target | Use |
+| K-FSW target | Zephyr board | Default configuration |
 | --- | --- | --- |
-| `linux` | `native_sim/native/64` | Primary simulated node |
-| `linux_node2` | `native_sim/native/64` | Software integration peer |
-| `linux_uart` | `native_sim/native/64` | Physical UART bridge |
-| `nucleo_l496zg` | NUCLEO-L496ZG | Base embedded image |
-| `nucleo_l496zg_uart` | NUCLEO-L496ZG | Embedded UART/KISS node |
+| `linux` | `native_sim/native/64` | CSP UART/KISS over a simulated PTY, parameters, persistence, storage, and FTP |
+| `nucleo_l496zg` | `nucleo_l496zg` | CSP UART/KISS on USART3, parameters, persistence, storage, and FTP |
+
+The second Linux CSP node is an integration-test configuration under
+`tests/config/`; it is not another supported target.
 
 ## Project layout
 
-`k-fsw` composes the application and owns profiles, tools, integration tests,
+`k-fsw` composes the application and owns targets, tools, integration tests,
 and the aggregate documentation. Reusable code lives in three west-pinned
 repositories:
 

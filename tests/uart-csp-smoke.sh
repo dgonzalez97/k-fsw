@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-source "$(dirname "$0")/../tools/_common.sh" nucleo_l496zg_uart
+source "$(dirname "$0")/../tools/_common.sh" nucleo_l496zg
 
 ftdi_device=""
 debug_serial="$KFSW_SERIAL"
 debug_baud="$KFSW_SERIAL_BAUD"
 nucleo_build_dir="$KFSW_BUILD_DIR"
-linux_build_dir="$KFSW_ROOT/build/linux_uart"
+linux_build_dir="$KFSW_ROOT/build/linux"
 linux_executable="$linux_build_dir/zephyr/zephyr.exe"
 work_dir="$(mktemp -d /tmp/kfsw-uart-csp.XXXXXX)"
 linux_pid=""
@@ -198,11 +198,11 @@ lsusb | grep -Ei '0403:6001|FT232|FTDI' || true
 echo "Debug shell: $debug_serial"
 echo "YP-05 logic selection: 3.3 V required"
 
-"$KFSW_ROOT/k-fsw/tools/build.sh" linux_uart
-"$KFSW_ROOT/k-fsw/tools/build.sh" nucleo_l496zg_uart
+"$KFSW_ROOT/k-fsw/tools/build.sh" linux
+"$KFSW_ROOT/k-fsw/tools/build.sh" nucleo_l496zg
 
 [[ -x "$linux_executable" ]] || \
-	fail "Linux UART profile executable was not produced"
+	fail "the supported Linux target executable was not produced"
 
 debug_stty="$(stty -F "$debug_serial" -g)" || \
 	fail "cannot read ST-LINK UART settings: $debug_serial"
@@ -215,7 +215,7 @@ timeout 180s cat "$debug_serial" >"$work_dir/nucleo.log" &
 debug_capture_pid=$!
 
 west flash -d "$nucleo_build_dir" --runner openocd || \
-	fail "NUCLEO UART profile flash failed"
+	fail "the supported NUCLEO target flash failed"
 
 wait_for_output "$work_dir/nucleo.log" "@BOOT " "$debug_capture_pid" || \
 	fail "NUCLEO did not report @BOOT on the ST-LINK UART"

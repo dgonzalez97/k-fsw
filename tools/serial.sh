@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-KFSW_PROFILE="${1:-nucleo_l496zg}"
+KFSW_TARGET="${1:-nucleo_l496zg}"
 DURATION_SECONDS="${2:-10}"
 
-source "$(dirname "$0")/_common.sh" "$KFSW_PROFILE"
+source "$(dirname "$0")/_common.sh" "$KFSW_TARGET"
 
 if [[ ! -e "$KFSW_SERIAL" ]]; then
     echo "ERROR: serial device not found: $KFSW_SERIAL"

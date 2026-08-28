@@ -31,17 +31,18 @@ layout is deferred until the MCUboot roadmap item, but all four boundaries are
 2 KiB-aligned and the current image fits comfortably in either proposed slot.
 
 KFSW-Linux uses the same lifecycle, Zephyr flash map, and LittleFS code over
-native_sim's simulated flash. `tools/run-linux.sh` gives each Linux profile a
+native_sim's simulated flash. `tools/run-linux.sh` gives each Linux instance a
 persistent backing image under its build directory. Tests pass explicit
 temporary flash images so parallel nodes do not share media and transient test
 data is cleaned up.
 
 ## Persistent parameters
 
-Profiles with PARAM and storage enabled restore the service-owned snapshot
-after the parameter table is initialized and before its CSP server starts. A
-missing or invalid snapshot leaves compiled defaults active and does not stop
-the application. Runtime `set` operations never write flash automatically.
+Configurations with PARAM and storage enabled restore the service-owned
+snapshot after the parameter table is initialized and before its CSP server
+starts. A missing or invalid snapshot leaves compiled defaults active and does
+not stop the application. Runtime `set` operations never write flash
+automatically.
 
 The single `/kfsw/params/parameters.dat` file contains explicitly selected
 writable values, a versioned header, portable name/type/value entries, and an

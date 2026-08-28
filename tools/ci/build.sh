@@ -5,21 +5,19 @@ KFSW_CI_BUILD_TOOL="$(readlink -f "${BASH_SOURCE[0]}")"
 KFSW_CI_DIR="$(dirname "$KFSW_CI_BUILD_TOOL")"
 KFSW_TOOLS_DIR="$(dirname "$KFSW_CI_DIR")"
 
-default_profiles=(
+default_targets=(
 	linux
-	linux_uart
 	nucleo_l496zg
-	nucleo_l496zg_uart
 )
 
 if [[ $# -gt 0 ]]; then
-	profiles=("$@")
+	targets=("$@")
 else
-	profiles=("${default_profiles[@]}")
+	targets=("${default_targets[@]}")
 fi
 
-for profile in "${profiles[@]}"; do
+for target in "${targets[@]}"; do
 	echo
-	echo "CI BUILD: $profile"
-	KFSW_PRISTINE=always "$KFSW_TOOLS_DIR/build.sh" "$profile"
+	echo "CI BUILD: $target"
+	KFSW_PRISTINE=always "$KFSW_TOOLS_DIR/build.sh" "$target"
 done

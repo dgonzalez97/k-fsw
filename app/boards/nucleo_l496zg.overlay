@@ -1,8 +1,21 @@
 / {
 	chosen {
 		zephyr,code-partition = &kfsw_app_partition;
+		kfsw,csp-uart = &usart3;
 		kfsw,storage-partition = &kfsw_storage_partition;
 	};
+};
+
+/* Dedicated CSP/KISS UART. The debug shell remains on LPUART1 PG7/PG8. */
+&usart3 {
+	label = "usart3";
+	pinctrl-0 = <&usart3_tx_pd8 &usart3_rx_pd9>;
+	pinctrl-names = "default";
+	current-speed = <115200>;
+	parity = "none";
+	stop-bits = "1";
+	data-bits = <8>;
+	status = "okay";
 };
 
 &flash0 {

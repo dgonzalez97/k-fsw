@@ -1,8 +1,8 @@
 # Getting Started {#getting_started}
 
 K-FSW uses a west workspace. The `k-fsw` repository contains the application,
-manifest, profiles, and developer tools; west checks out Zephyr and the K-FSW
-module repositories beside it.
+manifest, supported targets, and developer tools; west checks out Zephyr and
+the K-FSW module repositories beside it.
 
 The commands in this chapter use the following layout:
 
@@ -47,7 +47,7 @@ On an AArch64 host, omit `gcc-multilib` and `g++-multilib`, which are not
 available for that architecture.
 
 Install a Zephyr SDK compatible with Zephyr 4.4.0 before building the NUCLEO
-profiles. If it is not installed at a location detected by Zephyr, set
+target. If it is not installed at a location detected by Zephyr, set
 `ZEPHYR_SDK_INSTALL_DIR` in the shell used for the build.
 
 ## Create the workspace
@@ -100,7 +100,7 @@ workspace root.
 
 KFSW-Linux is the reference application built for Zephyr native simulation. It
 uses the same platform, service, communications, and shell modules as the
-embedded profiles.
+embedded target.
 
 1. Change to the workspace root and activate the environment if it is not
    already active:
@@ -116,14 +116,14 @@ embedded profiles.
    west manifest --validate
    ```
 
-3. Build the `linux` profile:
+3. Build the `linux` target:
 
    ```bash
    ./k-fsw/tools/kfsw-linux build
    ```
 
-The wrapper prints the selected profile, board, output directory, and pristine
-mode before calling `west build`. The executable is written to:
+The wrapper prints the selected target, Zephyr board, output directory, and
+pristine mode before calling `west build`. The executable is written to:
 
 ```text
 build/linux/zephyr/zephyr.exe
@@ -178,8 +178,7 @@ working through stale CMake state:
 KFSW_PRISTINE=always ./k-fsw/tools/kfsw-linux build
 ```
 
-Build every supported software and embedded profile from clean directories
-with the CI entry point:
+Build both supported targets from clean directories with the CI entry point:
 
 ```bash
 ./k-fsw/tools/ci/build.sh
@@ -187,28 +186,26 @@ with the CI entry point:
 
 ## Build the NUCLEO-L496ZG image
 
-Two profiles are available for the NUCLEO-L496ZG:
+`nucleo_l496zg` is the supported K-FSW target for the current board. Its tested
+default enables CSP UART/KISS on USART3 using PD8/PD9 at 115200 baud, together
+with parameters, persistence, storage, and FTP. The debug shell and logs remain
+on the ST-LINK virtual COM port.
 
-| Profile | Communications |
-| --- | --- |
-| `nucleo_l496zg` | Base image |
-| `nucleo_l496zg_uart` | CSP KISS on USART3, PD8/PD9, at 115200 baud |
-
-Build either profile from the workspace root:
+Build it from the workspace root:
 
 ```bash
 ./k-fsw/tools/build.sh nucleo_l496zg
-./k-fsw/tools/build.sh nucleo_l496zg_uart
 ```
 
-The shell and logs use the ST-LINK virtual COM port. The UART/KISS profile keeps
-the CSP transport on the separate USART3 connection.
+This is a supported default, not an architecture-wide requirement. CSP and
+KISS remain Kconfig options, and another board can select a different transport
+and UART in its own configuration and overlay.
 
 ## Flash and inspect a board
 
 1. Connect the board through ST-LINK.
 
-2. Build and flash the selected profile:
+2. Build and flash the selected target:
 
    ```bash
    ./k-fsw/tools/build.sh nucleo_l496zg
