@@ -7,11 +7,11 @@ Run test scripts from the west workspace root, for example:
 
 ```bash
 ./k-fsw/tools/ci/unit.sh
+./k-fsw/tools/ci/integration.sh
 ./k-fsw/tools/ci/valgrind.sh
-./k-fsw/tests/shell-smoke.sh
-./k-fsw/tests/csp-smoke.sh
-./k-fsw/tests/storage-smoke.sh
-./k-fsw/tests/param-persistence-smoke.sh
+./k-fsw/tools/ci/robot.sh
+./k-fsw/tools/ci/docs.sh
+./k-fsw/tools/ci/all.sh
 ```
 
 `tools/ci/unit.sh` runs the ztest suites under `tests/unit/` through Zephyr
@@ -19,6 +19,11 @@ Twister on `native_sim/native/64`. Results and logs are kept under
 `build/twister/` by default; set `KFSW_TWISTER_OUT_DIR` to override it.
 `tools/ci/valgrind.sh` runs a bounded KFSW-Linux boot under Memcheck and keeps
 its logs under `build/valgrind/`.
+`tools/ci/integration.sh` builds the two native nodes and executes all shell,
+CSP, PARAM, persistence, storage, and FTP integration scripts.
+`tools/ci/robot.sh` validates every Robot suite and then runs all scenarios
+except those tagged `physical`. `tools/ci/all.sh` composes these software-only
+checks with the build, quality, unit, memory, and documentation gates.
 
 Current:
 
@@ -39,15 +44,23 @@ Current:
 - NUCLEO boot/readiness HIL smoke test
 - physical FTDI-to-NUCLEO CSP UART HIL test
 
-## Robot Framework HIL
+## Robot Framework system and HIL tests
 
-Robot wraps the proven physical smoke scripts under `tests/hil/`; it does not
-duplicate their flash, serial, or PTY bridge control. Install its pinned Python
-dependency and validate suite discovery without hardware:
+Robot provides operator-level system scenarios and wraps the proven physical
+smoke scripts under `tests/hil/`; it does not duplicate their shell, flash,
+serial, or PTY bridge control. Install its pinned Python dependency and
+validate every suite without hardware:
 
 ```bash
 pip install -r ./k-fsw/tests/hil/requirements.txt
 ./k-fsw/tests/hil/run.sh --dryrun
+```
+
+Execute every software-compatible scenario, including shell, CSP, PARAM,
+parameter persistence, storage, and FTP, while excluding physical HIL:
+
+```bash
+./k-fsw/tests/hil/run.sh --exclude physical
 ```
 
 Run the smoke-tagged physical suite with explicit device paths:
@@ -61,8 +74,10 @@ KFSW_FTDI_DEVICE=/dev/serial/by-id/usb-FTDI_DEVICE-if00-port0 \
 `boot.robot` verifies `@BOOT` and `@READY` through `hil-smoke.sh`.
 `uart.robot` verifies the debug shell, `status`, bidirectional CSP ping,
 and UART transport checks through `uart-csp-smoke.sh`. Reports are written to
-`build/robot/` by default. Tags are `smoke`, `nucleo`, `shell`, `csp`, `uart`,
-`physical`, `terminal`, `storage`, `param`, and `persistence`.
+`build/robot/` by default. The compact tag vocabulary is `smoke`, `software`,
+`physical`, `terminal`, `shell`, `csp`, `uart`, `param`, `storage`, `ftp`, and
+`persistence`. Hosted CI dry-runs all suites and executes tests selected by
+`--exclude physical`; it never needs a serial device or development board.
 
 ### Terminal runner submodule
 

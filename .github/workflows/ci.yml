@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build:
-    name: Build (${{ matrix.profile }})
+    name: BUILD / ${{ matrix.profile }}
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -47,14 +47,8 @@ jobs:
       - name: Build profile
         run: ./k-fsw/tools/ci/build.sh "${{ matrix.profile }}"
 
-      - name: Run storage integration test
-        if: matrix.profile == 'linux'
-        run: |
-          ./k-fsw/tests/storage-smoke.sh
-          ./k-fsw/tests/param-persistence-smoke.sh
-
   quality:
-    name: Source quality
+    name: QUALITY / clang-format + cppcheck
     runs-on: ubuntu-24.04
 
     steps:
@@ -81,7 +75,7 @@ jobs:
         run: ./k-fsw/tools/ci/quality.sh
 
   unit:
-    name: Unit tests
+    name: UNIT / Twister
     runs-on: ubuntu-24.04
 
     steps:
@@ -116,8 +110,35 @@ jobs:
             build/twister/**/handler.log
           if-no-files-found: ignore
 
+  integration:
+    name: INTEGRATION / software
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out K-FSW
+        uses: actions/checkout@v4
+        with:
+          path: k-fsw
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up the west workspace and Zephyr SDK
+        uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          app-path: k-fsw
+          toolchains: arm-zephyr-eabi
+
+      - name: Install integration dependencies
+        run: sudo apt-get install --yes socat
+
+      - name: Run shell, CSP, PARAM, storage, and FTP integration tests
+        run: ./k-fsw/tools/ci/integration.sh
+
   valgrind:
-    name: Valgrind
+    name: MEMORY / Valgrind
     runs-on: ubuntu-24.04
 
     steps:
@@ -151,8 +172,8 @@ jobs:
           path: build/valgrind/*.log
           if-no-files-found: ignore
 
-  robot-validation:
-    name: Robot HIL validation
+  robot:
+    name: ROBOT / dry-run + software
     runs-on: ubuntu-24.04
 
     steps:
@@ -167,11 +188,20 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up the west workspace and Zephyr SDK
+        uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          app-path: k-fsw
+          toolchains: arm-zephyr-eabi
+
+      - name: Install software-system test dependencies
+        run: sudo apt-get install --yes socat tmux
+
       - name: Install Robot Framework
         run: pip install -r k-fsw/tests/hil/requirements.txt
 
-      - name: Validate Robot HIL suites
-        run: ./k-fsw/tests/hil/run.sh --dryrun
+      - name: Validate all Robot suites and run software scenarios
+        run: ./k-fsw/tools/ci/robot.sh
 
       - name: Upload Robot diagnostics
         if: failure()
@@ -180,3 +210,30 @@ jobs:
           name: robot-diagnostics
           path: build/robot/
           if-no-files-found: ignore
+
+  docs:
+    name: DOCS / Doxygen
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out K-FSW
+        uses: actions/checkout@v4
+        with:
+          path: k-fsw
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up the west workspace
+        uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          app-path: k-fsw
+          toolchains: arm-zephyr-eabi
+
+      - name: Install Doxygen
+        run: sudo apt-get install --yes doxygen
+
+      - name: Build and validate SDK documentation
+        run: ./k-fsw/tools/ci/docs.sh

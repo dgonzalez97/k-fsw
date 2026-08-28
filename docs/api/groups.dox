@@ -1,0 +1,74 @@
+/**
+ * @defgroup kfsw_platform K-FSW Platform
+ * @brief Zephyr-backed platform lifecycle and hardware capabilities.
+ *
+ * Platform APIs expose mechanisms needed by services and the application
+ * without creating a replacement hardware abstraction layer.
+ *
+ * @defgroup kfsw_platform_time Time
+ * @ingroup kfsw_platform
+ * @brief Monotonic elapsed-time readings for scheduling and measurements.
+ *
+ * See kfsw_time_monotonic_ms() and kfsw_time_monotonic_us(). These readings
+ * are local elapsed time, not synchronized spacecraft time.
+ *
+ * @defgroup kfsw_platform_storage Storage
+ * @ingroup kfsw_platform
+ * @brief LittleFS backend lifecycle and capacity reporting.
+ *
+ * Initialize with kfsw_storage_init(), mount with kfsw_storage_mount(), and
+ * query state with kfsw_storage_get_info(). Services use Zephyr filesystem
+ * calls after kfsw_storage_is_ready() reports true.
+ *
+ * @defgroup kfsw_platform_reset Reset
+ * @ingroup kfsw_platform
+ * @brief Hardware reset-cause access.
+ *
+ * kfsw_platform_get_reset_cause() reads and clears the platform reset flags.
+ *
+ * @defgroup kfsw_comms K-FSW Communications
+ * @brief CSP lifecycle, routing, and transport status.
+ *
+ * Communications owns libcsp integration and packet-routing lifecycle. Client
+ * services use the public K-FSW APIs instead of owning routers or transports.
+ *
+ * @defgroup kfsw_comms_csp CSP
+ * @ingroup kfsw_comms
+ * @brief libcsp initialization, route inspection, and ping operations.
+ *
+ * The application calls kfsw_csp_init() before registering CSP services and
+ * calls kfsw_csp_start() once to start the router thread.
+ *
+ * @defgroup kfsw_comms_uart UART / KISS
+ * @ingroup kfsw_comms
+ * @brief Dedicated UART transport status and end-to-end test support.
+ *
+ * kfsw_uart_get_info() reports the configured interface and counters;
+ * kfsw_uart_test() verifies that the configured peer route uses that UART.
+ *
+ * @defgroup kfsw_services K-FSW Services
+ * @brief Reusable software services composed by the K-FSW application.
+ *
+ * @defgroup kfsw_services_boot Boot
+ * @ingroup kfsw_services
+ * @brief Stable boot and readiness markers for operators and automation.
+ *
+ * @defgroup kfsw_services_logging Logging
+ * @ingroup kfsw_services
+ * @brief Runtime log filtering and compile-time-aware logging calls.
+ *
+ * @defgroup kfsw_services_param Parameters
+ * @ingroup kfsw_services
+ * @brief Local tables, remote CSP access, and explicit persistence.
+ *
+ * Initialize the local table with kfsw_param_init(). The application restores
+ * persistence before kfsw_param_server_start() exposes the CSP endpoints.
+ *
+ * @defgroup kfsw_services_ftp FTP
+ * @ingroup kfsw_services
+ * @brief Sandboxed file transfer over CSP/RDP with CRC32 validation.
+ *
+ * kfsw_ftp_init() prepares storage. kfsw_ftp_start() binds the server after
+ * storage and the CSP router are ready. PUT and GET stream bounded chunks and
+ * atomically commit received files.
+ */

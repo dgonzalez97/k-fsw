@@ -2,6 +2,7 @@
 Documentation    Operator-style command execution through robot-terminal-runner.
 Resource         resources/terminal.resource
 Test Teardown    Close KFSW Terminal
+Test Tags        software
 
 *** Test Cases ***
 KFSW Linux Can Command Remote CSP Node

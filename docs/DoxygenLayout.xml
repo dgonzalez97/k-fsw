@@ -1,0 +1,74 @@
+<doxygenlayout version="1.0">
+  <navindex>
+    <tab type="mainpage" visible="yes" title="Home"/>
+    <tab type="user" visible="yes" url="getting_started.html" title="Getting Started"/>
+    <tab type="user" visible="yes" url="architecture.html" title="Architecture"/>
+    <tab type="user" visible="yes" url="communications.html" title="Communications"/>
+    <tab type="user" visible="yes" url="services.html" title="Services"/>
+    <tab type="user" visible="yes" url="commands.html" title="Command Reference"/>
+    <tab type="user" visible="yes" url="testing.html" title="Testing"/>
+    <tab type="user" visible="yes" url="development.html" title="Development"/>
+    <tab type="user" visible="yes" url="api_reference.html" title="API Reference">
+      <tab type="modules" visible="yes" title="API Groups"/>
+      <tab type="classes" visible="yes" title="Data Types">
+        <tab type="classlist" visible="yes" title="Structures"/>
+        <tab type="classmembers" visible="yes" title="Members"/>
+      </tab>
+      <tab type="files" visible="yes" title="Headers">
+        <tab type="filelist" visible="yes" title="Public Headers"/>
+        <tab type="globals" visible="yes" title="Symbols"/>
+      </tab>
+    </tab>
+  </navindex>
+
+  <file>
+    <briefdescription visible="yes"/>
+    <includes visible="yes"/>
+    <includegraph visible="$HAVE_DOT"/>
+    <includedbygraph visible="$HAVE_DOT"/>
+    <sourcelink visible="yes"/>
+    <memberdecl>
+      <classes visible="yes" title="Data Structures"/>
+      <structs visible="yes" title="Data Structures"/>
+      <defines title="Macros"/>
+      <typedefs title="Types"/>
+      <enums title="Enumerations"/>
+      <functions title="Functions"/>
+      <variables title="Variables"/>
+    </memberdecl>
+    <detaileddescription title="Description"/>
+    <memberdef>
+      <inlineclasses title="Classes"/>
+      <defines title="Macro Documentation"/>
+      <typedefs title="Type Documentation"/>
+      <enums title="Enumeration Documentation"/>
+      <functions title="Function Documentation"/>
+      <variables title="Variable Documentation"/>
+    </memberdef>
+    <authorsection visible="yes"/>
+  </file>
+
+  <group>
+    <briefdescription visible="yes"/>
+    <groupgraph visible="$GROUP_GRAPHS"/>
+    <memberdecl>
+      <nestedgroups title="API Areas"/>
+      <files title="Public Headers"/>
+      <classes title="Data Structures"/>
+      <defines title="Macros"/>
+      <typedefs title="Types"/>
+      <enums title="Enumerations"/>
+      <functions title="Functions"/>
+      <variables title="Variables"/>
+    </memberdecl>
+    <detaileddescription title="Description"/>
+    <memberdef>
+      <defines title="Macro Documentation"/>
+      <typedefs title="Type Documentation"/>
+      <enums title="Enumeration Documentation"/>
+      <functions title="Function Documentation"/>
+      <variables title="Variable Documentation"/>
+    </memberdef>
+    <authorsection visible="yes"/>
+  </group>
+</doxygenlayout>
