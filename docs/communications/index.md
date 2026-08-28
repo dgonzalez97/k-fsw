@@ -6,7 +6,7 @@ K-FSW integrates libcsp behind the public headers in `kfsw-comms`. The
 communications lifecycle initializes the CSP identity, interfaces, and static
 routes once, then starts one application-owned router thread.
 
-The shell exposes status rather than implementation control:
+The shell provides status and diagnostic commands:
 
 ```text
 kfsw:~$ csp info

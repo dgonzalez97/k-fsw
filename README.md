@@ -1,12 +1,15 @@
 # K Flight Software — K-FSW
 
 [![Software CI](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml)
-[![Documentation](https://img.shields.io/badge/docs-K--FSW-168cff)](https://dgonzalez97.github.io/k-fsw/)
+[![Documentation](https://img.shields.io/badge/docs-K--FSW-28a96b)](https://dgonzalez97.github.io/k-fsw/)
 
-K-FSW is an open-source flight-software framework built on Zephyr RTOS. The
-same application runs in native simulation and on the NUCLEO-L496ZG, with
-reusable platform, service, and communications modules pinned in a west
-workspace.
+K-FSW is an open-source, modular flight-software framework for next space.
+The current reference integration supports Zephyr RTOS in native simulation
+and on the NUCLEO-L496ZG. Platform, service, and communications modules are
+versioned independently and pinned in a west workspace.
+
+CSP support lives in the optional `kfsw-comms` module and is enabled only by
+profiles that need packet routing or CSP-based services.
 
 [Read the documentation](https://dgonzalez97.github.io/k-fsw/) for setup,
 architecture, operations, testing, development, and the public C API.
@@ -14,9 +17,9 @@ architecture, operations, testing, development, and the public C API.
 ## Current capabilities
 
 - Zephyr shell on KFSW-Linux and NUCLEO-L496ZG
-- CSP routing with UART/KISS and RDP
+- optional CSP routing with UART/KISS and RDP
 - typed parameters with persistent storage
-- LittleFS storage and CSP/RDP file transfer
+- LittleFS storage and optional CSP/RDP file transfer
 - ztest/Twister, Valgrind, Robot Framework, and physical HIL paths
 
 ## Try KFSW-Linux
@@ -77,8 +80,16 @@ Build and serve the documentation locally:
 ./k-fsw/tools/docs/serve.sh
 ```
 
-Generated HTML is written to `build/docs/html/`. Physical HIL is selected
-explicitly and requires local hardware.
+Build the printable SDK guide after installing its Python requirements:
+
+```bash
+./.venv/bin/pip install -r k-fsw/docs/pdf/requirements.txt
+./k-fsw/tools/docs/pdf.sh
+```
+
+Generated HTML is written to `build/docs/html/`; the printable guide is
+written to `build/k-fsw-guide.pdf`. Physical HIL is selected explicitly and
+requires local hardware.
 
 See the [development guide](https://dgonzalez97.github.io/k-fsw/development.html)
 for contribution policy and coordinated west-pinned changes.

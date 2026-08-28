@@ -1,94 +1,85 @@
 # K-FSW
 
-@htmlonly
-<div class="kfsw-hero">
-  <p class="kfsw-kicker">Flight software framework</p>
-  <p class="kfsw-lede">Build, test, and operate one Zephyr application on native simulation and the NUCLEO-L496ZG.</p>
-  <p>K-FSW brings CSP communications, persistent parameters, LittleFS storage, and file transfer into a reproducible west workspace.</p>
-  <div class="kfsw-actions">
-    <a class="kfsw-button kfsw-button-primary" href="getting_started.html">Get started</a>
-    <a class="kfsw-button" href="architecture.html">See the architecture</a>
-    <a class="kfsw-button" href="api_reference.html">Browse the API</a>
-  </div>
-</div>
-@endhtmlonly
+**Modular flight software for next space.**
 
-## What already works
+K-FSW composes flight-software applications from separate platform, service,
+and communications modules. The current reference integration supports Zephyr
+RTOS on native simulation and the NUCLEO-L496ZG.
 
-@htmlonly
-<div class="kfsw-feature-grid">
-  <div class="kfsw-feature"><strong>Zephyr RTOS</strong><span>One application and shell across supported targets.</span></div>
-  <div class="kfsw-feature"><strong>KFSW-Linux</strong><span>Native simulation for daily development and automated tests.</span></div>
-  <div class="kfsw-feature"><strong>NUCLEO-L496ZG</strong><span>Embedded builds, flashing, debugging, and physical HIL.</span></div>
-  <div class="kfsw-feature"><strong>CSP + UART/KISS</strong><span>Packet routing between simulated and physical nodes.</span></div>
-  <div class="kfsw-feature"><strong>Parameters</strong><span>Typed values with persistence across restarts.</span></div>
-  <div class="kfsw-feature"><strong>Storage + FTP</strong><span>LittleFS storage and CSP/RDP file transfer.</span></div>
-</div>
-@endhtmlonly
+CSP support is provided by the configurable `kfsw-comms` module. Applications
+can enable it when packet routing, UART/KISS, or CSP-based services are needed.
 
-## Try it
+## At a glance
 
-From a configured west workspace root, build and run KFSW-Linux:
+| Area | Current implementation |
+| --- | --- |
+| Application model | Modules selected through Kconfig profiles |
+| Reference platform | Zephyr RTOS |
+| Development target | KFSW-Linux on `native_sim/native/64` |
+| Embedded target | NUCLEO-L496ZG |
+| Optional communications | CSP routing, UART/KISS, and RDP |
+| Services | Logging, parameters, persistence, LittleFS storage, and file transfer |
+| Workspace | Dependencies pinned by commit in `west.yml` |
 
-@htmlonly
-<div class="kfsw-demo-grid">
-  <div class="kfsw-demo">
-    <p class="kfsw-demo-label">Build and run</p>
-    <pre class="kfsw-console"><code>./k-fsw/tools/kfsw-linux build
-./k-fsw/tools/kfsw-linux run</code></pre>
-  </div>
-  <div class="kfsw-demo">
-    <p class="kfsw-demo-label">Use the shell</p>
-    <pre class="kfsw-console"><code>kfsw:~$ status
-kfsw:~$ csp ping 2
+## Quick start
+
+From a configured west workspace root:
+
+```bash
+./k-fsw/tools/kfsw-linux build
+./k-fsw/tools/kfsw-linux run
+```
+
+The application starts at the Zephyr shell prompt:
+
+```text
+kfsw:~$ status
 kfsw:~$ param get test_u32
-kfsw:~$ storage info</code></pre>
-  </div>
-</div>
-@endhtmlonly
+kfsw:~$ storage info
+kfsw:~$ csp ping 2
+```
 
-The prompt is `kfsw:~$`. Commands such as `status`, `csp`, `param`, and
-`storage` live directly below it.
+The `csp` commands are available in profiles that enable the communications
+module.
 
-## Same application, different targets
+## Supported profiles
 
-@htmlonly
-<div class="kfsw-targets">
-  <div class="kfsw-target-source"><strong>K-FSW application</strong><span>Zephyr + shared K-FSW modules</span></div>
-  <div class="kfsw-target-branch" aria-hidden="true"><span>runs as</span></div>
-  <div class="kfsw-target-options">
-    <div class="kfsw-target-card"><span class="kfsw-target-tag">Simulation</span><strong>KFSW-Linux</strong><span><code>native_sim/native/64</code></span><small>Fast local runs, software CI, and integration peers</small></div>
-    <div class="kfsw-target-card"><span class="kfsw-target-tag">Hardware</span><strong>NUCLEO-L496ZG</strong><span><code>nucleo_l496zg</code></span><small>Embedded build, flash, debug, and physical HIL</small></div>
-  </div>
-</div>
-@endhtmlonly
+| Profile | Target | Purpose |
+| --- | --- | --- |
+| `linux` | `native_sim/native/64` | Primary simulated node |
+| `linux_node2` | `native_sim/native/64` | Software integration peer |
+| `linux_uart` | `native_sim/native/64` | Physical UART bridge |
+| `nucleo_l496zg` | NUCLEO-L496ZG | Base embedded image |
+| `nucleo_l496zg_uart` | NUCLEO-L496ZG | Embedded UART/KISS node |
 
-Hosted CI exercises simulation. Hardware validation stays an explicit local
-step when a board, ST-LINK, or serial link is required.
+Hosted CI exercises the simulated profiles. Board, ST-LINK, and serial-link
+checks are explicit local HIL steps.
 
-## Explore
+## Development flow
 
-@htmlonly
-<div class="kfsw-explore">
-@endhtmlonly
+1. Initialize or update the west workspace.
+2. Select a profile and build the reference application.
+3. Run the relevant software checks under `tools/ci/`.
+4. Run physical HIL when the change depends on hardware.
 
-- @subpage getting_started "Getting Started" — set up the workspace, run
-  KFSW-Linux, or flash a board.
-- @subpage architecture "Architecture" — see how the application and
-  repositories fit together.
-- @subpage communications "Communications" — operate CSP routing, UART/KISS,
+See @subpage getting_started "Getting Started" for the complete commands and
+@subpage development "Development" for the repository and pull-request
+workflow.
+
+## Documentation
+
+- @subpage getting_started "Getting Started" — workspace setup, simulation,
+  flashing, and debugging.
+- @subpage architecture "Architecture" — composition, ownership, startup, and
+  dependency pins.
+- @subpage communications "Communications" — optional CSP routing, UART/KISS,
   and RDP-backed transfers.
-- @subpage services "Services" — work with logging, parameters, storage, and
-  FTP.
-- @subpage commands "Command Reference" — look up shell syntax and operator
-  examples.
-- @subpage testing "Testing" — run software checks, integration scenarios,
-  and physical HIL.
-- @subpage development "Development" — follow the contribution and
-  multi-repository workflow.
-- @subpage api_reference "API Reference" — browse public headers, data types,
-  and API groups.
-
-@htmlonly
-</div>
-@endhtmlonly
+- @subpage services "Services" — logging, parameters, persistence, storage,
+  and file transfer.
+- @subpage commands "Command Reference" — shell syntax and operator examples.
+- @subpage testing "Testing" — unit, integration, Robot, Valgrind, and HIL
+  checks.
+- @subpage development "Development" — contribution and multi-repository
+  workflow.
+- @subpage api_reference "API Reference" — public headers, data types, and API
+  groups.

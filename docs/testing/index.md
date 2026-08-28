@@ -2,13 +2,12 @@
 
 ## Test strategy
 
-K-FSW uses layered software checks. Fast source checks and unit tests isolate
-defects; native-simulator integration tests exercise real composition; Robot
-tests express operator-visible workflows. Physical HIL remains available for
-interfaces that cannot be represented on a hosted runner.
+The checks are split by scope. Source checks and unit tests catch local defects,
+native-simulator tests exercise the application, and Robot covers workflows
+visible at the shell. Interfaces that need a board or physical link use HIL.
 
-GitHub Actions is thin orchestration. Every required check calls the same
-project-owned entry point a developer can run from the west workspace root.
+GitHub Actions calls the same project scripts that developers run from the west
+workspace root.
 
 ## PR gates and local equivalents
 
@@ -25,7 +24,7 @@ project-owned entry point a developer can run from the west workspace root.
 | `ROBOT / dry-run + software` | `./k-fsw/tools/ci/robot.sh` | All-suite validation plus operator software scenarios |
 | `DOCS / Doxygen` | `./k-fsw/tools/ci/docs.sh` | Warning-free manual/API HTML generation |
 
-Run the complete software-only sequence with:
+Run all software checks with:
 
 ```bash
 ./k-fsw/tools/ci/all.sh
@@ -60,8 +59,8 @@ Temporary flash images and processes are isolated and removed by the runners.
 ## Valgrind
 
 `tools/ci/valgrind.sh` performs a bounded KFSW-Linux boot and a second boot with
-a deliberately corrupted parameter snapshot. Definite and indirect leaks are
-errors. Logs remain under `build/valgrind/`.
+a corrupted parameter snapshot. Definite and indirect leaks are errors. Logs
+remain under `build/valgrind/`.
 
 ## Robot Framework
 
@@ -70,7 +69,7 @@ visible results through the existing terminal adapter and
 robot-terminal-runner. It does not contain CSP, FTP, parameter, filesystem, or
 terminal-control implementation logic.
 
-The hosted selection is deliberately simple:
+Hosted CI runs these two Robot commands:
 
 ```bash
 ./k-fsw/tests/hil/run.sh --dryrun

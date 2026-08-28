@@ -19,7 +19,7 @@ sources.
 ## Application composition
 
 The `k-fsw/app/` image selects Kconfig, devicetree, and repository-owned
-modules. `main.c` intentionally remains a small lifecycle composition root:
+modules. `main.c` contains the lifecycle order and stays small:
 
 ```text
 platform storage init + mount
@@ -43,7 +43,7 @@ logic.
 
 ## Platform
 
-`kfsw-platform` is a deliberately small capability layer over Zephyr. It owns
+`kfsw-platform` is a small capability layer over Zephyr. It owns
 monotonic time, reset cause, and the lifecycle of the configured LittleFS
 volume at `/kfsw`. Services use Zephyr filesystem operations only after the
 platform reports the volume ready.

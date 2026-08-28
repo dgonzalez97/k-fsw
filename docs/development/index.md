@@ -2,7 +2,7 @@
 
 ## Branch-to-merge workflow
 
-Normal development does not happen directly on `main`.
+Create a topic branch for each change; do not work directly on `main`.
 
 ```text
 issue
@@ -16,9 +16,9 @@ issue
   -> main
 ```
 
-`main` represents the integrated green baseline. Keep one coherent issue or
-goal per branch and update documentation in the same PR as the behavior or API
-it describes.
+`main` is the integrated green baseline. Keep each branch tied to one issue or
+goal, and update documentation in the same PR as the behavior or API it
+describes.
 
 ## Branch naming
 

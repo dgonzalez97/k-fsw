@@ -14,7 +14,7 @@ The parameter service wraps the project-selected subset of libparam behind
 table, optionally restores persisted values, registers CSP parameter
 endpoints, and then starts routing.
 
-The initial table demonstrates a read-only `node_id` plus writable
+The default table contains a read-only `node_id` plus writable
 `log_level`, `test_u32`, `test_i32`, and `test_float` values. Remote operations
 accept a node explicitly.
 
@@ -57,9 +57,9 @@ persistence regression.
 
 ## FTP
 
-The K-FSW-owned file-transfer protocol uses configurable CSP port 9 with RDP
-and CSP CRC32. It is not claimed to be wire-compatible with another product
-that uses the FTP or TFTP name.
+The K-FSW file-transfer protocol uses configurable CSP port 9 with RDP and CSP
+CRC32. It is specific to K-FSW and is not wire-compatible with other FTP or
+TFTP implementations.
 
 All virtual paths are sandboxed below `/kfsw/ftp`; `/build/sample.bin` maps to
 `/kfsw/ftp/build/sample.bin` inside the Zephyr filesystem. Empty components,
