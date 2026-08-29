@@ -1,5 +1,48 @@
 # Development {#development}
 
+## VS Code IntelliSense
+
+Open the committed multi-root workspace from the west workspace root so VS
+Code treats only K-FSW-owned repositories as first-class source trees:
+
+```bash
+code k-fsw/K-FSW.code-workspace
+```
+
+KFSW-Linux is the default IntelliSense target because it is the fastest local
+development and CI environment. Build it and select its Zephyr-generated
+compilation database with:
+
+```bash
+./k-fsw/tools/build.sh linux
+./k-fsw/tools/select-intellisense.sh linux
+```
+
+For board-specific defines, generated headers, and devicetree data, build and
+select the physical target instead:
+
+```bash
+./k-fsw/tools/build.sh nucleo_l496zg
+./k-fsw/tools/select-intellisense.sh nucleo_l496zg
+```
+
+The selector repoints `build/compile_commands.json` and the workspace's
+`Active Build` folder; it does not copy or generate build artifacts. Rebuilding
+the selected target refreshes the real CMake database. After changing targets,
+refresh the Explorer and run `C/C++: Reset IntelliSense Database` from the VS
+Code command palette.
+
+The browse database is limited to `k-fsw`, `kfsw-platform`, `kfsw-services`,
+and `kfsw-comms` source/header roots. Build output, imported modules, upstream
+Zephyr trees, and Python environments are excluded from global browsing,
+watching, and search. Their headers remain available for explicit navigation
+because the active compilation database supplies the exact dependency and
+generated include paths, compiler defines, and flags.
+
+`Active Build` remains visible for manually inspecting generated artifacts.
+Folder-specific settings exclude it from global C/C++ browsing, filesystem
+watching, and text search without hiding it from the Explorer.
+
 ## Branch-to-merge workflow
 
 Create a topic branch for each change; do not work directly on `main`.

@@ -1,0 +1,11 @@
+{
+    "C_Cpp.files.exclude": {
+        "**": true
+    },
+    "files.watcherExclude": {
+        "**": true
+    },
+    "search.exclude": {
+        "**": true
+    }
+}
