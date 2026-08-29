@@ -15,25 +15,29 @@
         {
             "name": "kfsw-comms",
             "path": "../kfsw-comms"
+        },
+        {
+            "name": "Active Build",
+            "path": "../build/active"
         }
     ],
     "settings": {
-        "C_Cpp.default.compileCommands": "${workspaceFolder}/../build/compile_commands.json",
+        "C_Cpp.default.compileCommands": "${workspaceFolder:k-fsw}/../build/compile_commands.json",
         "C_Cpp.default.includePath": [
-            "${workspaceFolder}/../k-fsw/app/src",
-            "${workspaceFolder}/../kfsw-platform/include",
-            "${workspaceFolder}/../kfsw-services/include",
-            "${workspaceFolder}/../kfsw-comms/include"
+            "${workspaceFolder:k-fsw}/app/src",
+            "${workspaceFolder:kfsw-platform}/include",
+            "${workspaceFolder:kfsw-services}/include",
+            "${workspaceFolder:kfsw-comms}/include"
         ],
         "C_Cpp.default.browse.path": [
-            "${workspaceFolder}/../k-fsw/app/src",
-            "${workspaceFolder}/../k-fsw/tests/unit",
-            "${workspaceFolder}/../kfsw-platform/include",
-            "${workspaceFolder}/../kfsw-platform/src",
-            "${workspaceFolder}/../kfsw-services/include",
-            "${workspaceFolder}/../kfsw-services/src",
-            "${workspaceFolder}/../kfsw-comms/include",
-            "${workspaceFolder}/../kfsw-comms/src"
+            "${workspaceFolder:k-fsw}/app/src",
+            "${workspaceFolder:k-fsw}/tests/unit",
+            "${workspaceFolder:kfsw-platform}/include",
+            "${workspaceFolder:kfsw-platform}/src",
+            "${workspaceFolder:kfsw-services}/include",
+            "${workspaceFolder:kfsw-services}/src",
+            "${workspaceFolder:kfsw-comms}/include",
+            "${workspaceFolder:kfsw-comms}/src"
         ],
         "C_Cpp.default.browse.limitSymbolsToIncludedHeaders": true,
         "C_Cpp.exclusionPolicy": "checkFolders",

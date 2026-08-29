@@ -26,10 +26,11 @@ select the physical target instead:
 ./k-fsw/tools/select-intellisense.sh nucleo_l496zg
 ```
 
-The selector repoints `build/compile_commands.json`; it does not copy or
-generate a database. Rebuilding the selected target refreshes the real CMake
-database. After changing targets, run `C/C++: Reset IntelliSense Database`
-from the VS Code command palette.
+The selector repoints `build/compile_commands.json` and the workspace's
+`Active Build` folder; it does not copy or generate build artifacts. Rebuilding
+the selected target refreshes the real CMake database. After changing targets,
+refresh the Explorer and run `C/C++: Reset IntelliSense Database` from the VS
+Code command palette.
 
 The browse database is limited to `k-fsw`, `kfsw-platform`, `kfsw-services`,
 and `kfsw-comms` source/header roots. Build output, imported modules, upstream
@@ -37,6 +38,10 @@ Zephyr trees, and Python environments are excluded from global browsing,
 watching, and search. Their headers remain available for explicit navigation
 because the active compilation database supplies the exact dependency and
 generated include paths, compiler defines, and flags.
+
+`Active Build` remains visible for manually inspecting generated artifacts.
+Folder-specific settings exclude it from global C/C++ browsing, filesystem
+watching, and text search without hiding it from the Explorer.
 
 ## Branch-to-merge workflow
 
