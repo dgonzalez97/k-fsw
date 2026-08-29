@@ -9,10 +9,12 @@ for integration diagnostics.
 
 ## Parameters
 
-The parameter service wraps the project-selected subset of libparam behind
-`include/kfsw/services/parameter.h`. The application validates a static local
-table, optionally restores persisted values, registers CSP parameter
-endpoints, and then starts routing.
+`CONFIG_KFSW_PARAM` owns the static local table and local API behind
+`include/kfsw/services/parameter.h`. It can run without CSP. Optional
+`CONFIG_KFSW_PARAM_PERSISTENCE` snapshots are also local and depend on storage,
+not communications. `CONFIG_KFSW_PARAM_CSP` adds the libparam-compatible CSP
+server, remote client, and remote cache; it depends on both the local parameter
+service and K-FSW CSP.
 
 The default table contains a read-only `node_id` plus writable
 `log_level`, `test_u32`, `test_i32`, and `test_float` values. Remote operations
@@ -24,8 +26,8 @@ accept a node explicitly.
 | Read | `param get <name>` | `param get <node> <name>` |
 | Write RAM | `param set <name> <value>` | `param set <node> <name> <value>` |
 
-Parameter transactions use CSP port 10 and list descriptions use CSP port 12
-in the current configuration.
+When the CSP adapter is enabled, parameter transactions use CSP port 10 and
+list descriptions use CSP port 12 in the current configuration.
 
 ## Parameter persistence
 

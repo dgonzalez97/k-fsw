@@ -77,7 +77,7 @@ int main(void)
 			      uart_info.baudrate);
 #endif
 
-#if CONFIG_KFSW_PARAM
+#if CONFIG_KFSW_PARAM_CSP
 		result = kfsw_param_server_start();
 		if (result != 0) {
 			kfsw_log_error("Failed to start parameter server: %d", result);

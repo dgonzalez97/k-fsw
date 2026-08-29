@@ -26,9 +26,9 @@ platform storage init + mount
             |
 parameter table init + snapshot restore
             |
-       CSP init
+   optional CSP init
             |
-parameter endpoint registration
+optional parameter CSP adapter
             |
        CSP router start
             |
@@ -57,8 +57,9 @@ silently reformatted.
 
 `kfsw-services` owns reusable application services and their public interfaces.
 The current composition includes boot/readiness markers, runtime-filtered
-logging, local and CSP parameters, explicit parameter snapshots, and a
-sandboxed file-transfer service.
+logging, local parameters, explicit parameter snapshots, an optional CSP
+parameter adapter, and a sandboxed file-transfer service. The local parameter
+and persistence paths do not depend on communications.
 
 ## Communications
 

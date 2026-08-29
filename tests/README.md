@@ -10,6 +10,7 @@ Run test scripts from the west workspace root, for example:
 ./k-fsw/tools/ci/integration.sh
 ./k-fsw/tools/ci/valgrind.sh
 ./k-fsw/tools/ci/robot.sh
+./k-fsw/tests/param-local-smoke.sh
 ./k-fsw/tools/ci/docs.sh
 ./k-fsw/tools/ci/all.sh
 ```
@@ -24,6 +25,11 @@ CSP, PARAM, persistence, storage, and FTP integration scripts.
 `tools/ci/robot.sh` validates every Robot suite and then runs all scenarios
 except those tagged `physical`. `tools/ci/all.sh` composes these software-only
 checks with the build, quality, unit, memory, and documentation gates.
+
+`tests/param-local-smoke.sh` builds a test-only native composition with local
+parameters and persistence enabled while both the CSP parameter adapter and CSP
+itself are disabled. It exercises local list/get/set validation, defaults, and
+snapshot save/load/clear without adding another supported product target.
 
 Current:
 

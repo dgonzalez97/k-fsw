@@ -9,3 +9,19 @@ tests:
       - native_sim/native/64
     integration_platforms:
       - native_sim/native/64
+  kfsw.services.param_csp:
+    tags:
+      - unit
+      - services
+      - param
+      - csp
+    extra_configs:
+      - CONFIG_KFSW_CSP=y
+      - CONFIG_KFSW_CSP_ADDRESS=7
+      - CONFIG_KFSW_CSP_HOSTNAME="kfsw-param-test"
+      - CONFIG_KFSW_CSP_KISS_UART=n
+      - CONFIG_KFSW_PARAM_CSP=y
+    platform_allow:
+      - native_sim/native/64
+    integration_platforms:
+      - native_sim/native/64

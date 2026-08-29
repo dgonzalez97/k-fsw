@@ -4,13 +4,17 @@
 
 #include <zephyr/ztest.h>
 
+#if CONFIG_KFSW_PARAM_CSP
 #include <param/param.h>
 #include <param/param_list.h>
 #include <param/param_queue.h>
+#endif
 
 #include <kfsw/services/parameter.h>
 
+#if CONFIG_KFSW_PARAM_CSP
 #define TEST_PROTOCOL_VERSION 2
+#endif
 
 struct table_summary {
 	size_t count;
@@ -36,22 +40,27 @@ static bool summarize_parameter(const struct kfsw_param_info *info, void *contex
 	return true;
 }
 
-ZTEST(services_param, test_kfsw_parameter_lifecycle_and_wire_queue)
+ZTEST(services_param, test_kfsw_parameter_lifecycle)
 {
 	struct kfsw_param_value value = {0};
 	struct table_summary table = {0};
+
+#if CONFIG_KFSW_PARAM_CSP
 	const param_t *wire_param;
 	param_queue_t encode_queue;
 	param_queue_t decode_queue;
 	uint8_t wire_buffer[32];
 	uint32_t serialized_value = 0x12345678U;
+#endif
 
 	zassert_false(kfsw_param_is_initialized());
 	zassert_equal(kfsw_param_get("test_u32", &value), -EACCES);
 	zassert_equal(kfsw_param_set("test_u32", &value), -EACCES);
 	zassert_equal(kfsw_param_visit(summarize_parameter, &table), -EACCES);
+#if CONFIG_KFSW_PARAM_CSP
 	zassert_equal(kfsw_param_server_start(), -EACCES);
 	zassert_equal(kfsw_param_remote_get(2U, "test_u32", &value), -EACCES);
+#endif
 
 	zassert_ok(kfsw_param_init());
 	zassert_ok(kfsw_param_init());
@@ -88,6 +97,11 @@ ZTEST(services_param, test_kfsw_parameter_lifecycle_and_wire_queue)
 	zassert_equal(kfsw_param_set("missing", &value), -ENOENT);
 	zassert_equal(kfsw_param_get(NULL, &value), -EINVAL);
 	zassert_equal(kfsw_param_set("test_u32", NULL), -EINVAL);
+	zassert_ok(kfsw_param_get("log_level", &value));
+	value.scalar.u8 = 5U;
+	zassert_equal(kfsw_param_set("log_level", &value), -ERANGE);
+
+#if CONFIG_KFSW_PARAM_CSP
 
 	wire_param = param_list_find_name(0, "test_u32");
 	zassert_not_null(wire_param);
@@ -102,6 +116,7 @@ ZTEST(services_param, test_kfsw_parameter_lifecycle_and_wire_queue)
 	zassert_equal(value.scalar.u32, serialized_value);
 
 	zassert_equal(kfsw_param_server_start(), -EACCES);
+#endif
 }
 
 ZTEST_SUITE(services_param, NULL, NULL, NULL, NULL, NULL);
