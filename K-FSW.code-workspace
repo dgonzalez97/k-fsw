@@ -1,0 +1,80 @@
+{
+    "folders": [
+        {
+            "name": "k-fsw",
+            "path": "."
+        },
+        {
+            "name": "kfsw-platform",
+            "path": "../kfsw-platform"
+        },
+        {
+            "name": "kfsw-services",
+            "path": "../kfsw-services"
+        },
+        {
+            "name": "kfsw-comms",
+            "path": "../kfsw-comms"
+        }
+    ],
+    "settings": {
+        "C_Cpp.default.compileCommands": "${workspaceFolder}/../build/compile_commands.json",
+        "C_Cpp.default.includePath": [
+            "${workspaceFolder}/../k-fsw/app/src",
+            "${workspaceFolder}/../kfsw-platform/include",
+            "${workspaceFolder}/../kfsw-services/include",
+            "${workspaceFolder}/../kfsw-comms/include"
+        ],
+        "C_Cpp.default.browse.path": [
+            "${workspaceFolder}/../k-fsw/app/src",
+            "${workspaceFolder}/../k-fsw/tests/unit",
+            "${workspaceFolder}/../kfsw-platform/include",
+            "${workspaceFolder}/../kfsw-platform/src",
+            "${workspaceFolder}/../kfsw-services/include",
+            "${workspaceFolder}/../kfsw-services/src",
+            "${workspaceFolder}/../kfsw-comms/include",
+            "${workspaceFolder}/../kfsw-comms/src"
+        ],
+        "C_Cpp.default.browse.limitSymbolsToIncludedHeaders": true,
+        "C_Cpp.exclusionPolicy": "checkFolders",
+        "C_Cpp.files.exclude": {
+            "**/.git/**": true,
+            "**/.venv/**": true,
+            "**/build/**": true,
+            "**/zephyr/tests/**": true,
+            "**/zephyr/samples/**": true,
+            "**/third_party/libcsp/doc/**": true,
+            "**/third_party/libcsp/examples/**": true,
+            "**/third_party/libcsp/samples/**": true,
+            "**/third_party/libcsp/unittests/**": true,
+            "**/third_party/libparam/doc/**": true,
+            "**/third_party/libparam/tests/**": true
+        },
+        "C_Cpp.intelliSenseCacheSize": 1024,
+        "files.watcherExclude": {
+            "**/.git/**": true,
+            "**/.venv/**": true,
+            "**/build/**": true,
+            "**/third_party/**": true,
+            "**/zephyr/tests/**": true,
+            "**/zephyr/samples/**": true
+        },
+        "search.exclude": {
+            "**/.git/**": true,
+            "**/.venv/**": true,
+            "**/build/**": true,
+            "**/bootloader/**": true,
+            "**/modules/**": true,
+            "**/third_party/**": true,
+            "**/zephyr/tests/**": true,
+            "**/zephyr/samples/**": true
+        }
+    },
+    "extensions": {
+        "recommendations": [
+            "marus25.cortex-debug",
+            "ms-vscode.cmake-tools",
+            "ms-vscode.cpptools"
+        ]
+    }
+}

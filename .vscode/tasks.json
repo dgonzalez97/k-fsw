@@ -16,6 +16,26 @@
             "problemMatcher": ["$gcc"]
         },
         {
+            "label": "K-FSW: Select IntelliSense Linux",
+            "type": "shell",
+            "command": "${workspaceFolder}/tools/select-intellisense.sh",
+            "args": ["linux"],
+            "options": {
+                "cwd": "${workspaceFolder}/.."
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "K-FSW: Select IntelliSense NUCLEO-L496ZG",
+            "type": "shell",
+            "command": "${workspaceFolder}/tools/select-intellisense.sh",
+            "args": ["nucleo_l496zg"],
+            "options": {
+                "cwd": "${workspaceFolder}/.."
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "K-FSW: Flash",
             "type": "shell",
             "command": "${workspaceFolder}/tools/flash.sh",
