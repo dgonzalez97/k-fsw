@@ -13,16 +13,14 @@ permissions:
 
 jobs:
   build:
-    name: BUILD / ${{ matrix.profile }}
+    name: BUILD / ${{ matrix.target }}
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        profile:
+        target:
           - linux
-          - linux_uart
           - nucleo_l496zg
-          - nucleo_l496zg_uart
 
     steps:
       - name: Check out K-FSW
@@ -44,8 +42,12 @@ jobs:
       - name: Validate west manifest
         run: west manifest --validate
 
-      - name: Build profile
-        run: ./k-fsw/tools/ci/build.sh "${{ matrix.profile }}"
+      - name: Build supported target
+        run: ./k-fsw/tools/ci/build.sh "${{ matrix.target }}"
+
+      - name: Check the CSP-disabled application composition
+        if: matrix.target == 'linux'
+        run: ./k-fsw/tests/build-linux-minimal.sh
 
   quality:
     name: QUALITY / clang-format + cppcheck

@@ -6,7 +6,7 @@ K-FSW separates reusable capabilities from product composition.
 
 | Repository | Ownership |
 | --- | --- |
-| `k-fsw` | Application composition, west manifest, profiles, developer tools, integration tests, CI, and aggregate documentation |
+| `k-fsw` | Application composition, west manifest, supported targets, developer tools, integration tests, CI, and aggregate documentation |
 | `kfsw-platform` | Zephyr-backed time, reset-cause, and storage lifecycle APIs |
 | `kfsw-services` | Boot/readiness, logging, parameters, persistence, and FTP services |
 | `kfsw-comms` | CSP lifecycle, routing, packet ownership, and UART/KISS APIs |
@@ -63,9 +63,10 @@ sandboxed file-transfer service.
 ## Communications
 
 `kfsw-comms` owns the shared CSP instance, router thread, interfaces, routes,
-and packet-ownership boundary. UART profiles register a KISS interface on a
-dedicated 115200 8N1 UART. Services register CSP endpoints after initialization
-and never start a second router.
+and packet-ownership boundary. A target that enables UART/KISS selects its UART
+with devicetree; generic communications code does not identify boards or MCU
+peripherals. Services register CSP endpoints after initialization and never
+start a second router.
 
 ## Dependency management
 

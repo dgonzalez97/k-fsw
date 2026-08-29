@@ -3,9 +3,9 @@
 Commands are registered at the Zephyr shell root. In examples, `kfsw:~$` is
 the prompt; `kfsw` is not a command or namespace.
 
-Availability follows the selected Kconfig profile. Use `<node>` for a decimal
-CSP address, `<name>` for a parameter name, and `<path>` for an FTP virtual
-path.
+Availability follows the selected Kconfig configuration. Use `<node>` for a
+decimal CSP address, `<name>` for a parameter name, and `<path>` for an FTP
+virtual path.
 
 ## Runtime and shell
 
@@ -40,7 +40,7 @@ CSP ping 2: success, rtt_ms=...
 
 | Command | Arguments | Description | Notes |
 | --- | --- | --- | --- |
-| `uart info` | — | Show UART configuration, KISS status, peer, and counters | Present in UART/KISS profiles |
+| `uart info` | — | Show UART configuration, KISS status, peer, and counters | Present when UART/KISS is enabled |
 | `uart test` | — | Verify the peer route and ping it over the UART interface | Requires a connected peer |
 
 ## Parameters

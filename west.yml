@@ -33,7 +33,7 @@ manifest:
 
     - name: kfsw-comms
       remote: kfsw
-      revision: 1ba3c2a30c80be1e608d19c90492d0a878ef3db2
+      revision: 905a2a776f7ab117f31a0f9bc7608467916017f3
       path: kfsw-comms
 
     - name: libcsp

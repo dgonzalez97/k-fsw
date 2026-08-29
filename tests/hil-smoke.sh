@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-KFSW_PROFILE="${1:-nucleo_l496zg}"
+KFSW_TARGET="${1:-nucleo_l496zg}"
 
-source "$(dirname "$0")/../tools/_common.sh" "$KFSW_PROFILE"
+source "$(dirname "$0")/../tools/_common.sh" "$KFSW_TARGET"
 
 capture_file="$(mktemp)"
 capture_pid=""
@@ -48,7 +48,7 @@ echo "PASS"
 echo
 echo "[3/5] Build"
 
-"$KFSW_ROOT/k-fsw/tools/build.sh" "$KFSW_PROFILE"
+"$KFSW_ROOT/k-fsw/tools/build.sh" "$KFSW_TARGET"
 
 echo
 echo "[4/5] Start serial capture BEFORE reset"

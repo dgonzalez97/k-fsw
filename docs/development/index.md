@@ -87,9 +87,9 @@ before merge.
 
 Place reusable platform mechanisms, services, communications, or equipment
 clients in the repository that owns that abstraction. Keep product enablement,
-profiles, Kconfig selection, and lifecycle order in `k-fsw`. Add a public
-header under the owner's `include/kfsw/` hierarchy only for APIs intended for
-cross-module use.
+supported targets, Kconfig selection, and lifecycle order in `k-fsw`. Add a
+public header under the owner's `include/kfsw/` hierarchy only for APIs intended
+for cross-module use.
 
 Update `west.yml` only after the dependency commit is published. Add unit tests
 near the module and end-to-end coverage in the composition repository when the

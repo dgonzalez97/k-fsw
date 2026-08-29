@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-KFSW_PROFILE="${1:-nucleo_l496zg}"
+KFSW_TARGET="${1:-nucleo_l496zg}"
 KFSW_PRISTINE="${KFSW_PRISTINE:-auto}"
 
 case "$KFSW_PRISTINE" in
@@ -13,19 +13,20 @@ case "$KFSW_PRISTINE" in
 		;;
 esac
 
-source "$(dirname "$0")/_common.sh" "$KFSW_PROFILE"
+source "$(dirname "$0")/_common.sh" "$KFSW_TARGET"
 
 echo
 echo "============================================================"
 echo " K-FSW BUILD"
 echo "============================================================"
-echo "Profile : $KFSW_PROFILE"
+echo "Target  : $KFSW_TARGET"
 echo "Board   : $ZEPHYR_BOARD"
 echo "Build   : $KFSW_BUILD_DIR"
 echo "Pristine: $KFSW_PRISTINE"
 echo
 
 west_args=()
+cmake_args=()
 
 if [[ -n "${KFSW_EXTRA_CONF_FILE:-}" ]]; then
 	west_args+=(--extra-conf "$KFSW_EXTRA_CONF_FILE")
@@ -33,6 +34,14 @@ fi
 
 if [[ -n "${KFSW_EXTRA_DTC_OVERLAY_FILE:-}" ]]; then
 	west_args+=(--extra-dtc-overlay "$KFSW_EXTRA_DTC_OVERLAY_FILE")
+fi
+
+if [[ -n "${KFSW_CONF_FILE:-}" ]]; then
+	cmake_args+=("-DCONF_FILE=$KFSW_CONF_FILE")
+fi
+
+if [[ ${#cmake_args[@]} -gt 0 ]]; then
+	west_args+=(-- "${cmake_args[@]}")
 fi
 
 west build \

@@ -13,10 +13,8 @@ workspace root.
 
 | Required check | Local command | Coverage |
 | --- | --- | --- |
-| `BUILD / linux` | `west manifest --validate && ./k-fsw/tools/ci/build.sh linux` | KFSW-Linux image |
-| `BUILD / linux_uart` | `west manifest --validate && ./k-fsw/tools/ci/build.sh linux_uart` | Linux UART/KISS image |
-| `BUILD / nucleo_l496zg` | `west manifest --validate && ./k-fsw/tools/ci/build.sh nucleo_l496zg` | Base NUCLEO image |
-| `BUILD / nucleo_l496zg_uart` | `west manifest --validate && ./k-fsw/tools/ci/build.sh nucleo_l496zg_uart` | NUCLEO UART/KISS image |
+| `BUILD / linux` | `west manifest --validate && ./k-fsw/tools/ci/build.sh linux && ./k-fsw/tests/build-linux-minimal.sh` | Supported KFSW-Linux image and a focused CSP-disabled composition build |
+| `BUILD / nucleo_l496zg` | `west manifest --validate && ./k-fsw/tools/ci/build.sh nucleo_l496zg` | Supported NUCLEO image with UART/KISS |
 | `QUALITY / clang-format + cppcheck` | `./k-fsw/tools/ci/quality.sh` | Formatting and project-owned C analysis |
 | `UNIT / Twister` | `./k-fsw/tools/ci/unit.sh` | ztest suites on native simulation |
 | `INTEGRATION / software` | `./k-fsw/tools/ci/integration.sh` | Shell, CSP, PARAM, persistence, storage, and FTP |
@@ -43,8 +41,8 @@ behavior. Reports are written to `build/twister/`.
 
 ## Integration tests
 
-`tools/ci/integration.sh` builds pristine `linux` and `linux_node2` images,
-then runs:
+`tools/ci/integration.sh` builds the supported `linux` target and a second
+instance using `tests/config/linux-node2.conf`, then runs:
 
 - `shell-smoke.sh` for boot markers, root shell commands, local PARAM, storage,
   and logging;

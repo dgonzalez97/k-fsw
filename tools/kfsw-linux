@@ -13,7 +13,7 @@ usage()
 		'Usage: tools/kfsw-linux <command> [arguments]' \
 		'' \
 		'Commands:' \
-		'  build    Build the KFSW-Linux profile' \
+		'  build    Build the supported KFSW-Linux target' \
 		'  run      Run KFSW-Linux with its shell on this terminal' \
 		'  help     Show this help'
 }
@@ -37,8 +37,7 @@ case "$command" in
 			"$KFSW_LINUX_TOOLS_DIR/build.sh" linux
 		fi
 
-		exec "$KFSW_LINUX_TOOLS_DIR/run-linux.sh" \
-			--profile linux --uart_stdinout "$@"
+		exec "$KFSW_LINUX_TOOLS_DIR/run-linux.sh" --uart_stdinout "$@"
 		;;
 	help|-h|--help)
 		usage

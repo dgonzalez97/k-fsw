@@ -5,7 +5,7 @@ get_filename_component(KFSW_WORKSPACE_ROOT
     ABSOLUTE
 )
 
-# Keep the west-managed module composition explicit for every build profile.
+# Keep the west-managed module composition explicit for every build.
 list(APPEND ZEPHYR_EXTRA_MODULES
     "${KFSW_WORKSPACE_ROOT}/kfsw-platform"
     "${KFSW_WORKSPACE_ROOT}/kfsw-comms/third_party/libcsp"
@@ -38,9 +38,31 @@ target_sources(app PRIVATE
     src/main.c
 )
 
-target_sources_ifdef(CONFIG_KFSW_DEBUG_SHELL app PRIVATE
-    src/debug_shell.c
-)
+if(CONFIG_KFSW_DEBUG_SHELL)
+    target_sources(app PRIVATE
+        src/shell/shell_system.c
+    )
+
+    target_sources_ifdef(CONFIG_KFSW_CSP app PRIVATE
+        src/shell/shell_csp.c
+    )
+    target_sources_ifdef(CONFIG_KFSW_CSP_KISS_UART app PRIVATE
+        src/shell/shell_uart.c
+    )
+    target_sources_ifdef(CONFIG_KFSW_PARAM app PRIVATE
+        src/shell/shell_param.c
+    )
+    target_sources_ifdef(CONFIG_KFSW_STORAGE app PRIVATE
+        src/diagnostics/storage_diagnostics.c
+        src/shell/shell_storage.c
+    )
+    target_sources_ifdef(CONFIG_KFSW_FTP app PRIVATE
+        src/diagnostics/ftp_diagnostics.c
+        src/shell/shell_ftp.c
+    )
+endif()
+
+target_include_directories(app PRIVATE src)
 
 target_link_libraries(app PRIVATE
     kfsw::platform

@@ -20,20 +20,21 @@ They do not send shell command strings to a remote node.
 
 ## Routing
 
-The native and physical UART profiles install the KISS interface as the direct
-default route. `csp routes` reports each address/prefix, interface, and optional
-next hop; `csp interfaces` reports packet and error counters.
+The supported native and physical targets install the KISS interface as the
+direct default route. `csp routes` reports each address/prefix, interface, and
+optional next hop; `csp interfaces` reports packet and error counters.
 
 Node 2 is the current integration-test peer, not a hard-coded product topology.
 Operator commands accept a CSP node in the range supported by their service.
 
 ## UART / KISS
 
-KISS frames CSP packets over a dedicated UART. KFSW configures 115200 baud,
-8 data bits, no parity, one stop bit, and no flow control.
+KISS frames CSP packets over a dedicated UART. The target overlay selects that
+device through the `kfsw,csp-uart` chosen property and provides its speed,
+pins, and framing.
 
 - KFSW-Linux exposes a native-simulator PTY for the KISS UART.
-- NUCLEO-L496ZG UART profiles use USART3 on PD8/PD9.
+- NUCLEO-L496ZG uses USART3 on PD8/PD9 at 115200 baud, 8N1.
 - The debug shell remains on native stdin/stdout or the ST-LINK virtual COM
   port; it is not multiplexed onto the CSP transport.
 

@@ -13,7 +13,7 @@ can enable it when packet routing, UART/KISS, or CSP-based services are needed.
 
 | Area | Current implementation |
 | --- | --- |
-| Application model | Modules selected through Kconfig profiles |
+| Application model | Supported targets composed through Kconfig and devicetree |
 | Reference platform | Zephyr RTOS |
 | Development target | KFSW-Linux on `native_sim/native/64` |
 | Embedded target | NUCLEO-L496ZG |
@@ -39,26 +39,24 @@ kfsw:~$ storage info
 kfsw:~$ csp ping 2
 ```
 
-The `csp` commands are available in profiles that enable the communications
-module.
+The `csp` commands are available in configurations that enable the
+communications module.
 
-## Supported profiles
+## Supported targets
 
-| Profile | Target | Purpose |
+| K-FSW target | Zephyr board | Tested default |
 | --- | --- | --- |
-| `linux` | `native_sim/native/64` | Primary simulated node |
-| `linux_node2` | `native_sim/native/64` | Software integration peer |
-| `linux_uart` | `native_sim/native/64` | Physical UART bridge |
-| `nucleo_l496zg` | NUCLEO-L496ZG | Base embedded image |
-| `nucleo_l496zg_uart` | NUCLEO-L496ZG | Embedded UART/KISS node |
+| `linux` | `native_sim/native/64` | CSP UART/KISS over a simulated PTY with the current services |
+| `nucleo_l496zg` | `nucleo_l496zg` | CSP UART/KISS on USART3 with the current services |
 
-Hosted CI exercises the simulated profiles. Board, ST-LINK, and serial-link
-checks are explicit local HIL steps.
+Transport selection remains modular. These rows describe the supported
+defaults, not every Kconfig combination. Hosted CI builds both targets; board,
+ST-LINK, and serial-link checks are explicit local HIL steps.
 
 ## Development flow
 
 1. Initialize or update the west workspace.
-2. Select a profile and build the reference application.
+2. Select a supported target and build the reference application.
 3. Run the relevant software checks under `tools/ci/`.
 4. Run physical HIL when the change depends on hardware.
 
