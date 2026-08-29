@@ -49,6 +49,14 @@ kfsw:~$ storage info
 | `linux` | `native_sim/native/64` | CSP UART/KISS over a simulated PTY, parameters, persistence, storage, and FTP |
 | `nucleo_l496zg` | `nucleo_l496zg` | CSP UART/KISS on USART3, parameters, persistence, storage, and FTP |
 
+Physical shell bring-up profiles are intentionally narrower and are not yet
+fully qualified K-FSW targets:
+
+| K-FSW target | Zephyr board | Verified scope |
+| --- | --- | --- |
+| `frdm_k64f` | `frdm_k64f/mk64f12` | OpenSDA UART shell: prompt, `status`, `version`, and `help` |
+| `rpi_pico_w` | `rpi_pico/rp2040/w` | USB CDC ACM shell: prompt, `status`, `version`, and `help` |
+
 The second Linux CSP node is an integration-test configuration under
 `tests/config/`; it is not another supported target.
 
