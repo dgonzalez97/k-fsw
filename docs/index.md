@@ -49,6 +49,11 @@ communications module.
 | `linux` | `native_sim/native/64` | CSP UART/KISS over a simulated PTY with the current services |
 | `nucleo_l496zg` | `nucleo_l496zg` | CSP UART/KISS on USART3 with the current services |
 
+The `frdm_k64f` (`frdm_k64f/mk64f12`) and `rpi_pico_w`
+(`rpi_pico/rp2040/w`) profiles are physical shell bring-ups. They verify the
+K-FSW prompt plus `status`, `version`, and `help`, but are not yet fully
+qualified targets.
+
 Transport selection remains modular. These rows describe the supported
 defaults, not every Kconfig combination. Hosted CI builds both targets; board,
 ST-LINK, and serial-link checks are explicit local HIL steps.

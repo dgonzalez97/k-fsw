@@ -85,6 +85,19 @@ and UART transport checks through `uart-csp-smoke.sh`. Reports are written to
 `persistence`. Hosted CI dry-runs all suites and executes tests selected by
 `--exclude physical`; it never needs a serial device or development board.
 
+The shell-only board profiles share one manual physical acceptance script:
+
+```bash
+./k-fsw/tests/hil/shell-smoke.sh frdm_k64f
+./k-fsw/tests/hil/shell-smoke.sh rpi_pico_w
+```
+
+Each target descriptor supplies its Zephyr board, flash USB identity, runner,
+console fixture, baud rate, and expected prompt. The script builds, flashes,
+and checks the prompt plus `status`, `version`, and `help` without requiring
+CSP or storage. After a host-side Pico UF2 copy and usbipd reattachment, set
+`KFSW_FLASH=0` to run the same checks against the already-flashed application.
+
 ### Terminal runner submodule
 
 [`robot-terminal-runner`](https://github.com/dgonzalez97/robot-terminal-runner)

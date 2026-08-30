@@ -22,7 +22,9 @@
 
 int main(void)
 {
+#if CONFIG_KFSW_STORAGE || CONFIG_KFSW_PARAM || CONFIG_KFSW_CSP
 	int result;
+#endif
 
 	kfsw_log_info("K-FSW application starting");
 
