@@ -7,6 +7,7 @@
     <tab type="user" visible="yes" url="communications.html" title="Communications"/>
     <tab type="user" visible="yes" url="services.html" title="Services"/>
     <tab type="user" visible="yes" url="targets.html" title="Targets"/>
+    <tab type="user" visible="yes" url="ground.html" title="Ground"/>
     <tab type="user" visible="yes" url="commands.html" title="Command Reference"/>
     <tab type="user" visible="yes" url="testing.html" title="Testing"/>
     <tab type="user" visible="yes" url="development.html" title="Development"/>

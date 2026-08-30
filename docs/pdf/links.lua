@@ -6,6 +6,7 @@ local references = {
   communications = { "CSP and Communications", "communications" },
   services = { "Services and Storage", "services" },
   targets = { "Boards and Targets", "targets" },
+  ground = { "Ground Composition", "ground" },
   commands = { "Command Reference", "commands" },
   development = { "Development", "development" },
   testing = { "Testing", "testing" },

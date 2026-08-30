@@ -20,6 +20,7 @@ architecture, operations, testing, development, and the public C API.
 
 - full reference application on KFSW-Linux and NUCLEO-L496ZG
 - physical shell bring-up on FRDM-K64F and Raspberry Pi Pico W
+- configurable `k-ground` Linux nodes with local two-node CSP verification
 - optional CSP routing with UART/KISS and RDP
 - local typed parameters and persistence without a CSP dependency
 - optional remote parameter access over CSP
@@ -62,6 +63,18 @@ full-service K-FSW targets:
 
 The second Linux CSP node is an integration-test configuration under
 `tests/config/`; it is not another supported target.
+
+## Try k-ground
+
+Run an interactive ground node 16 linked to local peer 17:
+
+```bash
+./k-fsw/tools/k-ground demo
+```
+
+The prompt is `k-ground#`; `status`, `version`, and existing `csp` commands are
+unchanged. See the [ground composition guide](docs/ground/index.md) for
+standalone launch options and the pending Holybro HIL boundary.
 
 ## Project layout
 

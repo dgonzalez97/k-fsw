@@ -182,8 +182,9 @@ The application/service packet path stays the same, which is the point of the
 interface boundary.
 
 There is currently no CAN/CFP interface, automatic route discovery, flight
-routing table, redundant link selection, ZMQ interface, or radio interface in
-the K-FSW composition.
+routing table, redundant link selection, ZMQ interface, or production radio
+driver in the K-FSW composition. The k-ground Holybro HIL entry point reuses
+this direct serial KISS route and remains physically pending.
 
 ## KISS: packets on a serial stream
 
@@ -267,8 +268,9 @@ checks storage, transfers 4 KiB and 16 KiB files with FTP, accesses a remote
 parameter afterward, and requires nonzero clean KISS counters.
 
 This is physical UART/KISS qualification for the current NUCLEO/FTDI bench. It
-is not evidence for CSP over RF. No Holybro or SiK radio integration is merged,
-and K-FSW does not claim a supported radio path.
+is not evidence for CSP over RF. The Holybro/SiK fixture described in @ref
+ground prepares raw and CSP/KISS acceptance commands, but K-FSW does not claim
+a physically verified radio path.
 
 ## RDP: reliable CSP datagrams
 

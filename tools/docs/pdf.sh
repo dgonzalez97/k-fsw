@@ -45,6 +45,7 @@ manual_sources=(
 	"$KFSW_REPO_DIR/docs/communications/index.md"
 	"$KFSW_REPO_DIR/docs/services/index.md"
 	"$KFSW_REPO_DIR/docs/targets/index.md"
+	"$KFSW_REPO_DIR/docs/ground/index.md"
 	"$KFSW_REPO_DIR/docs/commands/index.md"
 	"$KFSW_REPO_DIR/docs/testing/index.md"
 	"$KFSW_REPO_DIR/docs/development/index.md"
