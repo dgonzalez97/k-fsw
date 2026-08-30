@@ -3,11 +3,14 @@
     <tab type="mainpage" visible="yes" title="Home"/>
     <tab type="user" visible="yes" url="getting_started.html" title="Getting Started"/>
     <tab type="user" visible="yes" url="architecture.html" title="Architecture"/>
+    <tab type="user" visible="yes" url="zephyr_integration.html" title="Zephyr"/>
     <tab type="user" visible="yes" url="communications.html" title="Communications"/>
     <tab type="user" visible="yes" url="services.html" title="Services"/>
+    <tab type="user" visible="yes" url="targets.html" title="Targets"/>
     <tab type="user" visible="yes" url="commands.html" title="Command Reference"/>
     <tab type="user" visible="yes" url="testing.html" title="Testing"/>
     <tab type="user" visible="yes" url="development.html" title="Development"/>
+    <tab type="user" visible="yes" url="project_status.html" title="Status"/>
     <tab type="user" visible="yes" url="api_reference.html" title="API Reference">
       <tab type="modules" visible="yes" title="API Groups"/>
       <tab type="classes" visible="yes" title="Data Types">

@@ -22,4 +22,7 @@ host transports remain future work.
 
 ## kfsw-modules
 
-Reusable external spacecraft equipment, subsystem and device clients.
+Reserved name for future external spacecraft equipment, subsystem, and device
+clients. The local placeholder has no committed implementation and is not a
+project in the current `west.yml`; it is not part of the reproducible K-FSW
+composition.

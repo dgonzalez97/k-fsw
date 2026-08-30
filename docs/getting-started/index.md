@@ -1,40 +1,54 @@
 # Getting Started {#getting_started}
 
-K-FSW uses a west workspace. The `k-fsw` repository contains the application,
-manifest, supported targets, and developer tools; west checks out Zephyr and
-the K-FSW module repositories beside it.
+## Workspace model
 
-The commands in this chapter use the following layout:
+K-FSW is developed as a west workspace. The `k-fsw` repository is the
+manifest and application-composition repository; west checks out Zephyr and
+the three reusable K-FSW repositories beside it.
+
+Commands in this manual assume:
 
 ```text
-k-fsw-workspace/
-├── k-fsw/
-├── kfsw-platform/
-├── kfsw-services/
-├── kfsw-comms/
-├── zephyr/
-└── build/
+k-fsw-workspace/                    workspace root
+├── .venv/                          Python environment, including west
+├── .west/                          west workspace metadata
+├── k-fsw/                          manifest/application repository
+├── kfsw-platform/                  pinned dependency
+├── kfsw-services/                  pinned dependency
+├── kfsw-comms/                     pinned dependency
+│   └── third_party/libcsp/          separate pinned west project
+├── zephyr/                         pinned Zephyr tree
+├── modules/                        Zephyr-imported projects
+└── build/                          generated output
 ```
 
-Run project commands from `k-fsw-workspace/`, which is referred to below as the
-workspace root.
+Run project scripts from the workspace root. The scripts resolve their own
+locations and automatically source `.venv/bin/activate` when it exists.
+Direct `west` commands require either an activated environment or the explicit
+path `.venv/bin/west`.
 
-## Requirements
+## Host requirements
 
-The reference build is verified by CI on Ubuntu 24.04 with Python 3.12. Other
-Linux distributions can be used when they provide the tools required by
-Zephyr 4.4.0.
+Hosted CI uses Ubuntu 24.04 and Python 3.12. Other Linux distributions can
+work when they satisfy Zephyr 4.4.0 and the selected board/toolchain
+requirements.
 
-| Item | Requirement |
+| Area | Required for |
 | --- | --- |
-| Host tools | CMake 3.20.5+, Python 3.12+, devicetree compiler 1.4.6+, Git, and Ninja |
-| Workspace tool | west |
-| RTOS revision | Zephyr 4.4.0, pinned by `west.yml` |
-| Native build | Host C/C++ toolchain for `native_sim/native/64` |
-| Embedded build | Zephyr SDK with the `arm-zephyr-eabi` toolchain |
-| Board tools | OpenOCD and ST-LINK access for flash and debug |
+| Git, CMake 3.20.5+, Ninja, devicetree compiler, host compiler | Workspace and native build |
+| Python 3.12+, `venv`, west, Zephyr Python requirements | Configuration, build, test tooling |
+| Zephyr SDK with `arm-zephyr-eabi` | MCU images |
+| Doxygen | HTML manual/API build |
+| Pandoc and WeasyPrint | Printable PDF |
+| clang-format and cppcheck | Static quality gate |
+| Valgrind | Native memory gate |
+| socat and tmux | Two-node integration and Robot terminal scenarios |
+| OpenOCD, USB access, serial tools | Physical board flash/debug/HIL |
 
-On Ubuntu, install the host packages used by Zephyr with:
+The Zephyr
+[getting-started guide](https://docs.zephyrproject.org/4.4.0/develop/getting_started/index.html)
+is authoritative for supported host dependencies and SDK installation. A
+typical Ubuntu package baseline is:
 
 ```bash
 sudo apt install --no-install-recommends \
@@ -43,202 +57,365 @@ sudo apt install --no-install-recommends \
   g++-multilib libsdl2-dev libmagic1
 ```
 
-On an AArch64 host, omit `gcc-multilib` and `g++-multilib`, which are not
-available for that architecture.
+On an AArch64 host, omit `gcc-multilib` and `g++-multilib`. Install a Zephyr
+SDK compatible with Zephyr 4.4.0 and either place it where Zephyr detects it or
+export `ZEPHYR_SDK_INSTALL_DIR`.
 
-Install a Zephyr SDK compatible with Zephyr 4.4.0 before building the NUCLEO
-target. If it is not installed at a location detected by Zephyr, set
-`ZEPHYR_SDK_INSTALL_DIR` in the shell used for the build.
+## Create a workspace
 
-## Create the workspace
+Choose an empty parent directory and clone the manifest repository:
 
-1. Create a workspace directory and enter it:
+```bash
+mkdir k-fsw-workspace
+cd k-fsw-workspace
+git clone https://github.com/dgonzalez97/k-fsw.git
+```
 
-   ```bash
-   mkdir k-fsw-workspace
-   cd k-fsw-workspace
-   ```
+Create the Python environment and install west:
 
-2. Clone the manifest repository:
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install west
+```
 
-   ```bash
-   git clone https://github.com/dgonzalez97/k-fsw.git
-   ```
+Initialize west from the local manifest and resolve all exact pins:
 
-3. Create the Python environment and install west:
+```bash
+west init -l k-fsw
+west update
+```
 
-   ```bash
-   python3 -m venv .venv
-   . .venv/bin/activate
-   pip install west
-   ```
+Install the Python requirements selected by the pinned Zephyr tree and export
+Zephyr's CMake package:
 
-4. Initialize and update the west workspace:
+```bash
+python -m pip install -r zephyr/scripts/requirements.txt
+west zephyr-export
+west manifest --validate
+```
 
-   ```bash
-   west init -l k-fsw
-   west update
-   ```
+Initialize the test-only Robot terminal runner submodule:
 
-5. Install the Python requirements selected by the pinned Zephyr revision:
+```bash
+git -C k-fsw submodule update --init --recursive
+```
 
-   ```bash
-   pip install -r zephyr/scripts/requirements.txt
-   ```
+That submodule is not flight code and is not managed by `west.yml`; both steps
+are therefore required for a complete development/test workspace.
 
-6. Export the Zephyr CMake package and validate the manifest:
+## Update an existing workspace
 
-   ```bash
-   west zephyr-export
-   west manifest --validate
-   ```
+When `k-fsw/west.yml` changes:
 
-The K-FSW scripts activate `.venv` automatically when it is present at the
-workspace root.
+```bash
+cd k-fsw-workspace
+. .venv/bin/activate
+git -C k-fsw switch main
+git -C k-fsw pull --ff-only
+west manifest --validate
+west update
+git -C k-fsw submodule update --init --recursive
+```
+
+`west update` may print that it left a local dependency branch behind and will
+normally detach dependency `HEAD` at the manifest commit. This is expected.
+Before updating, commit or otherwise preserve intentional work in every
+dependency; west must not be used as a substitute for understanding a dirty
+working tree.
+
+If the shell reports `west: command not found`, activate `.venv` or call:
+
+```bash
+./.venv/bin/west update
+```
+
+K-FSW's build/test scripts activate the environment automatically, but an
+unwrapped `west update` cannot do that for itself.
 
 ## First KFSW-Linux build
 
-KFSW-Linux is the reference application built for Zephyr native simulation. It
-uses the same platform, service, communications, and shell modules as the
-embedded target.
+The wrapper is the easiest entry point:
 
-1. Change to the workspace root and activate the environment if it is not
-   already active:
+```bash
+./k-fsw/tools/kfsw-linux build
+```
 
-   ```bash
-   cd k-fsw-workspace
-   . .venv/bin/activate
-   ```
-
-2. Validate the manifest:
-
-   ```bash
-   west manifest --validate
-   ```
-
-3. Build the `linux` target:
-
-   ```bash
-   ./k-fsw/tools/kfsw-linux build
-   ```
-
-The wrapper prints the selected target, Zephyr board, output directory, and
-pristine mode before calling `west build`. The executable is written to:
+It selects the K-FSW `linux` target, which maps to
+`native_sim/native/64`, and writes generated files to `build/linux/`. The
+executable is:
 
 ```text
 build/linux/zephyr/zephyr.exe
 ```
 
-## Run KFSW-Linux
+The equivalent generic command is:
 
-Start the application in the current terminal:
+```bash
+./k-fsw/tools/build.sh linux
+```
+
+The wrapper prints the target, Zephyr board, output directory, and pristine
+mode before invoking `west build`. A normal incremental build uses
+`KFSW_PRISTINE=auto`. Force full CMake reconfiguration after changing a board,
+toolchain, module set, or confusing generated state:
+
+```bash
+KFSW_PRISTINE=always ./k-fsw/tools/build.sh linux
+```
+
+Do not manually repair `build/linux/zephyr/.config`. Fix the relevant Kconfig,
+`.conf`, devicetree overlay, or build input and regenerate it.
+
+## Run KFSW-Linux
 
 ```bash
 ./k-fsw/tools/kfsw-linux run
 ```
 
-If the executable is missing, the run command builds it first. A normal start
-prints the automation markers and then the Zephyr shell prompt:
+The wrapper builds first when necessary and starts the native executable with
+a persistent simulated flash image. Normal startup contains:
 
 ```text
+[INFO] K-FSW application starting
+...
 @BOOT sw=kfsw-dev board=native_sim/native/64 ...
 @READY uptime_ms=...
 
 kfsw:~$
 ```
 
-The line beginning `uart_1 connected to pseudotty:` identifies the simulated
-CSP KISS transport. It is not the interactive shell.
+The native UART driver also reports a pseudoterminal for CSP. That PTY belongs
+to KISS transport automation; keep using the current terminal for shell
+commands.
 
-Try a few read-only commands:
+After `@READY`, try read-only commands:
 
 ```text
 kfsw:~$ status
 kfsw:~$ version
-kfsw:~$ param get test_u32
+kfsw:~$ time
 kfsw:~$ storage info
+kfsw:~$ param list
+kfsw:~$ param get test_u32
 kfsw:~$ csp info
+kfsw:~$ csp routes
 ```
 
-Press `Ctrl-C` to stop the node.
+Node 1 cannot ping node 2 until a peer and serial bridge are running. Use
+`tests/csp-smoke.sh` or the Robot terminal suite for that topology rather than
+manually guessing PTY paths.
 
-## Rebuild KFSW-Linux
+Press `Ctrl-C` to stop a normal interactive node. Its default simulated flash
+file remains, so explicitly saved parameters and FTP files can survive the
+next run.
 
-For normal development, run the same build command again:
+## Inspect the resolved build
+
+When behavior differs from an expected target, inspect the generated inputs:
 
 ```bash
-./k-fsw/tools/kfsw-linux build
+grep '^CONFIG_KFSW_' build/linux/zephyr/.config
+grep '^CONFIG_BOARD' build/linux/zephyr/.config
 ```
 
-The default pristine mode is `auto`, so Zephyr decides whether the existing
-build directory can be reused. Force a clean build when changing toolchains or
-working through stale CMake state:
+The compilation database and ELF are useful diagnostics:
 
-```bash
-KFSW_PRISTINE=always ./k-fsw/tools/kfsw-linux build
+```text
+build/linux/compile_commands.json
+build/linux/zephyr/zephyr.elf
+build/linux/zephyr/zephyr.map
 ```
 
-Build both supported targets from clean directories with the CI entry point:
+The application prints its Zephyr board target through `version` and `status`.
+This is more reliable than assuming a build directory still contains the
+configuration implied by its name.
+
+## Build the full reference targets
+
+Build both hosted-CI targets from clean directories:
 
 ```bash
 ./k-fsw/tools/ci/build.sh
 ```
 
-## Build the NUCLEO-L496ZG image
-
-`nucleo_l496zg` is the supported K-FSW target for the current board. Its tested
-default enables CSP UART/KISS on USART3 using PD8/PD9 at 115200 baud, together
-with parameters, persistence, storage, and FTP. The debug shell and logs remain
-on the ST-LINK virtual COM port.
-
-Build it from the workspace root:
+Or build them individually:
 
 ```bash
+./k-fsw/tools/build.sh linux
 ./k-fsw/tools/build.sh nucleo_l496zg
 ```
 
-This is a supported default, not an architecture-wide requirement. CSP and
-KISS remain Kconfig options, and another board can select a different transport
-and UART in its own configuration and overlay.
+`tools/ci/build.sh` defaults to only these two full reference targets. The
+FRDM and Pico shell profiles use the generic builder but are not in the hosted
+matrix:
 
-## Flash and inspect a board
+```bash
+./k-fsw/tools/build.sh frdm_k64f
+./k-fsw/tools/build.sh rpi_pico_w
+```
 
-1. Connect the board through ST-LINK.
+See @ref targets before interpreting a successful shell-profile build as
+service support.
 
-2. Build and flash the selected target:
+## NUCLEO flash, serial, and debug loop
 
-   ```bash
-   ./k-fsw/tools/build.sh nucleo_l496zg
-   ./k-fsw/tools/flash.sh nucleo_l496zg
-   ```
+Connect the NUCLEO through ST-LINK, then build and flash:
 
-3. Capture 30 seconds of serial output from the default `/dev/ttyACM0` device:
+```bash
+./k-fsw/tools/build.sh nucleo_l496zg
+./k-fsw/tools/flash.sh nucleo_l496zg
+```
 
-   ```bash
-   ./k-fsw/tools/serial.sh nucleo_l496zg 30
-   ```
+Capture 30 seconds of the default console:
 
-   Use a stable device path when the board is assigned a different name:
+```bash
+./k-fsw/tools/serial.sh nucleo_l496zg 30
+```
 
-   ```bash
-   KFSW_SERIAL=/dev/serial/by-id/<st-link-device> \
-     ./k-fsw/tools/serial.sh nucleo_l496zg 30
-   ```
+Prefer `/dev/serial/by-id/` for repeatable benches:
 
-4. Start an OpenOCD server and attach the debugger when source-level debugging
-   is needed:
+```bash
+KFSW_SERIAL=/dev/serial/by-id/<st-link-device> \
+  ./k-fsw/tools/serial.sh nucleo_l496zg 30
+```
 
-   ```bash
-   ./k-fsw/tools/debugserver.sh nucleo_l496zg
-   ./k-fsw/tools/debug.sh nucleo_l496zg
-   ```
+For an interactive serial program, configure 115200 baud, 8 data bits, no
+parity, and one stop bit. This console is the ST-LINK shell/log path. The CSP
+KISS path is separate USART3 wiring; @ref communications covers the physical
+bench.
 
-Flashing, serial capture, and debugging require local hardware and are not part
-of the GitHub-hosted software gate.
+Source debugging uses Zephyr's OpenOCD runner. Start the server:
 
-## Next steps
+```bash
+./k-fsw/tools/debugserver.sh nucleo_l496zg
+```
 
-- See @ref commands for shell syntax and examples.
-- See @ref testing for the local CI and HIL commands.
-- See @ref development before changing dependency pins or opening a pull
-  request.
+Then, in another terminal:
+
+```bash
+./k-fsw/tools/debug.sh nucleo_l496zg
+```
+
+`debug.sh` launches the configured GDB client through west. It is not required
+when using a VS Code Cortex-Debug launch configuration, but the same ELF,
+OpenOCD server, and generated source paths apply.
+
+## Run focused software checks
+
+Use the narrowest relevant check during iteration:
+
+```bash
+./k-fsw/tools/ci/quality.sh
+./k-fsw/tools/ci/unit.sh
+./k-fsw/tools/ci/integration.sh
+./k-fsw/tools/ci/valgrind.sh
+./k-fsw/tools/ci/robot.sh
+./k-fsw/tools/ci/docs.sh
+```
+
+Run the complete software-only sequence before opening a composition pull
+request:
+
+```bash
+./k-fsw/tools/ci/all.sh
+```
+
+It does not access physical boards. HIL is always an explicit command. See
+@ref testing for prerequisites, artifacts, and proof boundaries.
+
+## Build documentation
+
+Install Doxygen for HTML. Install the printable guide dependencies into the
+workspace environment:
+
+```bash
+./.venv/bin/pip install -r k-fsw/docs/pdf/requirements.txt
+```
+
+Build both outputs:
+
+```bash
+./k-fsw/tools/docs/build.sh
+./k-fsw/tools/docs/pdf.sh
+```
+
+Outputs are generated, not committed:
+
+```text
+build/docs/html/index.html
+build/docs/doxygen-warnings.log
+build/k-fsw-guide.pdf
+```
+
+Serve HTML from the workspace with:
+
+```bash
+./k-fsw/tools/docs/serve.sh
+```
+
+The Doxygen site includes the generated C API. The PDF deliberately contains
+only the engineering manual.
+
+## Common failures
+
+### `west` is not available
+
+Activate the workspace environment:
+
+```bash
+. .venv/bin/activate
+west --version
+```
+
+If `.venv` has no west executable, install it with that environment's Python.
+
+### A pinned repository is missing
+
+From the workspace root:
+
+```bash
+west manifest --validate
+west update
+```
+
+Do not clone an arbitrary branch into the expected path; the build is defined
+by the manifest revision.
+
+### An MCU toolchain is not found
+
+Verify the Zephyr SDK installation and set, for example:
+
+```bash
+export ZEPHYR_SDK_INSTALL_DIR=/path/to/zephyr-sdk
+```
+
+Then force a pristine build so CMake does not retain the previous toolchain
+decision.
+
+### A serial device changes name
+
+Use a stable `/dev/serial/by-id/` path and export `KFSW_SERIAL` (or the
+HIL-specific variable documented by the test). Check group permissions and
+whether another terminal already owns the device.
+
+### A service command is missing
+
+Command registration follows Kconfig. Inspect the target `.conf` and generated
+`.config`. The FRDM and Pico shell profiles intentionally omit CSP, PARAM,
+storage, UART/KISS, and FTP command domains.
+
+### Storage contains old developer state
+
+The normal Linux runner preserves its flash image. Tests use isolated files.
+When a clean developer image is genuinely intended, use the native simulator's
+explicit flash erase/remove options or move the specific
+`build/linux/kfsw-storage.bin` aside. Do not delete the workspace or an entire
+build tree as a first response to one stateful fixture.
+
+## Where to go next
+
+Read @ref architecture and @ref zephyr_integration before adding a service or
+target. Read @ref development before touching a west-managed dependency, and
+read @ref commands before using write/persistence or file-transfer operations.
