@@ -29,6 +29,10 @@ format_roots=("$KFSW_REPO_DIR/app/src")
 	format_roots+=("$KFSW_REPO_DIR/tests/unit")
 [[ -d "$KFSW_REPO_DIR/tests/hil/radio-uhf/holybro/raw-peer/src" ]] && \
 	format_roots+=("$KFSW_REPO_DIR/tests/hil/radio-uhf/holybro/raw-peer/src")
+[[ -d "$KFSW_WORKSPACE_ROOT/kfsw-modules/radio-uhf" ]] && \
+	format_roots+=("$KFSW_WORKSPACE_ROOT/kfsw-modules/radio-uhf")
+[[ -d "$KFSW_WORKSPACE_ROOT/kfsw-modules/tests" ]] && \
+	format_roots+=("$KFSW_WORKSPACE_ROOT/kfsw-modules/tests")
 
 mapfile -d '' format_sources < <(
 	find "${format_roots[@]}" -type f \( -name '*.c' -o -name '*.h' \) \
@@ -62,6 +66,7 @@ analysis_roots=(
 	"$KFSW_WORKSPACE_ROOT/kfsw-platform/src"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src"
 	"$KFSW_WORKSPACE_ROOT/kfsw-comms/src"
+	"$KFSW_WORKSPACE_ROOT/kfsw-modules/radio-uhf"
 )
 
 mapfile -d '' analysis_sources < <(
@@ -88,9 +93,14 @@ cppcheck \
 	-DCONFIG_KFSW_PARAM=1 \
 	-DCONFIG_KFSW_PARAM_CSP=1 \
 	-DCONFIG_KFSW_PARAM_PERSISTENCE=1 \
+	-DCONFIG_KFSW_RADIO_UHF=1 \
+	-DCONFIG_KFSW_RADIO_UHF_HOLYBRO=1 \
+	-DCONFIG_KFSW_RADIO_UHF_SHELL=1 \
+	-DCONFIG_KFSW_RADIO_UHF_EXPECTED_SERIAL_BAUD=57600 \
 	-I "$KFSW_WORKSPACE_ROOT/kfsw-platform/include" \
 	-I "$KFSW_WORKSPACE_ROOT/kfsw-services/include" \
 	-I "$KFSW_WORKSPACE_ROOT/kfsw-comms/include" \
+	-I "$KFSW_WORKSPACE_ROOT/kfsw-modules/radio-uhf/include" \
 	"${analysis_sources[@]}"
 
 echo "QUALITY RESULT: PASS"

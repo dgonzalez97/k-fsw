@@ -77,6 +77,12 @@ node16_executable="$KGROUND_BUILD_ROOT/node-16/zephyr/zephyr.exe"
 node19_executable="$KGROUND_BUILD_ROOT/node-19/zephyr/zephyr.exe"
 [[ -x "$node16_executable" ]] || fail "node 16 executable is missing"
 [[ -x "$node19_executable" ]] || fail "node 19 executable is missing"
+grep -Fq 'CONFIG_KFSW_RADIO_UHF_HOLYBRO=y' \
+	"$KGROUND_BUILD_ROOT/node-16/zephyr/.config" || \
+	fail "node 16 did not compose the Holybro UHF module"
+grep -Fq '# CONFIG_KFSW_RADIO_UHF is not set' \
+	"$KGROUND_BUILD_ROOT/node-19/zephyr/.config" || \
+	fail "node 19 unexpectedly owns the UHF radio module"
 
 mkfifo "$work_dir/node16.in" "$work_dir/node19.in"
 exec 3<>"$work_dir/node16.in"
@@ -128,7 +134,7 @@ if [[ "$mode" == "terminal" ]]; then
 	exit 0
 fi
 
-printf '%s\n' 'status' 'version' 'csp info' 'csp ping 19' >&3
+printf '%s\n' 'status' 'version' 'uhf status' 'csp info' 'csp ping 19' >&3
 printf '%s\n' 'status' 'version' 'csp info' 'csp ping 16' >&4
 
 wait_for_output "$work_dir/node16.log" "CSP ping 19: success" \
@@ -141,6 +147,9 @@ node16_expected=(
 	"Name: kfsw-gnd-uhf"
 	"CSP node: 16"
 	"hostname: kfsw-gnd-uhf"
+	"implementation: holybro-sik"
+	"expected serial: 57600 8N1"
+	"RF link: unknown"
 	"kfsw-gnd-uhf# "
 )
 node19_expected=(
