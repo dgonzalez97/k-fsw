@@ -263,6 +263,7 @@ Ask what contract is changing:
 | Cross-target monotonic/reset/storage lifecycle | `kfsw-platform` |
 | Logging, parameter, persistence, or FTP service behavior | `kfsw-services` |
 | CSP initialization, route/interface, KISS, packet ownership | `kfsw-comms` |
+| Reusable mission-specific device or subsystem behavior | `kfsw-modules` |
 | Target mapping/defaults, devicetree binding, application order, shell adapter, integration/HIL, aggregate docs | `k-fsw` |
 
 A public header belongs under the owner's `include/kfsw/` tree only when other
@@ -297,7 +298,7 @@ Open the committed multi-root workspace:
 code k-fsw/K-FSW.code-workspace
 ```
 
-It exposes the four owned source repositories plus one `Active Build` folder:
+It exposes the five owned source repositories plus one `Active Build` folder:
 
 ```text
 K-FSW.code-workspace
@@ -305,6 +306,7 @@ K-FSW.code-workspace
 ├── kfsw-platform
 ├── kfsw-services
 ├── kfsw-comms
+├── kfsw-modules
 └── Active Build -> build/<selected-target>
 ```
 

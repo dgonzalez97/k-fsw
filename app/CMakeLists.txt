@@ -11,6 +11,7 @@ list(APPEND ZEPHYR_EXTRA_MODULES
     "${KFSW_WORKSPACE_ROOT}/kfsw-comms/third_party/libcsp"
     "${KFSW_WORKSPACE_ROOT}/kfsw-comms"
     "${KFSW_WORKSPACE_ROOT}/kfsw-services"
+    "${KFSW_WORKSPACE_ROOT}/kfsw-modules"
 )
 
 # Apply K-FSW's libcsp feature policy before Zephyr loads the module. The FTP
@@ -32,6 +33,11 @@ endif()
 if(NOT TARGET kfsw_comms)
     message(FATAL_ERROR
         "kfsw-comms was not discovered as a Zephyr module")
+endif()
+
+if(NOT ZEPHYR_KFSW_MODULES_MODULE_DIR)
+    message(FATAL_ERROR
+        "kfsw-modules was not discovered as a Zephyr module")
 endif()
 
 target_sources(app PRIVATE

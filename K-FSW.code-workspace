@@ -17,6 +17,10 @@
             "path": "../kfsw-comms"
         },
         {
+            "name": "kfsw-modules",
+            "path": "../kfsw-modules"
+        },
+        {
             "name": "Active Build",
             "path": "../build/active"
         }
