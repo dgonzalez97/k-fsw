@@ -44,14 +44,15 @@ Current:
 - explicit parameter save/load/defaults/clear semantics across native processes
 - corrupt parameter-snapshot boot fallback without filesystem corruption
 - two-node native CSP/KISS parameter integration test
-- k-ground nodes 16 and 17 with ground identity and bidirectional CSP ping
+- k-ground UHF gateway node 16 and operator node 19 with role-specific prompts
+  and bidirectional CSP ping
 - K-FSW FTP protocol/path/CRC/atomic-commit ztests
 - two-node CSP/RDP file transfer for zero-byte through 8 KiB files
 - LIST/STAT/PUT/GET, byte comparison, missing-file, and traversal checks
 - Robot operator-level remote file transfer through the KFSW-Linux shell
 - NUCLEO boot/readiness HIL smoke test
 - physical FTDI-to-NUCLEO CSP UART HIL test
-- pending raw and CSP/KISS Holybro UHF fixtures
+- raw and CSP/KISS Holybro UHF HIL runners with an honest failing-bench result
 
 ## Robot Framework system and HIL tests
 
@@ -85,15 +86,16 @@ KFSW_FTDI_DEVICE=/dev/serial/by-id/usb-FTDI_DEVICE-if00-port0 \
 and UART transport checks through `uart-csp-smoke.sh`. Reports are written to
 `build/robot/` by default. The compact tag vocabulary is `smoke`, `software`,
 `physical`, `terminal`, `shell`, `csp`, `uart`, `param`, `storage`, `ftp`, and
-`persistence`, with `holybro`, `radio`, and `raw` reserved for the pending UHF
-fixture. Hosted CI dry-runs all suites and executes tests selected by
+`persistence`, with `holybro`, `radio`, and `raw` reserved for the UHF fixture.
+Hosted CI dry-runs all suites and executes tests selected by
 `--exclude physical`; it never needs a serial device or development board.
 
-The Holybro fixtures remain separate by design. The raw test proves a
-deterministic byte exchange without CSP. The CSP/KISS test then builds the
-57600-baud NUCLEO/ground profiles and proves a point-to-point CSP ping. See
-`tests/hil/radio-uhf/holybro/README.md`; both paths remain pending until the
-complete radio bench is connected.
+The Holybro fixtures remain separate by design. The raw runner flashes a
+temporary NUCLEO peer and proves a deterministic byte exchange without CSP.
+The CSP/KISS runner then builds the 57600-baud NUCLEO/ground profiles and
+requires a point-to-point CSP ping. See
+`tests/hil/radio-uhf/holybro/README.md` for the commands and latest physical
+result.
 
 The shell-only board profiles share one manual physical acceptance script:
 

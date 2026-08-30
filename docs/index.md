@@ -76,8 +76,8 @@ CSP, parameters, or FTP work on those boards.
   persistence, LittleFS, and K-FSW FTP.
 - @subpage targets "Boards and Targets" separates Zephyr boards, K-FSW target
   profiles, and their qualification levels.
-- @subpage ground "Ground Composition" explains k-ground identity, local
-  ground-node operation, and the pending UHF/Holybro HIL boundary.
+- @subpage ground "Ground Composition" explains configured ground roles,
+  local ground-node operation, and the separate UHF/Holybro HIL boundary.
 - @subpage commands "Shell and Command Reference" explains the interactive
   shell and every current project command.
 - @subpage testing "Testing, HIL, and CI" describes what each test layer does

@@ -19,9 +19,9 @@ or a release qualification record.
 | Platform/time | Monotonic ms/us and reset-cause API implemented over Zephyr | Time ztest; used by native boot/shell tests | Reset/boot path exercised on NUCLEO; no separate clock-accuracy qualification | No UTC/TAI/GNSS or clock correlation |
 | Logging | Fixed-buffer DEBUG/INFO/WARNING/ERROR with compile/runtime filters | Shell and integration diagnostics | Console logging observed in board HIL | Not a structured/persistent event service; no rate limiting |
 | CSP core | Optional libcsp identity, loopback, static routes, ping, one router | CSP ztest and two-node native integration/Robot | Bidirectional CSP ping on NUCLEO/FTDI UART bench | One direct KISS default route; no flight routing plan |
-| UART/KISS | Native PTY backend and interrupt-driven Zephyr UART adapter | Flight and ground two-node PTY bridge tests | NUCLEO USART3 ↔ FTDI bench physically verified | 115200 reference profiles; 57600 Holybro HIL overlays are pending physical use |
-| k-ground | Configurable `native_sim` role/name/node composition using the normal K-FSW shell and services | Nodes 16/17 report ground identity and ping in both directions | No physical evidence required for the local profile | Main is a naming convention; no ground orchestrator or mission-control framework |
-| Holybro UHF fixture | Separate raw-byte and CSP/KISS HIL entry points under `radio-uhf/holybro` | Scripts/configurations and Robot discovery validated | Pending second radio, NUCLEO wiring, raw peer, and RF acceptance | No radio driver or physical RF result |
+| UART/KISS | Native PTY backend and interrupt-driven Zephyr UART adapter | Flight and ground two-node PTY bridge tests | NUCLEO USART3 ↔ FTDI bench physically verified | 115200 reference profiles; Holybro fixture uses separate 57600 overlays |
+| k-ground | Configured `native_sim` roles using the normal K-FSW shell and services | UHF node 16 and ops node 19 report role-specific identity and ping both ways | No physical evidence required for the local profile | Direct two-node local link; no multi-node router, orchestrator, or mission-control framework |
+| Holybro UHF fixture | Separate NUCLEO raw-byte peer and CSP/KISS HIL entry points under `radio-uhf/holybro` | Scripts/configurations and Robot discovery validated | Connected bench attempted: builds/flashes/configuration pass, but raw bytes do not reach NUCLEO and CSP ping fails | RF/remote-UART path requires correction; no radio driver or successful physical RF result |
 | Local parameters | Static typed table, exact scalar checks, read-only flags, callbacks | CSP-disabled ztest and local/full shell integration | Local table runs in NUCLEO composition; physical bench checks remote access to it | Current table is mostly integration values; string/data/arrays absent |
 | PARAM CSP adapter | Optional libparam-compatible server/client/cache | Two-node native remote list/get/set plus Robot errors | Remote get succeeds after physical FTP bench transfers | Fixed remote descriptor pool; no remote persistence command |
 | Parameter persistence | Explicit bounded versioned CRC snapshot and defaults/load/save/clear | CSP-disabled unit suite, cross-process integration, corrupt snapshot fallback, Valgrind | No dedicated NUCLEO reboot/persistence acceptance | Local only; no migration framework beyond name/type compatibility |
@@ -62,8 +62,9 @@ future health/FDIR design will need explicit required/optional service policy.
 The current route is a direct `0/0` KISS default suitable for a two-node test
 link. There is no CAN/CFP, SocketCAN/vcan, ZMQ, redundant link selection, or
 dynamic route management. The Holybro fixture adapts the existing serial KISS
-path to a future radio bench; it is not a production radio driver and has no
-physical RF result yet.
+path to a radio bench; it is not a production radio driver. Its first connected
+attempt failed below CSP: the NUCLEO raw peer observed no USART3 bytes and the
+USB radio did not answer remote `RTI`/`RTI5` queries.
 
 CRC32 provides accidental-corruption detection, not authentication. HMAC,
 encryption, keys, command authorization, and operational security policy are
