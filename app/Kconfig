@@ -30,6 +30,14 @@ config KFSW_DEBUG_SHELL
 	  Disable this option for release builds that must not include the
 	  interactive shell.
 
+config KFSW_PARAM_TEST_DEFINITIONS
+	bool "Test-only parameter fixture definitions"
+	depends on KFSW_PARAM
+	help
+	  Link integration-only scalar parameter fixtures. Enable this only in
+	  software and physical test configurations; normal application
+	  compositions contain no test parameters.
+
 endmenu
 
 config SHELL_PROMPT_UART

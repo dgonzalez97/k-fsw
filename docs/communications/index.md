@@ -108,7 +108,7 @@ payload, and gives the packet to libcsp. Routing and interface selection happen
 below the service.
 
 ```text
-application operation: get parameter "test_u32"
+application operation: get parameter "log_level"
                          |
                 destination node 2
                 parameter port 10

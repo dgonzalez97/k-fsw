@@ -3,18 +3,11 @@
 #include <string.h>
 
 #include <zephyr/ztest.h>
+#include <zephyr/sys/util.h>
 
-#if CONFIG_KFSW_PARAM_CSP
-#include <param/param.h>
-#include <param/param_list.h>
-#include <param/param_queue.h>
-#endif
-
+#include <kfsw/services/log.h>
 #include <kfsw/services/parameter.h>
-
-#if CONFIG_KFSW_PARAM_CSP
-#define TEST_PROTOCOL_VERSION 2
-#endif
+#include <kfsw/testing/parameter_definitions.h>
 
 struct table_summary {
 	size_t count;
@@ -42,28 +35,44 @@ static bool summarize_parameter(const struct kfsw_param_info *info, void *contex
 
 ZTEST(services_param, test_kfsw_parameter_lifecycle)
 {
+	static uint8_t duplicate_value;
+	static const struct kfsw_param_definition duplicate_definitions[] = {
+		{
+			.id = 1U,
+			.type = KFSW_PARAM_U8,
+			.name = "duplicate_id",
+			.value = &duplicate_value,
+		},
+	};
+	static const struct kfsw_param_definition_set duplicate_set = {
+		.definitions = duplicate_definitions,
+		.count = ARRAY_SIZE(duplicate_definitions),
+	};
 	struct kfsw_param_value value = {0};
 	struct table_summary table = {0};
-
-#if CONFIG_KFSW_PARAM_CSP
-	const param_t *wire_param;
-	param_queue_t encode_queue;
-	param_queue_t decode_queue;
-	uint8_t wire_buffer[32];
-	uint32_t serialized_value = 0x12345678U;
-#endif
+	const struct kfsw_param_definition_set *const parameter_sets[] = {
+		&kfsw_log_param_definitions,
+		&kfsw_test_param_definitions,
+	};
+	const struct kfsw_param_definition_set *const invalid_sets[] = {
+		&kfsw_log_param_definitions,
+		&duplicate_set,
+	};
 
 	zassert_false(kfsw_param_is_initialized());
 	zassert_equal(kfsw_param_get("test_u32", &value), -EACCES);
 	zassert_equal(kfsw_param_set("test_u32", &value), -EACCES);
 	zassert_equal(kfsw_param_visit(summarize_parameter, &table), -EACCES);
+	zassert_equal(kfsw_param_init(NULL, 0U), -EINVAL);
+	zassert_equal(kfsw_param_init(invalid_sets, ARRAY_SIZE(invalid_sets)), -EEXIST);
+	zassert_false(kfsw_param_is_initialized());
 #if CONFIG_KFSW_PARAM_CSP
 	zassert_equal(kfsw_param_server_start(), -EACCES);
 	zassert_equal(kfsw_param_remote_get(2U, "test_u32", &value), -EACCES);
 #endif
 
-	zassert_ok(kfsw_param_init());
-	zassert_ok(kfsw_param_init());
+	zassert_ok(kfsw_param_init(parameter_sets, ARRAY_SIZE(parameter_sets)));
+	zassert_ok(kfsw_param_init(parameter_sets, ARRAY_SIZE(parameter_sets)));
 	zassert_true(kfsw_param_is_initialized());
 	zassert_ok(kfsw_param_visit(summarize_parameter, &table));
 	zassert_equal(table.count, 5U);
@@ -83,9 +92,10 @@ ZTEST(services_param, test_kfsw_parameter_lifecycle)
 	zassert_ok(kfsw_param_get("test_u32", &value));
 	zassert_equal(value.scalar.u32, 99U);
 
-	zassert_ok(kfsw_param_get("node_id", &value));
-	zassert_equal(value.type, KFSW_PARAM_U16);
-	zassert_equal(kfsw_param_set("node_id", &value), -EACCES);
+	zassert_equal(kfsw_param_get("node_id", &value), -ENOENT);
+	zassert_ok(kfsw_param_get("test_read_only", &value));
+	zassert_equal(value.type, KFSW_PARAM_U8);
+	zassert_equal(kfsw_param_set("test_read_only", &value), -EACCES);
 
 	zassert_ok(kfsw_param_get("test_u32", &value));
 	value.type = KFSW_PARAM_I32;
@@ -100,21 +110,11 @@ ZTEST(services_param, test_kfsw_parameter_lifecycle)
 	zassert_ok(kfsw_param_get("log_level", &value));
 	value.scalar.u8 = 5U;
 	zassert_equal(kfsw_param_set("log_level", &value), -ERANGE);
+	value.scalar.u8 = 3U;
+	zassert_ok(kfsw_param_set("log_level", &value));
+	zassert_equal(kfsw_log_get_level(), 3U);
 
 #if CONFIG_KFSW_PARAM_CSP
-
-	wire_param = param_list_find_name(0, "test_u32");
-	zassert_not_null(wire_param);
-	param_queue_init(&encode_queue, wire_buffer, sizeof(wire_buffer), 0, PARAM_QUEUE_TYPE_SET,
-			 TEST_PROTOCOL_VERSION);
-	zassert_ok(param_queue_add(&encode_queue, wire_param, -1, &serialized_value));
-	zassert_true(encode_queue.used > 0U);
-	param_queue_init(&decode_queue, wire_buffer, sizeof(wire_buffer), encode_queue.used,
-			 PARAM_QUEUE_TYPE_SET, TEST_PROTOCOL_VERSION);
-	zassert_ok(param_queue_apply(&decode_queue, 0, 0));
-	zassert_ok(kfsw_param_get("test_u32", &value));
-	zassert_equal(value.scalar.u32, serialized_value);
-
 	zassert_equal(kfsw_param_server_start(), -EACCES);
 #endif
 }

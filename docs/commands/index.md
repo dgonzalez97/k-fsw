@@ -158,10 +158,10 @@ Local commands exist with `CONFIG_KFSW_PARAM=y`.
 
 ```text
 kfsw:~$ param list
-kfsw:~$ param get test_u32
-test_u32 = 42
-kfsw:~$ param set test_u32 1234
-test_u32 = 1234
+kfsw:~$ param get log_level
+log_level = 1
+kfsw:~$ param set log_level 2
+log_level = 2
 ```
 
 `node_id` is read-only. `log_level` accepts 0 through 4. Integer parsing rejects
@@ -180,10 +180,10 @@ node before the normal arguments:
 | `param set <node> <name> <value>` | Validate text against the remote descriptor and request a remote RAM write |
 
 ```text
-kfsw:~$ param get 2 test_u32
-2:test_u32 = 42
-kfsw:~$ param set 2 test_u32 1234
-2:test_u32 = 1234
+kfsw:~$ param get 2 log_level
+2:log_level = 1
+kfsw:~$ param set 2 log_level 2
+2:log_level = 2
 ```
 
 The node argument is decimal. Remote changes are not automatically persisted
@@ -207,11 +207,11 @@ the local node.
 A safe trial sequence is:
 
 ```text
-kfsw:~$ param get test_u32
-kfsw:~$ param set test_u32 1234
-kfsw:~$ param get test_u32
+kfsw:~$ param get log_level
+kfsw:~$ param set log_level 2
+kfsw:~$ param get log_level
 kfsw:~$ param defaults
-kfsw:~$ param get test_u32
+kfsw:~$ param get log_level
 ```
 
 Only run `param save` after deciding the runtime state should become the next

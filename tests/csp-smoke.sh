@@ -152,6 +152,9 @@ printf '%s\n' \
 	'param set 2 test_u32 1234' \
 	'param get 2 test_u32' \
 	$'pa\t g\t 2 test_u32' \
+	'param get 2 log_level' \
+	'param set 2 log_level 5' \
+	'param get 2 log_level' \
 	'param get 2 missing' \
 	'param set 2 node_id 7' \
 	'ftp generate /build/empty.bin 0' \
@@ -197,6 +200,8 @@ wait_for_output "$work_dir/node2.log" "UART CSP test: PASS" \
     "$node2_pid" || fail "node 2 UART transport test did not pass"
 wait_for_output "$work_dir/node1.log" "2:test_u32 = 1234" \
     "$node1_pid" || fail "remote parameter set/readback did not pass"
+wait_for_output "$work_dir/node1.log" "2:log_level = 1" \
+	"$node1_pid" || fail "remote owner validation did not restore the compiled default"
 wait_for_output "$work_dir/node1.log" \
     "get: parameter 'missing' not found" "$node1_pid" || \
     fail "invalid remote parameter was not rejected"
@@ -232,6 +237,8 @@ node1_expected=(
     "2:0 node_id"
     "2:test_u32 = 42"
     "2:test_u32 = 1234"
+	"2:log_level = 5"
+	"2:log_level = 1"
     "get: parameter 'missing' not found"
     "set: parameter 'node_id' is read-only"
 	"FTP generate path=/build/empty.bin: PASS bytes=0 crc32=00000000"

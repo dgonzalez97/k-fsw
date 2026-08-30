@@ -42,7 +42,7 @@ The application starts at the standard Zephyr prompt:
 ```text
 kfsw:~$ status
 kfsw:~$ csp ping 2
-kfsw:~$ param get test_u32
+kfsw:~$ param get log_level
 kfsw:~$ storage info
 ```
 

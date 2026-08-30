@@ -173,7 +173,8 @@ Current mutable state has one clear owner:
 | --- | --- | --- |
 | Storage mount and backend readiness | `kfsw-platform` | Storage mutex; application initializes and mounts once |
 | Runtime log threshold | `kfsw-services` logging | Atomic value; parameter callback updates it |
-| Local parameter table | `kfsw-services` parameters | Parameter mutex; statically allocated table |
+| Parameter definitions and backing values | Owning application/service/test component | Compile-time definition sets; owner validation and callbacks |
+| Aggregated local parameter index | `kfsw-services` PARAM core | Parameter mutex; bounded static index assembled by the executable composition |
 | Snapshot workspace and file | Parameter persistence | Persistence mutex plus parameter-table lock |
 | CSP identity, routes, interfaces, router | `kfsw-comms` | Initialize once; one statically defined router thread |
 | Remote parameter descriptor cache | PARAM CSP adapter | Fixed pool selected by Kconfig |

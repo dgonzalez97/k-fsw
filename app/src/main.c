@@ -1,6 +1,7 @@
 #include <errno.h>
 
 #include <zephyr/kernel.h>
+#include <zephyr/sys/util.h>
 
 #if CONFIG_KFSW_CSP
 #include <kfsw/comms/csp.h>
@@ -18,6 +19,11 @@
 #include <kfsw/services/log.h>
 #if CONFIG_KFSW_PARAM
 #include <kfsw/services/parameter.h>
+#if CONFIG_KFSW_PARAM_TEST_DEFINITIONS
+#include <kfsw/testing/parameter_definitions.h>
+#endif
+
+#include "parameter_definitions.h"
 #endif
 
 int main(void)
@@ -41,7 +47,15 @@ int main(void)
 #endif
 
 #if CONFIG_KFSW_PARAM
-	result = kfsw_param_init();
+	const struct kfsw_param_definition_set *const parameter_sets[] = {
+		&kfsw_app_param_definitions,
+		&kfsw_log_param_definitions,
+#if CONFIG_KFSW_PARAM_TEST_DEFINITIONS
+		&kfsw_test_param_definitions,
+#endif
+	};
+
+	result = kfsw_param_init(parameter_sets, ARRAY_SIZE(parameter_sets));
 
 	if (result != 0) {
 		kfsw_log_error("Failed to initialize parameters: %d", result);

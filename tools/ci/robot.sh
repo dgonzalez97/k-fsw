@@ -11,7 +11,8 @@ echo "ROBOT: validate all suites without executing hardware actions"
 KFSW_ROBOT_OUT_DIR="$KFSW_WORKSPACE_ROOT/build/robot/dry-run" \
 	"$KFSW_ROBOT_RUNNER" --dryrun
 
-"$KFSW_CI_DIR/build.sh" linux
+KFSW_EXTRA_CONF_FILE="$KFSW_REPO_DIR/tests/config/param-fixtures.conf" \
+	"$KFSW_CI_DIR/build.sh" linux
 KFSW_PRISTINE=always "$KFSW_REPO_DIR/tests/build-linux-node2.sh"
 
 echo "ROBOT: execute every software-compatible scenario"

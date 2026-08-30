@@ -10,7 +10,8 @@ if ! command -v socat >/dev/null 2>&1; then
 	exit 1
 fi
 
-"$KFSW_CI_DIR/build.sh" linux
+KFSW_EXTRA_CONF_FILE="$KFSW_REPO_DIR/tests/config/param-fixtures.conf" \
+	"$KFSW_CI_DIR/build.sh" linux
 KFSW_PRISTINE=always "$KFSW_REPO_DIR/tests/build-linux-node2.sh"
 
 echo "INTEGRATION: shell and local PARAM"

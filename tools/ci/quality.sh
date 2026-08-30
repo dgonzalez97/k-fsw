@@ -23,6 +23,8 @@ if ! command -v cppcheck >/dev/null 2>&1; then
 fi
 
 format_roots=("$KFSW_REPO_DIR/app/src")
+[[ -d "$KFSW_REPO_DIR/tests/support" ]] && \
+	format_roots+=("$KFSW_REPO_DIR/tests/support")
 [[ -d "$KFSW_REPO_DIR/tests/unit" ]] && \
 	format_roots+=("$KFSW_REPO_DIR/tests/unit")
 [[ -d "$KFSW_REPO_DIR/tests/hil/radio-uhf/holybro/raw-peer/src" ]] && \

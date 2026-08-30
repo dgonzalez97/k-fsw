@@ -12,7 +12,7 @@ The current service set is intentionally compact:
 
 - boot/readiness markers;
 - runtime-filtered logging;
-- a statically allocated local parameter table;
+- a bounded local parameter index assembled from component-owned definitions;
 - optional parameter snapshots;
 - an optional CSP parameter adapter using the libparam wire format; and
 - a K-FSW file-transfer client/server over CSP/RDP.
@@ -65,10 +65,32 @@ the compiled minimum.
 
 ## Parameter architecture
 
-Parameters are named, typed runtime values with descriptions and flags. The
-local table is statically allocated and validated once. Applications read and
-write it through `include/kfsw/services/parameter.h`; the optional CSP adapter
-translates the same table to the selected libparam protocol.
+Parameters are named, typed runtime values with descriptions and flags. Each
+semantic component owns its definitions, backing storage, validation, and
+change callbacks. The executable composition passes the enabled definition
+sets to `kfsw_param_init()`; the PARAM core validates them once and builds a
+bounded, ID-sorted index. Applications read and write that index through
+`include/kfsw/services/parameter.h`; the optional persistence and CSP adapters
+consume the same index.
+
+```text
+application identity       logging service       test support (opt-in)
+  node_id set               log_level set          fixture set
+       \                         |                     /
+        \                        |                    /
+         +------ executable composition ------------+
+                            |
+                  kfsw_param_init(sets, count)
+                            |
+             PARAM core: validate + sorted index
+                     /                    \
+           KPAR v1 persistence       CSP/libparam adapter
+```
+
+The dependency direction is from an owner to the PARAM declaration API.
+PARAM does not include owner headers or contain owner-specific IDs, ranges, or
+callbacks. Adding an optional component requires adding its definition set to
+the composition; it does not require editing the PARAM core.
 
 The Kconfig split is central to the design:
 
@@ -101,21 +123,24 @@ composition.
 
 ### Local table
 
-The current table is small because several entries are integration values,
-not a claim of a complete spacecraft configuration schema.
+The production composition currently contains two parameters:
 
-| ID | Name | Type | Compiled default | Access | Persistent | Validation/effect |
-| --- | --- | --- | --- | --- | --- | --- |
-| 0 | `node_id` | `u16` | CSP address, or `0` without CSP | Read-only | No | Build-time identity only |
-| 1 | `log_level` | `u8` | `CONFIG_KFSW_LOG_MIN_LEVEL` | Writable | Yes | Range 0–4; callback updates runtime logging |
-| 2 | `test_u32` | `u32` | `42` | Writable | Yes | Full `u32` shell range |
-| 3 | `test_i32` | `i32` | `-7` | Writable | Yes | Full `i32` shell range |
-| 4 | `test_float` | `float` | `1.5` | Writable | Yes | Tokens fully consumed by the current `strtof()` parser |
+| Owner | ID | Name | Type | Compiled default | Access | Persistent | Validation/effect |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Application composition | 0 | `node_id` | `u16` | CSP address, or `0` without CSP | Read-only | No | Build-time identity only |
+| Logging service | 1 | `log_level` | `u8` | `CONFIG_KFSW_LOG_MIN_LEVEL` | Writable | Yes | Range 0–4; callback updates runtime logging |
+
+Software and physical test configurations may enable
+`CONFIG_KFSW_PARAM_TEST_DEFINITIONS`. That opt-in support component owns the
+compatibility fixtures `test_u32` (ID 2, default 42), `test_i32` (ID 3,
+default -7), and `test_float` (ID 4, default 1.5), plus a read-only unit-test
+fixture. These are not production application parameters.
 
 The public type enumeration names unsigned, signed, hexadecimal, float,
 double, string, and data categories. The current local core accepts scalar
 integer/hex/float/double sizes; string, data, and arrays are not implemented as
-local values. The shipped table uses only the five types shown above.
+local values. The production and test definition sets use only the scalar
+types described above.
 
 `kfsw_param_init()` rejects an empty or malformed table, unsupported entry
 type/shape, duplicate ID, or duplicate name. Local reads and writes are
@@ -143,13 +168,13 @@ current RAM values untouched.
 
 ### Local operations
 
-The direct service API provides initialize, state check, get, set, and table
-visitor operations. The shell exposes the same distinction:
+The direct service API provides composition-aware initialization, state check,
+get, set, and table visitor operations. The shell exposes the same distinction:
 
 ```text
 kfsw:~$ param list
-kfsw:~$ param get test_u32
-kfsw:~$ param set test_u32 1234
+kfsw:~$ param get log_level
+kfsw:~$ param set log_level 2
 ```
 
 The shell parses text according to the parameter's actual type. Negative text
@@ -186,8 +211,8 @@ Current remote shell forms are:
 
 ```text
 kfsw:~$ param list 2
-kfsw:~$ param get 2 test_u32
-kfsw:~$ param set 2 test_u32 1234
+kfsw:~$ param get 2 log_level
+kfsw:~$ param set 2 log_level 2
 ```
 
 The CSP adapter is protocol compatibility, not shared memory. Each node owns

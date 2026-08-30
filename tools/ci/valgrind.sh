@@ -22,7 +22,8 @@ executable="$KFSW_ROOT/build/linux/zephyr/zephyr.exe"
 
 mkdir -p "$output_dir"
 
-"$KFSW_TOOLS_DIR/build.sh" linux
+KFSW_EXTRA_CONF_FILE="$KFSW_ROOT/k-fsw/tests/config/param-fixtures.conf" \
+	"$KFSW_TOOLS_DIR/build.sh" linux
 
 echo "MEMORY: Valgrind log: $valgrind_log"
 echo "MEMORY: Program log: $program_log"
