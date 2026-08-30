@@ -106,7 +106,7 @@ Wait for the application readiness marker before exercising services:
 @READY uptime_ms=...
 
 kfsw:~$ status
-kfsw:~$ param get test_u32
+kfsw:~$ param get log_level
 kfsw:~$ storage info
 kfsw:~$ csp info
 ```

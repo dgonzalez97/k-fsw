@@ -38,6 +38,19 @@ target_sources(app PRIVATE
     src/main.c
 )
 
+target_sources_ifdef(CONFIG_KFSW_PARAM app PRIVATE
+    src/parameter_definitions.c
+)
+
+if(CONFIG_KFSW_PARAM_TEST_DEFINITIONS)
+    target_sources(app PRIVATE
+        ../tests/support/parameter_definitions.c
+    )
+    target_include_directories(app PRIVATE
+        ../tests/support/include
+    )
+endif()
+
 if(CONFIG_KFSW_DEBUG_SHELL)
     target_sources(app PRIVATE
         src/shell/shell_system.c

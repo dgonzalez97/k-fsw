@@ -198,7 +198,7 @@ kfsw:~$ version
 kfsw:~$ time
 kfsw:~$ storage info
 kfsw:~$ param list
-kfsw:~$ param get test_u32
+kfsw:~$ param get log_level
 kfsw:~$ csp info
 kfsw:~$ csp routes
 ```

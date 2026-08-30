@@ -7,11 +7,13 @@
 #include <zephyr/storage/flash_map.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/crc.h>
+#include <zephyr/sys/util.h>
 #include <zephyr/ztest.h>
 
 #include <kfsw/platform/storage.h>
 #include <kfsw/services/log.h>
 #include <kfsw/services/parameter.h>
+#include <kfsw/testing/parameter_definitions.h>
 
 #define STORAGE_PARTITION_NODE DT_CHOSEN(kfsw_storage_partition)
 #define STORAGE_PARTITION_ID DT_FIXED_PARTITION_ID(STORAGE_PARTITION_NODE)
@@ -23,6 +25,16 @@
 #define SNAPSHOT_EXPECTED_SIZE 84U
 
 static uint8_t snapshot[SNAPSHOT_MAX_SIZE];
+
+/* KPAR v1 snapshot produced by kfsw-services 32260f8 before ownership moved. */
+static const uint8_t pre_refactor_snapshot[] = {
+	0x4b, 0x50, 0x41, 0x52, 0x00, 0x01, 0x00, 0x14, 0x00, 0x00, 0x00, 0x40, 0x00, 0x04,
+	0x00, 0x00, 0x6d, 0x80, 0x22, 0xc6, 0x09, 0x01, 0x00, 0x01, 0x6c, 0x6f, 0x67, 0x5f,
+	0x6c, 0x65, 0x76, 0x65, 0x6c, 0x03, 0x08, 0x02, 0x00, 0x04, 0x74, 0x65, 0x73, 0x74,
+	0x5f, 0x75, 0x33, 0x32, 0x00, 0x00, 0x04, 0xd2, 0x08, 0x03, 0x00, 0x04, 0x74, 0x65,
+	0x73, 0x74, 0x5f, 0x69, 0x33, 0x32, 0xff, 0xff, 0xfb, 0x2e, 0x0a, 0x04, 0x00, 0x04,
+	0x74, 0x65, 0x73, 0x74, 0x5f, 0x66, 0x6c, 0x6f, 0x61, 0x74, 0x40, 0x10, 0x00, 0x00,
+};
 
 static void erase_storage_partition(void)
 {
@@ -71,6 +83,15 @@ static int32_t get_i32(const char *name)
 	return value.scalar.i32;
 }
 
+static float get_float(const char *name)
+{
+	struct kfsw_param_value value;
+
+	zassert_ok(kfsw_param_get(name, &value), "parameter get failed");
+	zassert_equal(value.type, KFSW_PARAM_FLOAT, "unexpected parameter type");
+	return value.scalar.f32;
+}
+
 static void set_u8(const char *name, uint8_t raw_value)
 {
 	struct kfsw_param_value value;
@@ -104,7 +125,7 @@ static void write_snapshot(size_t size)
 	ssize_t written;
 
 	fs_file_t_init(&file);
-	zassert_ok(fs_open(&file, SNAPSHOT_PATH, FS_O_WRITE | FS_O_TRUNC),
+	zassert_ok(fs_open(&file, SNAPSHOT_PATH, FS_O_CREATE | FS_O_WRITE | FS_O_TRUNC),
 		   "snapshot rewrite open failed");
 	written = fs_write(&file, snapshot, size);
 	zassert_equal(written, size, "snapshot rewrite failed");
@@ -142,10 +163,16 @@ static size_t find_snapshot_entry(const char *name, size_t size)
 
 static void *persistence_setup(void)
 {
+	const struct kfsw_param_definition_set *const parameter_sets[] = {
+		&kfsw_log_param_definitions,
+		&kfsw_test_param_definitions,
+	};
+
 	erase_storage_partition();
 	zassert_ok(kfsw_storage_init(), "storage init failed");
 	zassert_ok(kfsw_storage_mount(), "storage mount failed");
-	zassert_ok(kfsw_param_init(), "parameter init failed");
+	zassert_ok(kfsw_param_init(parameter_sets, ARRAY_SIZE(parameter_sets)),
+		   "parameter init failed");
 	return NULL;
 }
 
@@ -161,6 +188,26 @@ ZTEST(param_persistence, test_no_file_uses_compiled_defaults)
 {
 	zassert_equal(kfsw_param_persist_load(), -ENOENT, "missing snapshot was accepted");
 	zassert_equal(get_u32("test_u32"), 42U, "compiled default changed");
+}
+
+ZTEST(param_persistence, test_pre_refactor_kpar_v1_snapshot_is_restored)
+{
+	struct kfsw_param_value log_level;
+	int result;
+
+	zassert_true(sizeof(pre_refactor_snapshot) <= sizeof(snapshot));
+	result = fs_mkdir(SNAPSHOT_DIRECTORY);
+	zassert_true((result == 0) || (result == -EEXIST));
+	memcpy(snapshot, pre_refactor_snapshot, sizeof(pre_refactor_snapshot));
+	write_snapshot(sizeof(pre_refactor_snapshot));
+
+	zassert_ok(kfsw_param_persist_load(), "pre-refactor snapshot was rejected");
+	zassert_ok(kfsw_param_get("log_level", &log_level));
+	zassert_equal(log_level.scalar.u8, 3U, "pre-refactor log level was not restored");
+	zassert_equal(kfsw_log_get_level(), 3U, "pre-refactor log callback was not applied");
+	zassert_equal(get_u32("test_u32"), 1234U, "pre-refactor u32 was not restored");
+	zassert_equal(get_i32("test_i32"), -1234, "pre-refactor i32 was not restored");
+	zassert_equal(get_float("test_float"), 2.25F, "pre-refactor float was not restored");
 }
 
 ZTEST(param_persistence, test_save_modify_load_and_repeated_operations)
@@ -199,8 +246,8 @@ ZTEST(param_persistence, test_read_only_parameter_is_excluded)
 	zassert_ok(kfsw_param_persist_save(), "save failed");
 	size = read_snapshot();
 
-	zassert_equal(find_snapshot_entry("node_id", size), SIZE_MAX,
-		      "read-only node identity was persisted");
+	zassert_equal(find_snapshot_entry("test_read_only", size), SIZE_MAX,
+		      "read-only test parameter was persisted");
 	zassert_not_equal(find_snapshot_entry("log_level", size), SIZE_MAX,
 			  "persistent log level is absent");
 }
@@ -288,6 +335,28 @@ ZTEST(param_persistence, test_restored_log_level_is_applied)
 	zassert_ok(kfsw_param_get("log_level", &value), "log level get failed");
 	zassert_equal(value.scalar.u8, 3U, "log level value was not restored");
 	zassert_equal(kfsw_log_get_level(), 3U, "restored log policy was not applied");
+}
+
+ZTEST(param_persistence, test_invalid_owner_value_is_ignored)
+{
+	struct kfsw_param_value value;
+	size_t entry_offset;
+	size_t size;
+
+	set_u8("log_level", 2U);
+	zassert_ok(kfsw_param_persist_save(), "save failed");
+	size = read_snapshot();
+	entry_offset = find_snapshot_entry("log_level", size);
+	zassert_not_equal(entry_offset, SIZE_MAX, "log level entry missing");
+	snapshot[entry_offset + 4U + strlen("log_level")] = 5U;
+	update_snapshot_crc(size);
+	write_snapshot(size);
+
+	set_u8("log_level", 3U);
+	zassert_ok(kfsw_param_persist_load(), "invalid owner value rejected the snapshot");
+	zassert_ok(kfsw_param_get("log_level", &value));
+	zassert_equal(value.scalar.u8, 3U, "invalid owner value changed backing storage");
+	zassert_equal(kfsw_log_get_level(), 3U, "invalid owner value changed owner behavior");
 }
 
 ZTEST(param_persistence, test_unavailable_storage_and_save_failure_are_reported)
