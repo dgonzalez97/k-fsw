@@ -1,1 +1,2 @@
 robotframework==7.4.2
+pyserial==3.5
