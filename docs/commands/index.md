@@ -78,17 +78,21 @@ root
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `status` | none | Print `K-FSW status`, the compiled Zephyr board target, and monotonic uptime in milliseconds |
+| `status` | none | Print configured role/name, CSP node when enabled, compiled Zephyr board target, and monotonic uptime |
 | `version` | none | Print K-FSW development revision text, Zephyr kernel version, and board target |
 | `time` | none | Print monotonic milliseconds and microseconds |
 
 ```text
 kfsw:~$ status
 K-FSW status
+Role: flight
+Name: kfsw
+CSP node: 1
 board: native_sim/native/64
 uptime_ms: ...
 ```
 
+Role and name are composition metadata; they do not select hidden behavior.
 `status` does not aggregate service health or restate `@READY`. `time` is
 elapsed local time, not UTC/TAI/GNSS or synchronized spacecraft time.
 

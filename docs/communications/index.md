@@ -182,8 +182,11 @@ The application/service packet path stays the same, which is the point of the
 interface boundary.
 
 There is currently no CAN/CFP interface, automatic route discovery, flight
-routing table, redundant link selection, ZMQ interface, or radio interface in
-the K-FSW composition.
+routing table, redundant link selection, ZMQ interface, or production radio
+driver in the K-FSW composition. The k-ground Holybro HIL entry point reuses
+this direct serial KISS route. Its named bench passed 100/100 raw exchanges and
+bidirectional node 16 ↔ node 2 CSP ping with clean KISS counters on 30 August
+2026.
 
 ## KISS: packets on a serial stream
 
@@ -221,7 +224,8 @@ Zephyr UART device and one of two receive paths:
   libcsp's KISS decoder to avoid physical polling overruns.
 
 Both use 115200 baud, eight data bits, no parity, and one stop bit in the
-current profiles. The chosen devicetree node is the source of those values.
+reference profiles. The Holybro HIL overlays select 57600 baud at both ends.
+The chosen devicetree node is the source of those values.
 The [libcsp KISS interface API](https://github.com/libcsp/libcsp/blob/develop/include/csp/interfaces/csp_if_kiss.h)
 is the upstream reference for framing state and interface hooks.
 
@@ -266,9 +270,11 @@ serial paths, performs bidirectional CSP ping, runs the permanent UART test,
 checks storage, transfers 4 KiB and 16 KiB files with FTP, accesses a remote
 parameter afterward, and requires nonzero clean KISS counters.
 
-This is physical UART/KISS qualification for the current NUCLEO/FTDI bench. It
-is not evidence for CSP over RF. No Holybro or SiK radio integration is merged,
-and K-FSW does not claim a supported radio path.
+This is physical UART/KISS qualification for the current NUCLEO/FTDI bench.
+Separately, the Holybro/SiK fixture described in @ref ground now has functional
+raw UART/RF and CSP/KISS bench evidence. That result verifies the named
+hardware path and configuration; it is not RF performance or flight
+qualification.
 
 ## RDP: reliable CSP datagrams
 

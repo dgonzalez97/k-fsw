@@ -2,11 +2,12 @@
 
 ## Status baseline
 
-This status was reviewed on 30 August 2026 against `k-fsw` main commit
-`959377e`, the exact `west.yml` dependency pins, current Kconfig and target
+This status was reviewed on 30 August 2026 against feature-branch base
+`f6a5419`, the exact `west.yml` dependency pins, current Kconfig and target
 profiles, project tests, GitHub workflows, merged pull requests, open issues,
-and the public K Flight Software project board. The main Software CI and Pages
-runs after the PARAM and board bring-up merges completed successfully.
+and the public K Flight Software project board. The k-ground prototype is
+tracked by [issue 28](https://github.com/dgonzalez97/k-fsw/issues/28); its
+named Holybro bench has passed raw and CSP/KISS functional acceptance.
 
 Status here is an engineering summary, not a substitute for the issue tracker
 or a release qualification record.
@@ -18,7 +19,9 @@ or a release qualification record.
 | Platform/time | Monotonic ms/us and reset-cause API implemented over Zephyr | Time ztest; used by native boot/shell tests | Reset/boot path exercised on NUCLEO; no separate clock-accuracy qualification | No UTC/TAI/GNSS or clock correlation |
 | Logging | Fixed-buffer DEBUG/INFO/WARNING/ERROR with compile/runtime filters | Shell and integration diagnostics | Console logging observed in board HIL | Not a structured/persistent event service; no rate limiting |
 | CSP core | Optional libcsp identity, loopback, static routes, ping, one router | CSP ztest and two-node native integration/Robot | Bidirectional CSP ping on NUCLEO/FTDI UART bench | One direct KISS default route; no flight routing plan |
-| UART/KISS | Native PTY backend and interrupt-driven Zephyr UART adapter | Two-node PTY bridge tests and counter checks | NUCLEO USART3 ↔ FTDI bench physically verified | 115200 8N1 current profiles; no radio claim |
+| UART/KISS | Native PTY backend and interrupt-driven Zephyr UART adapter | Flight and ground two-node PTY bridge tests | NUCLEO USART3 ↔ FTDI bench physically verified | 115200 reference profiles; Holybro fixture uses separate 57600 overlays |
+| k-ground | Configured `native_sim` roles using the normal K-FSW shell and services | UHF node 16 and ops node 19 report role-specific identity and ping both ways | No physical evidence required for the local profile | Direct two-node local link; no multi-node router, orchestrator, or mission-control framework |
+| Holybro UHF fixture | Separate NUCLEO raw-byte peer and CSP/KISS HIL entry points under `radio-uhf/holybro` | Scripts/configurations and Robot discovery validated | Raw 100/100 with no invalid/timeout; bidirectional node 16 ↔ 2 CSP ping; clean KISS counters on corrected bench | Functional bench evidence only; no radio driver, RF performance/soak campaign, or qualification |
 | Local parameters | Static typed table, exact scalar checks, read-only flags, callbacks | CSP-disabled ztest and local/full shell integration | Local table runs in NUCLEO composition; physical bench checks remote access to it | Current table is mostly integration values; string/data/arrays absent |
 | PARAM CSP adapter | Optional libparam-compatible server/client/cache | Two-node native remote list/get/set plus Robot errors | Remote get succeeds after physical FTP bench transfers | Fixed remote descriptor pool; no remote persistence command |
 | Parameter persistence | Explicit bounded versioned CRC snapshot and defaults/load/save/clear | CSP-disabled unit suite, cross-process integration, corrupt snapshot fallback, Valgrind | No dedicated NUCLEO reboot/persistence acceptance | Local only; no migration framework beyond name/type compatibility |
@@ -57,8 +60,13 @@ future health/FDIR design will need explicit required/optional service policy.
 ### Communications topology
 
 The current route is a direct `0/0` KISS default suitable for a two-node test
-link. There is no CAN/CFP, SocketCAN/vcan, ZMQ, redundant link selection,
-dynamic route management, or radio interface in the merged composition.
+link. There is no CAN/CFP, SocketCAN/vcan, ZMQ, redundant link selection, or
+dynamic route management. The Holybro fixture adapts the existing serial KISS
+path to a radio bench; it is not a production radio driver. After the bench
+power/USB arrangement was corrected, raw traffic and bidirectional CSP passed
+without RF parameter changes. The raw HIL peer also required removal of
+blocking polling behavior; the production UART/KISS receive path remains
+interrupt-driven.
 
 CRC32 provides accidental-corruption detection, not authentication. HMAC,
 encryption, keys, command authorization, and operational security policy are

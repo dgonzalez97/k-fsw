@@ -20,6 +20,7 @@ architecture, operations, testing, development, and the public C API.
 
 - full reference application on KFSW-Linux and NUCLEO-L496ZG
 - physical shell bring-up on FRDM-K64F and Raspberry Pi Pico W
+- configurable `k-ground` Linux nodes with local two-node CSP verification
 - optional CSP routing with UART/KISS and RDP
 - local typed parameters and persistence without a CSP dependency
 - optional remote parameter access over CSP
@@ -62,6 +63,26 @@ full-service K-FSW targets:
 
 The second Linux CSP node is an integration-test configuration under
 `tests/config/`; it is not another supported target.
+
+## Try k-ground
+
+Create a mission-local copy of the small reference configuration, then start
+the UHF gateway and operator node in separate terminals:
+
+```bash
+./k-fsw/tools/k-ground init
+./k-fsw/tools/k-ground run kfsw-gnd-uhf
+```
+
+```bash
+./k-fsw/tools/k-ground run kfsw-ops
+```
+
+The prompts identify the roles as `kfsw-gnd-uhf#` and `kfsw-ops#`. The normal
+`status`, `version`, and `csp` commands are unchanged; `csp ping 16` from the
+operator node verifies the local link. See the
+[ground composition guide](docs/ground/index.md) for the configuration model,
+other reserved roles, and the separate Holybro HIL boundary.
 
 ## Project layout
 

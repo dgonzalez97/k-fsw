@@ -243,7 +243,7 @@ The following are not current K-FSW capabilities:
 
 - a local application message bus;
 - a generic command dispatcher or remote command service;
-- CAN/CFP, SocketCAN, ZMQ, or radio interfaces;
+- CAN/CFP, SocketCAN, ZMQ, or a production radio interface;
 - health monitoring, watchdog policy, or fault-management coordination;
 - MCUboot image selection, application update, or rollback control;
 - synchronized absolute time; and

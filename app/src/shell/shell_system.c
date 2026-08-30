@@ -11,6 +11,11 @@ static int cmd_status(const struct shell *sh, size_t argc, char **argv)
 	ARG_UNUSED(argv);
 
 	shell_print(sh, "K-FSW status");
+	shell_print(sh, "Role: %s", CONFIG_KFSW_ROLE);
+	shell_print(sh, "Name: %s", CONFIG_KFSW_INSTANCE_NAME);
+#if CONFIG_KFSW_CSP
+	shell_print(sh, "CSP node: %d", CONFIG_KFSW_CSP_ADDRESS);
+#endif
 	shell_print(sh, "board: %s", CONFIG_BOARD_TARGET);
 	shell_print(sh, "uptime_ms: %llu", (unsigned long long)kfsw_time_monotonic_ms());
 

@@ -25,6 +25,8 @@ fi
 format_roots=("$KFSW_REPO_DIR/app/src")
 [[ -d "$KFSW_REPO_DIR/tests/unit" ]] && \
 	format_roots+=("$KFSW_REPO_DIR/tests/unit")
+[[ -d "$KFSW_REPO_DIR/tests/hil/radio-uhf/holybro/raw-peer/src" ]] && \
+	format_roots+=("$KFSW_REPO_DIR/tests/hil/radio-uhf/holybro/raw-peer/src")
 
 mapfile -d '' format_sources < <(
 	find "${format_roots[@]}" -type f \( -name '*.c' -o -name '*.h' \) \
