@@ -4,7 +4,7 @@
 
 K-FSW is developed as a west workspace. The `k-fsw` repository is the
 manifest and application-composition repository; west checks out Zephyr and
-the three reusable K-FSW repositories beside it.
+the four reusable K-FSW repositories beside it.
 
 Commands in this manual assume:
 
@@ -17,6 +17,7 @@ k-fsw-workspace/                    workspace root
 ├── kfsw-services/                  pinned dependency
 ├── kfsw-comms/                     pinned dependency
 │   └── third_party/libcsp/          separate pinned west project
+├── kfsw-modules/                   pinned dependency
 ├── zephyr/                         pinned Zephyr tree
 ├── modules/                        Zephyr-imported projects
 └── build/                          generated output

@@ -205,12 +205,11 @@ tests/hil/radio-uhf/
     └── csp-kiss-smoke.sh
 ```
 
-`kfsw-comms` continues to own reusable CSP/KISS behavior. The current
-`kfsw-modules` checkout has no committed baseline and is not in `west.yml`, so
-this prototype does not pretend to add a reusable radio driver there. If that
-repository is activated later, reusable radio-management code should follow
-the category/device hierarchy `radio-uhf/holybro` and expose a bounded
-interface, parameters, implementation, and useful diagnostics.
+`kfsw-comms` continues to own reusable CSP/KISS behavior. `kfsw-modules` is now
+the manifest-managed home for future reusable radio management, but its
+foundation does not add a radio driver. A future `radio-uhf` module may expose
+a bounded interface, own its UHF definitions through `param_uhf`, report
+bounded health through `health`, and select a `holybro` implementation.
 
 The two physical tests answer different questions:
 

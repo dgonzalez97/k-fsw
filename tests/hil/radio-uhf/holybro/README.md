@@ -120,8 +120,8 @@ This is verified functional evidence for this Holybro SiK raw UART/RF and
 CSP/KISS bench. It is not RF qualification, production readiness, flight
 qualification, an RF performance measurement, or a long-duration link test.
 
-The dormant `kfsw-modules` repository is not currently a west project and has
-no committed module baseline. Reusable Holybro control or radio-management code
-belongs under `radio-uhf/holybro` there once that repository is initialized and
-added to the manifest. This prototype adds only K-FSW-owned HIL fixtures and
-does not invent a radio driver.
+`kfsw-modules` is the manifest-managed home for future reusable Holybro control
+or radio-management code. A future `radio-uhf` module may own its UHF
+definitions in `param_uhf`, provide bounded status through `health`, and select
+the `holybro` implementation. This prototype adds only K-FSW-owned HIL fixtures
+and does not invent a radio driver.

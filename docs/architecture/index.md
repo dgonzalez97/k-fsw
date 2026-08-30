@@ -17,13 +17,12 @@ That separation supports three practical goals:
 
 The implementation is intentionally smaller than the long-term design notes
 that preceded it. There is no current local message bus, command registry,
-watchdog service, CAN transport, update service, or committed equipment-module
-repository in the manifest. Those concepts must not be used to explain code
-that does not exist.
+watchdog service, CAN transport, update service, or production equipment
+module. Those concepts must not be used to explain code that does not exist.
 
 ## Repository ownership
 
-The current tested composition contains four project-owned Git repositories.
+The current tested composition contains five project-owned Git repositories.
 
 | Repository | Current ownership | Does not own |
 | --- | --- | --- |
@@ -31,12 +30,12 @@ The current tested composition contains four project-owned Git repositories.
 | `kfsw-platform` | Monotonic time, reset-cause access, and LittleFS storage lifecycle over Zephyr | Mission policy, file-transfer rules, board selection |
 | `kfsw-services` | Boot/readiness markers, logging, local parameters, persistence, optional CSP parameter adapter, and FTP client/server | CSP interfaces/routes or raw flash layout |
 | `kfsw-comms` | Optional libcsp lifecycle, one router, routes, packet ownership, and UART/KISS adapter | Parameter semantics, FTP protocol, shell parsing |
+| `kfsw-modules` | Compile-time-selectable mission-specific device and subsystem modules | Generic platform, service, or communications mechanisms |
 
-A local `kfsw-modules` placeholder exists in some development workspaces, but
-it has no committed implementation and is not a project in the current
-`west.yml`. It is therefore not part of the reproducible K-FSW composition.
-Future equipment or subsystem clients should become manifest dependencies only
-after they have real code, ownership, and a published revision.
+`kfsw-modules` is a normal west dependency and Zephyr module with Kconfig and
+CMake extension points. Its foundation contributes no runtime source or public
+API. Production modules are added only with a real interface, ownership,
+implementation, selection contract, and verification.
 
 Upstream dependencies keep their own histories and licenses:
 
@@ -53,22 +52,23 @@ Upstream dependencies keep their own histories and licenses:
 
 ## Dependency direction
 
-The application may depend on all three reusable repositories. Services may
+The application may depend on all four reusable repositories. Services may
 depend on the platform layer, and only CSP-backed services depend on the
 communications layer. Communications depends on the platform layer and
-libcsp. Dependencies do not point back into `k-fsw/app`.
+libcsp. Individual device/subsystem modules declare only the generic
+dependencies they actually need. Dependencies do not point back into
+`k-fsw/app`.
 
 ```text
-                           k-fsw/app
-                   composition and lifecycle
-                     /          |          \
-                    v           v           v
-           kfsw-services  kfsw-platform  kfsw-comms
-              |     \           ^          |   \
-              |      \----------|----------/    v
-              |          optional use          libcsp
-              v
-       optional libparam codec
+                              k-fsw/app
+                      composition and lifecycle
+                      /        |        |        \
+                     v         v        v         v
+          kfsw-platform  kfsw-services  kfsw-comms  kfsw-modules
+                              |    \        |   \
+                              |     \-------/    v
+                              v   optional use  libcsp
+                    optional libparam codec
 
 All project layers use selected Zephyr APIs.
 ```
@@ -229,8 +229,9 @@ At the time of this manual revision, `west.yml` selects:
 | --- | --- |
 | Zephyr | tag `v4.4.0` |
 | `kfsw-platform` | `359c7195b19b27a34c235b7601537ea0c793bf46` |
-| `kfsw-services` | `32260f85bb318403caa05fe895cc646ab83de7b2` |
+| `kfsw-services` | `ad7b101f54e7cee0d696c4ee0de68df01bb3f175` |
 | `kfsw-comms` | `905a2a776f7ab117f31a0f9bc7608467916017f3` |
+| `kfsw-modules` | `a23c2ba21bdc5f3e316877efdef2c9b7b6f801d3` |
 | libcsp | `097a039701c85e4ceb98e91f380810662e23878a` |
 | libparam | `c296dfb6055a3c360f44dcbbd6ad108e98c76640` |
 
