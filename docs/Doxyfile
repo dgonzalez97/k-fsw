@@ -1,6 +1,6 @@
 PROJECT_NAME           = "K-FSW"
 PROJECT_NUMBER         =
-PROJECT_BRIEF          = "Modular flight software for next space"
+PROJECT_BRIEF          = "Modular embedded flight-software framework"
 
 OUTPUT_DIRECTORY       = ../build/docs
 CREATE_SUBDIRS         = NO
