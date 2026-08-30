@@ -12,6 +12,9 @@
 #if CONFIG_KFSW_STORAGE
 #include <kfsw/platform/storage.h>
 #endif
+#if CONFIG_KFSW_RADIO_UHF
+#include <kfsw/modules/radio_uhf.h>
+#endif
 #include <kfsw/services/boot.h>
 #if CONFIG_KFSW_FTP
 #include <kfsw/services/ftp.h>
@@ -28,11 +31,23 @@
 
 int main(void)
 {
-#if CONFIG_KFSW_STORAGE || CONFIG_KFSW_PARAM || CONFIG_KFSW_CSP
+#if CONFIG_KFSW_STORAGE || CONFIG_KFSW_PARAM || CONFIG_KFSW_CSP || CONFIG_KFSW_RADIO_UHF
 	int result;
 #endif
 
 	kfsw_log_info("K-FSW application starting");
+
+#if CONFIG_KFSW_RADIO_UHF
+	struct kfsw_radio_uhf_info radio_info;
+
+	result = kfsw_radio_uhf_get_info(&radio_info);
+	if (result != 0) {
+		kfsw_log_error("Failed to read UHF radio composition: %d", result);
+	} else {
+		kfsw_log_info("UHF radio selected: %s; expected serial %u baud",
+			      radio_info.implementation, radio_info.expected_serial_baud);
+	}
+#endif
 
 #if CONFIG_KFSW_STORAGE
 	result = kfsw_storage_init();

@@ -88,3 +88,11 @@ target_link_libraries(app PRIVATE
     kfsw::services
     kfsw::comms
 )
+
+if(CONFIG_KFSW_RADIO_UHF)
+    if(NOT TARGET kfsw_radio_uhf)
+        message(FATAL_ERROR
+            "radio-uhf was enabled but kfsw-modules did not provide its target")
+    endif()
+    target_link_libraries(app PRIVATE kfsw::radio_uhf)
+endif()
