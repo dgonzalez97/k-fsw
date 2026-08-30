@@ -23,6 +23,7 @@ static bool print_param_info(const struct kfsw_param_info *info, void *context)
 	return true;
 }
 
+#if CONFIG_KFSW_PARAM_CSP
 static int parse_param_node(const struct shell *sh, const char *text, uint16_t *node)
 {
 	unsigned long parsed;
@@ -37,6 +38,7 @@ static int parse_param_node(const struct shell *sh, const char *text, uint16_t *
 	*node = (uint16_t)parsed;
 	return 0;
 }
+#endif
 
 static int print_param_error(const struct shell *sh, const char *operation, const char *name,
 			     int result)
@@ -222,6 +224,7 @@ static int cmd_param_list(const struct shell *sh, size_t argc, char **argv)
 	struct param_list_context context = {.shell = sh};
 	int result;
 
+#if CONFIG_KFSW_PARAM_CSP
 	if (argc == 1U) {
 		result = kfsw_param_visit(print_param_info, &context);
 	} else {
@@ -233,6 +236,11 @@ static int cmd_param_list(const struct shell *sh, size_t argc, char **argv)
 		}
 		result = kfsw_param_remote_visit(node, print_param_info, &context);
 	}
+#else
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+	result = kfsw_param_visit(print_param_info, &context);
+#endif
 
 	if (result != 0) {
 		shell_error(sh, "parameter list failed (%d)", result);
@@ -247,6 +255,7 @@ static int cmd_param_get(const struct shell *sh, size_t argc, char **argv)
 	uint16_t node = 0U;
 	int result;
 
+#if CONFIG_KFSW_PARAM_CSP
 	if (argc == 2U) {
 		name = argv[1];
 		result = kfsw_param_get(name, &value);
@@ -258,6 +267,11 @@ static int cmd_param_get(const struct shell *sh, size_t argc, char **argv)
 		name = argv[2];
 		result = kfsw_param_remote_get(node, name, &value);
 	}
+#else
+	ARG_UNUSED(argc);
+	name = argv[1];
+	result = kfsw_param_get(name, &value);
+#endif
 
 	if (result != 0) {
 		return print_param_error(sh, "get", name, result);
@@ -274,6 +288,7 @@ static int cmd_param_set(const struct shell *sh, size_t argc, char **argv)
 	uint16_t node = 0U;
 	int result;
 
+#if CONFIG_KFSW_PARAM_CSP
 	if (argc == 3U) {
 		name = argv[1];
 		text = argv[2];
@@ -287,6 +302,12 @@ static int cmd_param_set(const struct shell *sh, size_t argc, char **argv)
 		text = argv[3];
 		result = kfsw_param_remote_get(node, name, &value);
 	}
+#else
+	ARG_UNUSED(argc);
+	name = argv[1];
+	text = argv[2];
+	result = kfsw_param_get(name, &value);
+#endif
 	if (result != 0) {
 		return print_param_error(sh, "set", name, result);
 	}
@@ -298,8 +319,14 @@ static int cmd_param_set(const struct shell *sh, size_t argc, char **argv)
 		return result;
 	}
 
-	result = (node == 0U) ? kfsw_param_set(name, &value)
-			      : kfsw_param_remote_set(node, name, &value);
+	if (node == 0U) {
+		result = kfsw_param_set(name, &value);
+	}
+#if CONFIG_KFSW_PARAM_CSP
+	else {
+		result = kfsw_param_remote_set(node, name, &value);
+	}
+#endif
 	if (result != 0) {
 		return print_param_error(sh, "set", name, result);
 	}
@@ -385,18 +412,30 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 	SHELL_CMD_ARG(defaults, NULL, "Restore compiled defaults in RAM only.", cmd_param_defaults,
 		      1, 0),
 #endif
-	SHELL_CMD_ARG(get, NULL, "Get local or remote value: get [node] <name>.", cmd_param_get, 2,
-		      1),
+	SHELL_CMD_ARG(get, NULL,
+#if CONFIG_KFSW_PARAM_CSP
+		      "Get local or remote value: get [node] <name>.", cmd_param_get, 2, 1),
+#else
+		      "Get a local value: get <name>.", cmd_param_get, 2, 0),
+#endif
 #if CONFIG_KFSW_PARAM_PERSISTENCE
 	SHELL_CMD_ARG(load, NULL, "Reload the saved snapshot into RAM.", cmd_param_load, 1, 0),
 #endif
-	SHELL_CMD_ARG(list, NULL, "List local or remote parameters: list [node].", cmd_param_list,
-		      1, 1),
+	SHELL_CMD_ARG(list, NULL,
+#if CONFIG_KFSW_PARAM_CSP
+		      "List local or remote parameters: list [node].", cmd_param_list, 1, 1),
+#else
+		      "List local parameters.", cmd_param_list, 1, 0),
+#endif
 #if CONFIG_KFSW_PARAM_PERSISTENCE
 	SHELL_CMD_ARG(save, NULL, "Atomically save persistent RAM values.", cmd_param_save, 1, 0),
 #endif
-	SHELL_CMD_ARG(set, NULL, "Set local or remote value: set [node] <name> <value>.",
-		      cmd_param_set, 3, 1),
+	SHELL_CMD_ARG(set, NULL,
+#if CONFIG_KFSW_PARAM_CSP
+		      "Set local or remote value: set [node] <name> <value>.", cmd_param_set, 3, 1),
+#else
+		      "Set a local value: set <name> <value>.", cmd_param_set, 3, 0),
+#endif
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(param, &param_commands, "K-FSW parameter commands.", NULL);

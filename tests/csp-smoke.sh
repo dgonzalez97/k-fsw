@@ -15,8 +15,9 @@ if [[ $# -ne 0 ]]; then
     exit 1
 fi
 
-node1_executable="$KFSW_ROOT/build/linux/zephyr/zephyr.exe"
-node2_executable="$KFSW_ROOT/build/tests/linux-node2/zephyr/zephyr.exe"
+node1_executable="$KFSW_BUILD_DIR/zephyr/zephyr.exe"
+node2_build_dir="${KFSW_NODE2_BUILD_DIR:-$KFSW_ROOT/build/tests/linux-node2}"
+node2_executable="$node2_build_dir/zephyr/zephyr.exe"
 work_dir="$(mktemp -d /tmp/kfsw-csp-smoke.XXXXXX)"
 node1_pid=""
 node2_pid=""
@@ -86,7 +87,7 @@ fi
 
 if [[ ! -x "$node2_executable" ]]; then
     echo "CSP SMOKE: building node 2"
-    "$KFSW_ROOT/k-fsw/tests/build-linux-node2.sh"
+	KFSW_BUILD_DIR="$node2_build_dir" "$KFSW_ROOT/k-fsw/tests/build-linux-node2.sh"
 fi
 
 mkfifo "$work_dir/node1.in" "$work_dir/node2.in"

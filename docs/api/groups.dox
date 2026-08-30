@@ -59,10 +59,11 @@
  *
  * @defgroup kfsw_services_param Parameters
  * @ingroup kfsw_services
- * @brief Local tables, remote CSP access, and explicit persistence.
+ * @brief Local tables and persistence with optional remote CSP access.
  *
  * Initialize the local table with kfsw_param_init(). The application restores
- * persistence before kfsw_param_server_start() exposes the CSP endpoints.
+ * persistence independently of CSP. When CONFIG_KFSW_PARAM_CSP is enabled,
+ * kfsw_param_server_start() exposes the same table through the CSP adapter.
  *
  * @defgroup kfsw_services_ftp FTP
  * @ingroup kfsw_services

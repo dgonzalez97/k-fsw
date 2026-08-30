@@ -21,4 +21,8 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(kfsw_services_param_tests LANGUAGES C)
 
 target_sources(app PRIVATE src/main.c)
-target_link_libraries(app PRIVATE kfsw::services kfsw_libparam)
+target_link_libraries(app PRIVATE kfsw::services)
+
+if(CONFIG_KFSW_PARAM_CSP)
+    target_link_libraries(app PRIVATE kfsw_libparam)
+endif()

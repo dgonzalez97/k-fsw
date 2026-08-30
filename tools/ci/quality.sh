@@ -44,6 +44,7 @@ format_sources+=(
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp_server.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/log.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter_csp.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter_internal.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter_persistence.c"
 )
@@ -80,6 +81,8 @@ cppcheck \
 	-DCONFIG_KFSW_LOG_MIN_LEVEL=0 \
 	-DCONFIG_KFSW_STORAGE=1 \
 	-DCONFIG_KFSW_FTP=1 \
+	-DCONFIG_KFSW_PARAM=1 \
+	-DCONFIG_KFSW_PARAM_CSP=1 \
 	-DCONFIG_KFSW_PARAM_PERSISTENCE=1 \
 	-I "$KFSW_WORKSPACE_ROOT/kfsw-platform/include" \
 	-I "$KFSW_WORKSPACE_ROOT/kfsw-services/include" \
