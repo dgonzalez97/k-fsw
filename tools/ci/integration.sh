@@ -25,4 +25,7 @@ echo "INTEGRATION: PARAM persistence"
 echo "INTEGRATION: CSP, remote PARAM, storage, and FTP"
 "$KFSW_REPO_DIR/tests/csp-smoke.sh"
 
+echo "INTEGRATION: k-ground nodes 16 and 17"
+"$KFSW_REPO_DIR/tests/k-ground-csp-smoke.sh"
+
 echo "INTEGRATION RESULT: PASS"

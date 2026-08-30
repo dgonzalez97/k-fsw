@@ -2,6 +2,19 @@ mainmenu "K-FSW Configuration"
 
 menu "K-FSW application"
 
+config KFSW_ROLE
+	string "K-FSW composition role"
+	default "flight"
+	help
+	  Short operator-visible role for this composition, such as flight or
+	  ground. This is identity metadata and does not select behavior.
+
+config KFSW_INSTANCE_NAME
+	string "K-FSW instance name"
+	default "kfsw"
+	help
+	  Short operator-visible name for this configured K-FSW instance.
+
 config KFSW_DEBUG_SHELL
 	bool "K-FSW debug command shell"
 	select SHELL

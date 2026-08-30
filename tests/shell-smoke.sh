@@ -62,6 +62,8 @@ expected_output=(
 	'storage  : K-FSW filesystem storage commands.'
 	'version  : Show K-FSW build information.'
     'K-FSW status'
+	'Role: flight'
+	'Name: kfsw'
     'board: native_sim/native/64'
     'uptime_ms: '
     'monotonic_ms: '
