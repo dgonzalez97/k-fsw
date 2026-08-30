@@ -52,47 +52,73 @@ KGROUND-RAW-PONG 0001
 ```
 
 This is HIL-only test traffic, not a K-FSW protocol or production radio module.
-Run it with both serial paths explicit:
+Run one exchange first, then the 100-exchange acceptance. `--count` increments
+the four-digit starting sequence and reports completed exchanges, invalid
+payloads, and timeouts:
 
 ```bash
-KGROUND_HOLYBRO_DEVICE=/dev/serial/by-id/<usb-radio> \
-KFSW_DEBUG_SERIAL=/dev/serial/by-id/<st-link-vcp> \
-  ./k-fsw/tests/hil/radio-uhf/holybro/raw-nucleo-smoke.sh
+./k-fsw/tests/hil/radio-uhf/holybro/raw-nucleo-smoke.sh --count 1
+./k-fsw/tests/hil/radio-uhf/holybro/raw-nucleo-smoke.sh --count 100
 ```
+
+The temporary raw peer continuously polls USART3. At 57600 baud, sleeping or
+printing after reception starts can let a burst overrun this deliberately
+simple polling fixture. Production CSP/KISS reception is interrupt-driven and
+does not use this raw-peer loop.
 
 ## CSP/KISS second
 
 `csp-kiss-smoke.sh` builds `kfsw-gnd-uhf` node 16 and NUCLEO node 2 with a
 57600-baud KISS UART, flashes the NUCLEO, bridges the ground PTY to the USB
-radio, and requires `csp ping 2` to succeed:
+radio, and verifies both interfaces, the direct KISS routes, bidirectional CSP
+ping, and clean nonzero post-traffic counters:
 
 ```bash
-KGROUND_HOLYBRO_DEVICE=/dev/serial/by-id/<usb-radio> \
-KFSW_DEBUG_SERIAL=/dev/serial/by-id/<st-link-vcp> \
-  ./k-fsw/tests/hil/radio-uhf/holybro/csp-kiss-smoke.sh
+./k-fsw/tests/hil/radio-uhf/holybro/csp-kiss-smoke.sh
 ```
 
 The electrical fixture must use the board/radio-compatible logic level, a
 common ground, crossed TX/RX, and no hardware flow control. Confirm the actual
 radio and board pinouts before applying power.
 
-## Current bench result
+## Verified bench result
 
-The connected bench was exercised on 30 August 2026. Both applications built
-and flashed, the NUCLEO debug console became ready, and both CSP endpoints
-reported the expected node, peer, and 57600-baud configuration. Physical
-acceptance did not pass:
+The corrected physical bench passed on 30 August 2026. The stable WSL devices
+were:
 
-- the raw client timed out waiting for `KGROUND-RAW-PONG 0001`;
-- the NUCLEO raw peer reported no received USART3 byte;
-- the local USB radio accepted command mode and reported the settings above,
-  but remote `RTI` and `RTI5` queries received no answer; and
-- the CSP/KISS bridge started correctly, but node 16 could not ping node 2.
+| Function | USB identity | Stable device |
+| --- | --- | --- |
+| Ground Holybro FTDI | `0403:6015`, FT230X serial `DN05YTP0` | `/dev/serial/by-id/usb-FTDI_FT230X_Basic_UART_DN05YTP0-if00-port0` |
+| NUCLEO ST-LINK console/debug | `0483:374b`, ST-LINK serial `0670FF3732504E3043093407` | `/dev/serial/by-id/usb-STMicroelectronics_STM32_STLink_0670FF3732504E3043093407-if02` |
 
-This evidence places the current problem below CSP, in the remote-radio/RF or
-NUCLEO-side UART path. Check RF pairing and both radios' settings, power/common
-ground, voltage level, and crossed TX/RX before rerunning raw acceptance. Do
-not treat LED activity alone as a passing data link.
+The user observed established RF link LEDs after separating the bench
+power/USB arrangement and had independently measured 100/100 direct USB radio
+exchanges in each direction. No persistent SiK parameter was changed.
+
+K-FSW acceptance then produced this evidence:
+
+- the basic raw request/reply passed through USART3 PD8/PD9;
+- sequences `0001` through `0100` passed 100/100, with zero invalid payloads
+  and zero timeouts, and the NUCLEO logged all 100 exchanges;
+- NUCLEO node 2 and ground node 16 each exposed `KISS addr=<node>/0` and
+  `0/0 -> KISS direct` at 57600 baud;
+- node 16 pinged node 2 in 180 ms, and node 2 pinged node 16 in 175 ms; and
+- both endpoints ended with KISS `tx=2 rx=2`, with `txerr=0`, `rxerr=0`,
+  `drop=0`, and UART `frame=0`.
+
+The initial raw rerun exposed a separate defect in the HIL-only polling peer:
+diagnostic output and a one-millisecond idle sleep could stall or overrun a
+57600-baud burst. Removing those operations was the only functional source
+change required. The normal K-FSW UART/KISS receive path is interrupt-driven,
+and its successful bidirectional CSP result does not indicate a production
+UART/RF software defect. Together with the changed power/USB arrangement, the
+new evidence supports attributing the earlier end-to-end CSP failure to bench
+conditions, while the earlier raw result was also affected by the test-peer
+defect.
+
+This is verified functional evidence for this Holybro SiK raw UART/RF and
+CSP/KISS bench. It is not RF qualification, production readiness, flight
+qualification, an RF performance measurement, or a long-duration link test.
 
 The dormant `kfsw-modules` repository is not currently a west project and has
 no committed module baseline. Reusable Holybro control or radio-management code

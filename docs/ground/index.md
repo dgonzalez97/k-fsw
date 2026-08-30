@@ -215,13 +215,16 @@ interface, parameters, implementation, and useful diagnostics.
 The two physical tests answer different questions:
 
 - `raw-nucleo-smoke.sh` flashes a temporary NUCLEO raw peer, sends
-  `KGROUND-RAW-PING 0001`, and requires `KGROUND-RAW-PONG 0001`. It proves
-  only that bytes traverse the UART/RF link.
+  deterministic numbered requests, and requires every matching reply. The
+  accepted bench ran 100/100 exchanges with no invalid payload or timeout. It
+  proves only that bytes traverse the UART/RF link.
 - `csp-kiss-smoke.sh` builds k-ground node 16 and NUCLEO node 2 with 57600-baud
-  UART profiles, bridges the ground KISS PTY to the USB radio, and requires a
-  CSP ping. It proves KISS framing and CSP routing in addition to the link.
+  UART profiles, bridges the ground KISS PTY to the USB radio, and requires
+  interfaces, direct routes, bidirectional CSP ping, and clean counters. It
+  proves KISS framing and CSP routing in addition to the link.
 
 The recorded USB-side RFD SiK 2.0 settings, exact commands, and latest bench
-result are in `tests/hil/radio-uhf/holybro/README.md`. The fixture is present,
-but the current bench has not passed either acceptance path; this is not a
-physically verified RF link.
+result are in `tests/hil/radio-uhf/holybro/README.md`. On 30 August 2026, the
+corrected bench passed both raw and CSP/KISS acceptance without changing radio
+parameters. This is physical functional evidence for that named bench, not RF
+or flight qualification.

@@ -7,7 +7,7 @@ This status was reviewed on 30 August 2026 against feature-branch base
 profiles, project tests, GitHub workflows, merged pull requests, open issues,
 and the public K Flight Software project board. The k-ground prototype is
 tracked by [issue 28](https://github.com/dgonzalez97/k-fsw/issues/28); its
-physical Holybro acceptance remains pending.
+named Holybro bench has passed raw and CSP/KISS functional acceptance.
 
 Status here is an engineering summary, not a substitute for the issue tracker
 or a release qualification record.
@@ -21,7 +21,7 @@ or a release qualification record.
 | CSP core | Optional libcsp identity, loopback, static routes, ping, one router | CSP ztest and two-node native integration/Robot | Bidirectional CSP ping on NUCLEO/FTDI UART bench | One direct KISS default route; no flight routing plan |
 | UART/KISS | Native PTY backend and interrupt-driven Zephyr UART adapter | Flight and ground two-node PTY bridge tests | NUCLEO USART3 ↔ FTDI bench physically verified | 115200 reference profiles; Holybro fixture uses separate 57600 overlays |
 | k-ground | Configured `native_sim` roles using the normal K-FSW shell and services | UHF node 16 and ops node 19 report role-specific identity and ping both ways | No physical evidence required for the local profile | Direct two-node local link; no multi-node router, orchestrator, or mission-control framework |
-| Holybro UHF fixture | Separate NUCLEO raw-byte peer and CSP/KISS HIL entry points under `radio-uhf/holybro` | Scripts/configurations and Robot discovery validated | Connected bench attempted: builds/flashes/configuration pass, but raw bytes do not reach NUCLEO and CSP ping fails | RF/remote-UART path requires correction; no radio driver or successful physical RF result |
+| Holybro UHF fixture | Separate NUCLEO raw-byte peer and CSP/KISS HIL entry points under `radio-uhf/holybro` | Scripts/configurations and Robot discovery validated | Raw 100/100 with no invalid/timeout; bidirectional node 16 ↔ 2 CSP ping; clean KISS counters on corrected bench | Functional bench evidence only; no radio driver, RF performance/soak campaign, or qualification |
 | Local parameters | Static typed table, exact scalar checks, read-only flags, callbacks | CSP-disabled ztest and local/full shell integration | Local table runs in NUCLEO composition; physical bench checks remote access to it | Current table is mostly integration values; string/data/arrays absent |
 | PARAM CSP adapter | Optional libparam-compatible server/client/cache | Two-node native remote list/get/set plus Robot errors | Remote get succeeds after physical FTP bench transfers | Fixed remote descriptor pool; no remote persistence command |
 | Parameter persistence | Explicit bounded versioned CRC snapshot and defaults/load/save/clear | CSP-disabled unit suite, cross-process integration, corrupt snapshot fallback, Valgrind | No dedicated NUCLEO reboot/persistence acceptance | Local only; no migration framework beyond name/type compatibility |
@@ -62,9 +62,11 @@ future health/FDIR design will need explicit required/optional service policy.
 The current route is a direct `0/0` KISS default suitable for a two-node test
 link. There is no CAN/CFP, SocketCAN/vcan, ZMQ, redundant link selection, or
 dynamic route management. The Holybro fixture adapts the existing serial KISS
-path to a radio bench; it is not a production radio driver. Its first connected
-attempt failed below CSP: the NUCLEO raw peer observed no USART3 bytes and the
-USB radio did not answer remote `RTI`/`RTI5` queries.
+path to a radio bench; it is not a production radio driver. After the bench
+power/USB arrangement was corrected, raw traffic and bidirectional CSP passed
+without RF parameter changes. The raw HIL peer also required removal of
+blocking polling behavior; the production UART/KISS receive path remains
+interrupt-driven.
 
 CRC32 provides accidental-corruption detection, not authentication. HMAC,
 encryption, keys, command authorization, and operational security policy are

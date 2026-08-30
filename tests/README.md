@@ -52,7 +52,7 @@ Current:
 - Robot operator-level remote file transfer through the KFSW-Linux shell
 - NUCLEO boot/readiness HIL smoke test
 - physical FTDI-to-NUCLEO CSP UART HIL test
-- raw and CSP/KISS Holybro UHF HIL runners with an honest failing-bench result
+- raw and CSP/KISS Holybro UHF HIL runners with measured passing-bench evidence
 
 ## Robot Framework system and HIL tests
 
@@ -91,9 +91,10 @@ Hosted CI dry-runs all suites and executes tests selected by
 `--exclude physical`; it never needs a serial device or development board.
 
 The Holybro fixtures remain separate by design. The raw runner flashes a
-temporary NUCLEO peer and proves a deterministic byte exchange without CSP.
-The CSP/KISS runner then builds the 57600-baud NUCLEO/ground profiles and
-requires a point-to-point CSP ping. See
+temporary NUCLEO peer and proves one or more deterministic byte exchanges
+without CSP. The CSP/KISS runner then builds the 57600-baud NUCLEO/ground
+profiles and requires routes, bidirectional point-to-point CSP ping, and clean
+post-traffic counters. See
 `tests/hil/radio-uhf/holybro/README.md` for the commands and latest physical
 result.
 
