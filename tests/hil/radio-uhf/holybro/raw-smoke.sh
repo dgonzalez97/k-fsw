@@ -9,6 +9,7 @@ KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
 radio_device="${KGROUND_HOLYBRO_DEVICE:-}"
 radio_baud="${KGROUND_HOLYBRO_BAUD:-57600}"
 sequence="${KGROUND_HOLYBRO_SEQUENCE:-0001}"
+exchange_count="${KGROUND_HOLYBRO_COUNT:-1}"
 test_timeout="${KGROUND_HOLYBRO_TIMEOUT:-10}"
 
 while [[ $# -gt 0 ]]; do
@@ -21,12 +22,16 @@ while [[ $# -gt 0 ]]; do
 		sequence="${2:?--sequence requires four digits}"
 		shift 2
 		;;
+	--count)
+		exchange_count="${2:?--count requires an integer}"
+		shift 2
+		;;
 	--timeout)
 		test_timeout="${2:?--timeout requires seconds}"
 		shift 2
 		;;
 	-h|--help)
-		echo "Usage: raw-smoke.sh [--device PATH] [--sequence NNNN] [--timeout SECONDS]"
+		echo "Usage: raw-smoke.sh [--device PATH] [--sequence NNNN] [--count N] [--timeout SECONDS]"
 		exit 0
 		;;
 	*)
@@ -64,4 +69,5 @@ exec "$python_command" "$HOLYBRO_DIR/raw_smoke.py" \
 	--device "$radio_device" \
 	--baud "$radio_baud" \
 	--sequence "$sequence" \
+	--count "$exchange_count" \
 	--timeout "$test_timeout"

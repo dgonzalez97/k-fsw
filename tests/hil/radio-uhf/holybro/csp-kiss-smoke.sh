@@ -84,6 +84,28 @@ wait_for_output()
 	return 1
 }
 
+wait_for_clean_transport_stats()
+{
+	local file="$1"
+	local process_pid="$2"
+	local last_interface
+	local last_uart
+
+	for _ in {1..1200}; do
+		last_uart="$(grep -F 'KISS tx=' "$file" | tail -1 || true)"
+		last_interface="$(grep -F 'KISS addr=' "$file" | tail -1 || true)"
+		if grep -Eq 'KISS tx=[1-9][0-9]* rx=[1-9][0-9]* txerr=0 rxerr=0 drop=0 frame=0' \
+			<<<"$last_uart" && \
+			grep -Eq 'KISS addr=[0-9]+/0 default=no tx=[1-9][0-9]* rx=[1-9][0-9]* txerr=0 rxerr=0 drop=0' \
+			<<<"$last_interface"; then
+			return 0
+		fi
+		kill -0 "$process_pid" 2>/dev/null || return 1
+		sleep 0.05
+	done
+	return 1
+}
+
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
@@ -134,13 +156,18 @@ west flash -d "$nucleo_build_dir" --runner openocd || \
 wait_for_output "$work_dir/nucleo.log" "@READY " "$debug_capture_pid" || \
 	fail "NUCLEO did not report readiness"
 
-printf '%s\r\n' 'status' 'uart info' >"$debug_serial"
+printf '%s\r\n' 'status' 'uart info' 'csp interfaces' 'csp routes' \
+	>"$debug_serial"
 wait_for_output "$work_dir/nucleo.log" "CSP node: 2" "$debug_capture_pid" || \
 	fail "NUCLEO did not report CSP node 2"
 wait_for_output "$work_dir/nucleo.log" "CSP peer: 16" "$debug_capture_pid" || \
 	fail "NUCLEO did not report ground peer 16"
 wait_for_output "$work_dir/nucleo.log" "baudrate: 57600" "$debug_capture_pid" || \
 	fail "NUCLEO did not report the Holybro serial rate"
+wait_for_output "$work_dir/nucleo.log" "KISS addr=2/0" "$debug_capture_pid" || \
+	fail "NUCLEO did not report its KISS interface"
+wait_for_output "$work_dir/nucleo.log" "0/0 -> KISS direct" "$debug_capture_pid" || \
+	fail "NUCLEO did not report its default KISS route"
 
 mkfifo "$work_dir/ground.in"
 exec 3<>"$work_dir/ground.in"
@@ -165,14 +192,31 @@ bridge_pid=$!
 wait_for_output "$work_dir/socat.log" "starting data transfer loop" \
 	"$bridge_pid" || fail "the PTY-to-Holybro bridge did not become ready"
 
-printf '%s\n' 'status' 'uart info' 'csp ping 2' >&3
+printf '%s\n' 'status' 'uart info' 'csp interfaces' 'csp routes' \
+	'csp ping 2' >&3
 wait_for_output "$work_dir/ground.log" "Role: kfsw-gnd-uhf" "$ground_pid" || \
 	fail "the UHF gateway did not report its role"
 wait_for_output "$work_dir/ground.log" "baudrate: 57600" "$ground_pid" || \
 	fail "k-ground did not report the Holybro serial rate"
+wait_for_output "$work_dir/ground.log" "KISS addr=16/0" "$ground_pid" || \
+	fail "k-ground did not report its KISS interface"
+wait_for_output "$work_dir/ground.log" "0/0 -> KISS direct" "$ground_pid" || \
+	fail "k-ground did not report its default KISS route"
 wait_for_output "$work_dir/ground.log" "CSP ping 2: success" "$ground_pid" || \
 	fail "k-ground node 16 could not ping NUCLEO node 2 over Holybro"
 
+printf '%s\r\n' 'csp ping 16' >"$debug_serial"
+wait_for_output "$work_dir/nucleo.log" "CSP ping 16: success" \
+	"$debug_capture_pid" || \
+	fail "NUCLEO node 2 could not ping k-ground node 16 over Holybro"
+
+printf '%s\r\n' 'uart info' 'csp interfaces' >"$debug_serial"
+printf '%s\n' 'uart info' 'csp interfaces' >&3
+wait_for_clean_transport_stats "$work_dir/ground.log" "$ground_pid" || \
+	fail "k-ground does not have clean, nonzero post-traffic KISS counters"
+wait_for_clean_transport_stats "$work_dir/nucleo.log" "$debug_capture_pid" || \
+	fail "NUCLEO does not have clean, nonzero post-traffic KISS counters"
+
 cat "$work_dir/ground.log"
 cat "$work_dir/nucleo.log"
-echo "HOLYBRO CSP/KISS RESULT: PASS"
+echo "HOLYBRO CSP/KISS RESULT: PASS bidirectional=yes counters=clean"

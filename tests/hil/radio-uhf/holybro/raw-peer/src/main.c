@@ -2,7 +2,6 @@
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/uart.h>
-#include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 
 #define RAW_UART DT_NODELABEL(usart3)
@@ -51,7 +50,6 @@ int main(void)
 	printk("HOLYBRO RAW PEER: READY uart=USART3 baud=57600\n");
 	for (;;) {
 		if (uart_poll_in(raw_uart, &byte) != 0) {
-			k_msleep(1);
 			continue;
 		}
 
@@ -71,9 +69,6 @@ int main(void)
 			continue;
 		}
 
-		if (length == 0) {
-			printk("HOLYBRO RAW PEER: RX START\n");
-		}
 		if (length < sizeof(line)) {
 			line[length++] = (char)byte;
 		} else {

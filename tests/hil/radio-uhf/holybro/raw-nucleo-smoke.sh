@@ -9,6 +9,7 @@ source "$KFSW_REPO_DIR/tools/_common.sh" nucleo_l496zg
 
 radio_device="${KGROUND_HOLYBRO_DEVICE:-}"
 debug_serial="${KFSW_DEBUG_SERIAL:-$KFSW_SERIAL}"
+exchange_count="${KGROUND_HOLYBRO_COUNT:-1}"
 build_dir="$KFSW_ROOT/build/hil/holybro/raw-peer"
 work_dir="$(mktemp -d /tmp/k-ground-holybro-raw.XXXXXX)"
 debug_capture_pid=""
@@ -24,8 +25,12 @@ while [[ $# -gt 0 ]]; do
 		debug_serial="${2:?--serial requires a device path}"
 		shift 2
 		;;
+	--count)
+		exchange_count="${2:?--count requires an integer}"
+		shift 2
+		;;
 	-h|--help)
-		echo "Usage: raw-nucleo-smoke.sh [--radio PATH] [--serial STLINK_PATH]"
+		echo "Usage: raw-nucleo-smoke.sh [--radio PATH] [--serial STLINK_PATH] [--count N]"
 		exit 0
 		;;
 	*)
@@ -65,6 +70,20 @@ wait_for_output()
 	return 1
 }
 
+wait_for_exchange_count()
+{
+	local observed
+
+	for _ in {1..600}; do
+		observed="$(grep -Fc "HOLYBRO RAW PEER: EXCHANGE PASS" \
+			"$work_dir/nucleo.log" 2>/dev/null || true)"
+		((observed >= exchange_count)) && return 0
+		kill -0 "$debug_capture_pid" 2>/dev/null || return 1
+		sleep 0.05
+	done
+	return 1
+}
+
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
@@ -82,6 +101,9 @@ fi
 if [[ "$(readlink -f "$radio_device")" == "$(readlink -f "$debug_serial")" ]]; then
 	fail "radio and debug serial paths resolve to the same device"
 fi
+if [[ ! "$exchange_count" =~ ^[1-9][0-9]*$ ]]; then
+	fail "exchange count must be a positive integer"
+fi
 
 echo "HOLYBRO RAW/NUCLEO: building the temporary USART3 raw peer"
 west build -p always -b "$ZEPHYR_BOARD" -d "$build_dir" \
@@ -98,12 +120,13 @@ wait_for_output "HOLYBRO RAW PEER: READY" || \
 	fail "the NUCLEO raw peer did not report readiness"
 
 if ! "$HOLYBRO_DIR/raw-smoke.sh" --device "$radio_device" \
-	--sequence 0001 --timeout 15 >"$work_dir/raw.log" 2>&1; then
+	--sequence 0001 --count "$exchange_count" --timeout 15 \
+	>"$work_dir/raw.log" 2>&1; then
 	fail "the USB radio did not receive the expected raw response"
 fi
-wait_for_output "HOLYBRO RAW PEER: EXCHANGE PASS" || \
-	fail "the NUCLEO did not confirm the raw exchange"
+wait_for_exchange_count || \
+	fail "the NUCLEO did not confirm all $exchange_count raw exchanges"
 
 cat "$work_dir/raw.log"
 cat "$work_dir/nucleo.log"
-echo "HOLYBRO RAW/NUCLEO RESULT: PASS"
+echo "HOLYBRO RAW/NUCLEO RESULT: PASS exchanges=$exchange_count/$exchange_count"
