@@ -224,7 +224,7 @@ build                                 Zephyr board
 optional flash          <----------   flash USB ID + runner
 discover/open console   <----------   app USB ID / serial path / baud
 wait for prompt         <----------   expected prompt
-status/version/help                    
+status/version/help
 ```
 
 This split is what made FRDM and Pico bring-up additive. A future shell target

@@ -1,7 +1,16 @@
 local references = {
+  k_fsw_manual = { "Overview", "k_fsw_manual" },
+  getting_started = { "Getting Started", "getting_started" },
+  architecture = { "Architecture", "architecture" },
+  zephyr_integration = { "Zephyr Integration", "zephyr_integration" },
+  communications = { "CSP and Communications", "communications" },
+  services = { "Services and Storage", "services" },
+  targets = { "Boards and Targets", "targets" },
   commands = { "Command Reference", "commands" },
   development = { "Development", "development" },
   testing = { "Testing", "testing" },
+  project_status = { "Project Status and Roadmap", "project_status" },
+  api_reference = { "generated API reference", nil },
   kfsw_comms = { "generated communications API reference", nil },
   kfsw_services = { "generated services API reference", nil },
 }

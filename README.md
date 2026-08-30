@@ -3,10 +3,11 @@
 [![Software CI](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml)
 [![Documentation](https://img.shields.io/badge/docs-K--FSW-28a96b)](https://dgonzalez97.github.io/k-fsw/)
 
-K-FSW is an open-source, modular flight-software framework for next space.
-The current reference integration supports Zephyr RTOS in native simulation
-and on the NUCLEO-L496ZG. Platform, service, and communications modules are
-versioned independently and pinned in a west workspace.
+K-FSW is an open-source, modular flight-software framework. The full reference
+composition runs on Zephyr in native simulation and on the NUCLEO-L496ZG.
+FRDM-K64F and Raspberry Pi Pico W have narrower, physically verified shell
+bring-up profiles. Platform, service, and communications modules are versioned
+independently and pinned in a west workspace.
 
 CSP support lives in the optional `kfsw-comms` module. Each supported target
 has a tested default configuration, while Kconfig and devicetree keep the
@@ -17,11 +18,13 @@ architecture, operations, testing, development, and the public C API.
 
 ## Current capabilities
 
-- Zephyr shell on KFSW-Linux and NUCLEO-L496ZG
+- full reference application on KFSW-Linux and NUCLEO-L496ZG
+- physical shell bring-up on FRDM-K64F and Raspberry Pi Pico W
 - optional CSP routing with UART/KISS and RDP
-- typed parameters with persistent storage
+- local typed parameters and persistence without a CSP dependency
+- optional remote parameter access over CSP
 - LittleFS storage and optional CSP/RDP file transfer
-- ztest/Twister, Valgrind, Robot Framework, and physical HIL paths
+- hosted software CI plus manually invoked physical HIL paths
 
 ## Try KFSW-Linux
 
@@ -49,8 +52,8 @@ kfsw:~$ storage info
 | `linux` | `native_sim/native/64` | CSP UART/KISS over a simulated PTY, parameters, persistence, storage, and FTP |
 | `nucleo_l496zg` | `nucleo_l496zg` | CSP UART/KISS on USART3, parameters, persistence, storage, and FTP |
 
-Physical shell bring-up profiles are intentionally narrower and are not yet
-fully qualified K-FSW targets:
+Physical shell bring-up profiles are intentionally narrower and are not
+full-service K-FSW targets:
 
 | K-FSW target | Zephyr board | Verified scope |
 | --- | --- | --- |
@@ -91,7 +94,7 @@ Build and serve the documentation locally:
 ./k-fsw/tools/docs/serve.sh
 ```
 
-Build the printable SDK guide after installing its Python requirements:
+Build the printable engineering guide after installing its Python requirements:
 
 ```bash
 ./.venv/bin/pip install -r k-fsw/docs/pdf/requirements.txt
@@ -102,5 +105,7 @@ Generated HTML is written to `build/docs/html/`; the printable guide is
 written to `build/k-fsw-guide.pdf`. Physical HIL is selected explicitly and
 requires local hardware.
 
-See the [development guide](https://dgonzalez97.github.io/k-fsw/development.html)
+See the [development guide](docs/development/index.md)
 for contribution policy and coordinated west-pinned changes.
+The [project status](docs/status/index.md)
+separates implemented, software-tested, and physically verified scope.

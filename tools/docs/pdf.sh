@@ -41,11 +41,14 @@ manual_sources=(
 	"$KFSW_REPO_DIR/docs/index.md"
 	"$KFSW_REPO_DIR/docs/getting-started/index.md"
 	"$KFSW_REPO_DIR/docs/architecture/index.md"
+	"$KFSW_REPO_DIR/docs/zephyr/index.md"
 	"$KFSW_REPO_DIR/docs/communications/index.md"
 	"$KFSW_REPO_DIR/docs/services/index.md"
+	"$KFSW_REPO_DIR/docs/targets/index.md"
 	"$KFSW_REPO_DIR/docs/commands/index.md"
 	"$KFSW_REPO_DIR/docs/testing/index.md"
 	"$KFSW_REPO_DIR/docs/development/index.md"
+	"$KFSW_REPO_DIR/docs/status/index.md"
 )
 
 for input in "${manual_sources[@]}" \
@@ -78,7 +81,7 @@ pandoc \
 	--lua-filter="$KFSW_PDF_SOURCE_DIR/links.lua" \
 	--css="$KFSW_PDF_SOURCE_DIR/guide.css" \
 	--metadata title="K-FSW Guide" \
-	--metadata subtitle="Modular flight software for next space" \
+	--metadata subtitle="Engineering Manual" \
 	--metadata date="$guide_date" \
 	--output "$guide_html" \
 	"${manual_sources[@]}"

@@ -151,10 +151,12 @@ pre {
   border: 1px solid #d4d9d6;
   border-left: 3px solid #2a9d63;
   border-radius: 2px;
+  break-inside: avoid;
   font-family: "DejaVu Sans Mono", monospace;
   font-size: 8pt;
   line-height: 1.38;
   margin: 4mm 0;
+  page-break-inside: avoid;
   padding: 3.5mm;
   white-space: pre-wrap;
 }
