@@ -16,8 +16,30 @@ observed settings are:
 | Channels | `10` |
 | `RTSCTS` | `0` |
 
-Copy `bench.env.example` outside the repository or export the same variables
-directly. Prefer stable `/dev/serial/by-id/...` paths.
+Create a host-specific bench environment from the template, edit both stable
+device paths, and source it from the workspace root. Create the mission
+`ground-station/` first with `./k-fsw/tools/k-ground init` if it does not yet
+exist:
+
+```bash
+cp ./k-fsw/tests/hil/radio-uhf/holybro/bench.env.example \
+  ./ground-station/holybro-bench.env
+${EDITOR:-vi} ./ground-station/holybro-bench.env
+. ./ground-station/holybro-bench.env
+```
+
+The template uses `export`, so its variables are inherited by the HIL scripts.
+Keep the actual bench file outside the reusable `k-fsw` repository. Prefer
+stable `/dev/serial/by-id/...` paths over `/dev/ttyUSB0` or `/dev/ttyACM0`,
+whose numbering can change after reconnecting hardware. Verify the selected
+devices without writing to them:
+
+```bash
+printf 'radio=%s\ndebug=%s\nbaud=%s\n' \
+  "$KGROUND_HOLYBRO_DEVICE" "$KFSW_DEBUG_SERIAL" "$KGROUND_HOLYBRO_BAUD"
+readlink -f "$KGROUND_HOLYBRO_DEVICE"
+readlink -f "$KFSW_DEBUG_SERIAL"
+```
 
 ## Raw bytes first
 

@@ -16,3 +16,12 @@ The assigned prototype roles are:
 Run `tools/k-ground init` from a mission workspace to copy this configuration
 into a local `ground-station/` directory. `KGROUND_STATION_DIR` can select a
 different deployment explicitly.
+
+The environment boundaries are intentional:
+
+- activate the workspace `.venv` for direct `west` commands;
+- let `tools/k-ground` load the selected `nodes/*.env` file automatically; and
+- source a separate exported bench file for host-specific USB/serial paths.
+
+Do not add physical device paths to these reusable node files. See the ground
+composition guide for the complete setup and verification procedure.

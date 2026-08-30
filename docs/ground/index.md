@@ -52,6 +52,66 @@ board: native_sim/native/64
 
 Normal Linux images retain the `kfsw:~$` prompt and report `Role: flight`.
 
+## Engineering environment setup
+
+Use three separate environment layers. Keeping them distinct makes failures
+easier to locate:
+
+| Layer | Purpose | How it is loaded |
+| --- | --- | --- |
+| Workspace `.venv` | Python, west, and Zephyr tooling | Activate in the engineer's shell; K-FSW scripts also discover it automatically |
+| `ground-station/nodes/*.env` | Version-controlled role, CSP address, and peer | Loaded automatically by `tools/k-ground` |
+| Holybro bench environment | Host-specific serial paths and measured radio settings | Explicitly sourced before physical HIL |
+
+From an existing west workspace, prepare a terminal with:
+
+```bash
+cd /path/to/k-fsw-workspace
+. .venv/bin/activate
+west topdir
+west manifest --validate
+command -v socat
+```
+
+`west topdir` should print the workspace root, and `west manifest --validate`
+must complete without an error. `socat` is required for local CSP/KISS links.
+On Ubuntu, install it with `sudo apt install socat` if the final command prints
+nothing.
+The complete one-time workspace and host-package procedure is in @ref
+getting_started; do not run `west init` again inside an already initialized
+workspace.
+
+There is no generic project `.env` that must be executed. Activating `.venv`
+configures the development tools; the role files configure K-FSW instances.
+Project wrappers source `.venv/bin/activate` when it exists, but activation is
+still recommended when invoking `west` directly.
+
+The launcher defaults to the reference deployment in `k-fsw/ground-station`
+and generated output in `build/k-ground`. To select a mission deployment and
+an explicit build root for the current terminal:
+
+```bash
+export KGROUND_STATION_DIR="$PWD/ground-station"
+export KGROUND_BUILD_ROOT="$PWD/build/k-ground"
+./k-fsw/tools/k-ground build kfsw-gnd-uhf
+```
+
+These exports affect only the current shell and its children. Do not add them
+globally to `.bashrc` when one host serves more than one mission deployment.
+Use `unset KGROUND_STATION_DIR KGROUND_BUILD_ROOT` to return to launcher
+defaults.
+
+Inspect the active values before a test with:
+
+```bash
+printf 'station=%s\nbuild=%s\n' \
+  "$KGROUND_STATION_DIR" "$KGROUND_BUILD_ROOT"
+```
+
+Do not place USB device paths in reusable node files. They are properties of a
+particular bench host and belong in the separate Holybro bench environment
+described below.
+
 ## Ground-station configuration
 
 `ground-station/` is a version-controlled deployment description, not a
