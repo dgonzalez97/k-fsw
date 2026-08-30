@@ -46,7 +46,8 @@ SHOW_NAMESPACES        = NO
 INPUT                  = docs \
                          ../kfsw-platform/include/kfsw \
                          ../kfsw-services/include/kfsw \
-                         ../kfsw-comms/include/kfsw
+                         ../kfsw-comms/include/kfsw \
+                         ../kfsw-modules/radio-uhf/include/kfsw
 INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = *.h *.md *.dox
 RECURSIVE              = YES

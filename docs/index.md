@@ -22,15 +22,15 @@ implemented and tested.
                          k-fsw
         application composition, targets, tests, tools, docs
                             |
-             +--------------+--------------+
-             |              |              |
-      kfsw-services   kfsw-platform   kfsw-comms
-       reusable app      time and       optional CSP,
-         services         storage        routing, KISS
-             |              |              |
-             +--------------+--------------+
+       +-------------+-------------+-------------+-------------+
+       |             |             |             |
+kfsw-services  kfsw-platform  kfsw-comms   kfsw-modules
+ reusable app    time and     optional CSP,  selected device/
+   services       storage      routing, KISS subsystem modules
+       |             |             |             |
+       +-------------+-------------+-------------+
                             |
-                         Zephyr
+                          Zephyr
                 kernel, devices, drivers, build
                             |
           +-----------------+------------------+
@@ -56,6 +56,10 @@ NUCLEO-L496ZG. It currently includes:
 - an optional libcsp router and UART/KISS interface;
 - an optional CSP parameter adapter; and
 - a K-FSW-specific file-transfer service over CSP/RDP.
+
+The UHF ground/NUCLEO test compositions additionally select the reusable
+`radio-uhf` module with Holybro SiK identity and bounded status. They continue
+to use the same `kfsw-comms` CSP/KISS/UART path.
 
 FRDM-K64F and Raspberry Pi Pico W profiles intentionally select a much smaller
 composition: boot markers, the debug shell, and the root `status`, `version`,

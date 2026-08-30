@@ -37,9 +37,10 @@ familiar 5-bit `0..31` address range does not apply to this composition. A
 peer may be any different CSP v2 address in `1..16383`, allowing the UHF
 gateway to target a flight-side node such as node 2.
 
-Role, name, hostname, prompt, address, direct peer, and build directory are
-generated from configuration rather than hard-coded into C. `status` makes the
-selected composition visible:
+Role, name, hostname, prompt, address, direct peer, optional UHF implementation,
+and build directory are generated from configuration rather than hard-coded
+into C. `status` makes the selected instance visible, while `uhf status` is
+present only when the radio module is composed:
 
 ```text
 kfsw-gnd-uhf# status
@@ -48,6 +49,11 @@ Role: kfsw-gnd-uhf
 Name: kfsw-gnd-uhf
 CSP node: 16
 board: native_sim/native/64
+
+kfsw-gnd-uhf# uhf status
+implementation: holybro-sik
+expected serial: 57600 8N1
+RF link: unknown
 ```
 
 Normal Linux images retain the `kfsw:~$` prompt and report `Role: flight`.
@@ -134,7 +140,12 @@ Each node file is a small shell-compatible environment file:
 KFSW_ROLE=kfsw-gnd-uhf
 KFSW_CSP_NODE=16
 KFSW_CSP_PEER=19
+KFSW_RADIO_UHF=holybro
 ```
+
+Only `kfsw-gnd-uhf` selects `KFSW_RADIO_UHF`; ops, beacon, and rotator roles do
+not own the physical radio. The launcher maps `holybro` to the reusable module's
+compile-time Kconfig choice rather than calling implementation-specific C APIs.
 
 Create a mission-local copy from the west workspace root with:
 
@@ -205,11 +216,17 @@ tests/hil/radio-uhf/
     └── csp-kiss-smoke.sh
 ```
 
-`kfsw-comms` continues to own reusable CSP/KISS behavior. `kfsw-modules` is now
-the manifest-managed home for future reusable radio management, but its
-foundation does not add a radio driver. A future `radio-uhf` module may expose
-a bounded interface, own its UHF definitions through `param_uhf`, report
-bounded health through `health`, and select a `holybro` implementation.
+`kfsw-comms` continues to own reusable CSP/KISS/UART behavior. `kfsw-modules`
+owns the compile-time-selected `radio-uhf` interface and the `holybro-sik`
+implementation. That module reports configured identity and expected serial
+facts without adding send/receive operations, another UART driver, KISS
+framing, CSP interface, or background manager.
+
+No radio parameter definitions are exported yet. The implementation does not
+enter SiK command mode or safely apply runtime setting changes, so writable
+TX-power, network-ID, or air-rate parameters would accept state without real
+hardware behavior. The generic PARAM mechanism remains ready for a future
+module-owned definition set once an actual safe operation exists.
 
 The two physical tests answer different questions:
 

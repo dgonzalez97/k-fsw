@@ -17,8 +17,9 @@ That separation supports three practical goals:
 
 The implementation is intentionally smaller than the long-term design notes
 that preceded it. There is no current local message bus, command registry,
-watchdog service, CAN transport, update service, or production equipment
-module. Those concepts must not be used to explain code that does not exist.
+watchdog service, CAN transport, or update service. `radio-uhf` is the first
+reusable equipment module; other planned module concepts must not be used to
+explain code that does not exist.
 
 ## Repository ownership
 
@@ -33,9 +34,9 @@ The current tested composition contains five project-owned Git repositories.
 | `kfsw-modules` | Compile-time-selectable mission-specific device and subsystem modules | Generic platform, service, or communications mechanisms |
 
 `kfsw-modules` is a normal west dependency and Zephyr module with Kconfig and
-CMake extension points. Its foundation contributes no runtime source or public
-API. Production modules are added only with a real interface, ownership,
-implementation, selection contract, and verification.
+CMake extension points. Its first implementation is `radio-uhf` with Holybro
+SiK selected at compile time. It owns configured radio identity and bounded
+status while `kfsw-comms` retains the CSP/KISS/UART data plane.
 
 Upstream dependencies keep their own histories and licenses:
 
@@ -86,9 +87,15 @@ uses Kconfig to decide which source files exist in that image. When CSP is
 disabled, `kfsw-comms` contributes an interface library so the top-level link
 shape stays simple without pulling in libcsp behavior.
 
+When `KFSW_RADIO_UHF=y`, the application links `kfsw::radio_uhf`. The selected
+Holybro implementation provides immutable build-time descriptors; it does not
+create a UART, call CSP, allocate memory, or start a thread. Board pins and the
+actual UART rate remain target/devicetree composition.
+
 The application source stays focused on order and failure reporting:
 
 - initialize and mount storage if configured;
+- report the selected UHF identity if configured;
 - initialize the parameter table and restore a snapshot if configured;
 - initialize CSP and any selected interfaces;
 - register the optional parameter CSP endpoints;
@@ -245,11 +252,11 @@ The following are not current K-FSW capabilities:
 
 - a local application message bus;
 - a generic command dispatcher or remote command service;
-- CAN/CFP, SocketCAN, ZMQ, or a production radio interface;
+- CAN/CFP, SocketCAN, ZMQ, or runtime radio control/readback;
 - health monitoring, watchdog policy, or fault-management coordination;
 - MCUboot image selection, application update, or rollback control;
 - synchronized absolute time; and
-- committed spacecraft equipment modules.
+- equipment modules beyond the current UHF identity/status boundary.
 
 Some appear in open issues or older architecture planning material. They may
 shape future interfaces, but they must be implemented and verified before

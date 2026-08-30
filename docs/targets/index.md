@@ -152,8 +152,10 @@ bidirectional ping, UART interface status, mounted storage and its file test,
 remote parameter access, 4 KiB and 16 KiB FTP round trips, and clean nonzero
 KISS statistics. @ref communications describes the topology.
 
-This evidence applies to the defined NUCLEO/FTDI bench. CSP over CAN and CSP
-over radio are not implemented or physically verified.
+This evidence applies to the defined NUCLEO/FTDI bench. The separate Holybro
+UHF profile selects the reusable `radio-uhf` module, changes USART3 to 57600,
+and has physically verified raw and CSP/KISS acceptance. CSP over CAN remains
+unimplemented; neither physical result is flight or RF qualification.
 
 ## FRDM-K64F shell profile
 
