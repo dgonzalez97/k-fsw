@@ -217,7 +217,9 @@ kfsw:~$ param set 2 log_level 2
 
 The CSP adapter is protocol compatibility, not shared memory. Each node owns
 its local table and applies its own validation/callbacks when a remote write is
-decoded.
+decoded. An invalid externally supplied value is rejected by the owner
+validator and the parameter is restored to its compiled default; it does not
+retain the last runtime value.
 
 ## Parameter persistence
 

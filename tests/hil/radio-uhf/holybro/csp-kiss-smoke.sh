@@ -19,6 +19,7 @@ debug_capture_pid=""
 bridge_pid=""
 debug_stty=""
 radio_stty=""
+compiled_log_level_default=""
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -163,17 +164,24 @@ fi
 command -v socat >/dev/null 2>&1 || fail "socat is required"
 
 echo "HOLYBRO CSP/KISS: building ground node 16 at ${radio_baud} baud"
-KGROUND_BUILD_ROOT="$ground_build_root" \
+KFSW_PRISTINE=always \
+	KGROUND_BUILD_ROOT="$ground_build_root" \
 	KFSW_EXTRA_DTC_OVERLAY_FILE="$HOLYBRO_DIR/k-ground.overlay" \
 	"$KFSW_REPO_DIR/tools/k-ground" build kfsw-gnd-uhf --peer 2
 
 echo "HOLYBRO CSP/KISS: building NUCLEO node 2 with peer 16"
-KFSW_BUILD_DIR="$nucleo_build_dir" \
+KFSW_PRISTINE=always \
+	KFSW_BUILD_DIR="$nucleo_build_dir" \
 	KFSW_EXTRA_CONF_FILE="$HOLYBRO_DIR/nucleo_l496zg.conf" \
 	KFSW_EXTRA_DTC_OVERLAY_FILE="$HOLYBRO_DIR/nucleo_l496zg.overlay" \
 	"$KFSW_REPO_DIR/tools/build.sh" nucleo_l496zg
 
 [[ -x "$ground_executable" ]] || fail "ground executable was not produced"
+compiled_log_level_default="$(sed -n \
+	's/^CONFIG_KFSW_LOG_MIN_LEVEL=\([0-4]\)$/\1/p' \
+	"$nucleo_build_dir/zephyr/.config")"
+[[ -n "$compiled_log_level_default" ]] || \
+	fail "cannot determine the NUCLEO compiled log_level default"
 
 debug_stty="$(stty -F "$debug_serial" -g)" || \
 	fail "cannot read NUCLEO debug serial settings"
@@ -262,17 +270,24 @@ wait_for_output "$work_dir/ground.log" "2:0 node_id" "$ground_pid" || \
 	fail "the production NUCLEO parameter list is missing node_id"
 wait_for_output "$work_dir/ground.log" "2:1 log_level" "$ground_pid" || \
 	fail "the production NUCLEO parameter list is missing log_level"
+wait_for_output "$work_dir/ground.log" "2:log_level = " "$ground_pid" || \
+	fail "k-ground could not read the NUCLEO log_level parameter"
 if grep -Eq '2:[0-9]+ +test_(u32|i32|float)' "$work_dir/ground.log"; then
 	fail "the production NUCLEO parameter list contains test-only definitions"
 fi
-wait_for_output "$work_dir/ground.log" "2:log_level = " "$ground_pid" || \
-	fail "k-ground could not read the NUCLEO log_level parameter"
 original_log_level="$(tr -d '\r' <"$work_dir/ground.log" | \
 	sed -n 's/.*2:log_level = \([0-4]\)$/\1/p' | head -1)"
 [[ -n "$original_log_level" ]] || fail "the initial remote log_level is invalid"
 
-alternate_log_level=3
-[[ "$original_log_level" == 3 ]] && alternate_log_level=2
+alternate_log_level=""
+for candidate in 3 2 4 0; do
+	if [[ "$candidate" != "$original_log_level" && \
+		"$candidate" != "$compiled_log_level_default" ]]; then
+		alternate_log_level="$candidate"
+		break
+	fi
+done
+[[ -n "$alternate_log_level" ]] || fail "cannot select a non-default log_level"
 printf '%s\n' \
 	"param set 2 log_level $alternate_log_level" \
 	'param get 2 log_level' >&3
@@ -280,32 +295,41 @@ wait_for_output_count "$work_dir/ground.log" \
 	"2:log_level = $alternate_log_level" 2 "$ground_pid" || \
 	fail "valid remote log_level set/readback did not pass"
 
-printf '%s\r\n' 'log test' >"$debug_serial"
+nucleo_status_count_before="$(grep -Fc 'K-FSW status' "$work_dir/nucleo.log" || true)"
+printf '%s\r\n' 'log test' 'status' >"$debug_serial"
 wait_for_output "$work_dir/nucleo.log" "K-FSW shell log test: error" \
 	"$debug_capture_pid" || fail "the NUCLEO log callback test did not run"
+wait_for_output_count "$work_dir/nucleo.log" "K-FSW status" \
+	"$((nucleo_status_count_before + 1))" "$debug_capture_pid" || \
+	fail "the NUCLEO log callback output did not reach its status barrier"
 validate_log_callback "$alternate_log_level" || \
 	fail "the owner callback did not apply the remote log_level"
 
-printf '%s\n' \
-	"param set 2 log_level $original_log_level" \
-	'param get 2 log_level' >&3
-wait_for_output_count "$work_dir/ground.log" \
-	"2:log_level = $original_log_level" 3 "$ground_pid" || \
-	fail "the original remote log_level was not restored"
-
+default_count_before="$(grep -Fc \
+	"2:log_level = $compiled_log_level_default" "$work_dir/ground.log" || true)"
+ground_status_count_before="$(grep -Fc 'K-FSW status' "$work_dir/ground.log" || true)"
+negative_start_line="$(($(wc -l <"$work_dir/ground.log") + 1))"
 printf '%s\n' 'param set 2 log_level 5' 'param get 2 log_level' \
 	'param get 2 missing' 'csp ping 3' 'status' >&3
 wait_for_output "$work_dir/ground.log" "2:log_level = 5" "$ground_pid" || \
 	fail "the invalid remote log_level request was not transmitted"
 wait_for_output_count "$work_dir/ground.log" \
-	"2:log_level = $original_log_level" 4 "$ground_pid" || \
-	fail "invalid remote log_level changed the retained valid state"
+	"2:log_level = $compiled_log_level_default" \
+	"$((default_count_before + 1))" "$ground_pid" || \
+	fail "invalid remote log_level did not restore the compiled default"
 wait_for_output "$work_dir/ground.log" "get: parameter 'missing' not found" \
 	"$ground_pid" || fail "missing remote parameter was not rejected"
 wait_for_output "$work_dir/ground.log" "CSP ping 3: failed" "$ground_pid" || \
 	fail "a nonexistent CSP node did not fail cleanly"
-wait_for_output_count "$work_dir/ground.log" "K-FSW status" 2 "$ground_pid" || \
+wait_for_output_count "$work_dir/ground.log" "K-FSW status" \
+	"$((ground_status_count_before + 1))" "$ground_pid" || \
 	fail "the ground shell was not responsive after negative tests"
+negative_output="$(tail -n +"$negative_start_line" "$work_dir/ground.log")"
+grep -Fq "2:log_level = $compiled_log_level_default" \
+	<<<"$negative_output" || fail "the negative-test window lacks default readback"
+if grep -Fq "2:log_level = $alternate_log_level" <<<"$negative_output"; then
+	fail "invalid remote log_level retained the prior non-default value"
+fi
 
 printf '%s\r\n' 'uart info' 'csp interfaces' >"$debug_serial"
 printf '%s\n' 'uart info' 'csp interfaces' >&3

@@ -145,8 +145,10 @@ and leave RF link `unknown`; it does not query the modem. `uart info` and
 `csp interfaces` report the actual transport and counters.
 
 Use real production parameters to prove a service across RF. Record the
-initial value, select a different valid value in `0..4`, read it back, and
-restore the recorded value. Do not run `param save` during this trial:
+initial value, select a different non-default value in `0..4`, and read it
+back. While that value is still active, send an invalid value and verify that
+the target restores the compiled default. The current composition compiles
+`log_level` with default `1`. Do not run `param save` during this trial:
 
 ```text
 kfsw-gnd-uhf# param list 2
@@ -154,7 +156,7 @@ kfsw-gnd-uhf# param get 2 node_id
 kfsw-gnd-uhf# param get 2 log_level
 kfsw-gnd-uhf# param set 2 log_level 3
 kfsw-gnd-uhf# param get 2 log_level
-kfsw-gnd-uhf# param set 2 log_level <recorded-value>
+kfsw-gnd-uhf# param set 2 log_level 5
 kfsw-gnd-uhf# param get 2 log_level
 ```
 
@@ -163,8 +165,6 @@ The production list contains `node_id` and `log_level`; it must not contain
 and confirm both shells remain responsive:
 
 ```text
-kfsw-gnd-uhf# param set 2 log_level 5
-kfsw-gnd-uhf# param get 2 log_level
 kfsw-gnd-uhf# param get 2 missing
 kfsw-gnd-uhf# csp ping 3
 kfsw-gnd-uhf# status
@@ -172,9 +172,11 @@ kfsw-gnd-uhf# uart info
 kfsw-gnd-uhf# csp interfaces
 ```
 
-The invalid value must leave the previously valid `log_level` unchanged, the
-missing name must be rejected, and node 3 must time out cleanly. Stop the
-bridge and both shells with `Ctrl-C` when finished.
+The invalid external value must be rejected and `log_level` must return from
+the verified non-default value to its compiled default `1`; retaining the
+previous non-default value is a failure. The missing name must be rejected,
+and node 3 must time out cleanly. Stop the bridge and both shells with `Ctrl-C`
+when finished.
 
 Current DX friction is explicit: the interactive console needs external
 `picocom`; manual ground-to-radio operation requires copying a generated PTY
@@ -249,8 +251,9 @@ K-FSW acceptance then produced this evidence:
 - node 16 pinged node 2 in 230 ms, and node 2 pinged node 16 in 172 ms;
 - the production remote PARAM list contained only `node_id` and `log_level`;
   `log_level` changed from 1 to 3, its owner callback reduced `log test` to
-  ERROR-only output, and the test restored the value to 1;
-- invalid `log_level=5` retained 1, a missing parameter and node 3 were
+  ERROR-only output;
+- while 3 was still active, invalid `log_level=5` restored the compiled
+  default 1 rather than retaining 3; a missing parameter and node 3 were
   rejected cleanly, and the shell remained responsive; and
 - both endpoints ended with KISS `tx=14 rx=14`, with `txerr=0`, `rxerr=0`,
   `drop=0`, and UART `frame=0`.
