@@ -32,9 +32,11 @@ Run Physical UART CSP Smoke
 
 Run Holybro Raw Smoke
     ${result}=    Run Process
-    ...    ${KFSW_REPO_DIR}/tests/hil/radio-uhf/holybro/raw-smoke.sh
-    ...    --device
+    ...    ${KFSW_REPO_DIR}/tests/hil/radio-uhf/holybro/raw-nucleo-smoke.sh
+    ...    --radio
     ...    ${HOLYBRO_RADIO}
+    ...    --serial
+    ...    ${DEBUG_SERIAL}
     ...    stdout=PIPE
     ...    stderr=STDOUT
     RETURN    ${result}

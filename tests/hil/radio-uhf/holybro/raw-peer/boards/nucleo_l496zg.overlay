@@ -1,0 +1,3 @@
+&usart3 {
+	current-speed = <57600>;
+};

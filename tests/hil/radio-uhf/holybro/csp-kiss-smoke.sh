@@ -108,7 +108,7 @@ command -v socat >/dev/null 2>&1 || fail "socat is required"
 echo "HOLYBRO CSP/KISS: building ground node 16 at ${radio_baud} baud"
 KGROUND_BUILD_ROOT="$ground_build_root" \
 	KFSW_EXTRA_DTC_OVERLAY_FILE="$HOLYBRO_DIR/k-ground.overlay" \
-	"$KFSW_REPO_DIR/tools/k-ground" build --node 16 --name main --peer 2
+	"$KFSW_REPO_DIR/tools/k-ground" build kfsw-gnd-uhf --peer 2
 
 echo "HOLYBRO CSP/KISS: building NUCLEO node 2 with peer 16"
 KFSW_BUILD_DIR="$nucleo_build_dir" \
@@ -166,8 +166,8 @@ wait_for_output "$work_dir/socat.log" "starting data transfer loop" \
 	"$bridge_pid" || fail "the PTY-to-Holybro bridge did not become ready"
 
 printf '%s\n' 'status' 'uart info' 'csp ping 2' >&3
-wait_for_output "$work_dir/ground.log" "Role: ground" "$ground_pid" || \
-	fail "k-ground did not report its role"
+wait_for_output "$work_dir/ground.log" "Role: kfsw-gnd-uhf" "$ground_pid" || \
+	fail "the UHF gateway did not report its role"
 wait_for_output "$work_dir/ground.log" "baudrate: 57600" "$ground_pid" || \
 	fail "k-ground did not report the Holybro serial rate"
 wait_for_output "$work_dir/ground.log" "CSP ping 2: success" "$ground_pid" || \
