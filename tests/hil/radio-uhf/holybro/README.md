@@ -227,10 +227,12 @@ The electrical fixture must use the board/radio-compatible logic level, a
 common ground, crossed TX/RX, and no hardware flow control. Confirm the actual
 radio and board pinouts before applying power.
 
-## Verified bench result
+## Evidence classification
 
-The corrected physical bench passed on 30 August 2026. The stable WSL devices
-were:
+### PHYSICALLY BENCH VERIFIED
+
+The physical bench run on 30 August 2026 verified raw UART/RF, bidirectional
+CSP/KISS, and remote PARAM transport over Holybro. The stable WSL devices were:
 
 | Function | USB identity | Stable device |
 | --- | --- | --- |
@@ -241,7 +243,7 @@ The user observed established RF link LEDs after separating the bench
 power/USB arrangement and had independently measured 100/100 direct USB radio
 exchanges in each direction. No persistent SiK parameter was changed.
 
-K-FSW acceptance then produced this evidence:
+K-FSW acceptance produced this physical evidence:
 
 - the basic raw request/reply passed through USART3 PD8/PD9;
 - sequences `0001` through `0100` passed 100/100, with zero invalid payloads
@@ -251,12 +253,34 @@ K-FSW acceptance then produced this evidence:
 - node 16 pinged node 2 in 230 ms, and node 2 pinged node 16 in 172 ms;
 - the production remote PARAM list contained only `node_id` and `log_level`;
   `log_level` changed from 1 to 3, its owner callback reduced `log test` to
-  ERROR-only output;
-- while 3 was still active, invalid `log_level=5` restored the compiled
-  default 1 rather than retaining 3; a missing parameter and node 3 were
+  ERROR-only output, and the fixture then restored `log_level` to 1;
+- after that restoration, invalid `log_level=5` ended with `log_level=1`; this
+  historical sequence did not distinguish retaining the current value from
+  resetting to the compiled default; a missing parameter and node 3 were
   rejected cleanly, and the shell remained responsive; and
 - both endpoints ended with KISS `tx=14 rx=14`, with `txerr=0`, `rxerr=0`,
   `drop=0`, and UART `frame=0`.
+
+### SOFTWARE VERIFIED
+
+The corrected discriminating PARAM oracle is verified in software:
+
+```text
+initial/compiled default = 1
+valid set                = 3
+invalid request          = 5
+final value              = 1
+```
+
+This proves the current production behavior: invalid externally supplied
+values are rejected and the parameter is restored to its compiled default.
+
+### PENDING PHYSICAL RE-RUN
+
+The physical HIL script now leaves the verified non-default value `3` active,
+sends invalid value `5`, and requires the final value to be the compiled
+default `1`. That corrected `1 -> 3 -> invalid 5 -> 1` oracle has not yet been
+rerun on the physical Holybro bench.
 
 The initial raw rerun exposed a separate defect in the HIL-only polling peer:
 diagnostic output and a one-millisecond idle sleep could stall or overrun a
