@@ -173,14 +173,18 @@ The software acceptance scope is:
   persistence flag; and
 - clean NUCLEO profile configuration/linking with the chosen GPIO binding.
 
-The focused run passed 2 configurations and 23 cases. The opt-in NUCLEO build
-and Linux integration smoke also passed; the combined UHF/routing/button
-candidate is subject to the full regression described above. The resulting
-classification is **SOFTWARE VERIFIED**. It does not establish physical
-interrupt timing, electrical polarity, mechanical bounce behavior, or a real
-press on PC13. The separate manual NUCLEO acceptance remains **PHYSICAL
-VERIFICATION PENDING** and must not be promoted without user interaction and
-captured observations.
+The focused run passed 2 configurations and 23 cases. The combined
+UHF/routing/button candidate then passed the full Twister run (13
+configurations, 62 cases), native integration, and Robot software scenarios.
+The opt-in NUCLEO profile and the combined UHF-plus-button NUCLEO composition
+also built successfully, as did the Linux, minimal, FRDM-K64F, and Pico W
+profiles. Against the clean default NUCLEO composition, the opt-in button
+profile increases image usage from 139,216 to 142,756 bytes of FLASH (+3,540)
+and from 38,396 to 39,740 bytes of RAM (+1,344). The resulting classification
+is **SOFTWARE VERIFIED**. It does not establish physical interrupt timing,
+electrical polarity, mechanical bounce behavior, or a real press on PC13. The
+separate manual NUCLEO acceptance remains **PHYSICAL VERIFICATION PENDING** and
+must not be promoted without user interaction and captured observations.
 
 ## Native integration tests
 
