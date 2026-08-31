@@ -95,6 +95,11 @@ A successful MCU build does not prove that a board was flashed, that its pins
 match the bench, or that an enabled driver can exchange real data. Those are
 physical claims.
 
+Building the opt-in `nucleo-boton-test` configuration additionally checks that
+`/chosen/kfsw,boton-test-button` resolves to a GPIO device and that the module,
+shell diagnostic, parameter definitions, and application composition link for
+the ARM target. It still does not prove a physical button press.
+
 ## Static quality
 
 The quality script runs the repository's clang-format policy in dry-run/error
@@ -126,6 +131,10 @@ K-FSW runs project-owned suites on `native_sim/native/64`. Current suites cover:
   configuration;
 - parameter persistence encoding, loading, corruption/mismatch handling,
   defaults, and clear behavior with CSP disabled;
+- `boton_test` initial state, first/multiple presses, held/released behavior,
+  timestamp flooring, count/time saturation, coherent typed status, live
+  read-only non-persistent parameter definitions, and an active-low GPIO
+  emulator path that exercises real edge callbacks and rescheduled work;
 - storage initialization/mount policy, capacity, and file operations; and
 - FTP protocol codec, path sandbox, CRC, and atomic commit helpers.
 
@@ -142,6 +151,41 @@ Native ztests still use Zephyr. They do not substitute a host-only mock for the
 kernel, which helps exercise module CMake/Kconfig integration as well as the C
 logic.
 
+### `boton_test` evidence boundary
+
+The focused module suite has a GPIO-disabled state/PARAM configuration and an
+active-low GPIO-emulator configuration. The latter drives Zephyr GPIO edges,
+restarts the real 30 ms delayable work across bounce, and checks hold and
+release/rearm behavior. Private state hooks cover deterministic time and
+saturation cases; there is no production fake-press command. Both
+configurations remain independent of physical hardware and exercise the same
+owner state exposed through `kfsw_boton_test_get_status()` and PARAM IDs 6 and
+7.
+
+The software acceptance scope is:
+
+- zeroed state after initialization/reset;
+- stable released-to-pressed counting, hold suppression, and release rearm;
+- monotonic millisecond-to-second floor conversion;
+- saturation of `press_count` and `last_press_s` at `UINT32_MAX`;
+- a coherent typed two-field snapshot;
+- PARAM inclusion when enabled, live value reflection, rejected writes, and no
+  persistence flag; and
+- clean NUCLEO profile configuration/linking with the chosen GPIO binding.
+
+The focused run passed 2 configurations and 23 cases. The combined
+UHF/routing/button candidate then passed the full Twister run (13
+configurations, 62 cases), native integration, and Robot software scenarios.
+The opt-in NUCLEO profile and the combined UHF-plus-button NUCLEO composition
+also built successfully, as did the Linux, minimal, FRDM-K64F, and Pico W
+profiles. Against the clean default NUCLEO composition, the opt-in button
+profile increases image usage from 139,216 to 142,756 bytes of FLASH (+3,540)
+and from 38,396 to 39,740 bytes of RAM (+1,344). The resulting classification
+is **SOFTWARE VERIFIED**. It does not establish physical interrupt timing,
+electrical polarity, mechanical bounce behavior, or a real press on PC13. The
+separate manual NUCLEO acceptance remains **PHYSICAL VERIFICATION PENDING** and
+must not be promoted without user interaction and captured observations.
+
 ## Native integration tests
 
 `tools/ci/integration.sh` builds the full Linux target and its focused native
@@ -152,6 +196,12 @@ test images, then executes the shell runners below.
 `tests/shell-smoke.sh` checks boot/readiness markers, prompt and root command
 behavior, monotonic time, compiled logging behavior, local parameter
 list/get/set validation, storage status, and command help.
+
+`tests/boton-test-smoke.sh` builds both the default Linux image and an opt-in
+software-only `boton_test` image. It checks that the disabled composition has
+no button parameters, while the enabled composition initializes with zeroed
+live values, lists both definitions as read-only, rejects writes, and leaves
+owner state unchanged. This runner does not enable GPIO or synthesize presses.
 
 ### Storage
 
@@ -201,6 +251,13 @@ The VIA check proves that K-FSW preserves libcsp's field. KISS ignores that
 link-layer next hop by design. This is deterministic software evidence for two
 simultaneous interfaces and transit forwarding, not evidence for a second
 physical radio.
+
+### Ground roles
+
+`tests/k-ground-csp-smoke.sh` builds the configured UHF node-16 and operations
+node-19 roles, checks their identity/status, and verifies bidirectional CSP
+ping. This remains an independent composition test; `boton_test` has no
+ground-role, route, KISS-interface, or node-number dependency.
 
 ### Focused local-only composition
 

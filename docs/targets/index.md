@@ -115,6 +115,36 @@ The two UARTs have fixed roles:
 The CSP receive path is interrupt-driven. The current default addresses the
 NUCLEO as node 2 and routes non-local traffic directly to the KISS interface.
 
+### Opt-in USER-button example
+
+`boton_test` is not forced into the default NUCLEO image. The focused example
+uses both of these composition files:
+
+- `config/profiles/nucleo-boton-test.conf` selects the module, physical GPIO
+  backend, and diagnostic shell with a 30 ms debounce interval; and
+- `config/profiles/nucleo-boton-test.overlay` maps
+  `/chosen/kfsw,boton-test-button` to the upstream board's `user_button` node.
+
+Build that explicit profile from the workspace root with:
+
+```bash
+KFSW_EXTRA_CONF_FILE="$PWD/k-fsw/config/profiles/nucleo-boton-test.conf" \
+KFSW_EXTRA_DTC_OVERLAY_FILE="$PWD/k-fsw/config/profiles/nucleo-boton-test.overlay" \
+  ./k-fsw/tools/build.sh nucleo_l496zg
+```
+
+Zephyr's NUCLEO-L496ZG board definition maps `user_button` to PC13 with
+`GPIO_ACTIVE_HIGH`. That board-specific fact stays in devicetree; reusable
+module source reads the logical GPIO through the chosen reference and therefore
+does not hard-code the port, pin, MCU, board, or electrical polarity.
+
+The profile uses a 30 ms debounce interval, the system workqueue, and no
+dedicated thread or dynamic allocation. Its software build and state tests do
+not constitute physical evidence. Manual blue USER-button acceptance,
+including one-count-per-press, hold behavior, timestamps, remote observation,
+and rejected writes, remains pending until it is performed with a user on the
+named NUCLEO bench.
+
 ### Build, flash, and console
 
 ```bash
@@ -154,8 +184,10 @@ KISS statistics. @ref communications describes the topology.
 
 This evidence applies to the defined NUCLEO/FTDI bench. The separate Holybro
 UHF profile selects the reusable `radio-uhf` module, changes USART3 to 57600,
-and has physically verified raw and CSP/KISS acceptance. CSP over CAN remains
-unimplemented; neither physical result is flight or RF qualification.
+and has physically verified raw and CSP/KISS acceptance. Neither prior bench
+result physically verifies the opt-in `boton_test` profile. CSP over CAN
+remains unimplemented; none of these physical results is flight or RF
+qualification.
 
 ## FRDM-K64F shell profile
 

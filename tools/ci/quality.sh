@@ -29,13 +29,13 @@ format_roots=("$KFSW_REPO_DIR/app/src")
 	format_roots+=("$KFSW_REPO_DIR/tests/unit")
 [[ -d "$KFSW_REPO_DIR/tests/hil/radio-uhf/holybro/raw-peer/src" ]] && \
 	format_roots+=("$KFSW_REPO_DIR/tests/hil/radio-uhf/holybro/raw-peer/src")
-[[ -d "$KFSW_WORKSPACE_ROOT/kfsw-modules/radio-uhf" ]] && \
-	format_roots+=("$KFSW_WORKSPACE_ROOT/kfsw-modules/radio-uhf")
-[[ -d "$KFSW_WORKSPACE_ROOT/kfsw-modules/tests" ]] && \
-	format_roots+=("$KFSW_WORKSPACE_ROOT/kfsw-modules/tests")
+[[ -d "$KFSW_WORKSPACE_ROOT/kfsw-modules" ]] && \
+	format_roots+=("$KFSW_WORKSPACE_ROOT/kfsw-modules")
 
 mapfile -d '' format_sources < <(
-	find "${format_roots[@]}" -type f \( -name '*.c' -o -name '*.h' \) \
+	find "${format_roots[@]}" \
+		-type f \( -name '*.c' -o -name '*.h' \) \
+		! -path '*/third_party/*' \
 		-print0 | sort -z
 )
 
@@ -66,12 +66,29 @@ analysis_roots=(
 	"$KFSW_WORKSPACE_ROOT/kfsw-platform/src"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src"
 	"$KFSW_WORKSPACE_ROOT/kfsw-comms/src"
-	"$KFSW_WORKSPACE_ROOT/kfsw-modules/radio-uhf"
 )
+[[ -d "$KFSW_WORKSPACE_ROOT/kfsw-modules" ]] && \
+	analysis_roots+=("$KFSW_WORKSPACE_ROOT/kfsw-modules")
 
 mapfile -d '' analysis_sources < <(
-	find "${analysis_roots[@]}" -type f -name '*.c' -print0 | sort -z
+	find "${analysis_roots[@]}" \
+		-type f -name '*.c' \
+		! -path "$KFSW_WORKSPACE_ROOT/kfsw-modules/tests/*" \
+		! -path '*/third_party/*' \
+		-print0 | sort -z
 )
+
+module_include_args=()
+if [[ -d "$KFSW_WORKSPACE_ROOT/kfsw-modules" ]]; then
+	while IFS= read -r -d '' include_dir; do
+		module_include_args+=(-I "$include_dir")
+	done < <(
+		find "$KFSW_WORKSPACE_ROOT/kfsw-modules" \
+			-type d -name include \
+			! -path '*/third_party/*' \
+			-print0 | sort -z
+	)
+fi
 
 echo "QUALITY: cppcheck (${#analysis_sources[@]} files)"
 cppcheck \
@@ -93,6 +110,10 @@ cppcheck \
 	-DCONFIG_KFSW_PARAM=1 \
 	-DCONFIG_KFSW_PARAM_CSP=1 \
 	-DCONFIG_KFSW_PARAM_PERSISTENCE=1 \
+	-DCONFIG_KFSW_BOTON_TEST=1 \
+	-DCONFIG_KFSW_BOTON_TEST_GPIO=1 \
+	-DCONFIG_KFSW_BOTON_TEST_DEBOUNCE_MS=30 \
+	-DCONFIG_KFSW_BOTON_TEST_SHELL=1 \
 	-DCONFIG_KFSW_RADIO_UHF=1 \
 	-DCONFIG_KFSW_RADIO_UHF_HOLYBRO=1 \
 	-DCONFIG_KFSW_RADIO_UHF_SHELL=1 \
@@ -100,7 +121,7 @@ cppcheck \
 	-I "$KFSW_WORKSPACE_ROOT/kfsw-platform/include" \
 	-I "$KFSW_WORKSPACE_ROOT/kfsw-services/include" \
 	-I "$KFSW_WORKSPACE_ROOT/kfsw-comms/include" \
-	-I "$KFSW_WORKSPACE_ROOT/kfsw-modules/radio-uhf/include" \
+	"${module_include_args[@]}" \
 	"${analysis_sources[@]}"
 
 echo "QUALITY RESULT: PASS"

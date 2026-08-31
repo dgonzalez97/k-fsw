@@ -17,8 +17,9 @@ That separation supports three practical goals:
 
 The implementation is intentionally smaller than the long-term design notes
 that preceded it. There is no current local message bus, command registry,
-watchdog service, CAN transport, or update service. `radio-uhf` is the first
-reusable equipment module; other planned module concepts must not be used to
+watchdog service, CAN transport, update service, or housekeeping service.
+`radio-uhf` and the deliberately small `boton_test` reference module are the
+current equipment-module scope; other planned concepts must not be used to
 explain code that does not exist.
 
 ## Repository ownership
@@ -34,9 +35,13 @@ The current tested composition contains five project-owned Git repositories.
 | `kfsw-modules` | Compile-time-selectable mission-specific device and subsystem modules | Generic platform, service, or communications mechanisms |
 
 `kfsw-modules` is a normal west dependency and Zephyr module with Kconfig and
-CMake extension points. Its first implementation is `radio-uhf` with Holybro
-SiK selected at compile time. It owns configured radio identity and bounded
-status while `kfsw-comms` retains the CSP/KISS/UART data plane.
+CMake extension points. Its `radio-uhf` implementation selects Holybro SiK at
+compile time and owns configured radio identity and bounded status while
+`kfsw-comms` retains the CSP/KISS/UART data plane. Its `boton_test` reference
+module owns USER-button semantics, debouncing, coherent runtime state, a typed
+status API, and two live parameter definitions. The executable composition
+selects it and binds an abstract devicetree reference; the generic module does
+not name NUCLEO, STM32, GPIOC, or PC13.
 
 Upstream dependencies keep their own histories and licenses:
 
@@ -92,6 +97,13 @@ Holybro implementation provides immutable build-time descriptors; it does not
 create a UART, call CSP, allocate memory, or start a thread. Board pins and the
 actual UART rate remain target/devicetree composition.
 
+When `CONFIG_KFSW_BOTON_TEST=y`, the application links `kfsw::boton_test`,
+contributes the module-owned parameter definition set, and initializes the
+module. GPIO support uses Zephyr's GPIO API and the
+`kfsw,boton-test-button` chosen node. The explicit NUCLEO example profile maps
+that chosen node to the board's existing `user_button`; another target can bind
+a different GPIO without changing module source.
+
 When UART/KISS is enabled, `kfsw-comms` owns one context per enabled
 devicetree child: UART device, libcsp interface, address/prefix, KISS framing
 state, receive callback/thread state, and counters. The composition supplies a
@@ -100,11 +112,55 @@ longest-prefix selection; applications do not switch transports with their own
 destination conditionals. The legacy chosen-UART form remains the one-link
 special case and receives its historical direct default route.
 
+The module uses a GPIO edge callback only to reschedule one 30 ms delayable
+item on Zephyr's system workqueue. The work handler reads the logical level
+after the debounce interval. A stable released-to-pressed transition counts
+once, a held button does not recount, and a stable release rearms the next
+press. A button already held during initialization is not counted; it must be
+released before the next press can count. Initialization is serialized and
+schedules one debounced reconciliation sample after interrupt enable so a
+transition during GPIO setup is not lost. Devicetree GPIO flags provide
+polarity. There is no dedicated module thread and no dynamic allocation.
+
+State ownership and observation stay separated from transport:
+
+```text
+chosen GPIO -> ISR -> 30 ms system work -> boton_test owner state
+                                               |            \
+                                               |             +-> module PARAM definitions
+                                               v                         |
+                                      typed status snapshot              v
+                                               |                 optional PARAM/CSP
+                                               v
+                                      future HK collector
+                                      (not implemented)
+```
+
+`kfsw_boton_test_get_status()` returns one coherent
+`kfsw_boton_test_status` snapshot. `press_count` and `last_press_s` start at
+zero on every boot. Count saturates at `UINT32_MAX`; it never wraps to zero.
+The timestamp is monotonic milliseconds divided by 1000 with floor semantics
+and saturation at `UINT32_MAX`. It continues to update on accepted presses
+after the count has saturated. A press during second zero is unambiguous
+because the count becomes nonzero.
+
+The current raw-backing PARAM model reads the two aligned 32-bit fields as
+independent scalars under the PARAM table lock; it does not enter the module
+mutex. Tested targets provide single-copy aligned 32-bit access, but that is
+not a formally synchronized two-field C snapshot. Multi-field consumers must
+use the typed API. A future generic PARAM owner-read callback is the clean path
+to formal owner synchronization without duplicate storage or PARAM internals
+in this module.
+
+A future housekeeping collector should call the typed snapshot API. It should
+not query PARAM by name or read GPIO; HK itself remains unimplemented.
+
 The application source stays focused on order and failure reporting:
 
-- initialize and mount storage if configured;
 - report the selected UHF identity if configured;
+- initialize and mount storage if configured;
 - initialize the parameter table and restore a snapshot if configured;
+- initialize `boton_test` if configured;
 - initialize CSP and any selected interfaces;
 - register the optional parameter CSP endpoints;
 - start the one CSP router;
@@ -127,11 +183,15 @@ Zephyr kernel and configured subsystems start
                     |
          log "application starting"
                     |
+          [UHF] report selected identity
+                    |
        [storage] init -> mount LittleFS
                     |
        [parameters] validate local table
                     |
        [persistence] restore valid snapshot
+                    |
+       [boton_test] initialize GPIO/work/state
                     |
         [CSP] initialize identity/routes/interface
                     |
@@ -189,6 +249,7 @@ Current mutable state has one clear owner:
 | Storage mount and backend readiness | `kfsw-platform` | Storage mutex; application initializes and mounts once |
 | Runtime log threshold | `kfsw-services` logging | Atomic value; parameter callback updates it |
 | Parameter definitions and backing values | Owning application/service/test component | Compile-time definition sets; owner validation and callbacks |
+| Button count and timestamp pair | `kfsw-modules/boton-test` | Module mutex provides coherent typed snapshots; PARAM reads the same aligned `u32` backing fields individually; reset at boot |
 | Aggregated local parameter index | `kfsw-services` PARAM core | Parameter mutex; bounded static index assembled by the executable composition |
 | Snapshot workspace and file | Parameter persistence | Persistence mutex plus parameter-table lock |
 | CSP identity, static routes, interfaces, router | `kfsw-comms` | Validate/load once after all interfaces exist; one statically defined router thread |
@@ -212,6 +273,10 @@ The microsecond path uses Zephyr's 64-bit cycle counter when configured and
 otherwise converts uptime ticks. The API promises monotonic elapsed time, not
 a specific hardware clock resolution. Absolute spacecraft time and clock
 correlation are not implemented in the current composition.
+
+`boton_test_last_press_s` is explicitly elapsed monotonic seconds since boot,
+not wall time. It uses the same platform monotonic clock and does not implement
+another uptime counter.
 
 ## Configuration is part of the product
 
@@ -246,8 +311,8 @@ At the time of this manual revision, `west.yml` selects:
 | Zephyr | tag `v4.4.0` |
 | `kfsw-platform` | `359c7195b19b27a34c235b7601537ea0c793bf46` |
 | `kfsw-services` | `ad7b101f54e7cee0d696c4ee0de68df01bb3f175` |
-| `kfsw-comms` | `905a2a776f7ab117f31a0f9bc7608467916017f3` |
-| `kfsw-modules` | `a23c2ba21bdc5f3e316877efdef2c9b7b6f801d3` |
+| `kfsw-comms` | `c6d9e7c6fdad52b4a21a95cd95b5a49dd1acea87` |
+| `kfsw-modules` | `6e684a9a33a576cbfd52e7c4a6ad52e50437469b` |
 | libcsp | `097a039701c85e4ceb98e91f380810662e23878a` |
 | libparam | `c296dfb6055a3c360f44dcbbd6ad108e98c76640` |
 
@@ -265,7 +330,8 @@ The following are not current K-FSW capabilities:
 - health monitoring, watchdog policy, or fault-management coordination;
 - MCUboot image selection, application update, or rollback control;
 - synchronized absolute time; and
-- equipment modules beyond the current UHF identity/status boundary.
+- reusable equipment modules beyond the current UHF identity/status and narrow
+  `boton_test` reference implementations.
 
 Some appear in open issues or older architecture planning material. They may
 shape future interfaces, but they must be implemented and verified before

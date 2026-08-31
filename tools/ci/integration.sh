@@ -17,6 +17,9 @@ KFSW_PRISTINE=always "$KFSW_REPO_DIR/tests/build-linux-node2.sh"
 echo "INTEGRATION: shell and local PARAM"
 "$KFSW_REPO_DIR/tests/shell-smoke.sh"
 
+echo "INTEGRATION: boton_test opt-in PARAM ownership"
+"$KFSW_REPO_DIR/tests/boton-test-smoke.sh"
+
 echo "INTEGRATION: storage"
 "$KFSW_REPO_DIR/tests/storage-smoke.sh"
 

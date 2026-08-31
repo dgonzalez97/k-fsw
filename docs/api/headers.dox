@@ -51,3 +51,9 @@
  * @brief Sandboxed CSP/RDP file-transfer API.
  * @ingroup kfsw_services_ftp
  */
+
+/**
+ * @file ../kfsw-modules/boton-test/include/kfsw/modules/boton_test.h
+ * @brief Debounced button state and typed status API.
+ * @ingroup kfsw_modules_boton_test
+ */

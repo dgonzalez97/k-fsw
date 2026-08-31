@@ -47,12 +47,13 @@ INPUT                  = docs \
                          ../kfsw-platform/include/kfsw \
                          ../kfsw-services/include/kfsw \
                          ../kfsw-comms/include/kfsw \
-                         ../kfsw-modules/radio-uhf/include/kfsw
+                         ../kfsw-modules/radio-uhf/include/kfsw \
+                         ../kfsw-modules/boton-test/include/kfsw
 INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = *.h *.md *.dox
 RECURSIVE              = YES
 EXCLUDE                = docs/theme
-EXCLUDE_PATTERNS       = */third_party/* */build/* */bootloader/* */modules/*
+EXCLUDE_PATTERNS       = */third_party/* */build/* */bootloader/*
 EXAMPLE_PATH           = docs
 
 REFERENCES_RELATION    = NO

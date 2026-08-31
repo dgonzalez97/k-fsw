@@ -6,6 +6,7 @@ The generated reference covers only K-FSW-owned public headers from:
 - `kfsw-services/include/kfsw/`
 - `kfsw-comms/include/kfsw/`
 - `kfsw-modules/radio-uhf/include/kfsw/`
+- `kfsw-modules/boton-test/include/kfsw/`
 
 Browse the **API Groups** tab for the conceptual map and **Public Headers** for
 the complete declarations, structures, macros, arguments, and return contracts.
@@ -32,13 +33,16 @@ the complete declarations, structures, macros, arguments, and return contracts.
 
 - `kfsw/modules/radio_uhf.h` — selected UHF implementation identity,
   build-time serial expectations, and bounded hardware/link status
+- @ref kfsw_modules_boton_test — initialization, coherent press status, and
+  module-owned live parameter definitions
 
 ## Scope
 
 The API build explicitly excludes Zephyr, bootloaders, upstream/imported
 modules, libcsp, libparam, robot-terminal-runner, third-party trees, and
-generated build output. The project-owned `kfsw-modules` public header listed
-above is intentionally included; internal Holybro descriptors are not.
+generated build output. The project-owned `kfsw-modules` public headers listed
+above are intentionally included; internal Holybro descriptors and private
+button state/test interfaces remain excluded.
 
-The generated reference describes the currently shipped interfaces only. It
-does not create API placeholders for roadmap functionality.
+The generated reference describes interfaces selected in the checked-out
+source tree; it does not create API placeholders for roadmap functionality.

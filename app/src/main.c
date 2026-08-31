@@ -15,6 +15,9 @@
 #if CONFIG_KFSW_RADIO_UHF
 #include <kfsw/modules/radio_uhf.h>
 #endif
+#if CONFIG_KFSW_BOTON_TEST
+#include <kfsw/modules/boton_test.h>
+#endif
 #include <kfsw/services/boot.h>
 #if CONFIG_KFSW_FTP
 #include <kfsw/services/ftp.h>
@@ -31,7 +34,8 @@
 
 int main(void)
 {
-#if CONFIG_KFSW_STORAGE || CONFIG_KFSW_PARAM || CONFIG_KFSW_CSP || CONFIG_KFSW_RADIO_UHF
+#if CONFIG_KFSW_STORAGE || CONFIG_KFSW_PARAM || CONFIG_KFSW_CSP || CONFIG_KFSW_RADIO_UHF ||        \
+	CONFIG_KFSW_BOTON_TEST
 	int result;
 #endif
 
@@ -65,6 +69,9 @@ int main(void)
 	const struct kfsw_param_definition_set *const parameter_sets[] = {
 		&kfsw_app_param_definitions,
 		&kfsw_log_param_definitions,
+#if CONFIG_KFSW_BOTON_TEST
+		&kfsw_boton_test_param_definitions,
+#endif
 #if CONFIG_KFSW_PARAM_TEST_DEFINITIONS
 		&kfsw_test_param_definitions,
 #endif
@@ -87,6 +94,15 @@ int main(void)
 			kfsw_log_info("Persistent parameters restored");
 		}
 #endif
+	}
+#endif
+
+#if CONFIG_KFSW_BOTON_TEST
+	result = kfsw_boton_test_init();
+	if (result != 0) {
+		kfsw_log_error("Failed to initialize boton_test: %d", result);
+	} else {
+		kfsw_log_info("boton_test initialized");
 	}
 #endif
 

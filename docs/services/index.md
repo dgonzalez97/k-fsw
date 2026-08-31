@@ -74,17 +74,16 @@ bounded, ID-sorted index. Applications read and write that index through
 consume the same index.
 
 ```text
-application identity       logging service       test support (opt-in)
-  node_id set               log_level set          fixture set
-       \                         |                     /
-        \                        |                    /
-         +------ executable composition ------------+
-                            |
-                  kfsw_param_init(sets, count)
-                            |
-             PARAM core: validate + sorted index
-                     /                    \
-           KPAR v1 persistence       CSP/libparam adapter
+application identity   logging service   boton_test module   test support
+  node_id set           log_level set     live status set     fixture set
+       \                     |                  |                 /
+        +---------------- executable composition ---------------+
+                                  |
+                        kfsw_param_init(sets, count)
+                                  |
+                   PARAM core: validate + sorted index
+                           /                    \
+                 KPAR v1 persistence       CSP/libparam adapter
 ```
 
 The dependency direction is from an owner to the PARAM declaration API.
@@ -123,18 +122,42 @@ composition.
 
 ### Local table
 
-The production composition currently contains two parameters:
+The base production composition contains two parameters. The explicit
+NUCLEO `boton_test` example contributes two more when the module is enabled:
 
 | Owner | ID | Name | Type | Compiled default | Access | Persistent | Validation/effect |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Application composition | 0 | `node_id` | `u16` | CSP address, or `0` without CSP | Read-only | No | Build-time identity only |
 | Logging service | 1 | `log_level` | `u8` | `CONFIG_KFSW_LOG_MIN_LEVEL` | Writable | Yes | Range 0–4; callback updates runtime logging |
+| `boton_test` | 6 | `boton_test_press_count` | `u32` | `0` | Read-only | No | Live accepted-press count; saturates at `UINT32_MAX` |
+| `boton_test` | 7 | `boton_test_last_press_s` | `u32` | `0` | Read-only | No | Live monotonic seconds since boot; floor conversion and saturation |
 
 Software and physical test configurations may enable
 `CONFIG_KFSW_PARAM_TEST_DEFINITIONS`. That opt-in support component owns the
 compatibility fixtures `test_u32` (ID 2, default 42), `test_i32` (ID 3,
 default -7), and `test_float` (ID 4, default 1.5), plus a read-only unit-test
-fixture. These are not production application parameters.
+fixture at ID 5. These are not production application parameters, but their
+IDs remain reserved.
+
+K-FSW allocates a new parameter ID as the lowest unused value across every
+known production and test definition. Once assigned, an ID is never recycled,
+even when its owner is disabled or later removed. That policy reserves 0
+through 5 and assigns 6 and 7 to `boton_test`; the PARAM core's duplicate-ID
+and duplicate-name checks remain the runtime collision guard. The registry
+allocates numbers centrally for stability, but the definitions and semantics
+remain in their owning component.
+
+The two button entries reference the same individually aligned `uint32_t`
+backing fields represented by `kfsw_boton_test_get_status()`; PARAM does not
+maintain a second copy. The typed API uses the module mutex to return a coherent
+pair, while PARAM reads each scalar independently under its own table lock.
+On the tested targets those naturally aligned U32 views are single-copy, but
+the raw-value model does not provide a shared formal C synchronization edge
+with the owner mutex. They are runtime observations rather than configuration,
+so remote or local `set` operations are rejected and the persistent flag is
+absent. `param save`, `param load`, and `param defaults` therefore never change
+or restore them. A future generic owner-read callback belongs in PARAM if
+formal owner synchronization is required for these scalar reads.
 
 The public type enumeration names unsigned, signed, hexadecimal, float,
 double, string, and data categories. The current local core accepts scalar
@@ -214,6 +237,20 @@ kfsw:~$ param list 2
 kfsw:~$ param get 2 log_level
 kfsw:~$ param set 2 log_level 2
 ```
+
+When the NUCLEO button example is selected, the same generic adapter makes its
+live owner state observable without adding CSP knowledge to the module:
+
+```text
+kfsw:~$ param get 2 boton_test_press_count
+kfsw:~$ param get 2 boton_test_last_press_s
+kfsw:~$ param set 2 boton_test_press_count 100
+set: parameter 'boton_test_press_count' is read-only or service is not ready
+```
+
+The rejected write leaves both fields unchanged. Routing and the physical link
+are composition concerns; `boton_test` depends only on the local PARAM
+declaration API and the platform monotonic-time API.
 
 The CSP adapter is protocol compatibility, not shared memory. Each node owns
 its local table and applies its own validation/callbacks when a remote write is
