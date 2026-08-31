@@ -140,8 +140,17 @@ Each node file is a small shell-compatible environment file:
 KFSW_ROLE=kfsw-gnd-uhf
 KFSW_CSP_NODE=16
 KFSW_CSP_PEER=19
+KFSW_CSP_ROUTES='19/14 KISS'
 KFSW_RADIO_UHF=holybro
 ```
+
+`KFSW_CSP_ROUTES` is optional. When present, `tools/k-ground` validates its
+bounded characters/length and writes it to `CONFIG_KFSW_CSP_ROUTE_TABLE` for
+that node; the value uses libcsp's comma-separated
+`destination[/prefix] interface [via]` syntax. When absent, the one-interface
+image retains `0/0 -> KISS direct`. The launcher configures routes but still
+only auto-connects the direct two-peer PTY link described below; it is not a
+general network orchestrator.
 
 Only `kfsw-gnd-uhf` selects `KFSW_RADIO_UHF`; ops, beacon, and rotator roles do
 not own the physical radio. The launcher maps `holybro` to the reusable module's
@@ -171,7 +180,7 @@ Start the configured UHF gateway and operator shell in separate terminals:
 
 For two configured ground peers, `run` connects their native KISS PTYs through
 a local Unix socket. This is deliberately a direct two-node demonstration,
-not yet a multi-drop ground router. The existing shell syntax then works in
+not a multi-drop ground router. The existing shell syntax then works in
 both directions:
 
 ```text

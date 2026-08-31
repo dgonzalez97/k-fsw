@@ -6,6 +6,15 @@ Keep this application layer intentionally small.
 
 Functionality belongs in the reusable repositories rather than in main.c.
 
+## Communications composition
+
+The application selects Kconfig values and devicetree UART instances, then
+starts the single router owned by `kfsw-comms`. A legacy chosen UART produces
+one interface named `KISS` and the historical direct default route. A
+multi-link overlay declares any number of independently named UART/KISS
+children and supplies an explicit libcsp-native route table; route selection
+remains inside libcsp rather than application code.
+
 ## Storage composition
 
 The application enables the `kfsw-platform` LittleFS lifecycle and mounts the

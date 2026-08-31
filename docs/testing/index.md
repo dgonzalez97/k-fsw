@@ -117,6 +117,9 @@ K-FSW runs project-owned suites on `native_sim/native/64`. Current suites cover:
 
 - monotonic time behavior;
 - CSP pre-initialization state and error contracts;
+- libcsp-native route validation, longest-prefix selection, VIA retention,
+  malformed-table rejection, unknown-interface rejection, and duplicate KISS
+  name rejection;
 - local parameter initialization, access, type/read-only/range validation, and
   callback behavior with CSP disabled;
 - the optional parameter CSP/libparam serialization path in a separate
@@ -141,8 +144,8 @@ logic.
 
 ## Native integration tests
 
-`tools/ci/integration.sh` builds the full Linux target and a clean node-2 test
-image, then executes four shell runners:
+`tools/ci/integration.sh` builds the full Linux target and its focused native
+test images, then executes the shell runners below.
 
 ### Shell and local parameters
 
@@ -181,6 +184,23 @@ PTYs, joins them with `socat`, and checks:
 
 Processes, FIFOs, temporary files, and isolated flash images are cleaned by the
 runners.
+
+### Three-node multi-KISS routing
+
+`tests/build-multi-kiss.sh` builds a router plus nodes 10 and 11.
+`tests/multi-kiss-smoke.sh` gives the router two separate native PTYs named
+`KISS_1` and `KISS_2`, joins each to a different leaf with `socat`, and checks:
+
+- router-originated traffic to node 10 selects `KISS_1`;
+- router-originated traffic to node 11 selects `KISS_2`;
+- both independent transmit/receive counter sets become nonzero;
+- `csp routes` retains `11/14 -> KISS_2 via 11`; and
+- node 10 and node 11 ping through the router in both directions.
+
+The VIA check proves that K-FSW preserves libcsp's field. KISS ignores that
+link-layer next hop by design. This is deterministic software evidence for two
+simultaneous interfaces and transit forwarding, not evidence for a second
+physical radio.
 
 ### Focused local-only composition
 

@@ -41,10 +41,10 @@
  *
  * @defgroup kfsw_comms_uart UART / KISS
  * @ingroup kfsw_comms
- * @brief Dedicated UART transport status and end-to-end test support.
+ * @brief Independently configured UART transports and end-to-end test support.
  *
- * kfsw_uart_get_info() reports the configured interface and counters;
- * kfsw_uart_test() verifies that the configured peer route uses that UART.
+ * kfsw_uart_visit() reports every configured interface and its counters;
+ * kfsw_uart_test_peer() verifies and reports the UART selected for a node.
  *
  * @defgroup kfsw_services K-FSW Services
  * @brief Reusable software services composed by the K-FSW application.

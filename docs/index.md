@@ -53,7 +53,7 @@ NUCLEO-L496ZG. It currently includes:
 - runtime-filtered logging;
 - LittleFS storage mounted at `/kfsw`;
 - typed local parameters with explicit, CRC-protected snapshots;
-- an optional libcsp router and UART/KISS interface;
+- an optional libcsp router and one or more named UART/KISS interfaces;
 - an optional CSP parameter adapter; and
 - a K-FSW-specific file-transfer service over CSP/RDP.
 

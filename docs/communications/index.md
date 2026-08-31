@@ -71,7 +71,9 @@ pool; it is not an unbounded host socket abstraction.
 An interface adapts CSP packets to a link-layer mechanism such as CAN, KISS,
 I2C, ZMQ, or loopback. It has an address, a transmit function, receive path,
 maximum-transfer constraints, and counters. Current K-FSW exposes libcsp's
-loopback interface and one UART/KISS interface when selected.
+loopback interface and one or more UART/KISS interfaces when selected. Every
+KISS instance has a distinct UART, name, address/prefix, framing state,
+transport context, and counters.
 
 An interface is not a route. It says how packets can enter or leave; the
 routing table says which interface to use for a destination.
@@ -83,10 +85,11 @@ link-layer next hop. More-specific prefixes win over broad ones. The router
 takes complete packets from the incoming queue, delivers packets addressed to
 the local node, or forwards non-local packets through a selected interface.
 
-Current K-FSW installs `0/0 -> KISS direct` when UART/KISS is enabled. This is
-a direct default route: every non-local destination is sent on that serial
-link, without a separate gateway address. It is appropriate for the current
-two-node topology and is not a complete flight routing plan.
+An existing one-interface composition with no explicit route table still
+installs `0/0 -> KISS direct`. This is a direct default route: every non-local
+destination is sent on that serial link without a separate gateway address.
+Multi-interface compositions must provide explicit libcsp routes instead of
+implicitly choosing the first link.
 
 ### Transport and framing
 
@@ -135,7 +138,7 @@ K-FSW services never parse UART bytes directly.
 1. Set hostname, model, revision, and local address.
 2. Call `csp_init()` once.
 3. Assign the local address to libcsp loopback.
-4. Create the configured KISS interface and default route.
+4. Create every configured KISS interface, then validate and load static routes.
 5. Bind libcsp's standard ping handler.
 6. Start one K-FSW router thread that repeatedly calls `csp_route_work()`.
 
@@ -181,12 +184,66 @@ The NUCLEO bench replaces node 2's PTY with a physical UART and an FTDI cable.
 The application/service packet path stays the same, which is the point of the
 interface boundary.
 
-There is currently no CAN/CFP interface, automatic route discovery, flight
-routing table, redundant link selection, ZMQ interface, or production radio
-driver in the K-FSW composition. The k-ground Holybro HIL entry point reuses
-this direct serial KISS route. Its named bench passed 100/100 raw exchanges and
-bidirectional node 16 ↔ node 2 CSP ping with clean KISS counters on 30 August
-2026.
+The deterministic multi-interface test creates a router with two different
+native PTYs and two leaf processes:
+
+```text
+node 10                         router                         node 11
+  KISS ---- PTY/socat ---- KISS_1 8/14   KISS_2 9/14 ---- PTY/socat ---- KISS
+                                  |             |
+                         10/14 -> KISS_1   11/14 -> KISS_2 via 11
+```
+
+It proves router-originated traffic selects each link, both interface counter
+sets advance independently, the VIA field survives configuration/diagnostics,
+and node 10 and node 11 can ping through the router in both directions. The
+distinct `/14` interface addresses are significant: the pinned libcsp
+split-horizon logic must see these as different links before it forwards a
+transit packet.
+
+There is currently no CAN/CFP interface, automatic route discovery, runtime
+route mutation, redundant-link failover policy, ZMQ interface, or production
+radio driver in the K-FSW composition. The k-ground Holybro HIL entry point
+continues to reuse the direct serial KISS route. Its named one-link bench
+passed 100/100 raw exchanges and bidirectional node 16 ↔ node 2 CSP ping with
+clean KISS counters on 30 August 2026. No physical `KISS_2` bench is claimed.
+
+## Route-table configuration
+
+K-FSW reuses the pinned libcsp text parser rather than maintaining a second
+route representation. `CONFIG_KFSW_CSP_ROUTE_TABLE` is a comma-separated list
+in this exact form:
+
+```text
+destination[/prefix-length] interface [via], next-entry
+10/14 KISS_1,11/14 KISS_2 11
+```
+
+CSP v2 node IDs are 14 bits. The mask is the count of most-significant address
+bits in the prefix: `/14` matches one exact node, `/0` matches every node, and
+an omitted mask defaults to `/14`. The longest matching prefix wins. Equal
+destination/prefix entries are treated by this libcsp revision as multiple
+eligible routes and may transmit on each, not as ordered fallbacks.
+
+The optional `via` is libcsp's link-layer next-hop value. Its absence is stored
+as `CSP_NO_VIA_ADDRESS`; its presence is passed to the selected interface and
+reported by `csp routes`. KISS has no link-layer address, so the pinned KISS
+transmit function intentionally ignores `via`. Other interface types may use
+it; K-FSW does not reinterpret or discard it.
+
+Embedded profiles set the table through Kconfig. Ground node files may set the
+same value as `KFSW_CSP_ROUTES`, which `tools/k-ground` validates and writes to
+the generated Kconfig fragment. Startup first validates the complete table
+with `csp_rtable_check()`, interface-name resolution, the parser's 99-character
+limit, and route-table capacity, then loads it. Malformed or unknown-interface
+tables fail initialization. Runtime shell loading is intentionally absent:
+the pinned loader mutates incrementally, so a generally safe live replacement
+would require synchronization and rollback semantics outside this issue.
+
+Multi-interface devicetree uses enabled children of a
+`kfsw,csp-kiss-uarts` node. Interface names are one through nine
+`[A-Za-z0-9_-]` characters because the pinned route parser reads at most nine;
+`KISS_1` and `KISS_2` are valid, but longer examples must be shortened.
 
 ## KISS: packets on a serial stream
 
@@ -216,8 +273,8 @@ KISS provides framing; it does not itself guarantee delivery, correct ordering
 across lost frames, authentication, or encryption. K-FSW uses CSP CRC32 where
 selected for corruption detection and RDP for reliable FTP delivery.
 
-libcsp's maintained KISS interface performs packet framing. K-FSW supplies the
-Zephyr UART device and one of two receive paths:
+libcsp's maintained KISS interface performs packet framing. K-FSW supplies
+each Zephyr UART device and one of two receive paths:
 
 - KFSW-Linux uses libcsp's Zephyr USART backend over a native-simulator PTY.
 - NUCLEO-L496ZG configures USART3 and feeds interrupt-driven receive bytes to
@@ -225,7 +282,9 @@ Zephyr UART device and one of two receive paths:
 
 Both use 115200 baud, eight data bits, no parity, and one stop bit in the
 reference profiles. The Holybro HIL overlays select 57600 baud at both ends.
-The chosen devicetree node is the source of those values.
+The legacy chosen devicetree node is the source of those values for a single
+link. Multi-link profiles place a UART phandle and independent interface
+configuration in each `kfsw,csp-kiss-uarts` child.
 The [libcsp KISS interface API](https://github.com/libcsp/libcsp/blob/develop/include/csp/interfaces/csp_if_kiss.h)
 is the upstream reference for framing state and interface hooks.
 

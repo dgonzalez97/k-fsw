@@ -1,0 +1,29 @@
+/ {
+	uart2: uart_2 {
+		compatible = "zephyr,native-pty-uart";
+		current-speed = <115200>;
+		parity = "none";
+		stop-bits = "1";
+		data-bits = <8>;
+		status = "okay";
+	};
+
+	csp-kiss-uarts {
+		compatible = "kfsw,csp-kiss-uarts";
+		status = "okay";
+
+		kiss-1 {
+			uart = <&uart1>;
+			interface-name = "KISS_1";
+			address = <8>;
+			prefix-length = <14>;
+		};
+
+		kiss-2 {
+			uart = <&uart2>;
+			interface-name = "KISS_2";
+			address = <9>;
+			prefix-length = <14>;
+		};
+	};
+};

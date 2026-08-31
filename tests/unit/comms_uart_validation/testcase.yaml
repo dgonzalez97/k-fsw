@@ -1,0 +1,13 @@
+---
+tests:
+  kfsw.comms.uart_duplicate_name:
+    tags:
+      - unit
+      - comms
+      - csp
+      - uart
+      - routing
+    platform_allow:
+      - native_sim/native/64
+    integration_platforms:
+      - native_sim/native/64

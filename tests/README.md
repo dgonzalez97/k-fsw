@@ -20,9 +20,9 @@ Twister on `native_sim/native/64`. Results and logs are kept under
 `build/twister/` by default; set `KFSW_TWISTER_OUT_DIR` to override it.
 `tools/ci/valgrind.sh` runs a bounded KFSW-Linux boot under Memcheck and keeps
 its logs under `build/valgrind/`.
-`tools/ci/integration.sh` builds the native flight and ground profiles and
-executes all shell, CSP, PARAM, persistence, storage, FTP, and two-node
-k-ground integration scripts.
+`tools/ci/integration.sh` builds the native flight, ground, and focused
+three-node routing profiles and executes all shell, CSP, PARAM, persistence,
+storage, FTP, multi-KISS, and two-node k-ground integration scripts.
 `tools/ci/robot.sh` validates every Robot suite and then runs all scenarios
 except those tagged `physical`. `tools/ci/all.sh` composes these software-only
 checks with the build, quality, unit, memory, and documentation gates.
@@ -44,6 +44,11 @@ Current:
 - explicit parameter save/load/defaults/clear semantics across native processes
 - corrupt parameter-snapshot boot fallback without filesystem corruption
 - two-node native CSP/KISS parameter integration test
+- route-parser/precedence/VIA ztests plus malformed, unknown-interface, and
+  duplicate-KISS-name rejection
+- three-process native routing with simultaneous `KISS_1`/`KISS_2`, distinct
+  PTYs, per-interface counters, direct route selection, preserved VIA, and
+  bidirectional node-10-to-node-11 transit
 - k-ground UHF gateway node 16 and operator node 19 with role-specific prompts
   and bidirectional CSP ping; only node 16 composes Holybro `radio-uhf`
 - K-FSW FTP protocol/path/CRC/atomic-commit ztests
@@ -53,6 +58,9 @@ Current:
 - NUCLEO boot/readiness HIL smoke test
 - physical FTDI-to-NUCLEO CSP UART HIL test
 - raw and CSP/KISS Holybro UHF HIL runners with measured passing-bench evidence
+
+The multi-KISS topology is software-only. The physical evidence remains the
+single current Holybro KISS path; no physical `KISS_2` result is claimed.
 
 ## Robot Framework system and HIL tests
 

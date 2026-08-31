@@ -3,9 +3,11 @@ Library    tmux_interaction_lib.TmuxInteractionLib    WITH NAME    TerminalRunne
 
 *** Variables ***
 ${KFSW_REPO_DIR}    %{KFSW_REPO_DIR}
+${KFSW_TERMINAL_OUTPUT}    ${EMPTY}
 
 *** Keywords ***
 Open KFSW Linux CSP Console
+    Reset KFSW Terminal Output
     TerminalRunner.Start Program
     ...    ${KFSW_REPO_DIR}/tests/csp-smoke.sh
     ...    params=--terminal
@@ -17,6 +19,7 @@ Open KFSW Linux CSP Console
     ...    KFSW CSP TERMINAL: READY
 
 Open KFSW Linux Persistence Console
+    Reset KFSW Terminal Output
     TerminalRunner.Start Program
     ...    ${KFSW_REPO_DIR}/tests/param-persistence-terminal.sh
     ...    wait_time=0
@@ -27,6 +30,7 @@ Open KFSW Linux Persistence Console
     ...    KFSW PARAM TERMINAL: READY
 
 Restart KFSW Persistence Console
+    Reset KFSW Terminal Output
     TerminalRunner.Send Command    __KFSW_RESTART__
     Wait Until Keyword Succeeds
     ...    60s
@@ -36,6 +40,7 @@ Restart KFSW Persistence Console
 
 Execute KFSW Command
     [Arguments]    ${command}    ${expected}
+    Reset KFSW Terminal Output
     TerminalRunner.Send Command    ${command}
     Wait Until Keyword Succeeds
     ...    15s
@@ -46,8 +51,13 @@ Execute KFSW Command
 KFSW Terminal Output Should Contain
     [Arguments]    ${expected}
     ${output}=    TerminalRunner.Read Output
-    Log    ${output}
-    Should Contain    ${output}    ${expected}
+    ${combined}=    Catenate    SEPARATOR=    ${KFSW_TERMINAL_OUTPUT}    ${output}
+    Set Test Variable    $KFSW_TERMINAL_OUTPUT    ${combined}
+    Log    ${KFSW_TERMINAL_OUTPUT}
+    Should Contain    ${KFSW_TERMINAL_OUTPUT}    ${expected}
+
+Reset KFSW Terminal Output
+    Set Test Variable    $KFSW_TERMINAL_OUTPUT    ${EMPTY}
 
 Close KFSW Terminal
     Run Keyword And Ignore Error    TerminalRunner.Close Program
