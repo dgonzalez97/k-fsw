@@ -45,7 +45,7 @@ Current:
 - corrupt parameter-snapshot boot fallback without filesystem corruption
 - two-node native CSP/KISS parameter integration test
 - k-ground UHF gateway node 16 and operator node 19 with role-specific prompts
-  and bidirectional CSP ping
+  and bidirectional CSP ping; only node 16 composes Holybro `radio-uhf`
 - K-FSW FTP protocol/path/CRC/atomic-commit ztests
 - two-node CSP/RDP file transfer for zero-byte through 8 KiB files
 - LIST/STAT/PUT/GET, byte comparison, missing-file, and traversal checks
@@ -93,8 +93,9 @@ Hosted CI dry-runs all suites and executes tests selected by
 The Holybro fixtures remain separate by design. The raw runner flashes a
 temporary NUCLEO peer and proves one or more deterministic byte exchanges
 without CSP. The CSP/KISS runner then builds the 57600-baud NUCLEO/ground
-profiles and requires routes, bidirectional point-to-point CSP ping, and clean
-post-traffic counters. See
+profiles with the reusable Holybro module and requires module diagnostics,
+routes, bidirectional point-to-point CSP ping, production PARAM behavior,
+bounded negative cases, and clean post-traffic counters. See
 `tests/hil/radio-uhf/holybro/README.md` for the commands and latest physical
 result.
 

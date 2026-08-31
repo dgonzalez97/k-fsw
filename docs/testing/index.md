@@ -69,7 +69,7 @@ physical board.
 | `BUILD / linux` | `tools/ci/build.sh linux` plus `tests/build-linux-minimal.sh` | Full Linux target and a CSP-disabled minimal application composition configure/link cleanly |
 | `BUILD / nucleo_l496zg` | `tools/ci/build.sh nucleo_l496zg` | Full NUCLEO target configures and links with the ARM Zephyr toolchain |
 | `QUALITY / clang-format + cppcheck` | `tools/ci/quality.sh` | Selected project-owned C/H formatting and warning/performance/portability analysis |
-| `UNIT / Twister` | `tools/ci/unit.sh` | Project ztest suites on `native_sim/native/64` |
+| `UNIT / Twister` | `tools/ci/unit.sh` | Application/repository ztest suites, including west-managed reusable modules, on `native_sim/native/64` |
 | `INTEGRATION / software` | `tools/ci/integration.sh` | Full native shell, storage, PARAM, CSP/KISS, RDP, and FTP interactions |
 | `MEMORY / Valgrind` | `tools/ci/valgrind.sh` | Normal and corrupt-snapshot boot paths under Memcheck |
 | `ROBOT / dry-run + software` | `tools/ci/robot.sh` | All Robot suite syntax plus operator-level nonphysical scenarios |

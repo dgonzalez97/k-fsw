@@ -41,6 +41,151 @@ readlink -f "$KGROUND_HOLYBRO_DEVICE"
 readlink -f "$KFSW_DEBUG_SERIAL"
 ```
 
+## Manual developer bring-up
+
+The automated runners below are the acceptance authority, but a new developer
+can also operate each layer manually. Begin at the west workspace root:
+
+```bash
+cd /path/to/K-FSW
+. .venv/bin/activate
+west update
+west manifest --validate
+west list kfsw-modules -f '{name} {revision} {sha}'
+ls -l /dev/serial/by-id/
+. ./ground-station/holybro-bench.env
+```
+
+`west update` must select the `kfsw-modules` revision pinned by `west.yml`.
+Never use `/dev/ttyUSB0` or `/dev/ttyACM0` as the saved bench identity. Confirm
+the two stable paths again after every WSL/usbipd reattachment.
+
+Build and optionally run the normal Linux reference composition first:
+
+```bash
+./k-fsw/tools/kfsw-linux build
+./k-fsw/tools/kfsw-linux run
+```
+
+Exit the Linux shell, then build the NUCLEO UHF composition. This composition
+enables the reusable `radio-uhf`/Holybro module, selects node 2 with peer 16,
+and applies the 57600-baud USART3 overlay without changing the radio itself:
+
+```bash
+export KFSW_UHF_NUCLEO_BUILD="$PWD/build/manual/holybro-nucleo"
+KFSW_BUILD_DIR="$KFSW_UHF_NUCLEO_BUILD" \
+KFSW_EXTRA_CONF_FILE="$PWD/k-fsw/tests/hil/radio-uhf/holybro/nucleo_l496zg.conf" \
+KFSW_EXTRA_DTC_OVERLAY_FILE="$PWD/k-fsw/tests/hil/radio-uhf/holybro/nucleo_l496zg.overlay" \
+KFSW_PRISTINE=always \
+  ./k-fsw/tools/build.sh nucleo_l496zg
+
+KFSW_BUILD_DIR="$KFSW_UHF_NUCLEO_BUILD" \
+  ./k-fsw/tools/flash.sh nucleo_l496zg
+```
+
+Open the ST-LINK debug shell in one terminal. `tools/serial.sh` is a bounded
+capture tool, not an interactive terminal, so manual command entry currently
+uses the host `picocom` package:
+
+```bash
+picocom -b 115200 --flow n "$KFSW_DEBUG_SERIAL"
+```
+
+In a second terminal, activate/source the environment again and launch the UHF
+ground role. The role configuration selects Holybro; `--peer 2` selects the
+flight endpoint, and the physical overlay makes the native KISS PTY 57600:
+
+```bash
+cd /path/to/K-FSW
+. .venv/bin/activate
+. ./ground-station/holybro-bench.env
+export KGROUND_BUILD_ROOT="$PWD/build/manual/holybro-ground"
+KFSW_EXTRA_DTC_OVERLAY_FILE="$PWD/k-fsw/tests/hil/radio-uhf/holybro/k-ground.overlay" \
+  ./k-fsw/tools/k-ground run kfsw-gnd-uhf --peer 2 --no-local-link
+```
+
+Copy the `/dev/pts/N` path printed as `uart_1 connected to pseudotty:`. In a
+third terminal, bridge that exact PTY to the stable ground-radio device:
+
+```bash
+cd /path/to/K-FSW
+. ./ground-station/holybro-bench.env
+socat -d -d \
+  /dev/pts/N,raw,echo=0,b57600 \
+  "$KGROUND_HOLYBRO_DEVICE",raw,echo=0,b57600
+```
+
+The second terminal is the node-16 shell. Inspect composition, radio facts,
+CSP, routes, and counters before traffic:
+
+```text
+kfsw-gnd-uhf# status
+kfsw-gnd-uhf# uhf status
+kfsw-gnd-uhf# csp info
+kfsw-gnd-uhf# csp interfaces
+kfsw-gnd-uhf# csp routes
+kfsw-gnd-uhf# uart info
+kfsw-gnd-uhf# csp ping 2
+```
+
+The NUCLEO `picocom` terminal is the node-2 shell:
+
+```text
+kfsw:~$ status
+kfsw:~$ uhf status
+kfsw:~$ csp info
+kfsw:~$ csp interfaces
+kfsw:~$ csp routes
+kfsw:~$ uart info
+kfsw:~$ csp ping 16
+```
+
+`uhf status` must identify `holybro-sik`, show expected serial `57600 8N1`,
+and leave RF link `unknown`; it does not query the modem. `uart info` and
+`csp interfaces` report the actual transport and counters.
+
+Use real production parameters to prove a service across RF. Record the
+initial value, select a different non-default value in `0..4`, and read it
+back. While that value is still active, send an invalid value and verify that
+the target restores the compiled default. The current composition compiles
+`log_level` with default `1`. Do not run `param save` during this trial:
+
+```text
+kfsw-gnd-uhf# param list 2
+kfsw-gnd-uhf# param get 2 node_id
+kfsw-gnd-uhf# param get 2 log_level
+kfsw-gnd-uhf# param set 2 log_level 3
+kfsw-gnd-uhf# param get 2 log_level
+kfsw-gnd-uhf# param set 2 log_level 5
+kfsw-gnd-uhf# param get 2 log_level
+```
+
+The production list contains `node_id` and `log_level`; it must not contain
+`test_u32`, `test_i32`, or `test_float`. Finish with bounded negative checks
+and confirm both shells remain responsive:
+
+```text
+kfsw-gnd-uhf# param get 2 missing
+kfsw-gnd-uhf# csp ping 3
+kfsw-gnd-uhf# status
+kfsw-gnd-uhf# uart info
+kfsw-gnd-uhf# csp interfaces
+```
+
+The invalid external value must be rejected and `log_level` must return from
+the verified non-default value to its compiled default `1`; retaining the
+previous non-default value is a failure. The missing name must be rejected,
+and node 3 must time out cleanly. Stop the bridge and both shells with `Ctrl-C`
+when finished.
+
+Current DX friction is explicit: the interactive console needs external
+`picocom`; manual ground-to-radio operation requires copying a generated PTY
+into a separate `socat` command; and the local node-16/node-19 software demo
+uses its native 115200-baud PTY even though `uhf status` records the deployed
+Holybro expectation of 57600. The physical overlay aligns the actual UART and
+expected radio rate. These are candidates for a later developer-tooling issue,
+not reasons to add another transport abstraction.
+
 ## Raw bytes first
 
 `raw-nucleo-smoke.sh` builds and flashes the temporary `raw-peer/` application,
@@ -71,7 +216,8 @@ does not use this raw-peer loop.
 `csp-kiss-smoke.sh` builds `kfsw-gnd-uhf` node 16 and NUCLEO node 2 with a
 57600-baud KISS UART, flashes the NUCLEO, bridges the ground PTY to the USB
 radio, and verifies both interfaces, the direct KISS routes, bidirectional CSP
-ping, and clean nonzero post-traffic counters:
+ping, production PARAM list/get/set with owner validation/callback behavior,
+bounded negative cases, and clean nonzero post-traffic counters:
 
 ```bash
 ./k-fsw/tests/hil/radio-uhf/holybro/csp-kiss-smoke.sh
@@ -81,10 +227,12 @@ The electrical fixture must use the board/radio-compatible logic level, a
 common ground, crossed TX/RX, and no hardware flow control. Confirm the actual
 radio and board pinouts before applying power.
 
-## Verified bench result
+## Evidence classification
 
-The corrected physical bench passed on 30 August 2026. The stable WSL devices
-were:
+### PHYSICALLY BENCH VERIFIED
+
+The physical bench run on 30 August 2026 verified raw UART/RF, bidirectional
+CSP/KISS, and remote PARAM transport over Holybro. The stable WSL devices were:
 
 | Function | USB identity | Stable device |
 | --- | --- | --- |
@@ -95,16 +243,44 @@ The user observed established RF link LEDs after separating the bench
 power/USB arrangement and had independently measured 100/100 direct USB radio
 exchanges in each direction. No persistent SiK parameter was changed.
 
-K-FSW acceptance then produced this evidence:
+K-FSW acceptance produced this physical evidence:
 
 - the basic raw request/reply passed through USART3 PD8/PD9;
 - sequences `0001` through `0100` passed 100/100, with zero invalid payloads
   and zero timeouts, and the NUCLEO logged all 100 exchanges;
 - NUCLEO node 2 and ground node 16 each exposed `KISS addr=<node>/0` and
   `0/0 -> KISS direct` at 57600 baud;
-- node 16 pinged node 2 in 180 ms, and node 2 pinged node 16 in 175 ms; and
-- both endpoints ended with KISS `tx=2 rx=2`, with `txerr=0`, `rxerr=0`,
+- node 16 pinged node 2 in 230 ms, and node 2 pinged node 16 in 172 ms;
+- the production remote PARAM list contained only `node_id` and `log_level`;
+  `log_level` changed from 1 to 3, its owner callback reduced `log test` to
+  ERROR-only output, and the fixture then restored `log_level` to 1;
+- after that restoration, invalid `log_level=5` ended with `log_level=1`; this
+  historical sequence did not distinguish retaining the current value from
+  resetting to the compiled default; a missing parameter and node 3 were
+  rejected cleanly, and the shell remained responsive; and
+- both endpoints ended with KISS `tx=14 rx=14`, with `txerr=0`, `rxerr=0`,
   `drop=0`, and UART `frame=0`.
+
+### SOFTWARE VERIFIED
+
+The corrected discriminating PARAM oracle is verified in software:
+
+```text
+initial/compiled default = 1
+valid set                = 3
+invalid request          = 5
+final value              = 1
+```
+
+This proves the current production behavior: invalid externally supplied
+values are rejected and the parameter is restored to its compiled default.
+
+### PENDING PHYSICAL RE-RUN
+
+The physical HIL script now leaves the verified non-default value `3` active,
+sends invalid value `5`, and requires the final value to be the compiled
+default `1`. That corrected `1 -> 3 -> invalid 5 -> 1` oracle has not yet been
+rerun on the physical Holybro bench.
 
 The initial raw rerun exposed a separate defect in the HIL-only polling peer:
 diagnostic output and a one-millisecond idle sleep could stall or overrun a
@@ -120,8 +296,8 @@ This is verified functional evidence for this Holybro SiK raw UART/RF and
 CSP/KISS bench. It is not RF qualification, production readiness, flight
 qualification, an RF performance measurement, or a long-duration link test.
 
-`kfsw-modules` is the manifest-managed home for future reusable Holybro control
-or radio-management code. A future `radio-uhf` module may own its UHF
-definitions in `param_uhf`, provide bounded status through `health`, and select
-the `holybro` implementation. This prototype adds only K-FSW-owned HIL fixtures
-and does not invent a radio driver.
+`kfsw-modules` now owns the reusable `radio-uhf` interface and its first
+`holybro-sik` implementation. The module owns compile-time identity, expected
+serial configuration, and bounded status. It deliberately does not own UART,
+KISS, CSP, AT control, or any writable radio parameter; those omissions keep
+the verified transparent data path unchanged.

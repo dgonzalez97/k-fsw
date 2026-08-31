@@ -19,6 +19,7 @@ debug_capture_pid=""
 bridge_pid=""
 debug_stty=""
 radio_stty=""
+compiled_log_level_default=""
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -84,6 +85,41 @@ wait_for_output()
 	return 1
 }
 
+wait_for_output_count()
+{
+	local file="$1"
+	local expected="$2"
+	local required_count="$3"
+	local process_pid="$4"
+	local observed
+
+	for _ in {1..1200}; do
+		observed="$(grep -Fc "$expected" "$file" 2>/dev/null || true)"
+		((observed >= required_count)) && return 0
+		kill -0 "$process_pid" 2>/dev/null || return 1
+		sleep 0.05
+	done
+	return 1
+}
+
+validate_log_callback()
+{
+	local active_level="$1"
+	local callback_output
+
+	callback_output="$(sed -n '/kfsw:~\$ log test/,$p' "$work_dir/nucleo.log")"
+	grep -Fq '[ERROR] K-FSW shell log test: error' <<<"$callback_output" || return 1
+	if [[ "$active_level" == 2 ]]; then
+		grep -Fq '[WARNING] K-FSW shell log test: warning' \
+			<<<"$callback_output" || return 1
+	else
+		grep -Fq 'K-FSW shell log test: warning' <<<"$callback_output" && return 1
+	fi
+	grep -Fq 'K-FSW shell log test: info' <<<"$callback_output" && return 1
+	grep -Fq 'K-FSW shell log test: debug' <<<"$callback_output" && return 1
+	return 0
+}
+
 wait_for_clean_transport_stats()
 {
 	local file="$1"
@@ -128,17 +164,24 @@ fi
 command -v socat >/dev/null 2>&1 || fail "socat is required"
 
 echo "HOLYBRO CSP/KISS: building ground node 16 at ${radio_baud} baud"
-KGROUND_BUILD_ROOT="$ground_build_root" \
+KFSW_PRISTINE=always \
+	KGROUND_BUILD_ROOT="$ground_build_root" \
 	KFSW_EXTRA_DTC_OVERLAY_FILE="$HOLYBRO_DIR/k-ground.overlay" \
 	"$KFSW_REPO_DIR/tools/k-ground" build kfsw-gnd-uhf --peer 2
 
 echo "HOLYBRO CSP/KISS: building NUCLEO node 2 with peer 16"
-KFSW_BUILD_DIR="$nucleo_build_dir" \
+KFSW_PRISTINE=always \
+	KFSW_BUILD_DIR="$nucleo_build_dir" \
 	KFSW_EXTRA_CONF_FILE="$HOLYBRO_DIR/nucleo_l496zg.conf" \
 	KFSW_EXTRA_DTC_OVERLAY_FILE="$HOLYBRO_DIR/nucleo_l496zg.overlay" \
 	"$KFSW_REPO_DIR/tools/build.sh" nucleo_l496zg
 
 [[ -x "$ground_executable" ]] || fail "ground executable was not produced"
+compiled_log_level_default="$(sed -n \
+	's/^CONFIG_KFSW_LOG_MIN_LEVEL=\([0-4]\)$/\1/p' \
+	"$nucleo_build_dir/zephyr/.config")"
+[[ -n "$compiled_log_level_default" ]] || \
+	fail "cannot determine the NUCLEO compiled log_level default"
 
 debug_stty="$(stty -F "$debug_serial" -g)" || \
 	fail "cannot read NUCLEO debug serial settings"
@@ -156,7 +199,7 @@ west flash -d "$nucleo_build_dir" --runner openocd || \
 wait_for_output "$work_dir/nucleo.log" "@READY " "$debug_capture_pid" || \
 	fail "NUCLEO did not report readiness"
 
-printf '%s\r\n' 'status' 'uart info' 'csp interfaces' 'csp routes' \
+printf '%s\r\n' 'status' 'uhf status' 'uart info' 'csp interfaces' 'csp routes' \
 	>"$debug_serial"
 wait_for_output "$work_dir/nucleo.log" "CSP node: 2" "$debug_capture_pid" || \
 	fail "NUCLEO did not report CSP node 2"
@@ -164,6 +207,12 @@ wait_for_output "$work_dir/nucleo.log" "CSP peer: 16" "$debug_capture_pid" || \
 	fail "NUCLEO did not report ground peer 16"
 wait_for_output "$work_dir/nucleo.log" "baudrate: 57600" "$debug_capture_pid" || \
 	fail "NUCLEO did not report the Holybro serial rate"
+wait_for_output "$work_dir/nucleo.log" "implementation: holybro-sik" \
+	"$debug_capture_pid" || fail "NUCLEO did not report the Holybro module"
+wait_for_output "$work_dir/nucleo.log" "expected serial: 57600 8N1" \
+	"$debug_capture_pid" || fail "NUCLEO UHF expectation does not match the UART profile"
+wait_for_output "$work_dir/nucleo.log" "RF link: unknown" "$debug_capture_pid" || \
+	fail "NUCLEO did not preserve unknown RF state semantics"
 wait_for_output "$work_dir/nucleo.log" "KISS addr=2/0" "$debug_capture_pid" || \
 	fail "NUCLEO did not report its KISS interface"
 wait_for_output "$work_dir/nucleo.log" "0/0 -> KISS direct" "$debug_capture_pid" || \
@@ -192,12 +241,18 @@ bridge_pid=$!
 wait_for_output "$work_dir/socat.log" "starting data transfer loop" \
 	"$bridge_pid" || fail "the PTY-to-Holybro bridge did not become ready"
 
-printf '%s\n' 'status' 'uart info' 'csp interfaces' 'csp routes' \
+printf '%s\n' 'status' 'uhf status' 'uart info' 'csp interfaces' 'csp routes' \
 	'csp ping 2' >&3
 wait_for_output "$work_dir/ground.log" "Role: kfsw-gnd-uhf" "$ground_pid" || \
 	fail "the UHF gateway did not report its role"
 wait_for_output "$work_dir/ground.log" "baudrate: 57600" "$ground_pid" || \
 	fail "k-ground did not report the Holybro serial rate"
+wait_for_output "$work_dir/ground.log" "implementation: holybro-sik" "$ground_pid" || \
+	fail "k-ground did not report the Holybro module"
+wait_for_output "$work_dir/ground.log" "expected serial: 57600 8N1" "$ground_pid" || \
+	fail "k-ground UHF expectation does not match the UART profile"
+wait_for_output "$work_dir/ground.log" "RF link: unknown" "$ground_pid" || \
+	fail "k-ground did not preserve unknown RF state semantics"
 wait_for_output "$work_dir/ground.log" "KISS addr=16/0" "$ground_pid" || \
 	fail "k-ground did not report its KISS interface"
 wait_for_output "$work_dir/ground.log" "0/0 -> KISS direct" "$ground_pid" || \
@@ -210,6 +265,72 @@ wait_for_output "$work_dir/nucleo.log" "CSP ping 16: success" \
 	"$debug_capture_pid" || \
 	fail "NUCLEO node 2 could not ping k-ground node 16 over Holybro"
 
+printf '%s\n' 'param list 2' 'param get 2 log_level' >&3
+wait_for_output "$work_dir/ground.log" "2:0 node_id" "$ground_pid" || \
+	fail "the production NUCLEO parameter list is missing node_id"
+wait_for_output "$work_dir/ground.log" "2:1 log_level" "$ground_pid" || \
+	fail "the production NUCLEO parameter list is missing log_level"
+wait_for_output "$work_dir/ground.log" "2:log_level = " "$ground_pid" || \
+	fail "k-ground could not read the NUCLEO log_level parameter"
+if grep -Eq '2:[0-9]+ +test_(u32|i32|float)' "$work_dir/ground.log"; then
+	fail "the production NUCLEO parameter list contains test-only definitions"
+fi
+original_log_level="$(tr -d '\r' <"$work_dir/ground.log" | \
+	sed -n 's/.*2:log_level = \([0-4]\)$/\1/p' | head -1)"
+[[ -n "$original_log_level" ]] || fail "the initial remote log_level is invalid"
+
+alternate_log_level=""
+for candidate in 3 2 4 0; do
+	if [[ "$candidate" != "$original_log_level" && \
+		"$candidate" != "$compiled_log_level_default" ]]; then
+		alternate_log_level="$candidate"
+		break
+	fi
+done
+[[ -n "$alternate_log_level" ]] || fail "cannot select a non-default log_level"
+printf '%s\n' \
+	"param set 2 log_level $alternate_log_level" \
+	'param get 2 log_level' >&3
+wait_for_output_count "$work_dir/ground.log" \
+	"2:log_level = $alternate_log_level" 2 "$ground_pid" || \
+	fail "valid remote log_level set/readback did not pass"
+
+nucleo_status_count_before="$(grep -Fc 'K-FSW status' "$work_dir/nucleo.log" || true)"
+printf '%s\r\n' 'log test' 'status' >"$debug_serial"
+wait_for_output "$work_dir/nucleo.log" "K-FSW shell log test: error" \
+	"$debug_capture_pid" || fail "the NUCLEO log callback test did not run"
+wait_for_output_count "$work_dir/nucleo.log" "K-FSW status" \
+	"$((nucleo_status_count_before + 1))" "$debug_capture_pid" || \
+	fail "the NUCLEO log callback output did not reach its status barrier"
+validate_log_callback "$alternate_log_level" || \
+	fail "the owner callback did not apply the remote log_level"
+
+default_count_before="$(grep -Fc \
+	"2:log_level = $compiled_log_level_default" "$work_dir/ground.log" || true)"
+ground_status_count_before="$(grep -Fc 'K-FSW status' "$work_dir/ground.log" || true)"
+negative_start_line="$(($(wc -l <"$work_dir/ground.log") + 1))"
+printf '%s\n' 'param set 2 log_level 5' 'param get 2 log_level' \
+	'param get 2 missing' 'csp ping 3' 'status' >&3
+wait_for_output "$work_dir/ground.log" "2:log_level = 5" "$ground_pid" || \
+	fail "the invalid remote log_level request was not transmitted"
+wait_for_output_count "$work_dir/ground.log" \
+	"2:log_level = $compiled_log_level_default" \
+	"$((default_count_before + 1))" "$ground_pid" || \
+	fail "invalid remote log_level did not restore the compiled default"
+wait_for_output "$work_dir/ground.log" "get: parameter 'missing' not found" \
+	"$ground_pid" || fail "missing remote parameter was not rejected"
+wait_for_output "$work_dir/ground.log" "CSP ping 3: failed" "$ground_pid" || \
+	fail "a nonexistent CSP node did not fail cleanly"
+wait_for_output_count "$work_dir/ground.log" "K-FSW status" \
+	"$((ground_status_count_before + 1))" "$ground_pid" || \
+	fail "the ground shell was not responsive after negative tests"
+negative_output="$(tail -n +"$negative_start_line" "$work_dir/ground.log")"
+grep -Fq "2:log_level = $compiled_log_level_default" \
+	<<<"$negative_output" || fail "the negative-test window lacks default readback"
+if grep -Fq "2:log_level = $alternate_log_level" <<<"$negative_output"; then
+	fail "invalid remote log_level retained the prior non-default value"
+fi
+
 printf '%s\r\n' 'uart info' 'csp interfaces' >"$debug_serial"
 printf '%s\n' 'uart info' 'csp interfaces' >&3
 wait_for_clean_transport_stats "$work_dir/ground.log" "$ground_pid" || \
@@ -219,4 +340,4 @@ wait_for_clean_transport_stats "$work_dir/nucleo.log" "$debug_capture_pid" || \
 
 cat "$work_dir/ground.log"
 cat "$work_dir/nucleo.log"
-echo "HOLYBRO CSP/KISS RESULT: PASS bidirectional=yes counters=clean"
+echo "HOLYBRO CSP/KISS RESULT: PASS bidirectional=yes params=yes negative=yes counters=clean"

@@ -46,8 +46,9 @@ kfsw:~$ param help
 ```
 
 Command availability is a build property. A shell-only target will not show
-`csp`, `uart`, `param`, `storage`, or `ftp` because their Kconfig owners are
-disabled. The shell does not provide placeholder commands for absent services.
+`uhf`, `csp`, `uart`, `param`, `storage`, or `ftp` because their Kconfig owners
+are disabled. The shell does not provide placeholder commands for absent
+services.
 
 The shell thread and prompt may be active before the K-FSW startup sequence has
 printed `@READY`. Wait for that marker, then query service-specific state.
@@ -59,6 +60,8 @@ root
 ├── status, time, version
 ├── log
 │   └── test
+├── uhf                       when KFSW_RADIO_UHF_SHELL=y
+│   └── status
 ├── csp                       when KFSW_CSP=y
 │   ├── info, interfaces, routes, ping
 ├── uart                      when KFSW_CSP_KISS_UART=y
@@ -105,6 +108,29 @@ elapsed local time, not UTC/TAI/GNSS or synchronized spacecraft time.
 Runtime filtering may suppress lower-severity test lines. Change the
 `log_level` parameter to exercise that callback; save it explicitly only if
 the new threshold should survive reboot.
+
+## UHF radio diagnostics
+
+`uhf status` exists only when the reusable UHF module and its shell adapter are
+enabled. It reports the selected implementation, expected hardware and serial
+contract, hardware-status availability, and RF-link knowledge.
+
+```text
+kfsw-gnd-uhf# uhf status
+UHF radio
+enabled: yes
+implementation: holybro-sik
+expected hardware: RFD SiK 2.0 on HM-TRP
+configuration source: build-time expectation, not hardware readback
+expected serial: 57600 8N1
+expected flow control: none
+hardware status: unavailable
+RF link: unknown
+```
+
+The command does not enter SiK command mode or read the modem. Expected values
+must be compared with `uart info`; actual interface traffic and errors remain
+under `csp interfaces` and `uart info`.
 
 ## CSP diagnostics
 

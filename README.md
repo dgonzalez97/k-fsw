@@ -22,6 +22,7 @@ architecture, operations, testing, development, and the public C API.
 - full reference application on KFSW-Linux and NUCLEO-L496ZG
 - physical shell bring-up on FRDM-K64F and Raspberry Pi Pico W
 - configurable `k-ground` Linux nodes with local two-node CSP verification
+- compile-time `radio-uhf` identity/status with Holybro SiK implementation
 - optional CSP routing with UART/KISS and RDP
 - local typed parameters and persistence without a CSP dependency
 - optional remote parameter access over CSP
@@ -98,7 +99,7 @@ Software CI workflow.
 | [`kfsw-platform`](https://github.com/dgonzalez97/kfsw-platform) | Zephyr-backed time, storage, and platform capabilities | [![Software CI](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml) |
 | [`kfsw-services`](https://github.com/dgonzalez97/kfsw-services) | Logging, parameters, persistence, and file-transfer services | [![Software CI](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml) |
 | [`kfsw-comms`](https://github.com/dgonzalez97/kfsw-comms) | CSP lifecycle, routing, and transports | [![Software CI](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml) |
-| [`kfsw-modules`](https://github.com/dgonzalez97/kfsw-modules) | Reusable mission-specific device and subsystem module home; no production module is implemented yet | [![Software CI](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml) |
+| [`kfsw-modules`](https://github.com/dgonzalez97/kfsw-modules) | Reusable device/subsystem modules; `radio-uhf` with Holybro SiK is the first implementation | [![Software CI](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml) |
 
 Exact dependency commits are recorded in [`west.yml`](west.yml).
 

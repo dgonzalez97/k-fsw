@@ -79,7 +79,7 @@ load_role_config()
 	[[ -f "$config_file" ]] || \
 		fail "ground role is not configured: $role_key ($config_file)"
 
-	unset KFSW_ROLE KFSW_NAME KFSW_CSP_NODE KFSW_CSP_PEER
+	unset KFSW_ROLE KFSW_NAME KFSW_CSP_NODE KFSW_CSP_PEER KFSW_RADIO_UHF
 	# Node files are deliberately simple shell-compatible environment files.
 	set -a
 	# shellcheck disable=SC1090
@@ -90,6 +90,7 @@ load_role_config()
 	ground_name="${KFSW_NAME:-$ground_role}"
 	ground_node="${KFSW_CSP_NODE:-}"
 	ground_peer="${KFSW_CSP_PEER:-}"
+	ground_radio_uhf="${KFSW_RADIO_UHF:-}"
 
 	validate_role "$ground_role"
 	[[ "$ground_role" == "$role_key" ]] || \
@@ -97,6 +98,8 @@ load_role_config()
 	validate_role "$ground_name"
 	[[ -n "$ground_node" ]] || fail "$config_file does not set KFSW_CSP_NODE"
 	[[ -n "$ground_peer" ]] || fail "$config_file does not set KFSW_CSP_PEER"
+	[[ -z "$ground_radio_uhf" || "$ground_radio_uhf" == "holybro" ]] || \
+		fail "$config_file selects unsupported KFSW_RADIO_UHF=$ground_radio_uhf"
 }
 
 parse_role_options()
@@ -161,6 +164,11 @@ write_ground_config()
 		printf 'CONFIG_KFSW_CSP_ADDRESS=%s\n' "$ground_node"
 		printf 'CONFIG_KFSW_CSP_HOSTNAME="%s"\n' "$ground_role"
 		printf 'CONFIG_KFSW_CSP_UART_PEER_ADDRESS=%s\n' "$ground_peer"
+		if [[ "$ground_radio_uhf" == "holybro" ]]; then
+			printf 'CONFIG_KFSW_RADIO_UHF=y\n'
+			printf 'CONFIG_KFSW_RADIO_UHF_HOLYBRO=y\n'
+			printf 'CONFIG_KFSW_RADIO_UHF_EXPECTED_SERIAL_BAUD=57600\n'
+		fi
 	} >>"$config_file" || fail "cannot write generated ground configuration"
 
 	printf '%s\n' "$config_file"
