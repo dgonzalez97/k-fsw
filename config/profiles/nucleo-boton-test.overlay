@@ -1,0 +1,5 @@
+/ {
+	chosen {
+		kfsw,boton-test-button = &user_button;
+	};
+};
