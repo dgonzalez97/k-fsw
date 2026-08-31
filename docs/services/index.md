@@ -123,7 +123,7 @@ composition.
 ### Local table
 
 The base production composition contains two parameters. The explicit
-NUCLEO `boton_test` example contributes two more when the module is enabled:
+NUCLEO `boton_test` example contributes five more when the module is enabled:
 
 | Owner | ID | Name | Type | Compiled default | Access | Persistent | Validation/effect |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -131,6 +131,9 @@ NUCLEO `boton_test` example contributes two more when the module is enabled:
 | Logging service | 1 | `log_level` | `u8` | `CONFIG_KFSW_LOG_MIN_LEVEL` | Writable | Yes | Range 0–4; callback updates runtime logging |
 | `boton_test` | 6 | `boton_test_press_count` | `u32` | `0` | Read-only | No | Live accepted-press count; saturates at `UINT32_MAX` |
 | `boton_test` | 7 | `boton_test_last_press_s` | `u32` | `0` | Read-only | No | Live monotonic seconds since boot; floor conversion and saturation |
+| `boton_test` | 8 | `hw_test_led_green` | `u8` | `0` | Writable | No | Boolean 0/1; owner setter applies LD1 state |
+| `boton_test` | 9 | `hw_test_led_blue` | `u8` | `0` | Writable | No | Boolean 0/1; owner setter applies LD2 state |
+| `boton_test` | 10 | `hw_test_led_red` | `u8` | `0` | Writable | No | Boolean 0/1; owner setter applies LD3 state |
 
 Software and physical test configurations may enable
 `CONFIG_KFSW_PARAM_TEST_DEFINITIONS`. That opt-in support component owns the
@@ -142,7 +145,7 @@ IDs remain reserved.
 K-FSW allocates a new parameter ID as the lowest unused value across every
 known production and test definition. Once assigned, an ID is never recycled,
 even when its owner is disabled or later removed. That policy reserves 0
-through 5 and assigns 6 and 7 to `boton_test`; the PARAM core's duplicate-ID
+through 5 and assigns 6 through 10 to `boton_test`; the PARAM core's duplicate-ID
 and duplicate-name checks remain the runtime collision guard. The registry
 allocates numbers centrally for stability, but the definitions and semantics
 remain in their owning component.
@@ -158,6 +161,12 @@ so remote or local `set` operations are rejected and the persistent flag is
 absent. `param save`, `param load`, and `param defaults` therefore never change
 or restore them. A future generic owner-read callback belongs in PARAM if
 formal owner synchronization is required for these scalar reads.
+
+The three LED entries are non-persistent developer controls. Their validators
+accept only `0` or `1` and call the same owner setter used by the shell. A GPIO
+failure rejects the write before PARAM stores the new value, so reported owner
+state remains truthful. The five values form the logical `hw_test` definition
+set; `KFSW_HW_TEST_TABLE_ID` reserves table ID 67 for future HK collection.
 
 The public type enumeration names unsigned, signed, hexadecimal, float,
 double, string, and data categories. The current local core accepts scalar
@@ -244,6 +253,8 @@ live owner state observable without adding CSP knowledge to the module:
 ```text
 kfsw:~$ param get 2 boton_test_press_count
 kfsw:~$ param get 2 boton_test_last_press_s
+kfsw:~$ param set 2 hw_test_led_green 1
+kfsw:~$ param get 2 hw_test_led_green
 kfsw:~$ param set 2 boton_test_press_count 100
 set: parameter 'boton_test_press_count' is read-only or service is not ready
 ```

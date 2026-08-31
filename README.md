@@ -23,8 +23,8 @@ architecture, operations, testing, development, and the public C API.
 - physical shell bring-up on FRDM-K64F and Raspberry Pi Pico W
 - configurable `k-ground` Linux nodes with local two-node CSP verification
 - compile-time `radio-uhf` identity/status with Holybro SiK implementation
-- opt-in `boton_test` reference module with devicetree GPIO binding, debounced
-  typed status, and live read-only PARAM observation
+- opt-in `boton_test`/`hw_test` reference module with debounced button state,
+  three developer LED controls, PARAM ownership, and future-HK table ID 67
 - optional libcsp routing with independently named UART/KISS interfaces,
   static destination/prefix/VIA entries, and RDP
 - local typed parameters and persistence without a CSP dependency

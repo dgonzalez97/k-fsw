@@ -72,6 +72,8 @@ root
 │       when persistence is enabled
 ├── boton_test                when KFSW_BOTON_TEST_SHELL=y
 │   └── status
+├── test                      when KFSW_BOTON_TEST_SHELL=y
+│   └── led <colour> <on|off>
 ├── storage                   when KFSW_STORAGE=y
 │   ├── info, test
 └── ftp                       when KFSW_FTP=y
@@ -140,20 +142,27 @@ The module-owned diagnostic exists only when `CONFIG_KFSW_BOTON_TEST_SHELL=y`:
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `boton_test status` | none | Print one coherent snapshot of accepted presses and the most recent monotonic press second |
+| `boton_test status` | none | Print one coherent snapshot of button and LED state |
+| `test led` | `<green|blue|red> <on|off>` | Set one developer LED through the module owner |
 
 ```text
 kfsw:~$ boton_test status
 press_count: 0
 last_press_s: 0
+led_green: off
+led_blue: off
+led_red: off
 debounce_ms: 30
 ```
 
 `debounce_ms` is printed by GPIO-enabled compositions; a software-only build
 can omit that line.
 
-The command calls `kfsw_boton_test_get_status()`; it does not read GPIO or
-look up parameters. The module intentionally provides no production
+The status command calls `kfsw_boton_test_get_status()`; it does not read GPIO
+or look up parameters. `test led` and writable LED PARAMs call the same owner
+setter, so they cannot create parallel GPIO state. Unknown colours and states
+other than `on`/`off` are rejected without changing state. The module
+intentionally provides no production
 `fake-press` or reset command. Holding the button does not generate repeated
 counts, and state resets only when the image reboots.
 
@@ -236,18 +245,23 @@ log_level = 2
 overflow and unsigned-negative input; the command reads the parameter
 description first so it can parse the exact type.
 
-The opt-in NUCLEO button profile additionally exposes two module-owned live
-values:
+The opt-in NUCLEO hardware-test profile additionally exposes five module-owned
+live values. The button values remain read-only; LED values are writable
+non-persistent booleans and accept only `0` or `1`:
 
 ```text
 kfsw:~$ param get boton_test_press_count
 boton_test_press_count = 0
 kfsw:~$ param get boton_test_last_press_s
 boton_test_last_press_s = 0
+kfsw:~$ param get hw_test_led_green
+hw_test_led_green = 0
+kfsw:~$ param set hw_test_led_green 1
+hw_test_led_green = 1
 ```
 
-Both are read-only and non-persistent. A rejected `param set` does not change
-the typed owner state.
+All five reset to zero/off on boot. A rejected `param set`, including an LED
+value other than `0` or `1`, changes neither typed owner state nor GPIO output.
 
 ## Remote parameters
 

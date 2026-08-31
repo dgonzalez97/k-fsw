@@ -115,15 +115,16 @@ The two UARTs have fixed roles:
 The CSP receive path is interrupt-driven. The current default addresses the
 NUCLEO as node 2 and routes non-local traffic directly to the KISS interface.
 
-### Opt-in USER-button example
+### Opt-in hardware-test example
 
 `boton_test` is not forced into the default NUCLEO image. The focused example
 uses both of these composition files:
 
-- `config/profiles/nucleo-boton-test.conf` selects the module, physical GPIO
-  backend, and diagnostic shell with a 30 ms debounce interval; and
+- `config/profiles/nucleo-boton-test.conf` selects the module, button and LED
+  GPIO backends, and diagnostic shell with a 30 ms debounce interval; and
 - `config/profiles/nucleo-boton-test.overlay` maps
-  `/chosen/kfsw,boton-test-button` to the upstream board's `user_button` node.
+  the button plus green, blue, and red LED chosen properties to existing
+  upstream board nodes.
 
 Build that explicit profile from the workspace root with:
 
@@ -133,17 +134,18 @@ KFSW_EXTRA_DTC_OVERLAY_FILE="$PWD/k-fsw/config/profiles/nucleo-boton-test.overla
   ./k-fsw/tools/build.sh nucleo_l496zg
 ```
 
-Zephyr's NUCLEO-L496ZG board definition maps `user_button` to PC13 with
-`GPIO_ACTIVE_HIGH`. That board-specific fact stays in devicetree; reusable
-module source reads the logical GPIO through the chosen reference and therefore
-does not hard-code the port, pin, MCU, board, or electrical polarity.
+Zephyr's NUCLEO-L496ZG definition maps `user_button` with
+`GPIO_ACTIVE_HIGH`, and maps `led0`/LD1 green, `led1`/LD2 blue, and `led2`/LD3
+red as three independent outputs. Board-specific pins and polarity stay in
+Devicetree; reusable module source contains no port, pin, MCU, or board name.
 
 The profile uses a 30 ms debounce interval, the system workqueue, and no
 dedicated thread or dynamic allocation. Its software build and state tests do
 not constitute physical evidence. Manual blue USER-button acceptance,
 including one-count-per-press, hold behavior, timestamps, remote observation,
-and rejected writes, remains pending until it is performed with a user on the
-named NUCLEO bench.
+and rejected writes, plus physical LED shell/PARAM control, remains pending
+until it is performed with a user on the named NUCLEO bench. The logical
+`hw_test` table reserves ID 67 for the following generic HK integration.
 
 ### Build, flash, and console
 

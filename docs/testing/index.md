@@ -132,9 +132,9 @@ K-FSW runs project-owned suites on `native_sim/native/64`. Current suites cover:
 - parameter persistence encoding, loading, corruption/mismatch handling,
   defaults, and clear behavior with CSP disabled;
 - `boton_test` initial state, first/multiple presses, held/released behavior,
-  timestamp flooring, count/time saturation, coherent typed status, live
-  read-only non-persistent parameter definitions, and an active-low GPIO
-  emulator path that exercises real edge callbacks and rescheduled work;
+  timestamp flooring, count/time saturation, coherent typed status, button
+  and LED parameter definitions, LED validation, and GPIO-emulator paths that
+  exercise button edges plus active-low LED polarity;
 - storage initialization/mount policy, capacity, and file operations; and
 - FTP protocol codec, path sandbox, CRC, and atomic commit helpers.
 
@@ -159,8 +159,8 @@ restarts the real 30 ms delayable work across bounce, and checks hold and
 release/rearm behavior. Private state hooks cover deterministic time and
 saturation cases; there is no production fake-press command. Both
 configurations remain independent of physical hardware and exercise the same
-owner state exposed through `kfsw_boton_test_get_status()` and PARAM IDs 6 and
-7.
+owner state exposed through `kfsw_boton_test_get_status()` and PARAM IDs 6
+through 10.
 
 The software acceptance scope is:
 
@@ -168,14 +168,15 @@ The software acceptance scope is:
 - stable released-to-pressed counting, hold suppression, and release rearm;
 - monotonic millisecond-to-second floor conversion;
 - saturation of `press_count` and `last_press_s` at `UINT32_MAX`;
-- a coherent typed two-field snapshot;
-- PARAM inclusion when enabled, live value reflection, rejected writes, and no
-  persistence flag; and
-- clean NUCLEO profile configuration/linking with the chosen GPIO binding.
+- a coherent typed five-field snapshot and stable future-HK table ID 67;
+- PARAM inclusion when enabled, live value reflection, writable boolean LED
+  validation, rejected writes, and no persistence flag;
+- shell and PARAM control through the same LED owner setter; and
+- clean NUCLEO profile configuration/linking with four chosen GPIO bindings.
 
-The focused run passed 2 configurations and 23 cases. The combined
-UHF/routing/button candidate then passed the full Twister run (13
-configurations, 62 cases), native integration, and Robot software scenarios.
+The focused run passed 2 configurations and 28 cases. The final hardware-test
+candidate then passed the full Twister run (13 configurations, 67 cases), the
+affected native integration smoke, and all Robot software scenarios.
 The opt-in NUCLEO profile and the combined UHF-plus-button NUCLEO composition
 also built successfully, as did the Linux, minimal, FRDM-K64F, and Pico W
 profiles. Against the clean default NUCLEO composition, the opt-in button
@@ -199,9 +200,10 @@ list/get/set validation, storage status, and command help.
 
 `tests/boton-test-smoke.sh` builds both the default Linux image and an opt-in
 software-only `boton_test` image. It checks that the disabled composition has
-no button parameters, while the enabled composition initializes with zeroed
-live values, lists both definitions as read-only, rejects writes, and leaves
-owner state unchanged. This runner does not enable GPIO or synthesize presses.
+no hardware-test parameters, while the enabled composition initializes five
+zeroed values, preserves read-only button state, exercises all three LED shell
+commands, and rejects invalid colours, operations, and boolean writes. This
+runner does not enable GPIO or synthesize physical input.
 
 ### Storage
 
