@@ -2,12 +2,13 @@
 
 ## Status baseline
 
-This status was reviewed on 30 August 2026 against feature-branch base
-`b07a833`, the exact `west.yml` dependency pins, current Kconfig and target
-profiles, project tests, GitHub workflows, merged pull requests, open issues,
-and the public K Flight Software project board. The k-ground prototype is
-tracked by [issue 28](https://github.com/dgonzalez97/k-fsw/issues/28); its
-named Holybro bench has passed raw and CSP/KISS functional acceptance.
+This status was reviewed on 31 August 2026 against the local routing feature
+work, the exact `west.yml` dependency pins, current Kconfig and target profiles,
+project tests, GitHub workflows, merged pull requests, open issues, and the
+public K Flight Software project board. The routing changes described here are
+local and pending publication. The k-ground prototype is tracked by
+[issue 28](https://github.com/dgonzalez97/k-fsw/issues/28); its named Holybro
+bench has passed raw and CSP/KISS functional acceptance.
 
 Status here is an engineering summary, not a substitute for the issue tracker
 or a release qualification record.
@@ -18,9 +19,9 @@ or a release qualification record.
 | --- | --- | --- | --- | --- |
 | Platform/time | Monotonic ms/us and reset-cause API implemented over Zephyr | Time ztest; used by native boot/shell tests | Reset/boot path exercised on NUCLEO; no separate clock-accuracy qualification | No UTC/TAI/GNSS or clock correlation |
 | Logging | Fixed-buffer DEBUG/INFO/WARNING/ERROR with compile/runtime filters | Shell and integration diagnostics | Console logging observed in board HIL | Not a structured/persistent event service; no rate limiting |
-| CSP core | Optional libcsp identity, loopback, static routes, ping, one router | CSP ztest and two-node native integration/Robot | Bidirectional CSP ping on NUCLEO/FTDI UART bench | One direct KISS default route; no flight routing plan |
-| UART/KISS | Native PTY backend and interrupt-driven Zephyr UART adapter | Flight and ground two-node PTY bridge tests | NUCLEO USART3 ↔ FTDI bench physically verified | 115200 reference profiles; Holybro fixture uses separate 57600 overlays |
-| k-ground | Configured `native_sim` roles using the normal K-FSW shell and services | UHF node 16 and ops node 19 report role-specific identity and ping both ways | No physical evidence required for the local profile | Direct two-node local link; no multi-node router, orchestrator, or mission-control framework |
+| CSP core | Optional libcsp identity, loopback, validated native static routes with destination/prefix/interface/VIA, ping, one router | Route validation/precedence ztest; two-node and three-node native integration | Bidirectional CSP ping on NUCLEO/FTDI UART bench | No dynamic route mutation, redundant-link failover policy, or flight routing plan |
+| UART/KISS | Legacy chosen UART or generic independently named devicetree instances with separate state/counters | Two-node PTY tests plus simultaneous `KISS_1`/`KISS_2` direct selection and bidirectional transit | One NUCLEO USART3/FTDI and one Holybro link physically verified | Multiple links are software-verified only; 115200 reference profiles and 57600 Holybro overlays |
+| k-ground | Configured `native_sim` roles using the normal K-FSW shell/services and optional route string | UHF node 16 and ops node 19 report role-specific identity and ping both ways | No physical evidence required for the local profile | Launcher connects one direct peer link; no generic router orchestration or mission-control framework |
 | radio-uhf module | Compile-time implementation selection, generic identity/expected-configuration API, bounded `uhf status`; Holybro SiK implementation | Dedicated module ztest and node-16/NUCLEO composition builds | Reuses the separately verified Holybro bench | No live modem readback/control, radio parameters, worker, or data-plane API |
 | Holybro UHF fixture | Separate NUCLEO raw-byte peer and CSP/KISS HIL entry points under `radio-uhf/holybro` | Scripts validate module identity, production PARAM, negative behavior, interfaces/routes/counters | Raw 100/100 with no invalid/timeout; bidirectional node 16 ↔ 2 CSP ping; remote production PARAM validation/callback; KISS 14/14 with zero errors | Functional bench evidence only; no RF performance/soak campaign or qualification |
 | Local parameters | Static typed table, exact scalar checks, read-only flags, callbacks | CSP-disabled ztest and local/full shell integration | Local table runs in NUCLEO composition; physical bench checks remote access to it | Current table is mostly integration values; string/data/arrays absent |
@@ -60,13 +61,16 @@ future health/FDIR design will need explicit required/optional service policy.
 
 ### Communications topology
 
-The current route is a direct `0/0` KISS default suitable for a two-node test
-link. There is no CAN/CFP, SocketCAN/vcan, ZMQ, redundant link selection, or
+One-interface profiles retain a direct `0/0` KISS default suitable for a
+two-node test link. Multi-interface profiles use validated static libcsp routes
+and have software evidence for two different UART/KISS links plus bidirectional
+transit. There is no CAN/CFP, SocketCAN/vcan, ZMQ, redundant link selection, or
 dynamic route management. The Holybro module complements the existing serial
-KISS path; it does not replace or wrap that data plane. After the bench
-power/USB arrangement was corrected, raw traffic and bidirectional CSP passed
-without RF parameter changes. The raw HIL peer also required removal of
-blocking polling behavior; the production UART/KISS receive path remains
+KISS path; it does not replace or wrap that data plane. Only one Holybro/KISS
+link has physical evidence; `KISS_2` has not been physically tested. After the
+bench power/USB arrangement was corrected, raw traffic and bidirectional CSP
+passed without RF parameter changes. The raw HIL peer also required removal
+of blocking polling behavior; the production UART/KISS receive path remains
 interrupt-driven.
 
 CRC32 provides accidental-corruption detection, not authentication. HMAC,

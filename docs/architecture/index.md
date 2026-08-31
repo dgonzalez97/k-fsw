@@ -30,7 +30,7 @@ The current tested composition contains five project-owned Git repositories.
 | `k-fsw` | Executable application, `west.yml`, K-FSW targets, Kconfig composition, devicetree overlays, shell adapters, developer tools, integration/HIL tests, CI, aggregate manual | Reusable service implementations or upstream source |
 | `kfsw-platform` | Monotonic time, reset-cause access, and LittleFS storage lifecycle over Zephyr | Mission policy, file-transfer rules, board selection |
 | `kfsw-services` | Boot/readiness markers, logging, local parameters, persistence, optional CSP parameter adapter, and FTP client/server | CSP interfaces/routes or raw flash layout |
-| `kfsw-comms` | Optional libcsp lifecycle, one router, routes, packet ownership, and UART/KISS adapter | Parameter semantics, FTP protocol, shell parsing |
+| `kfsw-comms` | Optional libcsp lifecycle, one router, native static routes, packet ownership, and independently owned UART/KISS instances | Parameter semantics, FTP protocol, shell parsing |
 | `kfsw-modules` | Compile-time-selectable mission-specific device and subsystem modules | Generic platform, service, or communications mechanisms |
 
 `kfsw-modules` is a normal west dependency and Zephyr module with Kconfig and
@@ -91,6 +91,14 @@ When `KFSW_RADIO_UHF=y`, the application links `kfsw::radio_uhf`. The selected
 Holybro implementation provides immutable build-time descriptors; it does not
 create a UART, call CSP, allocate memory, or start a thread. Board pins and the
 actual UART rate remain target/devicetree composition.
+
+When UART/KISS is enabled, `kfsw-comms` owns one context per enabled
+devicetree child: UART device, libcsp interface, address/prefix, KISS framing
+state, receive callback/thread state, and counters. The composition supplies a
+libcsp-native static route string. A single global CSP router then performs
+longest-prefix selection; applications do not switch transports with their own
+destination conditionals. The legacy chosen-UART form remains the one-link
+special case and receives its historical direct default route.
 
 The application source stays focused on order and failure reporting:
 
@@ -183,7 +191,8 @@ Current mutable state has one clear owner:
 | Parameter definitions and backing values | Owning application/service/test component | Compile-time definition sets; owner validation and callbacks |
 | Aggregated local parameter index | `kfsw-services` PARAM core | Parameter mutex; bounded static index assembled by the executable composition |
 | Snapshot workspace and file | Parameter persistence | Persistence mutex plus parameter-table lock |
-| CSP identity, routes, interfaces, router | `kfsw-comms` | Initialize once; one statically defined router thread |
+| CSP identity, static routes, interfaces, router | `kfsw-comms` | Validate/load once after all interfaces exist; one statically defined router thread |
+| UART/KISS framing and transport state | One `kfsw-comms` context per devicetree interface | Unique UART/name enforced before opening; independent libcsp counters and receive state |
 | Remote parameter descriptor cache | PARAM CSP adapter | Fixed pool selected by Kconfig |
 | FTP client workspace | FTP client | One mutex serializes client operations |
 | FTP server connection | FTP server | One static worker; overlapping connection reports busy |

@@ -23,7 +23,8 @@ architecture, operations, testing, development, and the public C API.
 - physical shell bring-up on FRDM-K64F and Raspberry Pi Pico W
 - configurable `k-ground` Linux nodes with local two-node CSP verification
 - compile-time `radio-uhf` identity/status with Holybro SiK implementation
-- optional CSP routing with UART/KISS and RDP
+- optional libcsp routing with independently named UART/KISS interfaces,
+  static destination/prefix/VIA entries, and RDP
 - local typed parameters and persistence without a CSP dependency
 - optional remote parameter access over CSP
 - LittleFS storage and optional CSP/RDP file transfer

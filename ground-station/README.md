@@ -25,3 +25,12 @@ The environment boundaries are intentional:
 
 Do not add physical device paths to these reusable node files. See the ground
 composition guide for the complete setup and verification procedure.
+
+An installation can set `KFSW_CSP_ROUTES` in a node file to a libcsp-native
+comma-separated table without editing source, for example:
+
+```sh
+KFSW_CSP_ROUTES='2/14 KISS,16/10 KISS 2'
+```
+
+Omitting it preserves the legacy direct `0/0 -> KISS` route.

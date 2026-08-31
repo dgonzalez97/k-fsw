@@ -151,6 +151,21 @@ kfsw:~$ csp ping 2
 CSP ping 2: success, rtt_ms=...
 ```
 
+A multi-interface composition exposes the names and next hop without collapsing
+them to a generic transport:
+
+```text
+kfsw:~$ csp routes
+10/14 -> KISS_1 direct
+11/14 -> KISS_2 via 11
+kfsw:~$ csp interfaces
+KISS_1 addr=8/14 ...
+KISS_2 addr=9/14 ...
+```
+
+Routes are static startup configuration. The debug shell intentionally has no
+route-load/save command; `csp routes` is inspection-only.
+
 A ping timeout can mean no peer, no physical bridge, wrong address, wrong
 route, a stopped router, framing errors, or packet exhaustion. Inspect
 `csp interfaces`, `csp routes`, and `uart info` before treating every timeout
@@ -162,11 +177,13 @@ These commands exist only with `CONFIG_KFSW_CSP_KISS_UART=y`.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `uart info` | none | Show selected Zephyr UART, baud, readiness, KISS interface, local/peer addresses, and counters |
-| `uart test` | none | Confirm that the configured peer route uses this UART and ping the peer with a 128-byte CSP payload |
+| `uart info` | none | Show every configured UART, baud, readiness, KISS name/address, and independent counters |
+| `uart test` | `[node]` | Resolve the configured peer or explicit node through CSP, require a managed UART/KISS route, and ping with a 128-byte payload |
 
 `uart test` is stronger than a generic ping because it first verifies route
-selection. It does not test every service or electrical condition.
+selection and reports the interface name that libcsp selected. Use an explicit
+node to distinguish links in a multi-interface image, for example `uart test
+10` and `uart test 11`. It does not test every service or electrical condition.
 
 On NUCLEO, these commands are entered through the ST-LINK shell while the
 tested packets leave on USART3. Do not connect the shell terminal to the CSP
