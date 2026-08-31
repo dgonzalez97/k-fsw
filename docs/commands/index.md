@@ -70,6 +70,8 @@ root
 │   ├── list, get, set
 │   └── save, load, defaults, clear
 │       when persistence is enabled
+├── boton_test                when KFSW_BOTON_TEST_SHELL=y
+│   └── status
 ├── storage                   when KFSW_STORAGE=y
 │   ├── info, test
 └── ftp                       when KFSW_FTP=y
@@ -131,6 +133,29 @@ RF link: unknown
 The command does not enter SiK command mode or read the modem. Expected values
 must be compared with `uart info`; actual interface traffic and errors remain
 under `csp interfaces` and `uart info`.
+
+## `boton_test` diagnostic
+
+The module-owned diagnostic exists only when `CONFIG_KFSW_BOTON_TEST_SHELL=y`:
+
+| Command | Arguments | Meaning |
+| --- | --- | --- |
+| `boton_test status` | none | Print one coherent snapshot of accepted presses and the most recent monotonic press second |
+
+```text
+kfsw:~$ boton_test status
+press_count: 0
+last_press_s: 0
+debounce_ms: 30
+```
+
+`debounce_ms` is printed by GPIO-enabled compositions; a software-only build
+can omit that line.
+
+The command calls `kfsw_boton_test_get_status()`; it does not read GPIO or
+look up parameters. The module intentionally provides no production
+`fake-press` or reset command. Holding the button does not generate repeated
+counts, and state resets only when the image reboots.
 
 ## CSP diagnostics
 
@@ -211,6 +236,19 @@ log_level = 2
 overflow and unsigned-negative input; the command reads the parameter
 description first so it can parse the exact type.
 
+The opt-in NUCLEO button profile additionally exposes two module-owned live
+values:
+
+```text
+kfsw:~$ param get boton_test_press_count
+boton_test_press_count = 0
+kfsw:~$ param get boton_test_last_press_s
+boton_test_last_press_s = 0
+```
+
+Both are read-only and non-persistent. A rejected `param set` does not change
+the typed owner state.
+
 ## Remote parameters
 
 When `CONFIG_KFSW_PARAM_CSP=y`, `list`, `get`, and `set` accept an explicit
@@ -228,6 +266,19 @@ kfsw:~$ param get 2 log_level
 kfsw:~$ param set 2 log_level 2
 2:log_level = 2
 ```
+
+The same adapter can observe the button module on node 2:
+
+```text
+kfsw:~$ param get 2 boton_test_press_count
+2:boton_test_press_count = 0
+kfsw:~$ param get 2 boton_test_last_press_s
+2:boton_test_last_press_s = 0
+```
+
+Remote writes to either value fail as read-only. This visibility does not make
+`boton_test` a CSP-aware module; PARAM/CSP and routing remain separate
+composition capabilities.
 
 The node argument is decimal. Remote changes are not automatically persisted
 on the destination. The current API has no remote “save” command.

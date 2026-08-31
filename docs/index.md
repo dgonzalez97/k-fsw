@@ -39,7 +39,7 @@ kfsw-services  kfsw-platform  kfsw-comms   kfsw-modules
     native_sim        STM32L496 target     FRDM / Pico W
 ```
 
-The four project-owned repositories have independent Git histories. The
+The five project-owned repositories have independent Git histories. The
 `k-fsw` manifest pins the exact commits that form one tested composition. A
 developer normally changes reusable behavior in its owning repository and
 then updates the composition pin in a separate `k-fsw` pull request.
@@ -60,6 +60,13 @@ NUCLEO-L496ZG. It currently includes:
 The UHF ground/NUCLEO test compositions additionally select the reusable
 `radio-uhf` module with Holybro SiK identity and bounded status. They continue
 to use the same `kfsw-comms` CSP/KISS/UART path.
+
+An explicit NUCLEO example profile additionally composes the reusable
+`boton_test` module. It maps the board USER button through devicetree, debounces
+presses on the system workqueue, exposes a coherent typed snapshot, and makes
+the same live scalar storage remotely observable through optional PARAM/CSP.
+Automated software verification and physical USER-button acceptance are
+tracked separately; the physical step remains pending.
 
 FRDM-K64F and Raspberry Pi Pico W profiles intentionally select a much smaller
 composition: boot markers, the debug shell, and the root `status`, `version`,

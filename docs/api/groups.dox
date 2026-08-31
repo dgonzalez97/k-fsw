@@ -72,4 +72,11 @@
  * kfsw_ftp_init() prepares storage. kfsw_ftp_start() binds the server after
  * storage and the CSP router are ready. PUT and GET stream bounded chunks and
  * atomically commit received files.
+ *
+ * @defgroup kfsw_modules K-FSW Modules
+ * @brief Compile-time-selected device and subsystem behavior.
+ *
+ * Modules own their domain semantics, coherent state, typed interface, and
+ * parameter definitions. Product composition owns target selection and
+ * devicetree hardware binding.
  */

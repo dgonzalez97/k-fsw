@@ -20,6 +20,8 @@ required_inputs=(
 	"$KFSW_WORKSPACE_ROOT/kfsw-platform/include/kfsw"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw"
 	"$KFSW_WORKSPACE_ROOT/kfsw-comms/include/kfsw"
+	"$KFSW_WORKSPACE_ROOT/kfsw-modules/radio-uhf/include/kfsw"
+	"$KFSW_WORKSPACE_ROOT/kfsw-modules/boton-test/include/kfsw"
 )
 
 for input in "${required_inputs[@]}"; do

@@ -2,13 +2,13 @@
 
 ## Status baseline
 
-This status was reviewed on 31 August 2026 against the local routing feature
-work, the exact `west.yml` dependency pins, current Kconfig and target profiles,
-project tests, GitHub workflows, merged pull requests, open issues, and the
-public K Flight Software project board. The routing changes described here are
-local and pending publication. The k-ground prototype is tracked by
-[issue 28](https://github.com/dgonzalez97/k-fsw/issues/28); its named Holybro
-bench has passed raw and CSP/KISS functional acceptance.
+This status was updated on 31 August 2026 for the `boton_test` reference module
+tracked by [kfsw-modules issue 6](https://github.com/dgonzalez97/kfsw-modules/issues/6).
+It also reflects the published multi-KISS dependency, merged UHF and routing
+compositions, exact `west.yml` pins, current Kconfig/target profiles, project
+tests, workflows, issues, and pull requests. Automated software evidence is
+kept separate from pending manual USER-button acceptance. The named Holybro
+bench retains its previously reviewed raw and CSP/KISS evidence boundaries.
 
 Status here is an engineering summary, not a substitute for the issue tracker
 or a release qualification record.
@@ -24,7 +24,8 @@ or a release qualification record.
 | k-ground | Configured `native_sim` roles using the normal K-FSW shell/services and optional route string | UHF node 16 and ops node 19 report role-specific identity and ping both ways | No physical evidence required for the local profile | Launcher connects one direct peer link; no generic router orchestration or mission-control framework |
 | radio-uhf module | Compile-time implementation selection, generic identity/expected-configuration API, bounded `uhf status`; Holybro SiK implementation | Dedicated module ztest and node-16/NUCLEO composition builds | Reuses the separately verified Holybro bench | No live modem readback/control, radio parameters, worker, or data-plane API |
 | Holybro UHF fixture | Separate NUCLEO raw-byte peer and CSP/KISS HIL entry points under `radio-uhf/holybro` | Scripts validate module identity, production PARAM, negative behavior, interfaces/routes/counters | Raw 100/100 with no invalid/timeout; bidirectional node 16 ↔ 2 CSP ping; remote production PARAM validation/callback; KISS 14/14 with zero errors | Functional bench evidence only; no RF performance/soak campaign or qualification |
-| Local parameters | Static typed table, exact scalar checks, read-only flags, callbacks | CSP-disabled ztest and local/full shell integration | Local table runs in NUCLEO composition; physical bench checks remote access to it | Current table is mostly integration values; string/data/arrays absent |
+| `boton_test` reference module | Module-owned 30 ms debounce, coherent typed count/time status, PARAM IDs 6/7, chosen-GPIO binding, system workqueue | **SOFTWARE VERIFIED**: focused Twister (2 configurations, 23 cases), Linux opt-in smoke, NUCLEO profile build, and integration; combined full regression pending | **PHYSICAL VERIFICATION PENDING**; no physical USER-button press is claimed | NUCLEO example is opt-in; no dedicated thread/allocation, externally writable state, CSP dependency, or HK implementation |
+| Local parameters | Static typed table, exact scalar checks, read-only flags, callbacks | CSP-disabled ztest and local/full shell integration | Local table runs in NUCLEO composition; physical bench checks remote access to it | Base table is small; button profile adds two live read-only values; string/data/arrays absent |
 | PARAM CSP adapter | Optional libparam-compatible server/client/cache | Two-node native remote list/get/set plus Robot errors | Holybro RF bench passed production list/get/set and the valid owner callback; the corrected reset-to-default oracle is software verified and pending physical rerun | Fixed remote descriptor pool; no remote persistence command |
 | Parameter persistence | Explicit bounded versioned CRC snapshot and defaults/load/save/clear | CSP-disabled unit suite, cross-process integration, corrupt snapshot fallback, Valgrind | No dedicated NUCLEO reboot/persistence acceptance | Local only; no migration framework beyond name/type compatibility |
 | Storage | LittleFS lifecycle at `/kfsw`, cautious first-format policy, capacity API | Storage ztest and native cross-process integration | NUCLEO storage info/test passes in UART HIL | Linux/NUCLEO full profiles only; one 64 KiB volume per profile |
@@ -50,6 +51,12 @@ communications, and parameter services.
 No row means flight-qualified. Physical verification is tied to a named bench
 and acceptance behavior; it does not automatically transfer to a new board,
 radio, cable, routing plan, or Kconfig combination.
+
+`boton_test` is **SOFTWARE VERIFIED** because its automated state, debounce,
+saturation, typed API, PARAM, Linux integration, and NUCLEO composition gates
+passed locally on 31 August 2026. This classification does not mean the blue
+button was pressed. Physical count/timestamp and remote write-rejection
+evidence remain pending user interaction on the named bench.
 
 ## Known limitations
 
@@ -150,11 +157,12 @@ behavioral or physical acceptance criteria.
 ### Grow flight services deliberately
 
 After the command boundary is established, future services such as structured
-events, health, housekeeping, scheduling, and equipment modules should be
-introduced one contract at a time. Older architecture/reference notes are
-design input, not an already-approved feature list. Each new capability needs
-an owner, Kconfig boundary, target composition, tests, operational semantics,
-and an honest status row.
+events, health, housekeeping, and scheduling, plus equipment modules beyond
+the narrow `boton_test` reference example, should be introduced one contract at
+a time. Older architecture/reference notes are design input, not an
+already-approved feature list. Each new capability needs an owner, Kconfig
+boundary, target composition, tests, operational semantics, and an honest
+status row.
 
 ## Keeping this page current
 
