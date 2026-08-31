@@ -99,10 +99,10 @@ actual UART rate remain target/devicetree composition.
 
 When `CONFIG_KFSW_BOTON_TEST=y`, the application links `kfsw::boton_test`,
 contributes the module-owned parameter definition set, and initializes the
-module. GPIO support uses Zephyr's GPIO API and the
-`kfsw,boton-test-button` chosen node. The explicit NUCLEO example profile maps
-that chosen node to the board's existing `user_button`; another target can bind
-a different GPIO without changing module source.
+module. GPIO support uses Zephyr's GPIO API and composition-selected button,
+green, blue, and red chosen nodes. The explicit NUCLEO example maps them to
+the board's existing USER button and three independent LED nodes; another
+target can bind different GPIOs without changing module source.
 
 When UART/KISS is enabled, `kfsw-comms` owns one context per enabled
 devicetree child: UART device, libcsp interface, address/prefix, KISS framing
@@ -125,20 +125,18 @@ polarity. There is no dedicated module thread and no dynamic allocation.
 State ownership and observation stay separated from transport:
 
 ```text
-chosen GPIO -> ISR -> 30 ms system work -> boton_test owner state
-                                               |            \
-                                               |             +-> module PARAM definitions
-                                               v                         |
-                                      typed status snapshot              v
-                                               |                 optional PARAM/CSP
-                                               v
-                                      future HK collector
-                                      (not implemented)
+chosen button -> ISR -> 30 ms system work -------------------+
+chosen LEDs <-> shared owner setter <-> shell/PARAM ----------+-> boton_test state
+                                                               |          |
+                                                               |          +-> typed snapshot
+                                                               |                    |
+                                                               +--------------------+-> future HK
 ```
 
 `kfsw_boton_test_get_status()` returns one coherent
-`kfsw_boton_test_status` snapshot. `press_count` and `last_press_s` start at
-zero on every boot. Count saturates at `UINT32_MAX`; it never wraps to zero.
+`kfsw_boton_test_status` snapshot. `press_count`, `last_press_s`, and all three
+LED booleans start at zero/off on every boot. Count saturates at `UINT32_MAX`;
+it never wraps to zero.
 The timestamp is monotonic milliseconds divided by 1000 with floor semantics
 and saturation at `UINT32_MAX`. It continues to update on accepted presses
 after the count has saturated. A press during second zero is unambiguous
@@ -152,7 +150,8 @@ use the typed API. A future generic PARAM owner-read callback is the clean path
 to formal owner synchronization without duplicate storage or PARAM internals
 in this module.
 
-A future housekeeping collector should call the typed snapshot API. It should
+A future housekeeping collector should call the typed snapshot API. The
+logical table name is `hw_test`, and table ID 67 is reserved by the module. It should
 not query PARAM by name or read GPIO; HK itself remains unimplemented.
 
 The application source stays focused on order and failure reporting:

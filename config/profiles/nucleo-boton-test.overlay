@@ -1,5 +1,8 @@
 / {
 	chosen {
 		kfsw,boton-test-button = &user_button;
+		kfsw,boton-test-led-green = &green_led_1;
+		kfsw,boton-test-led-blue = &blue_led_2;
+		kfsw,boton-test-led-red = &red_led_3;
 	};
 };
