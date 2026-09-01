@@ -18,6 +18,7 @@ if [[ $# -ne 0 ]]; then
 fi
 
 work_dir="$(mktemp -d /tmp/k-ground-csp.XXXXXX)"
+station_dir="$work_dir/ground-station"
 node16_pid=""
 node19_pid=""
 bridge_pid=""
@@ -70,8 +71,18 @@ trap 'exit 143' TERM
 
 command -v socat >/dev/null 2>&1 || fail "socat is required"
 
-"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-gnd-uhf
-"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-ops
+mkdir -p "$station_dir/nodes"
+cp "$KGROUND_REPO_DIR/ground-station/nodes/kfsw-gnd-uhf.env" \
+	"$station_dir/nodes/kfsw-gnd-uhf.env"
+cp "$KGROUND_REPO_DIR/ground-station/nodes/kfsw-ops.env" \
+	"$station_dir/nodes/kfsw-ops.env"
+printf '%s\n' "KFSW_CSP_ROUTES='19/14 KISS'" \
+	>>"$station_dir/nodes/kfsw-gnd-uhf.env"
+
+KGROUND_STATION_DIR="$station_dir" \
+	"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-gnd-uhf
+KGROUND_STATION_DIR="$station_dir" \
+	"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-ops
 
 node16_executable="$KGROUND_BUILD_ROOT/node-16/zephyr/zephyr.exe"
 node19_executable="$KGROUND_BUILD_ROOT/node-19/zephyr/zephyr.exe"
