@@ -45,6 +45,8 @@ format_sources+=(
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command_internal.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command_protocol.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/command.h"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/event.h"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/event.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp_client.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp_internal.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp_link.h"
@@ -120,6 +122,8 @@ cppcheck \
 	-DCONFIG_KFSW_STORAGE=1 \
 	-DCONFIG_KFSW_FTP=1 \
 	-DCONFIG_KFSW_COMMAND=1 \
+	-DCONFIG_KFSW_EVENT=1 \
+	-DCONFIG_KFSW_EVENT_RING_DEPTH=32 \
 	-DCONFIG_KFSW_COMMAND_CSP=1 \
 	-DCONFIG_KFSW_COMMAND_MAX_COMMANDS=16 \
 	-DCONFIG_KFSW_COMMAND_TIMEOUT_MS=10000 \
