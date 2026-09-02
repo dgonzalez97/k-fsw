@@ -73,6 +73,11 @@
  * storage and the CSP router are ready. PUT and GET stream bounded chunks and
  * atomically commit received files.
  *
+ * kfsw_ftp_list(), kfsw_ftp_stat(), and kfsw_ftp_mkdir() accept this node's own
+ * CSP address and then run against local storage without a connection.
+ * kfsw_ftp_put() and kfsw_ftp_get() move a file between two nodes and return
+ * -ENOTSUP for the local address.
+ *
  * @defgroup kfsw_modules K-FSW Modules
  * @brief Compile-time-selected device and subsystem behavior.
  *

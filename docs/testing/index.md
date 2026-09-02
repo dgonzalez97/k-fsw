@@ -237,6 +237,17 @@ PTYs, joins them with `socat`, and checks:
 Processes, FIFOs, temporary files, and isolated flash images are cleaned by the
 runners.
 
+### Ground-node file transfer
+
+`tests/k-ground-ftp-smoke.sh` builds the two configured ground roles, bridges
+their KISS PTYs, and moves one file between them. The operator node 19 uploads
+`test.txt`, reads its metadata back, downloads it again, and compares the two
+local copies; the gateway node 16 then lists and stats the received file
+through its own address, which exercises the local-node path without a
+connection. The missing-file negative path runs in the same session. The CRC
+reported by the generator, by the remote `stat`, and by the returned copy must
+be identical.
+
 ### Three-node multi-KISS routing
 
 `tests/build-multi-kiss.sh` builds a router plus nodes 10 and 11.
@@ -342,6 +353,32 @@ KFSW_FTDI_DEVICE=/dev/serial/by-id/<ftdi-device> \
 ```
 
 No physical test is selected by `tools/ci/all.sh` or hosted GitHub Actions.
+
+### Holybro UHF CSP/KISS and file-transfer fixture
+
+`tests/hil/radio-uhf/holybro/csp-kiss-smoke.sh` is the radio acceptance. It
+builds ground node 16 and NUCLEO node 2, flashes the NUCLEO, bridges the ground
+KISS PTY to the USB-side Holybro at 57600 baud, and then verifies over RF:
+
+- bidirectional CSP ping between node 16 and node 2;
+- production remote PARAM read, write, owner callback, and the invalid-value
+  restore-to-default oracle;
+- a complete file round trip — `generate`, `mkdir`, `put`, `stat`, `ls`, `get`,
+  `verify` — with the same CRC on both nodes and on both local copies;
+- the flight node reading its own FTP root through its own address;
+- missing-file and unreachable-node negative paths; and
+- clean, nonzero KISS counters on both ends afterwards.
+
+It reads the bench device paths from a host-specific environment file and never
+changes a persistent SiK or AT setting. Host serial settings are saved and
+restored around the run.
+
+The recorded file-transfer run was taken one commit before the transport
+boundary was closed, when `kfsw_csp_get_info()` still moved behind
+`ftp_link.h`. That change touched service lifecycle and identity lookup only,
+not the wire format or the data path, so the evidence applies — but the exact
+published tree has not itself been on the bench. Rerun this fixture before
+treating the result as evidence for a specific commit.
 
 ### Reusable shell-only board fixture
 

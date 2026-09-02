@@ -205,6 +205,49 @@ roles without adding unused production protocols. There is no central
 orchestration, master election, GUI, database, web service, or new command
 framework.
 
+## Moving a file between ground nodes
+
+Ground roles are built from the same `native_sim` composition as KFSW-Linux, so
+they carry the same file-transfer service. Every path is virtual and sandboxed
+below `/kfsw/ftp` on the node that owns it.
+
+From the operator shell, upload a file to the gateway, read its metadata back,
+download it again, and compare the two local copies:
+
+```text
+kfsw-ops# ftp generate /build/test.txt 256
+FTP generate path=/build/test.txt: PASS bytes=256 crc32=0ce9d363
+kfsw-ops# ftp 16 mkdir /uplink
+FTP mkdir node=16 path=/uplink: PASS
+kfsw-ops# ftp put 16 /build/test.txt /uplink/test.txt
+FTP put node=16 source=/build/test.txt destination=/uplink/test.txt: PASS bytes=256 crc32=0ce9d363 ...
+kfsw-ops# ftp stat 16 /uplink/test.txt
+FTP stat node=16 path=/uplink/test.txt type=file bytes=256 crc32=0ce9d363
+kfsw-ops# ftp get 16 /uplink/test.txt /build/test-returned.txt
+FTP get node=16 source=/uplink/test.txt destination=/build/test-returned.txt: PASS bytes=256 ...
+kfsw-ops# ftp verify /build/test.txt /build/test-returned.txt
+FTP verify first=/build/test.txt second=/build/test-returned.txt: PASS
+```
+
+`ftp generate` writes a deterministic byte pattern rather than prose; the
+transfer service treats every file as binary. The same CRC appearing on the
+sender, on the receiver's `stat`, and on the returned copy is the end-to-end
+evidence that the round trip was exact.
+
+The gateway can inspect what it received without opening a connection, because
+a request addressed to a node's own CSP address is served from local storage:
+
+```text
+kfsw-gnd-uhf# ftp 16 ls /uplink
+f        256 test.txt
+FTP list: PASS entries=1
+```
+
+`tests/k-ground-ftp-smoke.sh` runs exactly this sequence between node 19 and
+node 16, including the missing-file negative path, and is part of the software
+integration suite. Transfers to and from a flight node over the radio are a
+separate physical path; see the Holybro fixture under `tests/hil/radio-uhf/`.
+
 ## Physical-interface ownership
 
 One process should own one physical interface. In the prototype,

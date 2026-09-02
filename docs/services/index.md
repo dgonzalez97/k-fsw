@@ -465,6 +465,63 @@ It has client and server APIs for list, stat, mkdir, upload (PUT), and download
 CRC32. Each protocol message has a 24-byte header, bounded path/data fields,
 request ID, offset, total size, and file CRC where applicable.
 
+### The local node
+
+`kfsw_ftp_list`, `kfsw_ftp_stat`, and `kfsw_ftp_mkdir` accept this node's own
+CSP address. Those calls run the same filesystem operations the server runs for
+a decoded request, directly against local storage. No connection is opened and
+no route is consulted, so a node can always inspect and prepare its own FTP
+root — including on a node with no configured peer.
+
+Local requests need storage mounted and the service started; otherwise they
+return `-EACCES`. `kfsw_ftp_put` and `kfsw_ftp_get` move a file between two
+nodes and return `-ENOTSUP` for the local address.
+
+This is a deliberate short circuit in the service, not CSP loopback. Self
+addressing at the CSP layer is not part of the verified routing scope, and
+nothing in K-FSW depends on it.
+
+### Internal layering
+
+The service separates what a transfer means from how its messages travel:
+
+```text
+        client and server operations
+   operation state, request/response order,
+        which file each request touches
+                    |
+             transfer engine
+   one send loop, one receive loop, shared by
+    both roles; owns the open file handle
+                    |
+        reliable transport (ftp_link.h)
+   connect, listen, accept, send, receive,
+          release, close, max payload
+                    |
+              CSP with RDP and CRC32
+                    |
+             CSP router, KISS, UART
+```
+
+Only the transport backend includes libcsp. The operation and engine layers
+work in terms of protocol messages and borrowed receive frames, so packet
+ownership is expressed by the interface rather than by convention:
+`kfsw_ftp_link_receive()` hands back a frame whose `path` and `data` point into
+the transport's buffer, and `kfsw_ftp_link_release()` is what ends that borrow.
+
+Two leaf units sit beside those layers and call nothing above them: the wire
+codec with path policy and status mapping, and the storage rules for whole-file
+CRC, the temporary file, and the atomic commit.
+
+RDP already guarantees ordering and retransmission, so the application does not
+add a second acknowledgement layer. The `offset` field in every data message is
+a consistency assertion that a stray or replayed packet cannot advance the
+write; it is not a reordering mechanism.
+
+The usable payload is bounded by the CSP buffer minus the RDP header, the
+CRC32, and the file-transfer header. `kfsw_ftp_link_max_payload()` reports that
+limit, and a build assertion holds the compiled chunk size below it.
+
 ### Virtual paths and sandbox
 
 Every FTP path is virtual and rooted below `/kfsw/ftp` on the node that uses
@@ -560,10 +617,15 @@ timeouts, and operational link conditions.
 
 Software tests cover protocol encoding/decoding, path validation, CRC and
 atomic-commit behavior, missing files, traversal rejection, zero-byte through
-8 KiB transfers, byte comparison, and buffer recovery. The NUCLEO physical
+8 KiB transfers, byte comparison, and buffer recovery. Two-node ground roles
+round-trip a file through `tests/k-ground-ftp-smoke.sh`. The NUCLEO physical
 UART bench transfers and verifies 4 KiB and 16 KiB files in both directions of
-the client workflow. These results apply to the current CSP/RDP UART bench, not
-to an unimplemented radio or CAN link.
+the client workflow.
+
+A 256-byte file has also been round-tripped over the Holybro SiK 433 MHz bench
+between ground node 16 and NUCLEO node 2, with matching CRC on both nodes and
+clean KISS counters. That is one small file on one named bench; it is not a
+throughput characterisation, and no larger transfer over RF is claimed.
 
 Browse @ref kfsw_services for exact public service declarations and return
 contracts.
