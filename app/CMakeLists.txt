@@ -48,6 +48,10 @@ target_sources_ifdef(CONFIG_KFSW_PARAM app PRIVATE
     src/parameter_definitions.c
 )
 
+target_sources_ifdef(CONFIG_KFSW_COMMAND app PRIVATE
+    src/commands/command_definitions.c
+)
+
 if(CONFIG_KFSW_PARAM_TEST_DEFINITIONS)
     target_sources(app PRIVATE
         ../tests/support/parameter_definitions.c
@@ -78,6 +82,9 @@ if(CONFIG_KFSW_DEBUG_SHELL)
     target_sources_ifdef(CONFIG_KFSW_FTP app PRIVATE
         src/diagnostics/ftp_diagnostics.c
         src/shell/shell_ftp.c
+    )
+    target_sources_ifdef(CONFIG_KFSW_COMMAND app PRIVATE
+        src/shell/shell_command.c
     )
 endif()
 

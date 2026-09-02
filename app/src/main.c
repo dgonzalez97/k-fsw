@@ -19,6 +19,11 @@
 #include <kfsw/modules/boton_test.h>
 #endif
 #include <kfsw/services/boot.h>
+#if CONFIG_KFSW_COMMAND
+#include <kfsw/services/command.h>
+
+#include "commands/command_definitions.h"
+#endif
 #if CONFIG_KFSW_FTP
 #include <kfsw/services/ftp.h>
 #endif
@@ -35,7 +40,7 @@
 int main(void)
 {
 #if CONFIG_KFSW_STORAGE || CONFIG_KFSW_PARAM || CONFIG_KFSW_CSP || CONFIG_KFSW_RADIO_UHF ||        \
-	CONFIG_KFSW_BOTON_TEST
+	CONFIG_KFSW_BOTON_TEST || CONFIG_KFSW_COMMAND
 	int result;
 #endif
 
@@ -106,6 +111,19 @@ int main(void)
 	}
 #endif
 
+#if CONFIG_KFSW_COMMAND
+	const struct kfsw_command_definition_set *const command_sets[] = {
+		&kfsw_app_command_definitions,
+	};
+
+	result = kfsw_command_init(command_sets, ARRAY_SIZE(command_sets));
+	if (result != 0) {
+		kfsw_log_error("Failed to initialize commands: %d", result);
+	} else {
+		kfsw_log_info("Command registry initialized");
+	}
+#endif
+
 #if CONFIG_KFSW_CSP
 	bool csp_started = false;
 
@@ -157,6 +175,18 @@ int main(void)
 		} else {
 			kfsw_log_info("FTP service started on CSP port %d",
 				      CONFIG_KFSW_FTP_CSP_PORT);
+		}
+	}
+#endif
+
+#if CONFIG_KFSW_COMMAND_CSP
+	if (csp_started) {
+		result = kfsw_command_server_start();
+		if (result != 0) {
+			kfsw_log_error("Failed to start command server: %d", result);
+		} else {
+			kfsw_log_info("Command server started on CSP port %d",
+				      CONFIG_KFSW_COMMAND_CSP_PORT);
 		}
 	}
 #endif

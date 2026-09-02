@@ -40,6 +40,11 @@ format_sources+=(
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/log.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/parameter.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/ftp.h"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command_csp.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command_internal.h"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command_protocol.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/command.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp_client.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp_internal.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp_link.h"
@@ -114,6 +119,10 @@ cppcheck \
 	-DCONFIG_KFSW_LOG_MIN_LEVEL=0 \
 	-DCONFIG_KFSW_STORAGE=1 \
 	-DCONFIG_KFSW_FTP=1 \
+	-DCONFIG_KFSW_COMMAND=1 \
+	-DCONFIG_KFSW_COMMAND_CSP=1 \
+	-DCONFIG_KFSW_COMMAND_MAX_COMMANDS=16 \
+	-DCONFIG_KFSW_COMMAND_TIMEOUT_MS=10000 \
 	-DCONFIG_KFSW_PARAM=1 \
 	-DCONFIG_KFSW_PARAM_CSP=1 \
 	-DCONFIG_KFSW_PARAM_PERSISTENCE=1 \
