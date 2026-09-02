@@ -17,11 +17,6 @@ else
 	exit 1
 fi
 
-if ! command -v cppcheck >/dev/null 2>&1; then
-	echo "ERROR: cppcheck is required"
-	exit 1
-fi
-
 format_roots=("$KFSW_REPO_DIR/app/src")
 [[ -d "$KFSW_REPO_DIR/tests/support" ]] && \
 	format_roots+=("$KFSW_REPO_DIR/tests/support")
@@ -46,10 +41,13 @@ format_sources+=(
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/parameter.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/ftp.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp_client.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp_common.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp_internal.h"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp_link.h"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp_link_csp.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp_protocol.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp_server.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp_store.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp_transfer.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/log.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter_csp.c"
@@ -88,6 +86,15 @@ if [[ -d "$KFSW_WORKSPACE_ROOT/kfsw-modules" ]]; then
 			! -path '*/third_party/*' \
 			-print0 | sort -z
 	)
+fi
+
+# Checked here rather than at the top so a missing analyser cannot abort the
+# run before the formatter has reported. A local gate that exits early looks
+# like a pass and hides exactly the failures CI then reports.
+if ! command -v cppcheck >/dev/null 2>&1; then
+	echo "ERROR: cppcheck is required"
+	echo "Debian/Ubuntu: sudo apt-get install cppcheck"
+	exit 1
 fi
 
 echo "QUALITY: cppcheck (${#analysis_sources[@]} files)"

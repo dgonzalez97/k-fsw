@@ -43,6 +43,13 @@ fi
 		'param clear' \
 		'storage info' \
 		'storage test' \
+		'ftp' \
+		'ftp generate' \
+		'ftp 1 mkdir /selfnode' \
+		'ftp 1 ls /' \
+		'ftp stat 1 /selfnode' \
+		'ftp 1 ls /missing' \
+		'ftp put 1 /selfnode/a.bin /selfnode/b.bin' \
 		'log test'
 } |
 	"$executable" --uart_stdinout --stop_at=1.0 --no-color \
@@ -99,6 +106,14 @@ expected_output=(
 	'ready: yes'
 	'total_bytes: 65536'
 	'Storage test: PASS'
+	'  mkdir     : Create a directory: mkdir <node> <path>; <node> may be this node.'
+	'generate: wrong parameter count'
+	'generate - Create deterministic local data: generate <path> <bytes 0..32768>.'
+	'FTP mkdir node=1 path=/selfnode: PASS'
+	'FTP list: PASS entries='
+	'FTP stat node=1 path=/selfnode type=directory'
+	'FTP list node=1 path=/missing: not found'
+	'FTP put node=1: transfers need two nodes'
     '[ERROR] K-FSW shell log test: error'
     '[WARNING] K-FSW shell log test: warning'
     '[INFO] K-FSW shell log test: info'

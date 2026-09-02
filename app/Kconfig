@@ -25,10 +25,13 @@ config KFSW_DEBUG_SHELL
 	select SHELL_HISTORY
 	select SHELL_METAKEYS
 	select SHELL_HELP
+	select SHELL_HELP_ON_WRONG_ARGUMENT_COUNT
 	help
 	  Enable the serial developer/debug shell and K-FSW command tree.
-	  Disable this option for release builds that must not include the
-	  interactive shell.
+	  SHELL_MINIMAL defaults the wrong-argument-count help off, so it is
+	  selected here: an operator who omits an argument is shown the command
+	  usage instead of only an error. Disable this option for release builds
+	  that must not include the interactive shell.
 
 config KFSW_PARAM_TEST_DEFINITIONS
 	bool "Test-only parameter fixture definitions"

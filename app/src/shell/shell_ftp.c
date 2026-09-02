@@ -50,6 +50,12 @@ static int print_ftp_error(const struct shell *sh, const char *operation, uint16
 			    node, path, result);
 	} else if (result == -EBUSY) {
 		shell_error(sh, "FTP %s node=%u path=%s: server busy", operation, node, path);
+	} else if (result == -ENOTSUP) {
+		shell_error(sh, "FTP %s node=%u: transfers need two nodes; use a remote node",
+			    operation, node);
+	} else if (result == -EACCES) {
+		shell_error(sh, "FTP %s node=%u path=%s: service or storage not ready", operation,
+			    node, path);
 	} else {
 		shell_error(sh, "FTP %s node=%u path=%s: FAIL (%d)", operation, node, path, result);
 	}
@@ -207,23 +213,48 @@ static int cmd_ftp_verify(const struct shell *sh, size_t argc, char **argv)
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	ftp_commands,
-	SHELL_CMD_ARG(generate, NULL, "Create deterministic local data: generate <path> <bytes>.",
+	SHELL_CMD_ARG(generate, NULL,
+		      "Create deterministic local data: generate <path> <bytes 0..32768>.",
 		      cmd_ftp_generate, 3, 0),
-	SHELL_CMD_ARG(get, NULL, "Download: get <node> <remote> <local>.", cmd_ftp_get, 4, 0),
-	SHELL_CMD_ARG(list, NULL, "List directory: list <node> [path].", cmd_ftp_list, 2, 1),
-	SHELL_CMD_ARG(ls, NULL, "List directory: ls <node> [path].", cmd_ftp_list, 2, 1),
-	SHELL_CMD_ARG(mkdir, NULL, "Create directory: mkdir <node> <path>.", cmd_ftp_mkdir, 3, 0),
-	SHELL_CMD_ARG(put, NULL, "Upload: put <node> <local> <remote>.", cmd_ftp_put, 4, 0),
-	SHELL_CMD_ARG(stat, NULL, "Show metadata: stat <node> <remote>.", cmd_ftp_stat, 3, 0),
-	SHELL_CMD_ARG(verify, NULL, "Compare local files: verify <first> <second>.",
+	SHELL_CMD_ARG(get, NULL, "Download from a remote node: get <node> <remote> <local>.",
+		      cmd_ftp_get, 4, 0),
+	SHELL_CMD_ARG(list, NULL, "List a directory: list <node> [path]; <node> may be this node.",
+		      cmd_ftp_list, 2, 1),
+	SHELL_CMD_ARG(ls, NULL, "List a directory: ls <node> [path]; <node> may be this node.",
+		      cmd_ftp_list, 2, 1),
+	SHELL_CMD_ARG(mkdir, NULL,
+		      "Create a directory: mkdir <node> <path>; <node> may be this node.",
+		      cmd_ftp_mkdir, 3, 0),
+	SHELL_CMD_ARG(put, NULL, "Upload to a remote node: put <node> <local> <remote>.",
+		      cmd_ftp_put, 4, 0),
+	SHELL_CMD_ARG(stat, NULL,
+		      "Show metadata: stat <node> <path>; <node> may be this node.", cmd_ftp_stat,
+		      3, 0),
+	SHELL_CMD_ARG(verify, NULL, "Compare two local files: verify <first> <second>.",
 		      cmd_ftp_verify, 3, 0),
 	SHELL_SUBCMD_SET_END);
+
+static int print_ftp_usage(const struct shell *sh)
+{
+	shell_error(sh, "Usage: ftp <command> [arguments]");
+	shell_error(sh, "   or: ftp <node> <ls|list|stat|mkdir|put|get> [paths]");
+	shell_help(sh);
+	return -EINVAL;
+}
 
 static int cmd_ftp_compat(const struct shell *sh, size_t argc, char **argv)
 {
 	uint16_t node;
-	int result = parse_ftp_node(sh, argv[1], &node);
+	int result;
 
+	if (argc == 1U) {
+		shell_help(sh);
+		return SHELL_CMD_HELP_PRINTED;
+	}
+	if (argc < 3U) {
+		return print_ftp_usage(sh);
+	}
+	result = parse_ftp_node(sh, argv[1], &node);
 	if (result != 0) {
 		return result;
 	}
@@ -243,10 +274,9 @@ static int cmd_ftp_compat(const struct shell *sh, size_t argc, char **argv)
 	if ((strcmp(argv[2], "get") == 0) && (argc == 5U)) {
 		return ftp_transfer(sh, false, node, argv[3], argv[4]);
 	}
-	shell_error(sh, "Usage: ftp <node> <ls|stat|mkdir|put|get> [paths]");
-	return -EINVAL;
+	return print_ftp_usage(sh);
 }
 
 SHELL_CMD_ARG_REGISTER(ftp, &ftp_commands,
 		       "K-FSW file transfer: ftp <command> ... or ftp <node> <command> ...",
-		       cmd_ftp_compat, 3, 2);
+		       cmd_ftp_compat, 1, 4);

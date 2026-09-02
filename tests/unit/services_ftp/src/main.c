@@ -203,6 +203,78 @@ ZTEST(services_ftp, test_successful_commit_atomically_replaces_file)
 	zassert_equal(fs_stat(TEST_TEMP_PATH, &entry), -ENOENT);
 }
 
+struct local_list_result {
+	uint32_t entries;
+	bool found_file;
+	uint32_t file_size;
+};
+
+static bool collect_local_entry(const struct kfsw_ftp_entry *entry, void *context)
+{
+	struct local_list_result *result = context;
+
+	result->entries++;
+	if (strcmp(entry->name, "local.bin") == 0) {
+		result->found_file = entry->type == KFSW_FTP_ENTRY_FILE;
+		result->file_size = entry->size;
+	}
+	return true;
+}
+
+static uint16_t local_node(void)
+{
+	struct kfsw_csp_info csp_info;
+
+	kfsw_csp_get_info(&csp_info);
+	return csp_info.address;
+}
+
+ZTEST(services_ftp, test_local_node_requests_bypass_csp)
+{
+	static const uint8_t contents[] = "123456789";
+	const uint16_t node = local_node();
+	struct local_list_result listed = {0};
+	struct kfsw_ftp_stat info;
+
+	/* No route or peer exists for this address; the service must not need one. */
+	zassert_ok(kfsw_ftp_mkdir(node, "/local"));
+	zassert_equal(kfsw_ftp_mkdir(node, "/local"), -EEXIST);
+
+	write_file(KFSW_FTP_STORAGE_ROOT "/local/local.bin", contents, sizeof(contents) - 1U);
+	zassert_ok(kfsw_ftp_list(node, "/local", collect_local_entry, &listed));
+	zassert_equal(listed.entries, 1U);
+	zassert_true(listed.found_file);
+	zassert_equal(listed.file_size, sizeof(contents) - 1U);
+
+	zassert_ok(kfsw_ftp_stat(node, "/local/local.bin", &info));
+	zassert_equal(info.type, KFSW_FTP_ENTRY_FILE);
+	zassert_equal(info.size, sizeof(contents) - 1U);
+	zassert_equal(info.crc32, 0xcbf43926U);
+
+	zassert_ok(kfsw_ftp_stat(node, "", &info));
+	zassert_equal(info.type, KFSW_FTP_ENTRY_DIRECTORY);
+}
+
+ZTEST(services_ftp, test_local_node_negative_paths)
+{
+	const uint16_t node = local_node();
+	struct kfsw_ftp_transfer_result transfer;
+	struct local_list_result listed = {0};
+	struct kfsw_ftp_stat info;
+
+	zassert_equal(kfsw_ftp_list(node, "/missing", collect_local_entry, &listed), -ENOENT);
+	zassert_equal(listed.entries, 0U);
+	zassert_equal(kfsw_ftp_stat(node, "/missing.bin", &info), -ENOENT);
+	zassert_equal(kfsw_ftp_mkdir(node, "../params/parameters.dat"), -EINVAL);
+	zassert_equal(kfsw_ftp_mkdir(node, ""), -EINVAL);
+
+	/* A transfer needs two nodes; the local address must fail explicitly. */
+	zassert_equal(kfsw_ftp_put(node, "/local/local.bin", "/local/copy.bin", &transfer),
+		      -ENOTSUP);
+	zassert_equal(kfsw_ftp_get(node, "/local/local.bin", "/local/copy.bin", &transfer),
+		      -ENOTSUP);
+}
+
 ZTEST(services_ftp, test_public_argument_validation_and_lifecycle)
 {
 	struct kfsw_ftp_transfer_result transfer;

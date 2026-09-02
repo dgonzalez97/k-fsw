@@ -45,6 +45,25 @@ kfsw:~$ help
 kfsw:~$ param help
 ```
 
+`Tab` completes command and subcommand names. It cannot complete free-form
+arguments such as a node number or a path, so each command states its arguments
+in its own help line. Three ways to reach that line:
+
+```text
+kfsw:~$ ftp                       group help plus every subcommand
+kfsw:~$ ftp generate -h           one subcommand's usage
+kfsw:~$ ftp generate              wrong argument count prints the same usage
+```
+
+```text
+kfsw:~$ ftp generate
+generate: wrong parameter count
+generate - Create deterministic local data: generate <path> <bytes 0..32768>.
+```
+
+Printing usage on a wrong argument count is enabled by `KFSW_DEBUG_SHELL`; it
+applies to every command, not only `ftp`.
+
 Command availability is a build property. A shell-only target will not show
 `uhf`, `csp`, `uart`, `param`, `storage`, or `ftp` because their Kconfig owners
 are disabled. The shell does not provide placeholder commands for absent
@@ -363,6 +382,26 @@ a remote server:
 
 Verb-first forms such as `ftp put <node> ...` remain available because they
 map naturally to Zephyr static subcommands and completion.
+
+### The local node
+
+`ls`, `list`, `stat`, and `mkdir` accept this node's own CSP address. Those
+requests are served directly from local storage: no connection is opened, no
+route is used, and the result does not depend on any peer being reachable.
+
+```text
+kfsw:~$ csp info
+CSP node: 1
+kfsw:~$ ftp 1 ls /
+kfsw:~$ ftp 1 mkdir /exchange
+```
+
+The local node still needs storage mounted and the FTP service started;
+otherwise the command reports `service or storage not ready`.
+
+`put` and `get` move a file between two nodes. Addressing them at the local
+node reports `transfers need two nodes` rather than copying in place. Use
+`ftp generate` and `ftp verify` for local file work.
 
 Local diagnostic helpers are:
 

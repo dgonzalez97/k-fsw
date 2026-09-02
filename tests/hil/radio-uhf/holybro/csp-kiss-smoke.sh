@@ -191,7 +191,7 @@ radio_stty="$(stty -F "$radio_device" -g)" || \
 stty -F "$debug_serial" "$KFSW_SERIAL_BAUD" cs8 -cstopb -parenb -crtscts raw -echo
 stty -F "$radio_device" "$radio_baud" cs8 -cstopb -parenb -crtscts raw -echo
 
-timeout 180s cat "$debug_serial" >"$work_dir/nucleo.log" &
+timeout 300s cat "$debug_serial" >"$work_dir/nucleo.log" &
 debug_capture_pid=$!
 
 west flash -d "$nucleo_build_dir" --runner openocd || \
@@ -331,6 +331,52 @@ if grep -Fq "2:log_level = $alternate_log_level" <<<"$negative_output"; then
 	fail "invalid remote log_level retained the prior non-default value"
 fi
 
+# File transfer across the radio. The NUCLEO flash persists between runs, so
+# the directory may already exist and the file may already be present; the
+# upload must overwrite it atomically either way.
+printf '%s\n' \
+	'ftp generate /build/test.txt 256' \
+	'ftp 2 mkdir /uplink' \
+	'ftp put 2 /build/test.txt /uplink/test.txt' \
+	'ftp stat 2 /uplink/test.txt' \
+	'ftp 2 ls /uplink' \
+	'ftp get 2 /uplink/test.txt /build/test-returned.txt' \
+	'ftp verify /build/test.txt /build/test-returned.txt' \
+	'ftp get 2 /uplink/missing.txt /build/missing.txt' >&3
+
+wait_for_output "$work_dir/ground.log" \
+	"FTP generate path=/build/test.txt: PASS bytes=256" "$ground_pid" || \
+	fail "the ground fixture file was not generated"
+uploaded_crc="$(tr -d '\r' <"$work_dir/ground.log" | \
+	sed -n 's/^FTP generate path=\/build\/test\.txt: PASS bytes=256 crc32=\([0-9a-f]*\)$/\1/p' |
+	head -1)"
+[[ -n "$uploaded_crc" ]] || fail "the generated fixture did not report a CRC"
+
+wait_for_output "$work_dir/ground.log" \
+	"FTP put node=2 source=/build/test.txt destination=/uplink/test.txt: PASS bytes=256 crc32=$uploaded_crc" \
+	"$ground_pid" || fail "the file upload to NUCLEO node 2 over Holybro failed"
+wait_for_output "$work_dir/ground.log" \
+	"FTP stat node=2 path=/uplink/test.txt type=file bytes=256 crc32=$uploaded_crc" \
+	"$ground_pid" || fail "NUCLEO reports different metadata for the uploaded file"
+wait_for_output "$work_dir/ground.log" "FTP list: PASS entries=" "$ground_pid" || \
+	fail "the remote uplink directory could not be listed over Holybro"
+wait_for_output "$work_dir/ground.log" \
+	"FTP get node=2 source=/uplink/test.txt destination=/build/test-returned.txt: PASS bytes=256 crc32=$uploaded_crc" \
+	"$ground_pid" || fail "the file download from NUCLEO node 2 over Holybro failed"
+wait_for_output "$work_dir/ground.log" \
+	"FTP verify first=/build/test.txt second=/build/test-returned.txt: PASS" \
+	"$ground_pid" || fail "the uploaded and downloaded copies differ"
+wait_for_output "$work_dir/ground.log" \
+	"FTP get node=2 path=/uplink/missing.txt: not found" "$ground_pid" || \
+	fail "a missing remote file was not reported as not found"
+
+# The flight node sees the committed file in its own FTP root.
+printf '%s\r\n' 'ftp 2 ls /uplink' 'ftp stat 2 /uplink/test.txt' >"$debug_serial"
+wait_for_output "$work_dir/nucleo.log" \
+	"FTP stat node=2 path=/uplink/test.txt type=file bytes=256 crc32=$uploaded_crc" \
+	"$debug_capture_pid" || \
+	fail "NUCLEO does not report the received file in its own FTP root"
+
 printf '%s\r\n' 'uart info' 'csp interfaces' >"$debug_serial"
 printf '%s\n' 'uart info' 'csp interfaces' >&3
 wait_for_clean_transport_stats "$work_dir/ground.log" "$ground_pid" || \
@@ -340,4 +386,5 @@ wait_for_clean_transport_stats "$work_dir/nucleo.log" "$debug_capture_pid" || \
 
 cat "$work_dir/ground.log"
 cat "$work_dir/nucleo.log"
-echo "HOLYBRO CSP/KISS RESULT: PASS bidirectional=yes params=yes negative=yes counters=clean"
+echo "HOLYBRO CSP/KISS RESULT: PASS bidirectional=yes params=yes ftp=yes negative=yes counters=clean"
+echo "HOLYBRO FTP: 256 bytes round-tripped node 16 <-> node 2, crc32=$uploaded_crc"

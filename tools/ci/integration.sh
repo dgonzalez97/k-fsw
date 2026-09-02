@@ -36,4 +36,7 @@ echo "INTEGRATION: multi-interface CSP/KISS routing and transit"
 echo "INTEGRATION: k-ground UHF node 16 and ops node 19"
 "$KFSW_REPO_DIR/tests/k-ground-csp-smoke.sh"
 
+echo "INTEGRATION: k-ground file transfer between node 19 and node 16"
+"$KFSW_REPO_DIR/tests/k-ground-ftp-smoke.sh"
+
 echo "INTEGRATION RESULT: PASS"
