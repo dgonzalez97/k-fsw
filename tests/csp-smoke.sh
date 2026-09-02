@@ -179,6 +179,11 @@ printf '%s\n' \
 	'ftp verify /build/large.bin /build/large-returned.bin' \
 	'ftp get 2 /flash/missing.bin /build/missing.bin' \
 	'ftp stat 2 ../params/parameters.dat' \
+	'cmd list' \
+	'cmd noop' \
+	'cmd 2 noop' \
+	'cmd 2 info' \
+	'cmd 2 bogus' \
 	'csp ping 2' \
 	'param get 2 test_u32' \
 	'csp info' \
@@ -219,6 +224,10 @@ wait_for_output "$work_dir/node1.log" \
 	"$node1_pid" || fail "FTP path traversal was not rejected"
 
 node1_expected=(
+    "noop node=0: OK noop from node 0"
+    "noop node=2: OK noop from node 1"
+    "info node=2: OK uptime_ms="
+    "unknown command 'bogus'"
     "CSP node: 1"
     "hostname: kfsw-1"
     "initialized: yes"
