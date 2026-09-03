@@ -24,9 +24,9 @@ or a release qualification record.
 | k-ground | Configured `native_sim` roles using the normal K-FSW shell/services and optional route string | UHF node 16 and ops node 19 report role-specific identity and ping both ways | No physical evidence required for the local profile | Launcher connects one direct peer link; no generic router orchestration or mission-control framework |
 | radio-uhf module | Compile-time implementation selection, generic identity/expected-configuration API, bounded `uhf status`; Holybro SiK implementation | Dedicated module ztest and node-16/NUCLEO composition builds | Reuses the separately verified Holybro bench | No live modem readback/control, radio parameters, worker, or data-plane API |
 | Holybro UHF fixture | Separate NUCLEO raw-byte peer and CSP/KISS HIL entry points under `radio-uhf/holybro` | Scripts validate module identity, production PARAM, file transfer, negative behavior, interfaces/routes/counters | Raw 100/100 with no invalid/timeout; bidirectional node 16 ↔ 2 CSP ping; remote production PARAM validation/callback; 256-byte file upload, remote stat/list, download and byte comparison; KISS counters with zero errors | Functional bench evidence only; no RF performance/soak campaign or qualification |
-| `boton_test` / `hw_test` reference module | Module-owned 30 ms debounce, coherent five-field typed status, PARAM IDs 6–10, three LED owner controls, chosen-GPIO binding, table ID 67 reserved | **SOFTWARE VERIFIED**: focused state/GPIO tests, Linux shell/PARAM smoke, and NUCLEO profile build; final matrix recorded with the feature commit | **PHYSICAL VERIFICATION PENDING**; no physical button/LED observation is claimed | NUCLEO example is opt-in; no dedicated thread/allocation, LED persistence, CSP dependency, or HK collector yet |
+| `boton_test` / `hw_test` reference module | Module-owned 30 ms debounce, coherent five-field typed status, PARAM IDs 6–10, three LED owner controls, chosen-GPIO binding, table ID 67 reserved | **SOFTWARE VERIFIED**: focused state/GPIO tests, Linux shell/PARAM smoke, and NUCLEO profile build; final matrix recorded with the feature commit | **PARTIALLY PHYSICALLY VERIFIED** on 3 September 2026: an untouched board held `press_count` at 0 for 10 s, physical presses advanced it to 7, both LED paths were observed lit by the operator and read back through `boton_test status`, and PARAM ID 6 agreed with the module status. Per-gesture attribution is not yet isolated | NUCLEO example is opt-in; no dedicated thread/allocation, LED persistence, CSP dependency, or HK collector yet |
 | Local parameters | Static typed table, exact scalar checks, read-only flags, callbacks | CSP-disabled ztest and local/full shell integration | Local table runs in NUCLEO composition; physical bench checks remote access to it | Base table is small; button profile adds two live read-only values; string/data/arrays absent |
-| PARAM CSP adapter | Optional libparam-compatible server/client/cache | Two-node native remote list/get/set plus Robot errors | Holybro RF bench passed production list/get/set and the valid owner callback; the corrected reset-to-default oracle is software verified and pending physical rerun | Fixed remote descriptor pool; no remote persistence command |
+| PARAM CSP adapter | Optional libparam-compatible server/client/cache | Two-node native remote list/get/set plus Robot errors | Holybro RF bench passed production list/get/set and the valid owner callback; the corrected reset-to-default oracle passed physically on 3 September 2026 (`1` to `3`, then invalid `5` restoring the compiled `1`) | Fixed remote descriptor pool; no remote persistence command |
 | Parameter persistence | Explicit bounded versioned CRC snapshot and defaults/load/save/clear | CSP-disabled unit suite, cross-process integration, corrupt snapshot fallback, Valgrind | No dedicated NUCLEO reboot/persistence acceptance | Local only; no migration framework beyond name/type compatibility |
 | Storage | LittleFS lifecycle at `/kfsw`, cautious first-format policy, capacity API | Storage ztest and native cross-process integration | NUCLEO storage info/test passes in UART HIL | Linux/NUCLEO full profiles only; one 64 KiB volume per profile |
 | K-FSW FTP | LIST/STAT/MKDIR/PUT/GET, 192-byte chunks, CRC, sandbox, atomic `.part` finalization; operation/transfer/transport layering with one transport backend; own-node LIST/STAT/MKDIR served locally | Protocol ztest, native transfers from 0 bytes through 8 KiB, ground-role round trip, Robot workflow | 4 KiB and 16 KiB round trips on NUCLEO UART bench; one 256-byte round trip over the Holybro RF bench with matching CRC and clean counters | K-FSW protocol, not Internet FTP; one server worker/client workspace; PUT/GET need two nodes; no RF throughput characterisation |
@@ -55,11 +55,21 @@ No row means flight-qualified. Physical verification is tied to a named bench
 and acceptance behavior; it does not automatically transfer to a new board,
 radio, cable, routing plan, or Kconfig combination.
 
-`boton_test` is **SOFTWARE VERIFIED** because its automated state, debounce,
-saturation, typed API, PARAM, LED owner controls, Linux integration, and NUCLEO
-composition gates passed locally on 31 August 2026. This classification does
-not mean the blue button was pressed or any LED was observed. Physical
-count/timestamp, LED output, and remote-write evidence remain pending user
+`boton_test` was **SOFTWARE VERIFIED** on 31 August 2026 by its automated
+state, debounce, saturation, typed API, PARAM, LED owner controls, Linux
+integration, and NUCLEO composition gates. On 3 September 2026 part of it
+became physical: on a NUCLEO-L496ZG running the opt-in profile, an untouched
+board held `press_count` at 0 for ten seconds, a sequence of physical presses
+advanced it to 7, the operator observed the green, blue and red LEDs light
+through both `test led` and `param set hw_test_led_*`, and PARAM ID 6 read back
+the same count as `boton_test status`.
+
+What is still not claimed is per-gesture attribution. The first fixture opened
+a window per gesture and advanced when the counter moved, so it straddled
+gestures whenever the operator worked ahead of it; the recorded total was
+consistent with the sequence asked for, but the individual steps cannot be
+decomposed from it. One count per press, and a held button counting once rather
+than repeating, therefore remain pending user
 interaction on the named bench.
 
 ## Known limitations
