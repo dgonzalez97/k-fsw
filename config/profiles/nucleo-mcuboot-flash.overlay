@@ -1,0 +1,47 @@
+/* Shared MCUboot flash map for the NUCLEO-L496ZG.
+ *
+ * Applied to BOTH Zephyr images: the bootloader resolves its own region and
+ * the two slots from exactly the same partitions the application is linked
+ * into. This is the one thing the two images cannot be allowed to disagree
+ * about, so it lives in a single file rather than being written twice.
+ *
+ * The storage partition at 0xf0000 is deliberately absent here. It belongs to
+ * the application alone, and leaving it untouched is what lets an existing
+ * LittleFS filesystem survive the migration to a bootloader.
+ *
+ * The golden region is reserved and unwritten. A last-resort image has to
+ * survive when other things are broken, so it is a raw partition rather than a
+ * file: recovery that depends on a filesystem mounting is not recovery.
+ * Reserving it now is what makes it possible later, because a bootloader's
+ * address map cannot be replaced over the air.
+ *
+ * Every boundary is a multiple of the 2 KB erase block.
+ */
+
+&flash0 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		boot_partition: partition@0 {
+			label = "mcuboot";
+			reg = <0x00000000 0x00010000>;
+		};
+
+		slot0_partition: partition@10000 {
+			label = "image-0";
+			reg = <0x00010000 0x00058000>;
+		};
+
+		slot1_partition: partition@68000 {
+			label = "image-1";
+			reg = <0x00068000 0x00058000>;
+		};
+
+		kfsw_golden_partition: partition@c0000 {
+			label = "kfsw-golden";
+			reg = <0x000c0000 0x00030000>;
+		};
+	};
+};
