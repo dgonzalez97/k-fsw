@@ -30,6 +30,8 @@ or a release qualification record.
 | Parameter persistence | Explicit bounded versioned CRC snapshot and defaults/load/save/clear | CSP-disabled unit suite, cross-process integration, corrupt snapshot fallback, Valgrind | No dedicated NUCLEO reboot/persistence acceptance | Local only; no migration framework beyond name/type compatibility |
 | Storage | LittleFS lifecycle at `/kfsw`, cautious first-format policy, capacity API | Storage ztest and native cross-process integration | NUCLEO storage info/test passes in UART HIL | Linux/NUCLEO full profiles only; one 64 KiB volume per profile |
 | K-FSW FTP | LIST/STAT/MKDIR/PUT/GET, 192-byte chunks, CRC, sandbox, atomic `.part` finalization; operation/transfer/transport layering with one transport backend; own-node LIST/STAT/MKDIR served locally | Protocol ztest, native transfers from 0 bytes through 8 KiB, ground-role round trip, Robot workflow | 4 KiB and 16 KiB round trips on NUCLEO UART bench; one 256-byte round trip over the Holybro RF bench with matching CRC and clean counters | K-FSW protocol, not Internet FTP; one server worker/client workspace; PUT/GET need two nodes; no RF throughput characterisation |
+| Command service | Frozen compile-time registry; one definition reached by name from the shell and by numeric identifier over CSP port 11; two-level validation; handlers on a dedicated thread | Registry, duplicate rejection, argument type/count checks, unknown and silent-failure paths in ztest; local and remote invocation in two-node integration | None; nothing in the service is hardware-facing | Synchronous only; no accepted-plus-identifier form; no authentication, though the request context reserves the fields; an unknown name is rejected locally before reaching the wire |
+| Event record | Numeric records in a bounded RAM ring with stable identifier, monotonic timestamp, sequence number, severity and opaque payload; identifiers owned by the producing component; boot, command and FTP emit | Ring wrap and overwrite counting, read-by-age, rejection counting, visitor early stop in ztest | None; nothing in the service is hardware-facing | RAM only, so it does not survive a reset; no persistent journal, rate limiting, coalescing or downlink stream; payloads are opaque and decoded by ground tooling |
 | Shell | Zephyr root commands with history, completion, help, and K-FSW prompt | Native shell/integration/Robot tests | Full NUCLEO shell; FRDM and Pico physical shell bring-up | Debug/operations adapter, not a command authorization service |
 | Linux target | Full reference composition on `native_sim/native/64` | Hosted build, unit, integration, Valgrind, Robot | Physical verification not applicable | Simulation does not prove MCU/electrical/timing properties |
 | NUCLEO-L496ZG | Full reference composition, flash layout, dual serial paths | Hosted clean build and native-equivalent service tests | Boot/readiness, storage, UART/KISS, CSP, remote PARAM, FTP bench | No CAN, radio, MCUboot, watchdog, or full mission qualification |
@@ -90,11 +92,21 @@ not implemented.
 The parameter table is deliberately small. Persistence has one snapshot and
 basic name/type compatibility rather than schema versions and mission
 migrations. FTP has one static worker and no multi-user or authorization
-model. Logging is console-oriented rather than a structured event service.
+model.
 
-There is no current local message bus, generic command service, housekeeping,
-health/watchdog policy, flight planner, telemetry serialization, or firmware
-update application.
+The command service is synchronous only: a handler runs to completion and
+there is no accepted-plus-identifier form for a long operation. It carries no
+authentication. The request context reserves a source and an authentication
+result, but the flag is always false.
+
+The event record is a fixed RAM ring. It does not survive a reset, so it
+answers what a node has done rather than what happened before it restarted.
+There is no persistent journal, rate limiting, coalescing, or downlink stream.
+Logging remains console-oriented and separate; events are the record, not a
+replacement for log messages.
+
+There is no current local message bus, housekeeping, health/watchdog policy,
+flight planner, telemetry serialization, or firmware update application.
 
 ### Qualification and release
 
@@ -106,17 +118,22 @@ those activities are complete.
 
 ## Near-term project direction
 
-The public project board identifies two active areas:
+The basic command service
+([k-fsw issue #4](https://github.com/dgonzalez97/k-fsw/issues/4)) is
+implemented and closed. Root shell commands for a specific service remain
+direct adapters to that service's API; the `cmd` root is the generic registry,
+and its shell front end resolves to the same definition and validation a remote
+caller passes through.
 
-- a basic command service/API with shell and CSP integration
-  ([k-fsw issue #4](https://github.com/dgonzalez97/k-fsw/issues/4)); and
-- a self-hosted physical HIL runner
-  ([k-fsw issue #11](https://github.com/dgonzalez97/k-fsw/issues/11)).
+The remaining active area on the public board is a self-hosted physical HIL
+runner ([k-fsw issue #11](https://github.com/dgonzalez97/k-fsw/issues/11)).
+All physical HIL is still manually invoked.
 
-The manual does not describe either as implemented. In particular, the
-existing root shell commands are direct adapters to service APIs, not the
-planned generic command service, and all physical HIL is still manually
-invoked.
+The platform watchdog
+([kfsw-platform issue #3](https://github.com/dgonzalez97/kfsw-platform/issues/3))
+is the next capability. It is the prerequisite for any health policy, and for a
+firmware update that must recover from a candidate image that stops
+responding.
 
 ## Broad roadmap
 

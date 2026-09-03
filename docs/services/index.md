@@ -629,3 +629,123 @@ throughput characterisation, and no larger transfer over RF is claimed.
 
 Browse @ref kfsw_services for exact public service declarations and return
 contracts.
+
+## Command service
+
+`CONFIG_KFSW_COMMAND` enables one normalized path for invoking a K-FSW
+operation. Before it existed, every remotely reachable operation had to supply
+its own CSP adapter: parameters on port 10, file transfer on port 9, each with
+a separate wire format, validation and error mapping. A third operation would
+have meant a third protocol.
+
+### One definition, two front ends
+
+A command is defined once by its owning component and carries both a stable
+text name and a stable numeric identifier:
+
+```text
+shell           "cmd info"           resolves by name
+ground station   id 2 on CSP port 11 resolves by identifier
+                         |
+                  the same definition
+                  the same validation
+                  the same handler
+```
+
+The shell adapter implements no command. It converts text into the argument
+types the definition declares and calls the same entry point the remote front
+end uses, so a local operator cannot bypass a check a remote caller passes
+through.
+
+### Registry
+
+Definitions arrive as compile-time sets from their owning component and the
+registry is frozen at startup, the same shape as parameter definitions.
+Startup rejects duplicate identifiers, duplicate names, missing handlers and
+argument counts above the bound. There is no runtime registration: a command
+that exists after startup existed at build time.
+
+Handlers run on the command server thread, never on a CSP receive context, and
+one invocation is serialized against another.
+
+### Wire format
+
+Requests use configurable CSP port 11 with CRC32, distinct from file transfer
+and the parameter adapter. Each message has a twelve-byte explicit big-endian
+header carrying version, opcode, status, argument count, command identifier,
+request identifier and payload size. Arguments follow as bounded
+type-length-value entries, and every length is checked against the buffer
+before use. A build assertion holds one message inside one CSP packet.
+
+### Security boundary
+
+There is no authentication. The request context carries the source node and an
+authentication result that is always false. The field exists so that adding
+authentication later does not change the structure's meaning, and so no handler
+encodes an assumption that a particular node is trusted. See
+@ref kfsw_services_command for the public contract.
+
+### Scope
+
+Version 1 is synchronous: a handler runs to completion and returns a status
+with an optional short detail. There is no accepted-plus-identifier form for a
+long operation, no operation tracking and no duplicate suppression.
+
+Remote parameter access deliberately has no command. The parameter service
+already owns that path over CSP, and a second route to the same operation would
+split its validation.
+
+## Event record
+
+`CONFIG_KFSW_EVENT` enables a bounded record of what a node has done.
+
+Logging is a human-readable stream that exists only while someone is watching
+it. Over a radio link, or after an unattended restart, it establishes nothing.
+An event is a numeric record instead: a stable identifier, a monotonic
+timestamp, a sequence number, a severity and a small opaque payload.
+
+Events do not replace logging. A message that only helps a developer reading a
+terminal stays a log call. A fact an operator may need after the moment has
+passed becomes an event.
+
+### Why numeric
+
+```text
+log    "FTP put node=2 destination=/uplink/test.txt: PASS bytes=256 crc32=0ce9d363"
+event  source=ftp id=1 payload={node:2, bytes:256, crc32:0x0ce9d363}
+```
+
+Three properties follow from the second form: it is small enough to downlink
+over a constrained link, a gap in the sequence is detectable, and rewording a
+message does not break ground tooling because the identifier did not change.
+
+### Ownership
+
+Identifiers belong to the producing component and are declared in its own
+public header together with the payload layout, so the event service does not
+know its producers. Boot records the reset cause, the command service records
+every dispatch outcome, and file transfer records completion and failure.
+
+Payload bytes are opaque to the service and stored exactly as given. A producer
+whose payload crosses a link writes it in network byte order.
+
+### Bounds and loss
+
+The record is a fixed RAM ring sized by Kconfig. When it wraps, the oldest
+record is overwritten and an overwritten counter increases, so losing history
+is visible rather than silent.
+
+Emitting takes a short spinlock rather than a mutex, so any context can record
+without sleeping, and the visitor runs outside the lock so a slow reader cannot
+hold off a producer. Nothing in the service touches a link or a filesystem.
+
+### Reading it remotely
+
+A remote node's record is read through the command service, using
+`event_stats` and `event_tail`, rather than through a separate protocol.
+
+### Scope
+
+The ring is RAM and does not survive a reset. It answers what a node has done,
+not what happened before it restarted. There is no persistent journal, rate
+limiting, coalescing or downlink stream. Persisting the record is separate work.
