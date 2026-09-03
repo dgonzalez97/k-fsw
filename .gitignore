@@ -1,0 +1,5 @@
+# Host-specific hardware-in-the-loop bench identities. These name real device
+# paths and belong to one machine, so they stay outside the reusable
+# repository. tests/hil/radio-uhf/holybro/bench.env.example is the template.
+bench.env
+*-bench.env
