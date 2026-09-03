@@ -375,9 +375,12 @@ No physical test is selected by `tools/ci/all.sh` or hosted GitHub Actions.
 builds ground node 16 and NUCLEO node 2, flashes the NUCLEO, bridges the ground
 KISS PTY to the USB-side Holybro at 57600 baud, and then verifies over RF:
 
-- bidirectional CSP ping between node 16 and node 2;
+- bidirectional CSP ping between node 16 and node 2, and each node reaching
+  itself;
 - production remote PARAM read, write, owner callback, and the invalid-value
   restore-to-default oracle;
+- commanding across the link, including a self-addressed command, and reading
+  the remote node's event record;
 - a complete file round trip — `generate`, `mkdir`, `put`, `stat`, `ls`, `get`,
   `verify` — with the same CRC on both nodes and on both local copies;
 - the flight node reading its own FTP root through its own address;
@@ -388,12 +391,32 @@ It reads the bench device paths from a host-specific environment file and never
 changes a persistent SiK or AT setting. Host serial settings are saved and
 restored around the run.
 
-The recorded file-transfer run was taken one commit before the transport
-boundary was closed, when `kfsw_csp_get_info()` still moved behind
-`ftp_link.h`. That change touched service lifecycle and identity lookup only,
-not the wire format or the data path, so the evidence applies — but the exact
-published tree has not itself been on the bench. Rerun this fixture before
-treating the result as evidence for a specific commit.
+### Recorded result
+
+Run of 3 September 2026, `k-fsw` main `29d0c4a` with `kfsw-comms` pinned at
+`bca9c1e`, NUCLEO-L496ZG as CSP node 2 and a `native_sim` ground node 16 over a
+Holybro SiK pair at 57600 8N1. No persistent radio setting was changed.
+
+```text
+ping        16 -> 2 success rtt_ms=210    2 -> 16 success rtt_ms=202
+self        csp ping 16 success rtt_ms=0
+command     noop node=16: OK noop from node 16      self-addressed
+            noop node=2:  OK noop from node 16      across the radio
+            info node=2:  OK uptime_ms=5017 storage=ready free_bytes=47104
+event       event_stats node=2: OK held=5/32 recorded=5 overwritten=0 rejected=0
+            event_tail  node=2: OK seq=3 command/1 sev=0 0004001000
+transfer    put 256 B 800 ms 320 B/s     get 256 B 560 ms 457 B/s
+            crc32=0ce9d363 on both nodes and both local copies; verify PASS
+negative    csp ping 3 failed; unknown command rejected; missing file not found
+counters    ground KISS tx=45 rx=43   NUCLEO KISS tx=43 rx=45   all errors 0
+```
+
+The `event_tail` payload is the flight node's own record of the command that
+produced it: command `0x0004` from node `0x0010`, status `0x00`. Commanding,
+the event record and the wire format are confirmed together.
+
+This is functional bench evidence for one named fixture. It is not a throughput
+characterisation, a soak, or any claim of qualification.
 
 ### Reusable shell-only board fixture
 
