@@ -78,7 +78,10 @@ HTML_FILE_EXTENSION    = .html
 HTML_COLORSTYLE_HUE    = 138
 HTML_COLORSTYLE_SAT    = 80
 HTML_COLORSTYLE_GAMMA  = 90
-HTML_TIMESTAMP         = NO
+# HTML_TIMESTAMP was removed upstream: Doxygen no longer stamps generated pages
+# with a build time, so the tag has no meaning and newer versions warn that it
+# is obsolete. WARN_AS_ERROR is on, so that warning fails the documentation
+# build on any branch once the runner picks up the newer Doxygen.
 HTML_DYNAMIC_MENUS     = YES
 HTML_DYNAMIC_SECTIONS  = YES
 HTML_INDEX_NUM_ENTRIES = 100
