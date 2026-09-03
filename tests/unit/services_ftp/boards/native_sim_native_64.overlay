@@ -1,5 +1,6 @@
 / {
 	chosen {
+		kfsw,fwu-partition = &slot1_partition;
 		kfsw,storage-partition = &storage_partition;
 	};
 };

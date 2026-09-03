@@ -9,12 +9,11 @@ way back if it does not work.
 | --- | --- |
 | Bootloader, A/B slots, automatic revert | working, physically verified |
 | Update service: receive, verify, offer to the bootloader | working, 26 unit tests |
-| Shell control: `fwu begin` / `finish` / `abort` / `status` | working |
-| **Carrying the image bytes from ground** | **not built yet** |
+| Shell control: `fwu status` / `abort` | working |
+| Carrying the image from ground, over FTP | working |
 
-The last row matters: the service is complete and tested, but nothing yet
-feeds it over the radio. Until that lands, an image reaches a slot only over
-ST-LINK. See [Getting the bytes in](#getting-the-bytes-in).
+An image is uploaded with the ordinary `ftp put` that already carries files,
+addressed to a reserved name. Nothing about the wire protocol changed.
 
 ## The shape of an update
 
@@ -53,6 +52,40 @@ west flash -d build/nucleo_l496zg
 `KFSW_MCUBOOT_KEY` is not optional in practice. Leave it out and the bootloader
 is built with the key MCUboot ships in its own public tree, which anyone can
 sign an image with.
+
+## Uploading an image
+
+```
+kfsw-gnd# ftp put build/nucleo_l496zg/app/zephyr/zephyr.signed.bin firmware.bin 2
+```
+
+`firmware.bin` is reserved. A put to that name is streamed into the firmware
+slot instead of being stored as a file; any other name is an ordinary file
+transfer. The name is `CONFIG_KFSW_FTP_FIRMWARE_PATH`.
+
+This works because an FTP put already sends the image size and its CRC32 in the
+request, which is exactly what the update service needs to begin. The client
+computes both before it connects, every chunk repeats them, and the receiver
+rejects any mismatch — so the update path inherits the checking the file
+transfer already had.
+
+Nothing is stored on the way. The image never becomes a file, which matters
+because it could not: an application image is around 154 KB and the filesystem
+partition is 64 KB.
+
+When the transfer completes the image has been verified and offered to the
+bootloader:
+
+```
+kfsw:~$ fwu status
+state: ready
+received: 156760
+expected_crc32: 9f3a2b1c
+actual_crc32: 9f3a2b1c
+swap_scheduled: yes
+```
+
+Then reboot, and confirm or reject as below.
 
 ## Preparing an image on the ground
 
@@ -123,23 +156,9 @@ ground a silent no-op looks exactly like a successful update, so the service
 asks the bootloader whether a swap was actually scheduled and fails if it was
 not.
 
-## Getting the bytes in
+## Loading a slot over ST-LINK
 
-Not built yet. The service takes bytes through `kfsw_fwu_write()`; what is
-missing is something that receives them over CSP and calls it.
-
-Two things constrain that work, both learned the hard way:
-
-**An image cannot be staged as a file.** The application image is around
-154 KB and the filesystem partition on the NUCLEO is 64 KB. The transport must
-stream into the slot, not save and then copy.
-
-**Writing to the slot start does nothing.** MCUboot's swap-using-offset mode
-needs the image one sector in. The service already handles this — callers pass
-offsets from zero — but any transport that bypasses the service and writes
-flash directly must do the same, and confirm a swap was scheduled afterwards.
-
-Until it lands, load a slot over ST-LINK:
+For bring-up, or when there is no link:
 
 ```bash
 openocd -f zephyr/boards/st/nucleo_l496zg/support/openocd.cfg \
@@ -160,8 +179,13 @@ openocd -f zephyr/boards/st/nucleo_l496zg/support/openocd.cfg \
 | `finish` returns `-EILSEQ` | the CRC32 does not match; the slot is erased so a partial image cannot be booted |
 | `finish` returns `-EIO` | the bootloader did not schedule a swap — usually the wrong write offset |
 | Board boots the old image after a reboot | the new one did not confirm itself, so the bootloader reverted. Working as designed |
+| `ftp put` to `firmware.bin` reports a transfer error | the update service refused the image; `fwu status` gives the reason |
 
 `fwu abort` is always safe and leaves the slot erased.
+
+A failed or abandoned upload always leaves the slot erased rather than holding
+a partial image, so there is never a half-written image for the bootloader to
+find.
 
 ## Related
 

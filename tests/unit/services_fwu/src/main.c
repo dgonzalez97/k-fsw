@@ -382,6 +382,108 @@ ZTEST(services_fwu, test_a_new_transfer_can_follow_a_failure)
 	zassert_ok(transfer_whole_image(1024U, crc, 256U));
 }
 
+/* --------------------------------------------------------------- edge cases */
+
+ZTEST(services_fwu, test_a_single_byte_image_is_accepted)
+{
+	/* One byte is smaller than any flash write block, so it exists only in
+	 * the stream buffer until the flush at finish. If the flush were
+	 * missed, the slot would be left erased and the bootloader would find
+	 * nothing.
+	 */
+	uint32_t crc = crc32_ieee(test_image, 1U);
+	uint8_t readback[4];
+
+	zassert_ok(kfsw_fwu_begin(1U, crc));
+	zassert_ok(kfsw_fwu_write(0U, test_image, 1U));
+	zassert_ok(kfsw_fwu_finish());
+
+	zassert_ok(read_slot(0U, readback, sizeof(readback)));
+	zassert_equal(readback[0], test_image[0], "the single byte never reached flash");
+}
+
+ZTEST(services_fwu, test_image_sizes_around_a_sector_boundary)
+{
+	/* Off-by-one around an erase block is where a streaming writer is most
+	 * likely to drop or duplicate a byte.
+	 */
+	static const uint32_t sizes[] = {4095U, 4096U, 4097U, 8191U, 8192U, 8193U};
+
+	for (size_t index = 0U; index < ARRAY_SIZE(sizes); index++) {
+		static uint8_t readback[8193];
+		uint32_t size = sizes[index];
+		uint32_t crc = crc32_ieee(test_image, size);
+
+		zassert_ok(kfsw_fwu_abort());
+		zassert_ok(transfer_whole_image(size, crc, 333U), "size %u failed", size);
+		zassert_ok(read_slot(0U, readback, size));
+		zassert_mem_equal(readback, test_image, size, "size %u came back wrong", size);
+	}
+}
+
+ZTEST(services_fwu, test_finish_twice_is_rejected)
+{
+	uint32_t crc = crc32_ieee(test_image, 1024U);
+
+	zassert_ok(transfer_whole_image(1024U, crc, 256U));
+	zassert_equal(kfsw_fwu_finish(), -EINVAL,
+		      "a completed transfer must not be offered a second time");
+}
+
+ZTEST(services_fwu, test_write_after_finish_is_rejected)
+{
+	uint32_t crc = crc32_ieee(test_image, 1024U);
+
+	zassert_ok(transfer_whole_image(1024U, crc, 256U));
+	zassert_equal(kfsw_fwu_write(1024U, test_image, 16U), -EINVAL,
+		      "a completed image must not be appended to");
+}
+
+ZTEST(services_fwu, test_abort_after_completion_returns_to_idle)
+{
+	struct kfsw_fwu_status status;
+	uint32_t crc = crc32_ieee(test_image, 1024U);
+
+	zassert_ok(transfer_whole_image(1024U, crc, 256U));
+	zassert_ok(kfsw_fwu_abort());
+
+	zassert_ok(kfsw_fwu_get_status(&status));
+	zassert_equal(status.state, KFSW_FWU_IDLE);
+}
+
+ZTEST(services_fwu, test_an_all_zero_image_is_carried_faithfully)
+{
+	/* Erased flash reads as 0xFF, so an image of zeros is the case where a
+	 * write that silently did nothing would still look plausible.
+	 */
+	static uint8_t zeros[512];
+	static uint8_t readback[512];
+	uint32_t crc = crc32_ieee(zeros, sizeof(zeros));
+
+	zassert_ok(kfsw_fwu_begin(sizeof(zeros), crc));
+	zassert_ok(kfsw_fwu_write(0U, zeros, sizeof(zeros)));
+	zassert_ok(kfsw_fwu_finish());
+
+	zassert_ok(read_slot(0U, readback, sizeof(readback)));
+	for (size_t index = 0U; index < sizeof(readback); index++) {
+		zassert_equal(readback[index], 0x00,
+			      "byte %u is 0x%02x, so the write did not happen", index,
+			      readback[index]);
+	}
+}
+
+ZTEST(services_fwu, test_a_failed_begin_leaves_no_transfer_running)
+{
+	struct kfsw_fwu_status status;
+
+	zassert_equal(kfsw_fwu_begin(0U, 0U), -EINVAL);
+	zassert_ok(kfsw_fwu_get_status(&status));
+	zassert_not_equal(status.state, KFSW_FWU_RECEIVING);
+
+	/* And a good transfer still works afterwards. */
+	zassert_ok(transfer_whole_image(1024U, crc32_ieee(test_image, 1024U), 256U));
+}
+
 /* ----------------------------------------------------------------- interface */
 
 ZTEST(services_fwu, test_get_status_rejects_null)
