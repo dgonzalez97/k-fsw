@@ -191,7 +191,7 @@ radio_stty="$(stty -F "$radio_device" -g)" || \
 stty -F "$debug_serial" "$KFSW_SERIAL_BAUD" cs8 -cstopb -parenb -crtscts raw -echo
 stty -F "$radio_device" "$radio_baud" cs8 -cstopb -parenb -crtscts raw -echo
 
-timeout 300s cat "$debug_serial" >"$work_dir/nucleo.log" &
+timeout 480s cat "$debug_serial" >"$work_dir/nucleo.log" &
 debug_capture_pid=$!
 
 west flash -d "$nucleo_build_dir" --runner openocd || \
@@ -331,6 +331,37 @@ if grep -Fq "2:log_level = $alternate_log_level" <<<"$negative_output"; then
 	fail "invalid remote log_level retained the prior non-default value"
 fi
 
+# Commanding and the event record across the radio, and a node reaching itself.
+printf '%s\n' \
+	'csp ping 16' \
+	'cmd 16 noop' \
+	'cmd list' \
+	'cmd 2 noop' \
+	'cmd 2 info' \
+	'cmd 2 event_stats' \
+	'cmd 2 event_tail 0' \
+	'cmd 2 bogus' >&3
+
+wait_for_output "$work_dir/ground.log" "CSP ping 16: success" "$ground_pid" || \
+	fail "the ground node could not reach itself"
+wait_for_output "$work_dir/ground.log" "noop node=16: OK noop from node 16" \
+	"$ground_pid" || fail "a self-addressed command did not report its own node"
+wait_for_output "$work_dir/ground.log" "noop node=2: OK noop from node 16" \
+	"$ground_pid" || fail "NUCLEO node 2 did not answer a command over Holybro"
+wait_for_output "$work_dir/ground.log" "info node=2: OK uptime_ms=" "$ground_pid" || \
+	fail "NUCLEO node 2 did not report info over Holybro"
+wait_for_output "$work_dir/ground.log" "event_stats node=2: OK held=" "$ground_pid" || \
+	fail "NUCLEO node 2 did not report event counters over Holybro"
+wait_for_output "$work_dir/ground.log" "event_tail node=2: OK seq=" "$ground_pid" || \
+	fail "NUCLEO node 2 did not return a recorded event over Holybro"
+wait_for_output "$work_dir/ground.log" "unknown command 'bogus'" "$ground_pid" || \
+	fail "an unknown command was not rejected"
+
+# The flight node records the commands it served.
+printf '%s\r\n' 'event stats' 'cmd 2 event_stats' >"$debug_serial"
+wait_for_output "$work_dir/nucleo.log" "recorded: " "$debug_capture_pid" || \
+	fail "NUCLEO did not report its event counters"
+
 # File transfer across the radio. The NUCLEO flash persists between runs, so
 # the directory may already exist and the file may already be present; the
 # upload must overwrite it atomically either way.
@@ -386,5 +417,5 @@ wait_for_clean_transport_stats "$work_dir/nucleo.log" "$debug_capture_pid" || \
 
 cat "$work_dir/ground.log"
 cat "$work_dir/nucleo.log"
-echo "HOLYBRO CSP/KISS RESULT: PASS bidirectional=yes params=yes ftp=yes negative=yes counters=clean"
+echo "HOLYBRO CSP/KISS RESULT: PASS bidirectional=yes params=yes ftp=yes cmd=yes event=yes self=yes negative=yes counters=clean"
 echo "HOLYBRO FTP: 256 bytes round-tripped node 16 <-> node 2, crc32=$uploaded_crc"
