@@ -12,6 +12,9 @@
 #if CONFIG_KFSW_STORAGE
 #include <kfsw/platform/storage.h>
 #endif
+#if CONFIG_KFSW_WATCHDOG
+#include <kfsw/platform/watchdog.h>
+#endif
 #if CONFIG_KFSW_RADIO_UHF
 #include <kfsw/modules/radio_uhf.h>
 #endif
@@ -40,7 +43,7 @@
 int main(void)
 {
 #if CONFIG_KFSW_STORAGE || CONFIG_KFSW_PARAM || CONFIG_KFSW_CSP || CONFIG_KFSW_RADIO_UHF ||        \
-	CONFIG_KFSW_BOTON_TEST || CONFIG_KFSW_COMMAND
+	CONFIG_KFSW_BOTON_TEST || CONFIG_KFSW_COMMAND || CONFIG_KFSW_WATCHDOG
 	int result;
 #endif
 
@@ -190,6 +193,28 @@ int main(void)
 		}
 	}
 #endif
+#endif
+
+#if CONFIG_KFSW_WATCHDOG
+	/* Armed last, once every service that could stall during start-up has
+	 * finished. A watchdog that can reset the board before the shell comes
+	 * up would make a slow boot indistinguishable from a hang, and would
+	 * take away the console needed to diagnose it.
+	 */
+	result = kfsw_platform_watchdog_init();
+	if (result == -ENODEV) {
+		kfsw_log_info("No watchdog device bound; running unguarded");
+	} else if (result != 0) {
+		kfsw_log_error("Failed to initialize the watchdog: %d", result);
+	} else if (IS_ENABLED(CONFIG_KFSW_WATCHDOG_AUTO_START)) {
+		result = kfsw_platform_watchdog_start();
+		if (result != 0) {
+			kfsw_log_error("Failed to start the watchdog: %d", result);
+		} else {
+			kfsw_log_info("Watchdog armed with a %d ms timeout",
+				      CONFIG_KFSW_WATCHDOG_TIMEOUT_MS);
+		}
+	}
 #endif
 
 	kfsw_boot_service_start();
