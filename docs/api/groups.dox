@@ -78,6 +78,29 @@
  * kfsw_ftp_put() and kfsw_ftp_get() move a file between two nodes and return
  * -ENOTSUP for the local address.
  *
+ * @defgroup kfsw_services_command Command
+ * @ingroup kfsw_services
+ * @brief One normalized path for invoking an operation, local or remote.
+ *
+ * kfsw_command_init() aggregates compile-time definition sets and freezes the
+ * registry. kfsw_command_invoke() resolves by name for a local caller;
+ * kfsw_command_invoke_id() resolves by wire identifier for the CSP front end.
+ * Both reach the same handler through the same validation.
+ *
+ * kfsw_command_source carries the origin node and an authentication result
+ * that is always false. Authentication is not implemented; a handler must not
+ * treat any source as trusted.
+ *
+ * @defgroup kfsw_services_event Event record
+ * @ingroup kfsw_services
+ * @brief Bounded numeric record of what a node has done.
+ *
+ * kfsw_event_emit() records an identifier, timestamp, sequence number,
+ * severity and opaque payload into a fixed RAM ring. Identifiers belong to the
+ * producing component and are declared in its own header with the payload
+ * layout. A wrapped ring increments an overwritten counter, so lost history is
+ * visible. The record does not survive a reset.
+ *
  * @defgroup kfsw_modules K-FSW Modules
  * @brief Compile-time-selected device and subsystem behavior.
  *

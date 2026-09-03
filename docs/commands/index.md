@@ -95,10 +95,19 @@ root
 │   └── led <colour> <on|off>
 ├── storage                   when KFSW_STORAGE=y
 │   ├── info, test
-└── ftp                       when KFSW_FTP=y
-    ├── list/ls, stat, mkdir, put, get
-    └── generate, verify      diagnostic helpers
+├── ftp                       when KFSW_FTP=y
+│   ├── list/ls, stat, mkdir, put, get
+│   └── generate, verify      diagnostic helpers
+├── cmd                       when KFSW_COMMAND=y
+│   ├── list
+│   └── <registered names>    supplied by the registry, not this tree
+└── event                     when KFSW_EVENT=y
+    ├── list, stats, clear
 ```
+
+`cmd` is the only root whose subcommands are not fixed at build time in this
+file. It offers whatever the command registry holds, so completion and help
+stay correct as components contribute commands.
 
 ## Runtime identity and time
 
@@ -426,6 +435,93 @@ Paths must begin with `/` and may not contain traversal or empty components.
 An FTP result line reports node, paths, byte count, or the mapped failure. A
 successful transport does not imply that a later `verify` can be skipped when
 an operator needs an explicit local comparison.
+
+## Commands
+
+`cmd` exists with `CONFIG_KFSW_COMMAND=y`. It is the generic command registry:
+one definition, reachable by name here and by numeric identifier over CSP from
+a ground station. Both routes resolve to the same handler and the same
+validation, so a shell operator and a remote caller cannot diverge.
+
+`cmd` implements nothing itself. It converts text into the argument types a
+definition declares and calls the same entry point the remote front end uses.
+
+| Command | Arguments | Meaning |
+| --- | --- | --- |
+| `cmd list` | none | Show every registered command with its identifier, argument count and description |
+| `cmd <name>` | `[arguments]` | Run a command on this node |
+| `cmd <node> <name>` | `[arguments]` | Run it on a remote node over CSP |
+
+A leading numeric token selects a remote node, the same convention as
+`param get [node] <name>` and `ftp <node> <op>`.
+
+```text
+kfsw:~$ cmd list
+ ID NAME         ARGS   DESCRIPTION
+  1 noop         0 args Round trip with no effect.
+  2 info         0 args Report uptime and storage state.
+  4 event_stats  0 args Report event record counters.
+  5 event_tail   1 arg  Read one recorded event by age, newest is 0.
+  3 reboot       0 args [mutating] Reset this node after a short delay.
+
+kfsw:~$ cmd info
+info node=0: OK uptime_ms=10 storage=ready free_bytes=40960
+
+kfsw:~$ cmd 2 info
+info node=2: OK uptime_ms=4140 storage=ready free_bytes=12288
+```
+
+Registered names are offered by completion and by `cmd -h`, because the
+subcommand set is built from the registry rather than written out. A command
+marked `[mutating]` changes node state.
+
+A name is resolved against **this** node's registry before a remote request is
+sent, so a command the local node does not know cannot be invoked remotely. The
+failure is local and immediate rather than a timeout.
+
+Remote commands need `CONFIG_KFSW_COMMAND_CSP=y`, which serves CSP port 11.
+There is no authentication: the request carries its source node, and a handler
+must not treat any particular source as trusted.
+
+## Event record
+
+`event` exists with `CONFIG_KFSW_EVENT=y`. It shows the numeric record of what
+this node has done, which is what remains available when no console is
+attached.
+
+| Command | Arguments | Meaning |
+| --- | --- | --- |
+| `event list` | none | Show held records, oldest first |
+| `event stats` | none | Show held, capacity, recorded, overwritten and rejected counts |
+| `event clear` | none | Discard held records; counters are preserved |
+
+```text
+kfsw:~$ event list
+     SEQ    TIME_MS SOURCE   SEVERITY    ID PAYLOAD
+       0          0 boot     info         1 0000000800
+       1         10 command  info         1 0002000000
+Events listed: 2
+```
+
+Payloads are shown as bytes and are not decoded. Their meaning belongs to the
+producing component, which documents the layout alongside its identifiers in
+its own public header.
+
+A gap in `SEQ` means records were lost. `event stats` reports how many, because
+a ring that wraps increments an overwritten counter rather than discarding
+silently.
+
+The record lives in RAM and does not survive a reset.
+
+To read a **remote** node's record, use the command service rather than a
+separate protocol:
+
+```text
+kfsw:~$ cmd 2 event_stats
+event_stats node=2: OK held=9/32 recorded=9 overwritten=0 rejected=0
+kfsw:~$ cmd 2 event_tail 0
+event_tail node=2: OK seq=8 t=8120ms ftp/1 sev=0 0002000001000ce9d363
+```
 
 ## Automation guidance
 

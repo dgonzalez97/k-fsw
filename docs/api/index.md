@@ -23,6 +23,8 @@ the complete declarations, structures, macros, arguments, and return contracts.
 - @ref kfsw_services_logging — compile-time and runtime log filtering
 - @ref kfsw_services_param — local/remote parameters and snapshots
 - @ref kfsw_services_ftp — sandboxed CSP/RDP file transfer
+- @ref kfsw_services_command — one path for invoking an operation, local or remote
+- @ref kfsw_services_event — bounded numeric record of what a node has done
 
 ## Communications API
 

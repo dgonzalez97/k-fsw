@@ -47,6 +47,18 @@
  */
 
 /**
+ * @file ../kfsw-services/include/kfsw/services/command.h
+ * @brief Command registry and its two front ends.
+ * @ingroup kfsw_services_command
+ */
+
+/**
+ * @file ../kfsw-services/include/kfsw/services/event.h
+ * @brief Bounded event record.
+ * @ingroup kfsw_services_event
+ */
+
+/**
  * @file ../kfsw-services/include/kfsw/services/ftp.h
  * @brief Sandboxed CSP/RDP file-transfer API.
  * @ingroup kfsw_services_ftp

@@ -237,6 +237,21 @@ PTYs, joins them with `socat`, and checks:
 Processes, FIFOs, temporary files, and isolated flash images are cleaned by the
 runners.
 
+### Command registry and event record
+
+`tests/unit/services_command` covers registry validation: duplicate identifiers
+and names, a missing handler, an oversized argument list, argument type and
+count checking, the unknown-command path, and a handler that returns an error
+without setting a status.
+
+`tests/unit/services_event` covers ring behaviour: read by age, sequence
+continuing across a clear, wrap overwriting the oldest record while counting
+the loss, rejection of an oversized payload and an unknown source, an empty
+payload, and a visitor stopping the walk early.
+
+`tests/csp-smoke.sh` additionally invokes a command locally, invokes one across
+the two-node link, and checks that an unknown name is rejected.
+
 ### Ground-node file transfer
 
 `tests/k-ground-ftp-smoke.sh` builds the two configured ground roles, bridges
