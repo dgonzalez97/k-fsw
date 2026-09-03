@@ -162,6 +162,35 @@ configurations remain independent of physical hardware and exercise the same
 owner state exposed through `kfsw_boton_test_get_status()` and PARAM IDs 6
 through 10.
 
+### `boton_test` hardware acceptance
+
+`tests/hil/boton-test/button-acceptance.sh` is the manual fixture for the three
+claims the automated suites cannot settle: that a physical press increments the
+counter and an untouched board does not, that a held button counts once rather
+than repeating, and that the LEDs physically light through both the shell and
+the parameter table.
+
+It flashes the opt-in profile, records a baseline with the board untouched, then
+prints one line per press the module reports, carrying the host time, the
+counter and the module's own `last_press_s`. Both LED paths are exercised in
+turn and read back through `boton_test status`, and PARAM IDs 6 and 7 are
+compared against that status. `--no-flash` reuses the image already on the
+board, which lets an operator be told to start pressing at a known moment.
+
+The fixture prints the timeline and does not grade it. An earlier version tried
+to keep step with the operator by opening a window per gesture and advancing
+when the counter moved; it straddled gestures whenever the operator worked
+ahead of it, and reported per-step deltas that were wrong even though the total
+was right. Recording a timeline and reading the gestures back out of it
+afterwards removes that failure mode.
+
+Recorded on 3 September 2026 against a NUCLEO-L496ZG: a ten-second untouched
+baseline held `press_count` at 0, physical presses advanced it to 7, the
+operator observed green, blue and red lighting through `test led` and through
+`param set hw_test_led_*`, and `param get boton_test_press_count` agreed with
+`boton_test status`. Per-gesture attribution was lost to the window design and
+is not claimed.
+
 The software acceptance scope is:
 
 - zeroed state after initialization/reset;
