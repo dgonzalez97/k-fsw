@@ -177,7 +177,7 @@ between two programs.
 | `A` → test `B` → no confirm → `A` | automatic revert |
 | `A` → test `B` → confirm → `B`, across two reboots | permanent upgrade, and no late revert |
 | An image signed with MCUboot's public default key is refused | the signature is actually checked |
-| Storage still mounts | pinning `kfsw-storage` at `0xf0000` really did preserve the filesystem |
+| A value written under `A` is readable at the very end | the swap machinery leaves the storage partition alone |
 
 Without the wrong-key case, "the bootloader ran the image" would prove only
 that it ran something, not that it verified anything.
@@ -191,6 +191,11 @@ case 2     swapped to B, confirmed, persists across a further reboot
 case 3     wrong-key image refused; still running 2.0.0
 storage    the filesystem at 0xf0000 still mounts
 ```
+
+The storage check deliberately writes a witness value under image `A` and reads
+it back after every swap, revert and reboot. Checking only that the filesystem
+mounts would prove almost nothing: the test erases the whole chip before
+installing, so the filesystem it would find is a fresh one it made itself.
 
 **A firmware update must be written one sector into the secondary slot**
 (`0x08068800`, not `0x08068000`). MCUboot runs in `BOOT_SWAP_USING_OFFSET` mode,
