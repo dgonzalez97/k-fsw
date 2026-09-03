@@ -89,6 +89,9 @@ if(CONFIG_KFSW_DEBUG_SHELL)
     target_sources_ifdef(CONFIG_KFSW_EVENT app PRIVATE
         src/shell/shell_event.c
     )
+    target_sources_ifdef(CONFIG_KFSW_WATCHDOG app PRIVATE
+        src/shell/shell_watchdog.c
+    )
 endif()
 
 target_include_directories(app PRIVATE src)

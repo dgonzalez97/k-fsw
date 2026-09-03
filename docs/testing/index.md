@@ -162,6 +162,41 @@ configurations remain independent of physical hardware and exercise the same
 owner state exposed through `kfsw_boton_test_get_status()` and PARAM IDs 6
 through 10.
 
+### Watchdog hardware acceptance
+
+`tests/hil/watchdog/watchdog-reset.sh` proves the platform watchdog on a board,
+in one uninterrupted serial capture so the reset and the boot that follows it
+are a single observation rather than two hopeful ones.
+
+The sequence is: arm and confirm the feed counter advances; survive twice the
+timeout while being fed; stop the feed; observe the reset inside a bounded
+window; and read the cause on the next boot.
+
+The survival step is what makes the rest mean anything. Without it a board
+resetting every few seconds for an unrelated reason would pass a test that only
+checked that a reset happened.
+
+Recorded on 3 September 2026 against `25f03f9` on a NUCLEO-L496ZG with an
+8000 ms timeout:
+
+```
+armed      state=running device=bound feeds=1
+survives   18 s fed, feeds 1 -> 8, no reset
+starve     reset observed within 13 s
+next boot  reset=0x00000011 reset_rc=0 reset_cause=watchdog
+rearmed    state=running
+```
+
+`0x11` is the pin and watchdog bits latched together, and the decoder reported
+`watchdog`. That multi-cause preference is asserted in the unit suite and was
+confirmed here on hardware.
+
+The unit suite runs on `native_sim`, which has no watchdog driver at all. That
+is deliberate: it pins the feed-interval arithmetic and the reset-cause
+decoding, which are pure and must hold everywhere, and it pins what a
+composition sees on a board with no watchdog hardware, where every operation
+reports `-ENODEV` rather than appearing to succeed.
+
 ### `boton_test` hardware acceptance
 
 `tests/hil/boton-test/button-acceptance.sh` is the manual fixture for the three

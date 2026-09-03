@@ -523,6 +523,39 @@ kfsw:~$ cmd 2 event_tail 0
 event_tail node=2: OK seq=8 t=8120ms ftp/1 sev=0 0002000001000ce9d363
 ```
 
+## Watchdog
+
+Present only in a composition that enables `CONFIG_KFSW_WATCHDOG` and binds a
+device through the `kfsw,watchdog` chosen property.
+
+```
+watchdog status          configuration and activity
+watchdog feed            feed once
+watchdog starve confirm  stop feeding; the board resets
+```
+
+`watchdog status` reports whether a device is bound, the lifecycle state
+(`unconfigured`, `configured`, `running`, `starved`), the configured timeout,
+the interval the keep-alive feeds at, the number of feeds since boot, and how
+long ago the last one was.
+
+`watchdog starve` requires the literal word `confirm`. It stops the keep-alive
+and the part resets within one timeout period; on hardware whose watchdog
+cannot be disarmed, which includes the STM32 independent watchdog, there is no
+way to call it off once issued. The confirmation is a word rather than an
+interactive prompt so the command stays usable from a script and over a link
+with no echo.
+
+After the reset the boot banner names the cause:
+
+```
+@BOOT sw=kfsw-dev board=nucleo_l496zg/stm32l496xx reset=0x00000011 reset_rc=0 reset_cause=watchdog
+```
+
+The raw mask is kept alongside the decoded name because a reset can latch
+several causes at once; `0x11` above is the pin and watchdog bits together.
+The name reports the one an operator needs first.
+
 ## Automation guidance
 
 Prefer stable markers and result lines over terminal timing. Wait for

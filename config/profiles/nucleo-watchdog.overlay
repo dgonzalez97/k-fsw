@@ -1,0 +1,14 @@
+/* The board aliases watchdog0 to the window watchdog, which resets when fed
+ * too early and whose timeout is far shorter than a keep-alive wants. Bind the
+ * independent watchdog explicitly instead; it is clocked from the low-speed
+ * oscillator and keeps running across most low-power states.
+ */
+&iwdg {
+	status = "okay";
+};
+
+/ {
+	chosen {
+		kfsw,watchdog = &iwdg;
+	};
+};

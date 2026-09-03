@@ -23,12 +23,12 @@ manifest:
 
     - name: kfsw-platform
       remote: kfsw
-      revision: 359c7195b19b27a34c235b7601537ea0c793bf46
+      revision: ee7f7493d571a151c1b67b442d10b7a90a49cb2f
       path: kfsw-platform
 
     - name: kfsw-services
       remote: kfsw
-      revision: 9eb9457198692e851ab4cd48e11a1ad4616ab201
+      revision: 296e47395db2f6143427fc34b9ed2244341df14f
       path: kfsw-services
 
     - name: kfsw-comms

@@ -147,6 +147,34 @@ and rejected writes, plus physical LED shell/PARAM control, remains pending
 until it is performed with a user on the named NUCLEO bench. The logical
 `hw_test` table reserves ID 67 for the following generic HK integration.
 
+### Opt-in watchdog
+
+The watchdog is not forced into the default NUCLEO image. Two composition files
+select it:
+
+- `config/profiles/nucleo-watchdog.conf` enables the mechanism with an 8000 ms
+  timeout and arms it during application start-up; and
+- `config/profiles/nucleo-watchdog.overlay` enables the independent watchdog
+  and binds it to the `kfsw,watchdog` chosen property.
+
+```bash
+KFSW_EXTRA_CONF_FILE="$PWD/k-fsw/config/profiles/nucleo-watchdog.conf" \
+KFSW_EXTRA_DTC_OVERLAY_FILE="$PWD/k-fsw/config/profiles/nucleo-watchdog.overlay" \
+  ./k-fsw/tools/build.sh nucleo_l496zg
+```
+
+The board's own `watchdog0` alias is deliberately not used. On this board it
+selects the window watchdog, which resets when fed too early and whose timeout
+is far shorter than a keep-alive wants. The independent watchdog is clocked
+from the low-speed oscillator, reaches roughly 32 s, and keeps running across
+most low-power states. Board-specific selection stays in Devicetree; reusable
+platform source names no watchdog instance.
+
+The watchdog is armed after every service has started, not at driver init. A
+watchdog that can reset the board before the shell is up makes a slow boot
+indistinguishable from a hang, and removes the console needed to tell them
+apart.
+
 ### Build, flash, and console
 
 ```bash
