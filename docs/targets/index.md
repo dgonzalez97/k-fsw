@@ -147,6 +147,54 @@ and rejected writes, plus physical LED shell/PARAM control, remains pending
 until it is performed with a user on the named NUCLEO bench. The logical
 `hw_test` table reserves ID 67 for the following generic HK integration.
 
+### Opt-in MCUboot
+
+The bootloader is not in the default NUCLEO image. Three composition files
+select it, and sysbuild is opted into with `KFSW_SYSBUILD`:
+
+```bash
+KFSW_SYSBUILD=1 \
+KFSW_MCUBOOT_KEY="$HOME/.config/kfsw/mcuboot-signing-key.pem" \
+KFSW_EXTRA_CONF_FILE="$PWD/k-fsw/config/profiles/nucleo-mcuboot.conf" \
+KFSW_EXTRA_DTC_OVERLAY_FILE="$PWD/k-fsw/config/profiles/nucleo-mcuboot-flash.overlay;$PWD/k-fsw/config/profiles/nucleo-mcuboot.overlay" \
+KFSW_MCUBOOT_DTC_OVERLAY_FILE="$PWD/k-fsw/config/profiles/nucleo-mcuboot-flash.overlay" \
+  ./k-fsw/tools/build.sh nucleo_l496zg
+```
+
+| Partition | Address | Size |
+| --- | --- | --- |
+| `boot_partition` | `0x000000` | 64 KB |
+| `slot0_partition` | `0x010000` | 352 KB |
+| `slot1_partition` | `0x068000` | 352 KB |
+| `kfsw_golden_partition` | `0x0C0000` | 192 KB, reserved and unwritten |
+| `kfsw_storage_partition` | `0x0F0000` | 64 KB, unchanged |
+
+The flash map is one file applied to **both** images. The bootloader and the
+application cannot be allowed to disagree about slot addresses, so it is not
+written twice.
+
+Storage deliberately does not move. Leaving it at `0xf0000` is what lets an
+existing filesystem, with its parameter snapshots and transferred files,
+survive the migration to a bootloader — verified in the rollback acceptance.
+
+The golden region is reserved and unwritten. A last-resort image has to survive
+when other things are broken, so it is a raw partition rather than a file.
+Reserving it now is what makes it possible later: a bootloader's address map
+cannot be replaced over the air.
+
+#### Signing
+
+The signing key is private and lives outside the repository. Passing
+`KFSW_MCUBOOT_KEY` writes it into the bootloader as a public key and signs the
+application with the private half. **Omitting it is not an error**: MCUboot
+falls back to the key it ships in its own public tree, which anyone can sign an
+image with. The acceptance checks for exactly that.
+
+Bootloader configuration lives in `app/sysbuild.conf` as `SB_CONFIG_*` symbols.
+Sysbuild generates a forced configuration for the bootloader image from those,
+which overrides any fragment placed on the image itself — a fragment there is
+accepted, applied, and silently discarded.
+
 ### Opt-in watchdog
 
 The watchdog is not forced into the default NUCLEO image. Two composition files

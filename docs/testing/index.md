@@ -162,6 +162,42 @@ configurations remain independent of physical hardware and exercise the same
 owner state exposed through `kfsw_boton_test_get_status()` and PARAM IDs 6
 through 10.
 
+### MCUboot rollback acceptance
+
+`tests/hil/mcuboot/rollback.sh` is the acceptance for `k-fsw#2`. It proves the
+two flows the issue names, and three properties that make them mean something.
+
+Images A and B are the **same binary signed with different versions**, so any
+difference in behaviour is the bootloader's doing rather than a difference
+between two programs.
+
+| Check | Proves |
+| --- | --- |
+| Signed artefact verifies against the project key, and **not** against MCUboot's default | the bootloader carries the right public key |
+| `A` → test `B` → no confirm → `A` | automatic revert |
+| `A` → test `B` → confirm → `B`, across two reboots | permanent upgrade, and no late revert |
+| An image signed with MCUboot's public default key is refused | the signature is actually checked |
+| Storage still mounts | pinning `kfsw-storage` at `0xf0000` really did preserve the filesystem |
+
+Without the wrong-key case, "the bootloader ran the image" would prove only
+that it ran something, not that it verified anything.
+
+Recorded on 3 September 2026 against `4dfd520`, all ten checks passing:
+
+```
+install    running A (1.0.0), confirmed and persists
+case 1     swapped to B (2.0.0), unconfirmed, REVERTED to A (1.0.0)
+case 2     swapped to B, confirmed, persists across a further reboot
+case 3     wrong-key image refused; still running 2.0.0
+storage    the filesystem at 0xf0000 still mounts
+```
+
+**A firmware update must be written one sector into the secondary slot**
+(`0x08068800`, not `0x08068000`). MCUboot runs in `BOOT_SWAP_USING_OFFSET` mode,
+where writing at the slot start is a silent no-op: no error and no swap, with
+the old image still running. This test failed exactly that way before the
+offset was applied.
+
 ### Watchdog hardware acceptance
 
 `tests/hil/watchdog/watchdog-reset.sh` proves the platform watchdog on a board,
