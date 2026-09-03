@@ -13,9 +13,12 @@
 #     key MCUboot ships in its own public tree is used as the wrong key, which
 #     is exactly the mistake this composition was once making silently.
 #
-#   * the storage partition still mounts afterwards. The whole point of pinning
-#     kfsw-storage at 0xf0000 was that an existing filesystem survives the move
-#     to a bootloader, and that claim is worth nothing untested.
+#   * a file written under image A is still readable at the very end, after
+#     every swap, revert and reboot. Merely checking that storage mounts would
+#     prove almost nothing here: this test erases the whole chip before it
+#     installs anything, so the filesystem it would find is a fresh one it made
+#     itself. Writing a value and reading it back at the end is what actually
+#     shows the swap machinery leaves the storage partition alone.
 #
 # Images A and B are the same binary signed with different versions. Using one
 # build isolates what is under test: any difference in behaviour is the
@@ -61,6 +64,9 @@ readonly ALIGN=8
 readonly VERSION_A=1.0.0
 readonly VERSION_B=2.0.0
 readonly VERSION_EVIL=3.0.0
+
+# Written under image A and read back at the very end.
+readonly STORAGE_WITNESS=mcuboot-witness
 
 cleanup()
 {
@@ -260,6 +266,17 @@ mark
 [[ "$(running_version)" == "$VERSION_A"* ]] && pass "A is confirmed and persists" || \
 	fail "A did not persist after confirmation"
 
+# Leave a value behind. Everything that follows -- swaps, a revert, several
+# reboots and a rejected image -- must not disturb it.
+mark
+send "storage test write $STORAGE_WITNESS"
+sleep 1.5
+if since_mark | grep -aq "Storage persistence write: PASS"; then
+	pass "wrote a witness value to storage under image A"
+else
+	fail "could not write the witness value to storage"
+fi
+
 # ---------------------------------------------------------------- case 1
 banner "Case 1: A -> test B -> no confirm -> A"
 
@@ -341,14 +358,21 @@ else
 fi
 
 # ---------------------------------------------------------------- storage
-banner "Storage survived the bootloader"
+banner "Storage survived every swap and revert"
 
+mark
 send "storage info"
 sleep 1.5
-if since_mark | grep -aq "ready: yes"; then
-	pass "the filesystem at 0xf0000 still mounts"
+since_mark | grep -aq "ready: yes" && pass "the filesystem at 0xf0000 mounts" || \
+	fail "storage does not report ready"
+
+mark
+send "storage test read $STORAGE_WITNESS"
+sleep 1.5
+if since_mark | grep -aq "Storage persistence read: PASS"; then
+	pass "the witness value written under A is intact after every swap and revert"
 else
-	fail "storage does not report ready after the migration to a bootloader"
+	fail "the witness value did not survive; the swap disturbed the storage partition"
 fi
 
 banner "Result"

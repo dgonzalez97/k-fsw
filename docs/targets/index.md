@@ -175,7 +175,9 @@ written twice.
 
 Storage deliberately does not move. Leaving it at `0xf0000` is what lets an
 existing filesystem, with its parameter snapshots and transferred files,
-survive the migration to a bootloader — verified in the rollback acceptance.
+survive the migration to a bootloader. The rollback acceptance checks the
+weaker but testable form of this: a value written under one image is still
+readable after every swap and revert.
 
 The golden region is reserved and unwritten. A last-resort image has to survive
 when other things are broken, so it is a raw partition rather than a file.
