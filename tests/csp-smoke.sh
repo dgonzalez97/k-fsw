@@ -181,6 +181,8 @@ printf '%s\n' \
 	'ftp stat 2 ../params/parameters.dat' \
 	'cmd list' \
 	'cmd noop' \
+	'cmd 1 noop' \
+	'csp ping 1' \
 	'cmd 2 noop' \
 	'cmd 2 info' \
 	'cmd 2 bogus' \
@@ -225,6 +227,8 @@ wait_for_output "$work_dir/node1.log" \
 
 node1_expected=(
     "noop node=0: OK noop from node 0"
+    "noop node=1: OK noop from node 1"
+    "CSP ping 1: success"
     "noop node=2: OK noop from node 1"
     "info node=2: OK uptime_ms="
     "unknown command 'bogus'"
@@ -232,7 +236,7 @@ node1_expected=(
     "hostname: kfsw-1"
     "initialized: yes"
     "router: running"
-    "LOOP addr=1/14"
+    "SELF addr=1/14"
     "KISS addr=1/0"
     "0/0 -> KISS direct"
     "UART transport"
