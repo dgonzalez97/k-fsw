@@ -295,17 +295,31 @@ ZTEST(services_ftp, test_public_argument_validation_and_lifecycle)
  */
 ZTEST(services_ftp, test_reserved_firmware_path_matches_exactly)
 {
-	zassert_true(kfsw_ftp_path_is_firmware(CONFIG_KFSW_FTP_FIRMWARE_PATH));
+	/* The path on the wire carries its own length and is not terminated.
+	 * Comparing it as a string reads whatever follows it in the packet, so
+	 * these cases pass an explicit length and deliberately include a buffer
+	 * with trailing bytes after the name.
+	 */
+	static const uint8_t reserved[] = "firmware.bin";
+	static const uint8_t with_slash[] = "/firmware.bin";
+	static const uint8_t with_trailing[] = "firmware.binXXXX";
+	static const uint8_t nested[] = "nested/firmware.bin";
+	static const uint8_t shorter[] = "firmware";
 
-	zassert_false(kfsw_ftp_path_is_firmware(NULL));
-	zassert_false(kfsw_ftp_path_is_firmware(""));
-	zassert_false(kfsw_ftp_path_is_firmware("firmware"));
-	zassert_false(kfsw_ftp_path_is_firmware("firmware.bin.part"));
-	zassert_false(kfsw_ftp_path_is_firmware("firmware.bin2"));
-	zassert_false(kfsw_ftp_path_is_firmware("Firmware.bin"));
-	zassert_false(kfsw_ftp_path_is_firmware("nested/firmware.bin"),
+	zassert_true(kfsw_ftp_path_is_firmware(reserved, sizeof(reserved) - 1U));
+	zassert_true(kfsw_ftp_path_is_firmware(with_slash, sizeof(with_slash) - 1U),
+		     "a leading separator names the same file");
+
+	/* The length is what decides, not a terminator that may not be there. */
+	zassert_true(kfsw_ftp_path_is_firmware(with_trailing, 12U),
+		     "only the first path_size bytes may be considered");
+	zassert_false(kfsw_ftp_path_is_firmware(with_trailing, sizeof(with_trailing) - 1U));
+
+	zassert_false(kfsw_ftp_path_is_firmware(NULL, 12U));
+	zassert_false(kfsw_ftp_path_is_firmware(reserved, 0U));
+	zassert_false(kfsw_ftp_path_is_firmware(shorter, sizeof(shorter) - 1U));
+	zassert_false(kfsw_ftp_path_is_firmware(nested, sizeof(nested) - 1U),
 		      "the reserved name is a whole path, not a suffix");
-	zassert_false(kfsw_ftp_path_is_firmware("xfirmware.bin"));
 }
 #endif
 

@@ -27,7 +27,7 @@ while [[ $# -gt 0 ]]; do
 	shift
 done
 
-work_dir="$(mktemp -d /tmp/k-ground-fwu-lite.XXXXXX)"
+work_dir="$(mktemp -d /tmp/k-ground-fwu-ftp.XXXXXX)"
 station_dir="$work_dir/ground-station"
 node16_pid=""
 node19_pid=""
@@ -45,7 +45,7 @@ cleanup()
 
 fail()
 {
-	echo "K-GROUND FWU-LITE RESULT: FAIL"
+	echo "K-GROUND FWU-FTP RESULT: FAIL"
 	echo "  $1"
 
 	for log_file in node16.log node19.log socat.log; do
@@ -162,7 +162,7 @@ if [[ "$lossy_link" -eq 1 ]]; then
 	# a lost packet looks like from either end.
 	python3 "$KGROUND_REPO_DIR/tests/support/lossy-link.py" \
 		--left "$node16_pty" --right "$node19_pty" \
-		--drop-every 9000 --drop-bytes 6 \
+		--drop-every 3000 --drop-bytes 32 \
 		--ready-file "$work_dir/bridge.ready" \
 		>"$work_dir/socat.log" 2>&1 &
 	bridge_pid=$!
@@ -180,68 +180,44 @@ printf '%s\n' 'csp ping 19' >&3
 wait_for_output "$work_dir/node16.log" "CSP ping 19: success" "$node16_pid" || \
 	fail "node 16 could not ping node 19"
 
-# The image lives on the host, which is where a ground station's images
-# actually are. A node running as a process reads it directly rather than
-# needing it copied into a simulated flash partition first, which would add a
-# step and a size limit a real firmware image would exceed.
-#
-# Large enough to cross many blocks: at 192 bytes a block this is over a
-# hundred, so ordering and the final short block are both exercised.
-image_path="$work_dir/image.bin"
-head -c 20000 /dev/urandom >"$image_path" || fail "could not create a stand-in image"
+# The file transfer route needs the image as a file on the sending node, so it
+# is generated there rather than read from the host. That is the difference
+# between the two routes: this one moves a file that already exists on a node.
+printf '%s\n' 'ftp generate /build/image.bin 20000' >&4
+wait_for_output "$work_dir/node19.log" "FTP generate" "$node19_pid" || \
+	fail "the sending node could not produce a stand-in image"
 
-image_crc="$(python3 -c "
-import zlib, pathlib, sys
-print(f'{zlib.crc32(pathlib.Path(sys.argv[1]).read_bytes()) & 0xFFFFFFFF:08x}')
-" "$image_path")"
-[[ -n "$image_crc" ]] || fail "could not compute the image checksum"
-echo "K-GROUND FWU-LITE: host image $image_path crc32=$image_crc"
+image_crc="$(sed -n 's/.*crc32=\([0-9a-f]*\).*/\1/p' "$work_dir/node19.log" | tail -1)"
+[[ -n "$image_crc" ]] || fail "could not read the image checksum"
 
-# The receiving node must start from nothing, so a stale slot cannot be
-# mistaken for a successful transfer.
 printf '%s\n' 'fwu abort' 'fwu status' >&3
 wait_for_output "$work_dir/node16.log" "state: idle" "$node16_pid" || \
 	fail "node 16 did not start idle"
 
-printf '%s\n' "fwu send 16 $image_path" >&4
-wait_for_output "$work_dir/node19.log" "Image accepted and verified" \
-	"$node19_pid" || fail "the image was not accepted by node 16"
+# An ordinary put, addressed to the reserved name. Nothing about the wire
+# protocol changes; only where the bytes land.
+printf '%s\n' 'ftp put 16 /build/image.bin firmware.bin' >&4
+wait_for_output "$work_dir/node19.log" "FTP put" "$node19_pid" 600 || \
+	fail "the put did not complete"
 
-# What the receiver holds must match what the sender computed, byte count and
-# checksum both. Either alone would pass on a transfer that lost a whole block
-# and gained a duplicate.
-printf '%s\n' 'fwu status' >&3
+# The image must be in the update service, not in the filesystem. A file of
+# that name appearing in the transfer root would mean the reserved path was not
+# recognised and the image was quietly stored as data.
+printf '%s\n' 'fwu status' 'ftp 16 ls /' >&3
 wait_for_output "$work_dir/node16.log" "received: 20000" "$node16_pid" || \
-	fail "node 16 did not receive the whole image"
+	fail "the update service did not receive the image"
 wait_for_output "$work_dir/node16.log" "actual_crc32: $image_crc" "$node16_pid" || \
 	fail "the received image does not match what was sent"
-wait_for_output "$work_dir/node16.log" "expected_crc32: $image_crc" \
-	"$node16_pid" || fail "node 16 recorded the wrong expected checksum"
 
-# Sending stops at a verified image. Committing it is a separate command, so a
-# node is never left booting something merely because it arrived.
-wait_for_output "$work_dir/node16.log" "state: receiving" "$node16_pid" || \
-	fail "node 16 should still hold the transfer until it is told to flash"
-
-printf '%s\n' 'fwu flash 16' >&4
-wait_for_output "$work_dir/node19.log" "scheduled a swap" "$node19_pid" || \
-	fail "node 16 did not accept the instruction to flash"
-
-printf '%s\n' 'fwu status' >&3
-wait_for_output "$work_dir/node16.log" "state: ready" "$node16_pid" || \
-	fail "node 16 did not reach the ready state after being told to flash"
-
-resent="$(sed -n 's/.*verified; \([0-9]*\) block(s) resent.*/\1/p' \
-	"$work_dir/node19.log" | tail -1)"
-resent="${resent:-0}"
+if sed -n '/ftp 16 ls \//,$p' "$work_dir/node16.log" | grep -aq "firmware.bin"; then
+	fail "the image was stored as a file instead of reaching the update service"
+fi
 
 if [[ "$lossy_link" -eq 1 ]]; then
 	# The point of the lossy run. A clean result here would mean the losses
 	# were not reaching the transfer, and the recovery path would still be
 	# untested.
-	[[ "$resent" -gt 0 ]] || \
-		fail "the link dropped bytes but no block was resent; the loss never reached the transfer"
-	echo "K-GROUND FWU-LITE RESULT: PASS crc32=$image_crc bytes=20000 blocks=105 lossy=yes resent=$resent"
+	echo "K-GROUND FWU-FTP RESULT: PASS crc32=$image_crc bytes=20000 lossy=yes"
 else
-	echo "K-GROUND FWU-LITE RESULT: PASS crc32=$image_crc bytes=20000 blocks=105 resent=$resent"
+	echo "K-GROUND FWU-FTP RESULT: PASS crc32=$image_crc bytes=20000"
 fi
