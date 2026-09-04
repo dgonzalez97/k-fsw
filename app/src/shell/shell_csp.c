@@ -80,17 +80,38 @@ static int cmd_csp_routes(const struct shell *sh, size_t argc, char **argv)
 
 static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 {
+	struct kfsw_csp_info info;
 	unsigned long node;
 	uint32_t round_trip_ms;
 	int parse_error = 0;
 	int result;
 
-	ARG_UNUSED(argc);
+	/* No node means this one. The address comes from the running CSP
+	 * configuration rather than the build option, so it is whatever the
+	 * node actually came up as.
+	 */
+	kfsw_csp_get_info(&info);
 
-	node = shell_strtoul(argv[1], 10, &parse_error);
-	if (parse_error != 0 || node > 16383U) {
-		shell_error(sh, "CSP node must be in range 0..16383");
-		return -EINVAL;
+	if (argc < 2U) {
+		node = info.address;
+		shell_print(sh, "No node given; using this node (%lu)", node);
+	} else {
+		node = shell_strtoul(argv[1], 10, &parse_error);
+		if (parse_error != 0 || node > 16383U) {
+			shell_error(sh, "CSP node must be in range 0..16383");
+			return -EINVAL;
+		}
+	}
+
+	/* A node pinging itself has no link to traverse: reaching the shell at
+	 * all is the answer. Saying so is honest, where reporting a round-trip
+	 * time would invent a measurement of nothing. Loopback traffic is also
+	 * where this libcsp loses the source address, so a real self-ping never
+	 * completes.
+	 */
+	if ((uint16_t)node == info.address) {
+		shell_print(sh, "CSP ping %lu: this node, no link traversed", node);
+		return 0;
 	}
 
 	result = kfsw_csp_ping((uint16_t)node, KFSW_CSP_PING_TIMEOUT_MS, KFSW_CSP_PING_PAYLOAD_SIZE,
@@ -107,11 +128,23 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 static int cmd_csp_ident(const struct shell *sh, size_t argc, char **argv)
 {
 	struct kfsw_csp_identity identity;
+	struct kfsw_csp_info info;
 	unsigned long node;
 	char *end = NULL;
 	int result;
 
-	ARG_UNUSED(argc);
+	/* Asking this node who it is needs no network. Answering locally keeps
+	 * the question working on a node whose links are all down, which is
+	 * exactly when an operator is most likely to be asking it.
+	 */
+	if (argc < 2U) {
+		kfsw_csp_get_info(&info);
+		shell_print(sh, "CSP ident %u (this node)", info.address);
+		shell_print(sh, "hostname: %s", info.hostname);
+		shell_print(sh, "model: %s", info.model);
+		shell_print(sh, "revision: %s", info.revision);
+		return 0;
+	}
 
 	node = strtoul(argv[1], &end, 0);
 	if ((end == argv[1]) || (*end != '\0') || (node > 16383UL)) {
@@ -135,12 +168,13 @@ static int cmd_csp_ident(const struct shell *sh, size_t argc, char **argv)
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(csp_commands,
-	SHELL_CMD_ARG(ident, NULL, "Ask a remote node to identify itself: ident <node>.",
-		      cmd_csp_ident, 2, 0),
+	SHELL_CMD_ARG(ident, NULL, "Identify a node, or this one when no node is given.",
+		      cmd_csp_ident, 1, 1),
 	SHELL_CMD_ARG(info, NULL, "Show local CSP identity and router state.", cmd_csp_info, 1, 0),
 	SHELL_CMD_ARG(interfaces, NULL, "Show registered CSP interfaces.", cmd_csp_interfaces, 1,
 		      0),
-	SHELL_CMD_ARG(ping, NULL, "Ping a CSP node: ping <node>.", cmd_csp_ping, 2, 0),
+	SHELL_CMD_ARG(ping, NULL, "Ping a node, or this one when no node is given.", cmd_csp_ping,
+		      1, 1),
 	SHELL_CMD_ARG(routes, NULL, "Show the CSP static routing table.", cmd_csp_routes, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
