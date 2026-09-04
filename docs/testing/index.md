@@ -131,6 +131,15 @@ K-FSW runs project-owned suites on `native_sim/native/64`. Current suites cover:
   configuration;
 - parameter persistence encoding, loading, corruption/mismatch handling,
   defaults, and clear behavior with CSP disabled;
+- the parameter table scheme: that every core table registers under the
+  identifier its owner is allocated and in that owner's band, that a reserved,
+  unallocated or unnamed table is refused, that a name past 32 characters is
+  refused rather than truncated, that two parameters cannot share one offset
+  while one offset may repeat in another table, that the wire identifier
+  decodes back to table and offset, that a sampled value advances between two
+  reads rather than reporting a copy taken at start-up, that an unbound
+  watchdog reports no timeout instead of the configured one, and that a report
+  period which would reset a healthy board is refused;
 - `boton_test` initial state, first/multiple presses, held/released behavior,
   timestamp flooring, count/time saturation, coherent typed status, button
   and LED parameter definitions, LED validation, and GPIO-emulator paths that
@@ -159,7 +168,8 @@ restarts the real 30 ms delayable work across bounce, and checks hold and
 release/rearm behavior. Private state hooks cover deterministic time and
 saturation cases; there is no production fake-press command. Both
 configurations remain independent of physical hardware and exercise the same
-owner state exposed through `kfsw_boton_test_get_status()` and PARAM IDs 6
+owner state exposed through `kfsw_boton_test_get_status()` and the two counter
+parameters at offsets 0x00 and 0x04 of table 67
 through 10.
 
 ### Firmware upload between two nodes
@@ -290,8 +300,8 @@ the parameter table.
 It flashes the opt-in profile, records a baseline with the board untouched, then
 prints one line per press the module reports, carrying the host time, the
 counter and the module's own `last_press_s`. Both LED paths are exercised in
-turn and read back through `boton_test status`, and PARAM IDs 6 and 7 are
-compared against that status. `--no-flash` reuses the image already on the
+turn and read back through `boton_test status`, and the two counter parameters
+in table 67 are compared against that status. `--no-flash` reuses the image already on the
 board, which lets an operator be told to start pressing at a known moment.
 
 The fixture prints the timeline and does not grade it. An earlier version tried
@@ -314,7 +324,8 @@ The software acceptance scope is:
 - stable released-to-pressed counting, hold suppression, and release rearm;
 - monotonic millisecond-to-second floor conversion;
 - saturation of `press_count` and `last_press_s` at `UINT32_MAX`;
-- a coherent typed five-field snapshot and stable future-HK table ID 67;
+- a coherent typed five-field snapshot registered as table 67 in the module
+  band;
 - PARAM inclusion when enabled, live value reflection, writable boolean LED
   validation, rejected writes, and no persistence flag;
 - shell and PARAM control through the same LED owner setter; and
@@ -474,8 +485,22 @@ Hosted CI performs:
 The dry run validates discovery and syntax for all suites, including physical
 ones, without executing their actions. The second command runs software-tagged
 terminal scenarios for identity, CSP, remote parameters, storage, persistence,
-and FTP. Reports are written below `build/robot/dry-run/` and
-`build/robot/software/` by the wrapper.
+FTP, firmware update and parameter tables. Reports are written below
+`build/robot/dry-run/` and `build/robot/software/` by the wrapper.
+
+### Parameter tables
+
+`tests/hil/param-tables.robot` wraps `tests/param-tables-smoke.sh`. It checks
+that every table a composition declares is present under its own identifier and
+band, that one offset repeats across tables the way the scheme intends, and
+that the listing reports each parameter's write mode.
+
+It is deliberately about existence and addressing rather than content. A value
+is only as good as the layer underneath it, so asserting a particular
+free-space figure would test LittleFS rather than the table scheme. The first
+three cases carry `software` and run hosted; the fourth carries `physical` and
+reads the same listing from a NUCLEO over its debug UART, where the tables are
+built from real hardware.
 
 Robot proves an operator-visible workflow. The underlying unit/integration
 tests remain necessary for detailed error cases and diagnosis.

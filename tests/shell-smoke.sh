@@ -29,6 +29,7 @@ fi
 		'time' \
 		'version' \
 		'uart info' \
+		'param tables' \
 		'param list' \
 		'param get test_u32' \
 		'param set test_u32 1234' \
@@ -52,7 +53,7 @@ fi
 		'ftp put 1 /selfnode/a.bin /selfnode/b.bin' \
 		'log test'
 } |
-	"$executable" --uart_stdinout --stop_at=1.0 --no-color \
+	"$executable" --uart_stdinout --stop_at=2.0 --no-color \
 		-flash="$flash_image" >"$capture_file" 2>&1
 
 cat "$capture_file"
@@ -86,11 +87,20 @@ expected_output=(
     'CSP interface: KISS'
     'CSP node: 1'
     'CSP peer: 2'
-    '0:0 node_id'
-    '0:1 log_level'
-    '0:2 test_u32'
-    '0:3 test_i32'
-    '0:4 test_float'
+    # Listed as table, offset, name: the columns are what makes a listing
+    # readable, so the smoke test checks the columns and not just the names.
+    # Every core table is registered and named, in ascending identifier order.
+    '  1  core     board'
+    '  2  core     system'
+    '  3  core     telemetry'
+    '  4  core     csp'
+    '  5  core     storage'
+    ' 25  service  log'
+    'board       0x00  node_id'
+    'system      0x00  boot_delay_ms'
+    'telemetry   0x00  uptime_s'
+    'test        0x08  test_u32'
+    'log         0x00  log_level'
     'test_u32 = 42'
     'test_u32 = 1234'
     "set: parameter 'node_id' is read-only"

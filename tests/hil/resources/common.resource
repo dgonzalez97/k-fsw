@@ -78,6 +78,24 @@ Run FWU FTP Route Smoke
     ...    timeout=900
     RETURN    ${result}
 
+Run Param Tables Smoke
+    ${result}=    Run Process
+    ...    ${KFSW_REPO_DIR}/tests/param-tables-smoke.sh
+    ...    stdout=PIPE
+    ...    stderr=STDOUT
+    ...    timeout=120
+    RETURN    ${result}
+
+Run Param Tables Smoke On Serial
+    ${result}=    Run Process
+    ...    ${KFSW_REPO_DIR}/tests/param-tables-smoke.sh
+    ...    --serial
+    ...    ${DEBUG_SERIAL}
+    ...    stdout=PIPE
+    ...    stderr=STDOUT
+    ...    timeout=120
+    RETURN    ${result}
+
 HIL Command Should Pass
     [Arguments]    ${result}    ${success_marker}
     Log    ${result.stdout}

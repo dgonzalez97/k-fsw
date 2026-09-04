@@ -44,9 +44,25 @@ target_sources(app PRIVATE
     src/main.c
 )
 
+# Core parameter tables, identifiers 1 to 24. They live in the composition
+# layer because kfsw-platform and kfsw-comms sit below the parameter service.
 target_sources_ifdef(CONFIG_KFSW_PARAM app PRIVATE
-    src/parameter_definitions.c
+    src/parameters/board_table.c
+    src/parameters/system_table.c
+    src/parameters/telemetry_table.c
 )
+
+if(CONFIG_KFSW_PARAM AND CONFIG_KFSW_CSP)
+    target_sources(app PRIVATE src/parameters/csp_table.c)
+endif()
+
+if(CONFIG_KFSW_PARAM AND CONFIG_KFSW_STORAGE)
+    target_sources(app PRIVATE src/parameters/storage_table.c)
+endif()
+
+if(CONFIG_KFSW_PARAM AND CONFIG_KFSW_WATCHDOG)
+    target_sources(app PRIVATE src/parameters/watchdog_table.c)
+endif()
 
 target_sources_ifdef(CONFIG_KFSW_COMMAND app PRIVATE
     src/commands/command_definitions.c

@@ -250,7 +250,9 @@ node1_expected=(
     "CSP interface: KISS"
     "CSP peer: 2"
     "UART CSP test: PASS"
-    "2:0 node_id"
+    # A remote listing knows the table from the identifier but not its name,
+    # so the number stands in for it.
+    "1           0x00  node_id"
     "2:test_u32 = 42"
     "2:test_u32 = 1234"
 	"2:log_level = 5"

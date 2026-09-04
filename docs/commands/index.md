@@ -257,17 +257,61 @@ Local commands exist with `CONFIG_KFSW_PARAM=y`.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `param list` | none | List local ID, type, access, name, value metadata, and description |
+| `param tables` | none | List registered tables with their identifier, band and size |
+| `param list` | none | List every parameter by table, offset, type, write mode and value |
 | `param get` | `<name>` | Read one local scalar |
 | `param set` | `<name> <value>` | Validate and change one local scalar in RAM |
 
+A parameter is addressed by **table and offset**, not by a flat identifier. The
+band a table sits in says who owns it: 1 to 24 core, 25 to 49 services, 50 to 99
+modules. Zero is reserved and never valid, so an uninitialised field cannot
+address a real table.
+
+```text
+kfsw:~$ param tables
+ id  band     name        params
+---  -------  ----------  ------
+  1  core     board            6
+  2  core     system           2
+  3  core     telemetry        5
+  4  core     csp              7
+  5  core     storage          4
+ 25  service  log              1
+```
+
 ```text
 kfsw:~$ param list
-kfsw:~$ param get log_level
-log_level = 1
-kfsw:~$ param set log_level 2
-log_level = 2
+table       addr  name                              type    mode  value
+----------  ----  --------------------------------  ------  ----  -----
+board       0x00  node_id                           u16     r     1
+system      0x00  boot_delay_ms                     u16     b     0
+system      0x02  app_report_ms                     u16     wb    1000
+telemetry   0x00  uptime_s                          u32     r     41
+log         0x00  log_level                         u8      wb    1
 ```
+
+The `mode` column is the parameter's write contract, and it is derived from the
+definition rather than written by hand:
+
+| Mode | Meaning |
+| --- | --- |
+| `r` | Read-only. Written by the flight software; a write is refused. |
+| `w` | The write takes effect immediately. |
+| `b` | The write is stored, but the running system keeps its old value until reboot. |
+| `wb` | Both. |
+
+A `b` parameter says so on write rather than acknowledging with a bare `OK`,
+because a stored value that the operator believes is live is the failure this
+scheme exists to prevent:
+
+```text
+kfsw:~$ param set boot_delay_ms 250
+boot_delay_ms = 250
+stored; takes effect after reboot
+```
+
+Names are at most 32 characters, refused at registration rather than truncated:
+a truncated name is printed but cannot be typed.
 
 `node_id` is read-only. `log_level` accepts 0 through 4. Integer parsing rejects
 overflow and unsigned-negative input; the command reads the parameter
@@ -299,6 +343,7 @@ node before the normal arguments:
 | Command | Meaning |
 | --- | --- |
 | `param list <node>` | Refresh and list the remote descriptor cache for that node |
+| | A remote listing knows the table from the identifier but not its name, so the number stands in for it |
 | `param get <node> <name>` | Read a remote scalar over CSP |
 | `param set <node> <name> <value>` | Validate text against the remote descriptor and request a remote RAM write |
 
