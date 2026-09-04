@@ -46,6 +46,16 @@ endmenu
 config SHELL_PROMPT_UART
 	default "kfsw:~$ " if KFSW_DEBUG_SHELL
 
+# The prompt is recoloured at runtime, which Kconfig strings cannot express.
+config SHELL_PROMPT_CHANGE
+	default y if KFSW_DEBUG_SHELL
+
+# Room for the prompt text plus the escape sequences that colour it. Zephyr's
+# default of 10 fits the text alone and rejects the coloured form; 40 is the
+# most the subsystem allows and covers the longest prompt in use.
+config SHELL_PROMPT_BUFF_SIZE
+	default 40 if KFSW_DEBUG_SHELL
+
 source "Kconfig.zephyr"
 
 config KFSW_APP_HEALTH_DEADLINE_MS

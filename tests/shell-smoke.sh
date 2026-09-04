@@ -65,7 +65,9 @@ cat "$capture_file"
 expected_output=(
     '@BOOT '
     '@READY '
-    'kfsw:~$ param  get  test_u32'
+    # Not anchored to the prompt: it carries colour escapes, so the prompt and
+    # the echoed command are no longer one contiguous run of text.
+    'param  get  test_u32'
 	'Available commands:'
 	'csp      : K-FSW CSP commands.'
 	'ftp      : K-FSW file transfer:'

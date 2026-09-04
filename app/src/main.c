@@ -27,8 +27,14 @@
 
 #include "commands/command_definitions.h"
 #endif
+#if CONFIG_KFSW_EVENT
+#include <kfsw/services/event.h>
+#endif
 #if CONFIG_KFSW_FTP
 #include <kfsw/services/ftp.h>
+#endif
+#if CONFIG_KFSW_FWU
+#include <kfsw/services/fwu.h>
 #endif
 #if CONFIG_KFSW_FWU_LITE_CSP
 #include <kfsw/services/fwu_lite.h>
@@ -44,6 +50,9 @@
 #endif
 
 #include "parameters/tables.h"
+#if CONFIG_KFSW_DEBUG_SHELL
+#include "shell/shell_prompt.h"
+#endif
 #endif
 
 int main(void)
@@ -100,6 +109,15 @@ int main(void)
 		&kfsw_test_param_definitions,
 #endif
 		&kfsw_log_param_definitions,
+#if CONFIG_KFSW_EVENT
+		&kfsw_event_param_definitions,
+#endif
+#if CONFIG_KFSW_FWU
+		&kfsw_fwu_param_definitions,
+#endif
+#if CONFIG_KFSW_HEALTH
+		&kfsw_health_param_definitions,
+#endif
 #if CONFIG_KFSW_BOTON_TEST
 		&kfsw_boton_test_param_definitions,
 #endif
@@ -282,6 +300,10 @@ int main(void)
 	if (result != 0) {
 		kfsw_log_error("Failed to start health monitoring: %d", result);
 	}
+#endif
+
+#if CONFIG_KFSW_DEBUG_SHELL
+	kfsw_shell_prompt_apply();
 #endif
 
 	kfsw_boot_service_start();
