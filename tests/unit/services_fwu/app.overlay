@@ -1,0 +1,9 @@
+/* The firmware update service writes into the secondary image slot. On this
+ * target that is the simulated flash slot1, which has 4 KB erase blocks, so
+ * the one-sector write offset and the reserved trailer are both observable.
+ */
+/ {
+	chosen {
+		kfsw,fwu-partition = &slot1_partition;
+	};
+};

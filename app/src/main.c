@@ -30,6 +30,9 @@
 #if CONFIG_KFSW_FTP
 #include <kfsw/services/ftp.h>
 #endif
+#if CONFIG_KFSW_FWU_LITE_CSP
+#include <kfsw/services/fwu_lite.h>
+#endif
 #include <kfsw/services/log.h>
 #if CONFIG_KFSW_PARAM
 #include <kfsw/services/parameter.h>
@@ -178,6 +181,18 @@ int main(void)
 		} else {
 			kfsw_log_info("FTP service started on CSP port %d",
 				      CONFIG_KFSW_FTP_CSP_PORT);
+		}
+	}
+#endif
+
+#if CONFIG_KFSW_FWU_LITE_CSP
+	if (csp_started) {
+		result = kfsw_fwu_lite_server_start();
+		if (result != 0) {
+			kfsw_log_error("Failed to start the firmware upload server: %d", result);
+		} else {
+			kfsw_log_info("Firmware upload server started on CSP port %d",
+				      CONFIG_KFSW_FWU_LITE_CSP_PORT);
 		}
 	}
 #endif

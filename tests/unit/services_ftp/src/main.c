@@ -288,4 +288,25 @@ ZTEST(services_ftp, test_public_argument_validation_and_lifecycle)
 	zassert_ok(kfsw_ftp_init());
 }
 
+#if CONFIG_KFSW_FWU
+/* The reserved upload path is what makes a firmware image reach the update
+ * slot instead of the filesystem, so an accidental match would divert an
+ * ordinary file and an accidental miss would silently store an image as data.
+ */
+ZTEST(services_ftp, test_reserved_firmware_path_matches_exactly)
+{
+	zassert_true(kfsw_ftp_path_is_firmware(CONFIG_KFSW_FTP_FIRMWARE_PATH));
+
+	zassert_false(kfsw_ftp_path_is_firmware(NULL));
+	zassert_false(kfsw_ftp_path_is_firmware(""));
+	zassert_false(kfsw_ftp_path_is_firmware("firmware"));
+	zassert_false(kfsw_ftp_path_is_firmware("firmware.bin.part"));
+	zassert_false(kfsw_ftp_path_is_firmware("firmware.bin2"));
+	zassert_false(kfsw_ftp_path_is_firmware("Firmware.bin"));
+	zassert_false(kfsw_ftp_path_is_firmware("nested/firmware.bin"),
+		      "the reserved name is a whole path, not a suffix");
+	zassert_false(kfsw_ftp_path_is_firmware("xfirmware.bin"));
+}
+#endif
+
 ZTEST_SUITE(services_ftp, NULL, ftp_setup, NULL, NULL, NULL);

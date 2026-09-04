@@ -162,6 +162,22 @@ configurations remain independent of physical hardware and exercise the same
 owner state exposed through `kfsw_boton_test_get_status()` and PARAM IDs 6
 through 10.
 
+### Firmware upload between two nodes
+
+`tests/k-ground-fwu-lite-smoke.sh` sends a 20000-byte stand-in image from one
+node to another over CSP, across 105 blocks, and checks the receiving node
+holds exactly what was sent.
+
+It asserts the byte count **and** the checksum: either alone would pass a
+transfer that lost a whole block and gained a duplicate. It also checks the
+receiving node stays in `receiving` until it is told to flash, because sending
+stops at a verified image and committing it is a separate command.
+
+The block protocol itself is unit tested without a link, so every rejection is
+exercised directly: a block out of order, a block failing its own checksum and
+then succeeding when resent, a short block in the middle, a second transfer
+while one is running, and an unknown opcode being answered rather than ignored.
+
 ### MCUboot rollback acceptance
 
 `tests/hil/mcuboot/rollback.sh` is the acceptance for `k-fsw#2`. It proves the
