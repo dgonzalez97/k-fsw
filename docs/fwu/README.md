@@ -88,6 +88,26 @@ swap_scheduled: yes
 
 Then reboot, and confirm or reject as below.
 
+## Choosing a route
+
+Both routes end at the same update service and can be built together. Whichever
+starts a transfer first holds it; the other is told the node is busy rather
+than quietly resetting the first.
+
+| | File transfer route | Direct upload (`fwu_lite`) |
+| --- | --- | --- |
+| Where the image is | a file on the sending node | a file on the sending node, or on its host |
+| Reliability | the transport's, connection-oriented | per-block checksum and repeat |
+| A lost packet costs | the connection, and the transfer restarts | one block |
+| Wire protocol | unchanged; an ordinary put | its own, twelve-byte header |
+| Best when | there is somewhere to put a file and the link is good | the link is marginal, or the image is only on the host |
+
+The second matters more than it sounds. The transport carries its own checksum,
+so a damaged packet is discarded before it is ever delivered: what the sender
+sees is not a bad block but **no answer at all**. A design that treats silence
+as fatal ends a transfer on the first disturbance, which is exactly the
+situation the direct route exists to survive.
+
 ## The other way: block by block
 
 The file transfer route needs the image to exist as a file on the sending node
@@ -111,6 +131,17 @@ resending it is simply sending it once more — no restart, no seeking.
 
 `blocks resent` is worth watching: a rising count is the link degrading well
 before it fails outright.
+
+**Two things are recovered from, and they look different.** A block that
+arrives damaged is rejected by its own checksum and asked for again. A block
+that does not arrive at all produces silence, and the sender resends after a
+timeout. The second is the common case on a radio, because the transport
+discards damaged packets before the update service ever sees them.
+
+There is a third case worth knowing about: the block arrives and is written,
+but its acknowledgement is lost. The sender resends, the node says it has moved
+on and names the block it wants instead, and the sender continues from there
+rather than resending forever.
 
 **Reliable delivery is off by default** (`CONFIG_KFSW_FWU_LITE_RDP`). Per-block
 checks and repeats already recover losses, and a second retry layer underneath

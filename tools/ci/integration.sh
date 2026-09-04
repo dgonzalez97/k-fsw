@@ -43,4 +43,12 @@ echo
 echo "INTEGRATION: firmware upload between two nodes"
 "$KFSW_REPO_DIR/tests/k-ground-fwu-lite-smoke.sh"
 
+echo
+echo "INTEGRATION: firmware upload over a link that drops bytes"
+"$KFSW_REPO_DIR/tests/k-ground-fwu-lite-smoke.sh" --lossy
+
+echo
+echo "INTEGRATION: firmware upload through the file transfer route"
+"$KFSW_REPO_DIR/tests/k-ground-fwu-ftp-smoke.sh"
+
 echo "INTEGRATION RESULT: PASS"

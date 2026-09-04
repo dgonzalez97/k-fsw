@@ -7,3 +7,13 @@
 		kfsw,fwu-partition = &slot1_partition;
 	};
 };
+
+/* The simulated flash writes single bytes by default, which makes every image
+ * size look aligned and hides a whole class of fault. A real part writes in
+ * blocks -- eight bytes on the one this is built for -- and an image is
+ * whatever length the linker produced. Matching that here is what lets these
+ * tests see an alignment mistake at all.
+ */
+&flash0 {
+	write-block-size = <8>;
+};

@@ -52,6 +52,32 @@ Run Holybro CSP KISS Smoke
     ...    stderr=STDOUT
     RETURN    ${result}
 
+Run FWU Over Radio
+    ${result}=    Run Process
+    ...    ${KFSW_REPO_DIR}/tests/hil/fwu/fwu-over-radio.sh
+    ...    stdout=PIPE
+    ...    stderr=STDOUT
+    ...    timeout=5400
+    RETURN    ${result}
+
+Run FWU Lite Smoke
+    [Arguments]    @{options}
+    ${result}=    Run Process
+    ...    ${KFSW_REPO_DIR}/tests/k-ground-fwu-lite-smoke.sh
+    ...    @{options}
+    ...    stdout=PIPE
+    ...    stderr=STDOUT
+    ...    timeout=900
+    RETURN    ${result}
+
+Run FWU FTP Route Smoke
+    ${result}=    Run Process
+    ...    ${KFSW_REPO_DIR}/tests/k-ground-fwu-ftp-smoke.sh
+    ...    stdout=PIPE
+    ...    stderr=STDOUT
+    ...    timeout=900
+    RETURN    ${result}
+
 HIL Command Should Pass
     [Arguments]    ${result}    ${success_marker}
     Log    ${result.stdout}
