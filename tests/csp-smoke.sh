@@ -227,8 +227,11 @@ wait_for_output "$work_dir/node1.log" \
 
 node1_expected=(
     "noop node=0: OK noop from node 0"
-    "noop node=1: OK noop from node 1"
-    "CSP ping 1: success"
+    # Addressed to this node, so it is run locally rather than sent into the
+    # network and back. Source node 0 is the marker for a command that did not
+    # arrive over CSP, which is now the truth for this one.
+    "noop node=1: OK noop from node 0"
+    "CSP ping 1: this node, no link traversed"
     "noop node=2: OK noop from node 1"
     "info node=2: OK uptime_ms="
     "unknown command 'bogus'"
@@ -236,7 +239,7 @@ node1_expected=(
     "hostname: kfsw-1"
     "initialized: yes"
     "router: running"
-    "SELF addr=1/14"
+    "LOOP addr=1/14"
     "KISS addr=1/0"
     "0/0 -> KISS direct"
     "UART transport"
