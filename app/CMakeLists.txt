@@ -95,6 +95,9 @@ if(CONFIG_KFSW_DEBUG_SHELL)
     target_sources_ifdef(CONFIG_KFSW_FWU app PRIVATE
         src/shell/shell_fwu.c
     )
+    target_sources_ifdef(CONFIG_KFSW_HEALTH app PRIVATE
+        src/shell/shell_health.c
+    )
 endif()
 
 target_include_directories(app PRIVATE src)

@@ -33,6 +33,9 @@
 #if CONFIG_KFSW_FWU_LITE_CSP
 #include <kfsw/services/fwu_lite.h>
 #endif
+#if CONFIG_KFSW_HEALTH
+#include <kfsw/services/health.h>
+#endif
 #include <kfsw/services/log.h>
 #if CONFIG_KFSW_PARAM
 #include <kfsw/services/parameter.h>
@@ -232,10 +235,44 @@ int main(void)
 	}
 #endif
 
+#if CONFIG_KFSW_HEALTH
+	/* The application thread watches itself first. It is the thread that
+	 * would stop if the system seized, and watching one real thing is worth
+	 * more than watching several that only look supervised. Services join
+	 * as they gain something meaningful to report.
+	 */
+	uint8_t health_handle = 0U;
+	bool health_watching = false;
+
+	result = kfsw_health_register("app", CONFIG_KFSW_APP_HEALTH_DEADLINE_MS, &health_handle);
+	if (result != 0) {
+		kfsw_log_error("Failed to register the application for health: %d", result);
+	} else {
+		health_watching = true;
+	}
+
+	/* Started after the watchdog is armed: this takes the feeding over, and
+	 * there is nothing to take over before then.
+	 */
+	result = kfsw_health_start();
+	if (result != 0) {
+		kfsw_log_error("Failed to start health monitoring: %d", result);
+	}
+#endif
+
 	kfsw_boot_service_start();
 
 	for (;;) {
+#if CONFIG_KFSW_HEALTH
+		if (health_watching) {
+			(void)kfsw_health_report(health_handle);
+		}
+		/* Well inside the deadline, so an ordinary scheduling delay is
+		 * not mistaken for the thread having stopped. */
+		k_sleep(K_MSEC(CONFIG_KFSW_APP_HEALTH_DEADLINE_MS / 4U));
+#else
 		k_sleep(K_SECONDS(60));
+#endif
 	}
 
 	return 0;
