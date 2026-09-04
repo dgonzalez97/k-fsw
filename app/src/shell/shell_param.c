@@ -20,7 +20,8 @@
 #define KFSW_PARAM_NAME_COLUMN ((int)KFSW_PARAM_NAME_MAX)
 #define KFSW_PARAM_TYPE_COLUMN 6
 #define KFSW_PARAM_MODE_COLUMN 4
-#define KFSW_PARAM_VALUE_TEXT_SIZE 32
+/* Wide enough for a quoted string parameter at full capacity. */
+#define KFSW_PARAM_VALUE_TEXT_SIZE (KFSW_PARAM_STRING_MAX + 3)
 
 struct param_list_context {
 	const struct shell *shell;
@@ -174,6 +175,10 @@ static void format_param_value(char *text, size_t size, const struct kfsw_param_
 		(void)snprintf(text, size, "%.12g", value->scalar.f64);
 		break;
 	case KFSW_PARAM_STRING:
+		/* Quoted so a trailing space or an empty value is visible rather
+		 * than looking like a missing one. */
+		(void)snprintf(text, size, "\"%s\"", value->text);
+		break;
 	case KFSW_PARAM_DATA:
 	case KFSW_PARAM_INVALID:
 	default:
@@ -234,7 +239,20 @@ static int parse_param_value(const char *text, struct kfsw_param_value *value)
 	case KFSW_PARAM_DOUBLE:
 		value->scalar.f64 = strtod(text, &end);
 		return ((errno == 0) && (end != text) && (*end == '\0')) ? 0 : -EINVAL;
-	case KFSW_PARAM_STRING:
+	case KFSW_PARAM_STRING: {
+		size_t length = 0U;
+
+		while ((length + 1U < sizeof(value->text)) && (text[length] != '\0')) {
+			value->text[length] = text[length];
+			length++;
+		}
+		if (text[length] != '\0') {
+			return -EMSGSIZE;
+		}
+		value->text[length] = '\0';
+		value->size = length + 1U;
+		return 0;
+	}
 	case KFSW_PARAM_DATA:
 	case KFSW_PARAM_INVALID:
 	default:
@@ -323,7 +341,16 @@ static int cmd_param_list(const struct shell *sh, size_t argc, char **argv)
 	result = kfsw_param_visit(print_param_info, &context);
 #endif
 
-	if (result != 0) {
+	if (result == -ENOSPC) {
+		/* The descriptor cache filled part way through the download, so
+		 * the parameters after that point never arrived. Naming the
+		 * option is the difference between a number and a fix.
+		 */
+		shell_error(sh,
+			    "parameter list failed: the remote cache holds %d descriptors; "
+			    "raise CONFIG_KFSW_PARAM_REMOTE_POOL_SIZE",
+			    CONFIG_KFSW_PARAM_REMOTE_POOL_SIZE);
+	} else if (result != 0) {
 		shell_error(sh, "parameter list failed (%d)", result);
 	}
 	return result;

@@ -152,6 +152,8 @@ printf '%s\n' \
 	'param set 2 test_u32 1234' \
 	'param get 2 test_u32' \
 	$'pa\t g\t 2 test_u32' \
+	'param get 2 uid' \
+	'param get 2 csp_buf_free' \
 	'param get 2 log_level' \
 	'param set 2 log_level 5' \
 	'param get 2 log_level' \
@@ -207,6 +209,22 @@ wait_for_output "$work_dir/node2.log" "UART CSP test: PASS" \
     "$node2_pid" || fail "node 2 UART transport test did not pass"
 wait_for_output "$work_dir/node1.log" "2:test_u32 = 1234" \
     "$node1_pid" || fail "remote parameter set/readback did not pass"
+# A string across the link, and a sampled value that is current when it is
+# asked for. The server hands libparam the backing storage directly, so a
+# sampled parameter that is not refreshed first answers with whatever the
+# storage last held: an identity that is always empty, an uptime always zero.
+wait_for_output "$work_dir/node1.log" '2:uid = "kfsw-2"' \
+    "$node1_pid" || fail "the remote identity did not arrive as text"
+# Buffers free is the sampled value worth asserting a number for: uptime in
+# whole seconds is legitimately zero this early, while a node that just
+# answered a request cannot have zero buffers. Before the server sampled, this
+# read back as the compiled default and looked like an exhausted node.
+wait_for_output "$work_dir/node1.log" "2:csp_buf_free = " \
+    "$node1_pid" || fail "the remote buffer count was not readable"
+if grep -Fq "2:csp_buf_free = 0" "$work_dir/node1.log"; then
+    fail "the remote buffer count read back as zero, so nothing sampled it"
+fi
+
 wait_for_output "$work_dir/node1.log" "2:log_level = 1" \
 	"$node1_pid" || fail "remote owner validation did not restore the compiled default"
 wait_for_output "$work_dir/node1.log" \
@@ -257,6 +275,7 @@ node1_expected=(
     "2:test_u32 = 1234"
 	"2:log_level = 5"
 	"2:log_level = 1"
+    '2:uid = "kfsw-2"'
     "get: parameter 'missing' not found"
     "set: parameter 'node_id' is read-only"
 	"FTP generate path=/build/empty.bin: PASS bytes=0 crc32=00000000"

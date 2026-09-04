@@ -30,6 +30,10 @@ fi
 		'version' \
 		'uart info' \
 		'param tables' \
+		'param get uid' \
+		'param set route_table "9/9 KISS"' \
+		'csp routes' \
+		'param set route_table bad-table' \
 		'param list' \
 		'param get test_u32' \
 		'param set test_u32 1234' \
@@ -97,6 +101,8 @@ expected_output=(
     '  5  core     storage'
     ' 25  service  log'
     'board       0x00  node_id'
+    # Strings render quoted, so an empty value reads as a value.
+    'board       0x10  uid                               string  r     "kfsw-1"'
     'system      0x00  boot_delay_ms'
     'telemetry   0x00  uptime_s'
     'test        0x08  test_u32'
@@ -105,6 +111,11 @@ expected_output=(
     'test_u32 = 1234'
     "set: parameter 'node_id' is read-only"
     "get: parameter 'missing' not found"
+    'uid = "kfsw-1"'
+    # Applied to the running router, not merely stored.
+    'route_table = "9/9 KISS"'
+    '9/9 -> KISS direct'
+    "set: parameter 'route_table' failed (-22)"
 	'Parameter snapshot save: PASS'
 	'Parameter defaults: PASS (saved snapshot unchanged)'
 	'test_u32 = 42'

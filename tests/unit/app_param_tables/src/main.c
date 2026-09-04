@@ -6,6 +6,7 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/ztest.h>
 
+#include <kfsw/comms/csp.h>
 #include <kfsw/platform/storage.h>
 #include <kfsw/platform/watchdog.h>
 #include <kfsw/services/parameter.h>
@@ -63,6 +64,13 @@ static void *tables_setup(void)
 	 * whether the table follows the hardware.
 	 */
 	(void)kfsw_platform_watchdog_init();
+
+	/* Same reasoning for identity: the board table samples the running CSP
+	 * configuration rather than the build options, so CSP has to be running
+	 * for those rows to say anything. Before initialization they report
+	 * empty, which is honest and worth nothing as a test.
+	 */
+	(void)kfsw_csp_init();
 
 	zassert_ok(kfsw_param_init(core_sets, ARRAY_SIZE(core_sets)));
 	return NULL;
@@ -345,6 +353,79 @@ ZTEST(app_param_tables, test_a_report_period_that_would_reset_the_board_is_refus
 	value.scalar.u16 = 200U;
 	zassert_ok(kfsw_param_set("app_report_ms", &value));
 	zassert_equal(kfsw_system_app_report_ms(), 200U);
+}
+
+/* ---------------------------------------------------------------- strings */
+
+ZTEST(app_param_tables, test_identity_is_reported_as_text)
+{
+	struct kfsw_param_info info;
+	struct kfsw_param_value value;
+
+	/* Sampled from the running CSP identity rather than kept as a second
+	 * copy of the build options: two sources for one fact eventually
+	 * disagree, and the one an operator can reach would be the wrong one.
+	 */
+	zassert_ok(kfsw_param_get_info("uid", &info));
+	zassert_equal(info.table, KFSW_PARAM_TABLE_BOARD);
+	zassert_equal(info.type, KFSW_PARAM_STRING);
+	zassert_true(info.read_only);
+
+	{
+		struct kfsw_csp_info csp_info;
+
+		kfsw_csp_get_info(&csp_info);
+		zassert_ok(kfsw_param_get("uid", &value));
+		zassert_equal(value.type, KFSW_PARAM_STRING);
+		/* Compared against what CSP actually reports, not against the
+		 * build option: the point of sampling is that the two can
+		 * differ, and the table has to follow the running one. */
+		zassert_str_equal(value.text, csp_info.hostname);
+		zassert_true(strlen(csp_info.hostname) + 1U <= info.array_size,
+			     "a truncated identity looks like a different node");
+		zassert_equal(value.size, strlen(value.text) + 1U, "size carries the terminator");
+	}
+
+	zassert_ok(kfsw_param_get("revision", &value));
+	zassert_true(strlen(value.text) > 0U);
+
+	/* Read-only means refused, not accepted and ignored. */
+	zassert_equal(kfsw_param_set("uid", &value), -EACCES);
+}
+
+ZTEST(app_param_tables, test_a_string_reports_its_capacity)
+{
+	struct kfsw_param_info info;
+
+	/* array_size carries the declared capacity so every layer -- the
+	 * listing, the snapshot, the wire -- sees one number for how much
+	 * storage the owner set aside.
+	 */
+	zassert_ok(kfsw_param_get_info("uid", &info));
+	zassert_true(info.array_size > 1U);
+	zassert_true(info.array_size <= KFSW_PARAM_STRING_MAX);
+}
+
+ZTEST(app_param_tables, test_the_route_table_starts_from_the_composed_one)
+{
+	struct kfsw_param_info info;
+	struct kfsw_param_value value;
+
+	/* Writable and live, but deliberately not persistent: a route table is
+	 * the one setting that can put a node out of reach, so a wrong one must
+	 * not survive a reboot. The compiled table comes back and the mistake
+	 * costs a pass rather than the node.
+	 */
+	zassert_ok(kfsw_param_get_info("route_table", &info));
+	zassert_equal(info.table, KFSW_PARAM_TABLE_CSP);
+	zassert_equal(info.type, KFSW_PARAM_STRING);
+	zassert_false(info.read_only);
+	zassert_str_equal(kfsw_param_mode_name(info.flags), "w",
+			  "live so it can be fixed from the ground, not stored so a "
+			  "mistake does not outlive the pass");
+
+	zassert_ok(kfsw_param_get("route_table", &value));
+	zassert_str_equal(value.text, CONFIG_KFSW_CSP_ROUTE_TABLE);
 }
 
 ZTEST(app_param_tables, test_looking_a_parameter_up_by_name)

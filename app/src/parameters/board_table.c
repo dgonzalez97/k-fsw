@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <string.h>
 
 #include <zephyr/sys/util.h>
 
@@ -14,19 +15,83 @@
 #define KFSW_BOARD_NODE_ID_DEFAULT 0U
 #endif
 
-/* Every value here is read-only. The configuration rows this table is meant to
- * carry -- a writable CSP address, the KISS baud rate -- would have to be read
- * back by kfsw-comms and kfsw-platform, which sit below the parameter service.
- * Publishing them as writable before that path exists would let an operator
- * change a value that nothing applies, which is the one failure this table
- * exists to prevent.
+/* Identity is read from the running CSP configuration rather than the build
+ * options, so the table reports what the node actually came up as.
+ *
+ * The switches below are read-only. A writable CSP address or KISS baud rate
+ * would have to be read back by kfsw-comms and kfsw-platform, which sit below
+ * the parameter service. Publishing them as writable before that path exists
+ * would let an operator change a value that nothing applies, which is the one
+ * failure this table exists to prevent.
  */
+/* Sized so the identities a composition actually uses fit whole. A truncated
+ * identity is worse than a missing one: it looks like a different node, and
+ * the operator comparing it against a build record has no way to tell.
+ */
+#define KFSW_BOARD_UID_SIZE 32U
+#define KFSW_BOARD_MODEL_SIZE 32U
+#define KFSW_BOARD_REVISION_SIZE 40U
+
+static char board_uid[KFSW_BOARD_UID_SIZE];
+static char board_model[KFSW_BOARD_MODEL_SIZE];
+static char board_revision[KFSW_BOARD_REVISION_SIZE];
 static uint16_t board_node_id = KFSW_BOARD_NODE_ID_DEFAULT;
 static uint32_t board_reset_cause;
 static uint8_t board_csp_enabled = IS_ENABLED(CONFIG_KFSW_CSP);
 static uint8_t board_kiss_enabled = IS_ENABLED(CONFIG_KFSW_CSP_KISS_UART);
 static uint8_t board_shell_enabled = IS_ENABLED(CONFIG_SHELL);
 static uint8_t board_storage_enabled = IS_ENABLED(CONFIG_KFSW_STORAGE);
+
+/* Copied out of the running CSP identity rather than duplicated as build
+ * constants: two sources for one fact eventually disagree, and the one an
+ * operator can reach would be the wrong one.
+ */
+static void sample_identity(char *destination, size_t size, const char *source)
+{
+	size_t length = 0U;
+
+	while ((length + 1U < size) && (source != NULL) && (source[length] != '\0')) {
+		destination[length] = source[length];
+		length++;
+	}
+	destination[length] = '\0';
+}
+
+static void sample_uid(void *value)
+{
+#if CONFIG_KFSW_CSP
+	struct kfsw_csp_info info;
+
+	kfsw_csp_get_info(&info);
+	sample_identity(value, KFSW_BOARD_UID_SIZE, info.hostname);
+#else
+	ARG_UNUSED(value);
+#endif
+}
+
+static void sample_model(void *value)
+{
+#if CONFIG_KFSW_CSP
+	struct kfsw_csp_info info;
+
+	kfsw_csp_get_info(&info);
+	sample_identity(value, KFSW_BOARD_MODEL_SIZE, info.model);
+#else
+	ARG_UNUSED(value);
+#endif
+}
+
+static void sample_revision(void *value)
+{
+#if CONFIG_KFSW_CSP
+	struct kfsw_csp_info info;
+
+	kfsw_csp_get_info(&info);
+	sample_identity(value, KFSW_BOARD_REVISION_SIZE, info.revision);
+#else
+	ARG_UNUSED(value);
+#endif
+}
 
 static void sample_node_id(void *value)
 {
@@ -67,6 +132,36 @@ static const struct kfsw_param_definition board_param_definitions[] = {
 		.value = &board_node_id,
 		.default_value = {.u16 = KFSW_BOARD_NODE_ID_DEFAULT},
 		.sample = sample_node_id,
+	},
+	{
+		.offset = 0x10U,
+		.type = KFSW_PARAM_STRING,
+		.capacity = KFSW_BOARD_UID_SIZE,
+		.flags = KFSW_PARAM_FLAG_READ_ONLY | KFSW_PARAM_FLAG_SYSTEM_INFO,
+		.name = "uid",
+		.description = "Unit identity, as reported by csp ident",
+		.value = board_uid,
+		.sample = sample_uid,
+	},
+	{
+		.offset = 0x20U,
+		.type = KFSW_PARAM_STRING,
+		.capacity = KFSW_BOARD_MODEL_SIZE,
+		.flags = KFSW_PARAM_FLAG_READ_ONLY | KFSW_PARAM_FLAG_SYSTEM_INFO,
+		.name = "model",
+		.description = "Composition this build identifies as",
+		.value = board_model,
+		.sample = sample_model,
+	},
+	{
+		.offset = 0x30U,
+		.type = KFSW_PARAM_STRING,
+		.capacity = KFSW_BOARD_REVISION_SIZE,
+		.flags = KFSW_PARAM_FLAG_READ_ONLY | KFSW_PARAM_FLAG_SYSTEM_INFO,
+		.name = "revision",
+		.description = "Build revision, as reported by csp ident",
+		.value = board_revision,
+		.sample = sample_revision,
 	},
 	{
 		.offset = 0x02U,

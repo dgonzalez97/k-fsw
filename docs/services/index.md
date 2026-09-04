@@ -183,6 +183,19 @@ needing a reboot. A `b` parameter says so on write rather than acknowledging
 with a bare `OK`: a stored value the operator believes is live is the failure
 this scheme exists to prevent.
 
+### Strings
+
+`KFSW_PARAM_STRING` carries text up to `CONFIG_KFSW_PARAM_STRING_MAX` bytes
+including the terminator. A definition declares the storage it owns through
+`capacity`; a write longer than that is refused rather than truncated, because
+a truncated value is a different value and the operator is never told. Strings
+have their own validator and change callback, since neither can be passed
+through the scalar union.
+
+Values travel on the caller's stack in a bounded buffer rather than through an
+allocator: a parameter service that allocated would have to fail at the worst
+moment.
+
 ### Sampled values
 
 A definition may supply a `sample` callback, which refreshes the backing store
@@ -190,8 +203,35 @@ immediately before a read. Live housekeeping uses it because a value is worth
 reading only if it is current when it was asked for; an uptime refreshed on a
 timer is wrong by up to one period every time somebody reads it.
 
+The CSP server hands libparam the backing storage directly rather than going
+through that read path, so it refreshes every sampled parameter before serving
+a request. Without that, a remote read answers with whatever the storage last
+held, which for a value nothing writes locally is its compiled default
+forever: an uptime always zero, an identity always empty.
+
 Sampling runs while PARAM serializes access, so a `sample` callback must not
 call back into the parameter API.
+
+### Transport sizing
+
+Listing a table sends one packet per parameter, which makes it the largest
+burst the composition produces. Three limits have to cover it and each fails
+differently when it does not:
+
+| Limit | Symptom when too small |
+| --- | --- |
+| `CSP_BUFFER_COUNT` | Every buffer sits on a connection's receive queue, the interface has none left to assemble the next frame, and the transfer stops outright |
+| `CSP_CONN_RXQUEUE_LEN` | Packets past the queue depth are dropped, so the caller gets a list that looks complete and is not |
+| `CSP_QFIFO_LEN` | The same, one layer lower, at the router's input |
+| `CONFIG_KFSW_PARAM_REMOTE_POOL_SIZE` | The download stops part way with `-ENOSPC` |
+
+The K-FSW compositions set all of them from
+`CONFIG_KFSW_PARAM_MAX_DEFINITIONS`. libcsp's own defaults of 15 and 16 are
+sized for ping-sized traffic.
+
+`CONFIG_KFSW_PARAM_LIST_RDP` puts the list on reliable delivery, on by
+default. The list has no acknowledgement of its own, so over a radio a lost
+descriptor leaves a hole the caller cannot see.
 
 ### Local parameters
 

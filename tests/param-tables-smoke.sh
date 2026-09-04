@@ -97,12 +97,24 @@ expect 'csp         0x00  tx_packets'
 expect 'storage     0x00  total_kb'
 expect 'log         0x00  log_level'
 
+printf '\n=== Strings ===\n'
+# A string is the one type whose length is part of the value, so it is checked
+# where it is rendered: quoted, so a trailing space or an empty value reads as
+# a value rather than a missing one.
+expect 'board       0x10  uid                               string'
+expect 'board       0x30  revision                          string'
+expect 'csp         0x20  route_table                       string'
+
 printf '\n=== Modes ===\n'
 # The mode column is derived from the definition rather than written by hand,
 # so a table whose behaviour drifts from its documented contract shows up here.
 expect 'uptime_s                          u32     r'
 expect 'boot_delay_ms                     u16     b'
 expect 'app_report_ms                     u16     wb'
+# Writable and live, and deliberately not persistent: a route table is the one
+# setting that can put a node out of reach, so a wrong one must not survive a
+# reboot.
+expect 'route_table                       string  w'
 
 printf '\n=== Result ===\n'
 if [[ "$failures" -eq 0 ]]; then
