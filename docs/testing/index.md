@@ -219,6 +219,31 @@ where writing at the slot start is a silent no-op: no error and no swap, with
 the old image still running. This test failed exactly that way before the
 offset was applied.
 
+### Health monitoring acceptance
+
+`tests/hil/health/health-reset.sh` proves the chain end to end: a component
+stops reporting, the feed is withheld, the board resets itself, and the next
+boot says why.
+
+The fault is real rather than simulated. There is no command to stall a thread
+and there will not be one, because that means shipping a way to hang the flight
+software; instead `health watch <name> <ms> confirm` registers a component that
+nothing reports, so health has something genuinely overdue.
+
+Surviving three watchdog timeouts while healthy comes first. Without it, a
+board resetting every few seconds for an unrelated reason would pass a test
+that only checked a reset happened.
+
+Recorded on 4 September 2026 against `f9973be`, eight checks:
+
+```
+health owns the watchdog    feeding: yes, platform keep-alive released
+survives 26 s healthy       three times the watchdog timeout, no reset
+component overdue           feed withheld
+reset                       reset_cause=watchdog
+recovered                   health supervising again
+```
+
 ### Watchdog hardware acceptance
 
 `tests/hil/watchdog/watchdog-reset.sh` proves the platform watchdog on a board,

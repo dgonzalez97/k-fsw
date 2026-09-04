@@ -39,6 +39,8 @@ format_sources+=(
 	"$KFSW_WORKSPACE_ROOT/kfsw-platform/src/storage.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-platform/include/kfsw/platform/watchdog.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-platform/src/watchdog.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/health.h"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/health/health.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/log.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/parameter.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/ftp.h"

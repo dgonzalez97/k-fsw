@@ -47,3 +47,14 @@ config SHELL_PROMPT_UART
 	default "kfsw:~$ " if KFSW_DEBUG_SHELL
 
 source "Kconfig.zephyr"
+
+config KFSW_APP_HEALTH_DEADLINE_MS
+	int "How long the application thread may go without reporting"
+	depends on KFSW_HEALTH
+	default 4000
+	range 200 60000
+	help
+	  The application reports once per quarter of this, so an ordinary
+	  scheduling delay is not mistaken for the thread having stopped. Long
+	  enough to tolerate a busy moment, short enough that a seized system is
+	  noticed well within the watchdog timeout.
