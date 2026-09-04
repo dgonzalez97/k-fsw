@@ -10,6 +10,10 @@
 	chosen {
 		kfsw,csp-uart = &uart1;
 		kfsw,storage-partition = &storage_partition;
+		/* Bound whether or not the update service is composed in. A
+		 * chosen property costs nothing when nothing reads it, and
+		 * naming it here keeps the address out of the service. */
+		kfsw,fwu-partition = &slot1_partition;
 	};
 };
 

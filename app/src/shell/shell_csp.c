@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include <zephyr/shell/shell.h>
 #include <zephyr/shell/shell_string_conv.h>
@@ -103,7 +104,39 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
+static int cmd_csp_ident(const struct shell *sh, size_t argc, char **argv)
+{
+	struct kfsw_csp_identity identity;
+	unsigned long node;
+	char *end = NULL;
+	int result;
+
+	ARG_UNUSED(argc);
+
+	node = strtoul(argv[1], &end, 0);
+	if ((end == argv[1]) || (*end != '\0') || (node > 16383UL)) {
+		shell_error(sh, "Invalid node: %s", argv[1]);
+		return -EINVAL;
+	}
+
+	result = kfsw_csp_identify((uint16_t)node, KFSW_CSP_PING_TIMEOUT_MS, &identity);
+	if (result != 0) {
+		shell_error(sh, "CSP ident %lu: failed (%d)", node, result);
+		return result;
+	}
+
+	shell_print(sh, "CSP ident %lu", node);
+	shell_print(sh, "hostname: %s", identity.hostname);
+	shell_print(sh, "model: %s", identity.model);
+	shell_print(sh, "revision: %s", identity.revision);
+	shell_print(sh, "date: %s", identity.date);
+	shell_print(sh, "time: %s", identity.time);
+	return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(csp_commands,
+	SHELL_CMD_ARG(ident, NULL, "Ask a remote node to identify itself: ident <node>.",
+		      cmd_csp_ident, 2, 0),
 	SHELL_CMD_ARG(info, NULL, "Show local CSP identity and router state.", cmd_csp_info, 1, 0),
 	SHELL_CMD_ARG(interfaces, NULL, "Show registered CSP interfaces.", cmd_csp_interfaces, 1,
 		      0),

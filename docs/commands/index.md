@@ -523,6 +523,31 @@ kfsw:~$ cmd 2 event_tail 0
 event_tail node=2: OK seq=8 t=8120ms ftp/1 sev=0 0002000001000ce9d363
 ```
 
+## Firmware update
+
+Present when `CONFIG_KFSW_FWU` is composed in.
+
+```
+fwu status               state, slot geometry and checksums
+fwu abort                abandon a transfer and erase the slot
+fwu begin <size> <crc>   start a transfer by hand
+fwu finish               verify and offer the image to the bootloader
+```
+
+With `CONFIG_KFSW_FWU_LITE_CSP`, a node can also send an image to another:
+
+```
+fwu send <node> <path>   send an image block by block
+fwu flash <node>         ask that node to boot what it has accepted
+```
+
+`fwu send` reports how many blocks had to be repeated. A rising count is the
+link degrading well before it fails outright.
+
+`swap_scheduled` in `fwu status` is the line that matters after a transfer. An
+image written to the wrong offset leaves the bootloader with nothing to swap,
+and it reports that only by quietly running the old image on the next boot.
+
 ## Watchdog
 
 Present only in a composition that enables `CONFIG_KFSW_WATCHDOG` and binds a

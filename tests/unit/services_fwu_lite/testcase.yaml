@@ -1,0 +1,10 @@
+tests:
+  kfsw.services.fwu_lite:
+    tags:
+      - unit
+      - services
+      - fwu
+    platform_allow:
+      - native_sim/native/64
+    integration_platforms:
+      - native_sim/native/64

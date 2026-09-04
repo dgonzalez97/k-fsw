@@ -80,7 +80,7 @@ load_role_config()
 		fail "ground role is not configured: $role_key ($config_file)"
 
 	unset KFSW_ROLE KFSW_NAME KFSW_CSP_NODE KFSW_CSP_PEER KFSW_CSP_ROUTES \
-		KFSW_RADIO_UHF
+		KFSW_RADIO_UHF KFSW_EXTRA_KCONFIG
 	# Node files are deliberately simple shell-compatible environment files.
 	set -a
 	# shellcheck disable=SC1090
@@ -172,6 +172,12 @@ write_ground_config()
 		printf 'CONFIG_KFSW_CSP_UART_PEER_ADDRESS=%s\n' "$ground_peer"
 		if [[ -n "$ground_routes" ]]; then
 			printf 'CONFIG_KFSW_CSP_ROUTE_TABLE="%s"\n' "$ground_routes"
+		fi
+		if [[ -n "${KFSW_EXTRA_KCONFIG:-}" ]]; then
+			# Verbatim passthrough from the node's env file, so a
+			# station can compose a service the base profile does not
+			# carry without a profile per combination.
+			printf '%s\n' "$KFSW_EXTRA_KCONFIG"
 		fi
 		if [[ "$ground_radio_uhf" == "holybro" ]]; then
 			printf 'CONFIG_KFSW_RADIO_UHF=y\n'

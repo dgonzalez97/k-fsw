@@ -11,6 +11,7 @@ way back if it does not work.
 | Update service: receive, verify, offer to the bootloader | working, 26 unit tests |
 | Shell control: `fwu status` / `abort` | working |
 | Carrying the image from ground, over FTP | working |
+| Carrying it over CSP block by block (`fwu_lite`) | working |
 
 An image is uploaded with the ordinary `ftp put` that already carries files,
 addressed to a reserved name. Nothing about the wire protocol changed.
@@ -86,6 +87,47 @@ swap_scheduled: yes
 ```
 
 Then reboot, and confirm or reject as below.
+
+## The other way: block by block
+
+The file transfer route needs the image to exist as a file on the sending node
+and runs over a reliable connection. `fwu_lite` sends blocks straight across
+CSP, checks each one on arrival, and lets the sender repeat a block that did
+not survive.
+
+```
+kfsw-ops# fwu send 2 /kfsw/ftp/build/image.bin
+Sending /kfsw/ftp/build/image.bin to node 2; this takes minutes over a slow link
+Image accepted and verified; 3 block(s) resent
+
+kfsw-ops# fwu flash 2
+Node 2 scheduled a swap; reboot it to try the image
+```
+
+**Why per-block checking.** A whole-image checksum tells you an eight minute
+upload failed. A per-block one tells you which 192 bytes to send again. A block
+that fails its check is not written and does not advance the transfer, so
+resending it is simply sending it once more — no restart, no seeking.
+
+`blocks resent` is worth watching: a rising count is the link degrading well
+before it fails outright.
+
+**Reliable delivery is off by default** (`CONFIG_KFSW_FWU_LITE_RDP`). Per-block
+checks and repeats already recover losses, and a second retry layer underneath
+brings connection state and timeouts that can stall a transfer on a marginal
+link instead of naming the block that needs resending. Turn it on for a link
+where reordering rather than loss is the problem.
+
+**Sending stops at a verified image.** Committing it is `fwu flash`, a separate
+command, so a node never boots something merely because it arrived.
+
+Both routes feed the same update service, and both can be built in at once.
+Whichever starts a transfer first holds it; the other is told the node is busy
+rather than quietly resetting the first.
+
+Every block but the last must be full. The receiving node works out which block
+it expects from how much it holds, so a short block in the middle would
+desynchronise both ends — it is rejected rather than accepted.
 
 ## Preparing an image on the ground
 
@@ -180,6 +222,9 @@ openocd -f zephyr/boards/st/nucleo_l496zg/support/openocd.cfg \
 | `finish` returns `-EIO` | the bootloader did not schedule a swap — usually the wrong write offset |
 | Board boots the old image after a reboot | the new one did not confirm itself, so the bootloader reverted. Working as designed |
 | `ftp put` to `firmware.bin` reports a transfer error | the update service refused the image; `fwu status` gives the reason |
+| `fwu send` reports `bad-block` repeatedly | the link is corrupting data faster than the retry count allows; raise `CONFIG_KFSW_FWU_LITE_BLOCK_RETRIES` or improve the link |
+| `fwu send` reports `busy` | another upload is in progress, by either route; `fwu abort` on the receiving node clears it |
+| `fwu send` reports `invalid` on the first block | the two ends disagree about the block size; they must be built with the same `CONFIG_KFSW_FWU_LITE_BLOCK_SIZE` |
 
 `fwu abort` is always safe and leaves the slot erased.
 

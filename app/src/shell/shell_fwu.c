@@ -7,6 +7,9 @@
 #include <zephyr/sys/util.h>
 
 #include <kfsw/services/fwu.h>
+#if CONFIG_KFSW_FWU_LITE_CSP
+#include <kfsw/services/fwu_lite.h>
+#endif
 
 static int parse_u32(const struct shell *sh, const char *text, const char *what, uint32_t *value)
 {
@@ -111,6 +114,59 @@ static int cmd_fwu_abort(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
+#if CONFIG_KFSW_FWU_LITE_CSP
+static int cmd_fwu_send(const struct shell *sh, size_t argc, char **argv)
+{
+	uint32_t blocks_resent = 0U;
+	uint32_t node;
+	int result;
+
+	ARG_UNUSED(argc);
+
+	result = parse_u32(sh, argv[1], "node", &node);
+	if (result != 0) {
+		return result;
+	}
+
+	shell_print(sh, "Sending %s to node %" PRIu32 "; this takes minutes over a slow link",
+		    argv[2], node);
+
+	result = kfsw_fwu_lite_send_file((uint16_t)node, argv[2], &blocks_resent);
+	if (result != 0) {
+		shell_error(sh, "firmware upload failed (%d) after %" PRIu32 " resent block(s)",
+			    result, blocks_resent);
+		return result;
+	}
+
+	shell_print(sh, "Image accepted and verified; %" PRIu32 " block(s) resent", blocks_resent);
+	shell_print(sh, "Run: fwu flash %" PRIu32, node);
+	return 0;
+}
+
+static int cmd_fwu_flash(const struct shell *sh, size_t argc, char **argv)
+{
+	uint32_t node;
+	int result;
+
+	ARG_UNUSED(argc);
+
+	result = parse_u32(sh, argv[1], "node", &node);
+	if (result != 0) {
+		return result;
+	}
+
+	result = kfsw_fwu_lite_start_flashing((uint16_t)node);
+	if (result != 0) {
+		shell_error(sh, "start flashing failed (%d)", result);
+		return result;
+	}
+
+	shell_print(sh, "Node %" PRIu32 " scheduled a swap; reboot it to try the image", node);
+	shell_print(sh, "It reverts unless it is confirmed after booting.");
+	return 0;
+}
+#endif
+
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	fwu_commands,
 	SHELL_CMD_ARG(abort, NULL, "Abandon a transfer and erase the slot.", cmd_fwu_abort, 1, 0),
@@ -118,6 +174,11 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 		      0),
 	SHELL_CMD_ARG(finish, NULL, "Verify the image and offer it to the bootloader.",
 		      cmd_fwu_finish, 1, 0),
+#if CONFIG_KFSW_FWU_LITE_CSP
+	SHELL_CMD_ARG(flash, NULL, "Ask a node to boot its image: flash <node>.", cmd_fwu_flash,
+		      2, 0),
+	SHELL_CMD_ARG(send, NULL, "Send an image: send <node> <path>.", cmd_fwu_send, 3, 0),
+#endif
 	SHELL_CMD_ARG(status, NULL, "Show update state and slot geometry.", cmd_fwu_status, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
