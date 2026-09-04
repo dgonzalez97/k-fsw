@@ -46,6 +46,10 @@ target_sources(app PRIVATE
 
 # Core parameter tables, identifiers 1 to 24. They live in the composition
 # layer because kfsw-platform and kfsw-comms sit below the parameter service.
+target_sources_ifdef(CONFIG_KFSW_DEBUG_SHELL app PRIVATE
+    src/shell/shell_prompt.c
+)
+
 target_sources_ifdef(CONFIG_KFSW_PARAM app PRIVATE
     src/parameters/board_table.c
     src/parameters/system_table.c

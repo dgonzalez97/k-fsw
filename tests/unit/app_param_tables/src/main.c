@@ -9,6 +9,10 @@
 #include <kfsw/comms/csp.h>
 #include <kfsw/platform/storage.h>
 #include <kfsw/platform/watchdog.h>
+#include <kfsw/services/event.h>
+#include <kfsw/services/fwu.h>
+#include <kfsw/services/health.h>
+#include <kfsw/services/log.h>
 #include <kfsw/services/parameter.h>
 
 #include "parameters/tables.h"
@@ -23,11 +27,12 @@
  */
 
 #define CORE_TABLE_COUNT 6U
+#define SERVICE_TABLE_COUNT 4U
 
 struct table_seen {
 	uint8_t ids[KFSW_PARAM_TABLE_MODULE_LAST + 1U];
 	size_t count;
-	bool every_band_correct;
+	bool bands_match_owners;
 	bool ascending;
 	uint8_t previous;
 };
@@ -43,9 +48,18 @@ struct param_seen {
 };
 
 static const struct kfsw_param_definition_set *const core_sets[] = {
-	&kfsw_board_param_definitions,     &kfsw_system_param_definitions,
-	&kfsw_telemetry_param_definitions, &kfsw_csp_param_definitions,
-	&kfsw_storage_param_definitions,   &kfsw_watchdog_param_definitions,
+	&kfsw_board_param_definitions,
+	&kfsw_system_param_definitions,
+	&kfsw_telemetry_param_definitions,
+	&kfsw_csp_param_definitions,
+	&kfsw_storage_param_definitions,
+	&kfsw_watchdog_param_definitions,
+	/* Service tables, so one listing carries both bands and they can be
+	 * told apart. */
+	&kfsw_log_param_definitions,
+	&kfsw_event_param_definitions,
+	&kfsw_fwu_param_definitions,
+	&kfsw_health_param_definitions,
 };
 
 static void *tables_setup(void)
@@ -88,8 +102,9 @@ static bool record_table(const struct kfsw_param_table_info *info, void *context
 		seen->ascending = false;
 	}
 	seen->previous = info->id;
-	if (strcmp(kfsw_param_band_name(info->id), "core") != 0) {
-		seen->every_band_correct = false;
+	if (strcmp(kfsw_param_band_name(info->id),
+		   (info->id <= KFSW_PARAM_TABLE_CORE_LAST) ? "core" : "service") != 0) {
+		seen->bands_match_owners = false;
 	}
 	seen->count++;
 	return true;
@@ -125,13 +140,13 @@ static bool record_parameter(const struct kfsw_param_info *info, void *context)
 ZTEST(app_param_tables, test_every_core_table_is_registered)
 {
 	struct table_seen seen = {
-		.every_band_correct = true,
+		.bands_match_owners = true,
 		.ascending = true,
 	};
 
-	zassert_equal(kfsw_param_table_count(), CORE_TABLE_COUNT);
+	zassert_equal(kfsw_param_table_count(), CORE_TABLE_COUNT + SERVICE_TABLE_COUNT);
 	zassert_ok(kfsw_param_visit_tables(record_table, &seen));
-	zassert_equal(seen.count, CORE_TABLE_COUNT);
+	zassert_equal(seen.count, CORE_TABLE_COUNT + SERVICE_TABLE_COUNT);
 
 	zassert_equal(seen.ids[0], KFSW_PARAM_TABLE_BOARD);
 	zassert_equal(seen.ids[1], KFSW_PARAM_TABLE_SYSTEM);
@@ -140,9 +155,14 @@ ZTEST(app_param_tables, test_every_core_table_is_registered)
 	zassert_equal(seen.ids[4], KFSW_PARAM_TABLE_STORAGE);
 	zassert_equal(seen.ids[5], KFSW_PARAM_TABLE_WATCHDOG);
 
+	zassert_equal(seen.ids[6], KFSW_LOG_PARAM_TABLE_ID);
+	zassert_equal(seen.ids[7], KFSW_EVENT_PARAM_TABLE_ID);
+	zassert_equal(seen.ids[8], KFSW_FWU_PARAM_TABLE_ID);
+	zassert_equal(seen.ids[9], KFSW_HEALTH_PARAM_TABLE_ID);
+
 	zassert_true(seen.ascending, "a listing must read in one direction");
-	zassert_true(seen.every_band_correct,
-		     "a core table outside the core band would collide with a service or module");
+	zassert_true(seen.bands_match_owners,
+		     "a table outside its owner's band would collide with another owner's");
 }
 
 ZTEST(app_param_tables, test_table_identifiers_sit_in_their_band)
@@ -426,6 +446,98 @@ ZTEST(app_param_tables, test_the_route_table_starts_from_the_composed_one)
 
 	zassert_ok(kfsw_param_get("route_table", &value));
 	zassert_str_equal(value.text, CONFIG_KFSW_CSP_ROUTE_TABLE);
+}
+
+/* -------------------------------------------------------- service tables */
+
+ZTEST(app_param_tables, test_a_service_table_sits_in_the_service_band)
+{
+	struct kfsw_param_info info;
+
+	/* The band is what keeps two independently developed owners from being
+	 * given the same table, so it is worth asserting per owner rather than
+	 * only across the listing. */
+	zassert_ok(kfsw_param_get_info("events_recorded", &info));
+	zassert_equal(info.table, KFSW_EVENT_PARAM_TABLE_ID);
+	zassert_str_equal(kfsw_param_band_name(info.table), "service");
+
+	zassert_ok(kfsw_param_get_info("fwu_state", &info));
+	zassert_equal(info.table, KFSW_FWU_PARAM_TABLE_ID);
+	zassert_str_equal(kfsw_param_band_name(info.table), "service");
+
+	zassert_ok(kfsw_param_get_info("health_state", &info));
+	zassert_equal(info.table, KFSW_HEALTH_PARAM_TABLE_ID);
+	zassert_str_equal(kfsw_param_band_name(info.table), "service");
+}
+
+ZTEST(app_param_tables, test_update_state_cannot_be_set_from_outside)
+{
+	struct kfsw_param_value value;
+
+	/* If an operator could write these, an unverified image could be marked
+	 * ready, which is the one thing the update service exists to prevent.
+	 */
+	zassert_ok(kfsw_param_get("fwu_state", &value));
+	zassert_equal(kfsw_param_set("fwu_state", &value), -EACCES);
+
+	zassert_ok(kfsw_param_get("fwu_swap_scheduled", &value));
+	zassert_equal(kfsw_param_set("fwu_swap_scheduled", &value), -EACCES);
+
+	zassert_ok(kfsw_param_get("fwu_expected_crc", &value));
+	zassert_equal(kfsw_param_set("fwu_expected_crc", &value), -EACCES);
+}
+
+ZTEST(app_param_tables, test_the_event_table_follows_the_record)
+{
+	struct kfsw_event_stats stats;
+	struct kfsw_param_value capacity;
+	struct kfsw_param_value recorded;
+
+	kfsw_event_get_stats(&stats);
+	zassert_ok(kfsw_param_get("events_capacity", &capacity));
+	zassert_equal(capacity.scalar.u16, stats.capacity);
+
+	/* Emitting has to move the counter the table reports, or the table is
+	 * describing something other than the record. */
+	zassert_ok(kfsw_param_get("events_recorded", &recorded));
+	kfsw_event_emit(KFSW_EVENT_SOURCE_APP, 1U, KFSW_EVENT_INFO, NULL, 0U);
+	{
+		struct kfsw_param_value after;
+
+		zassert_ok(kfsw_param_get("events_recorded", &after));
+		zassert_equal(after.scalar.u32, recorded.scalar.u32 + 1U);
+	}
+}
+
+ZTEST(app_param_tables, test_a_check_slower_than_the_watchdog_is_refused)
+{
+	struct kfsw_param_info info;
+	struct kfsw_param_value value;
+
+	zassert_ok(kfsw_param_get_info("health_interval_ms", &info));
+	zassert_str_equal(kfsw_param_mode_name(info.flags), "w",
+			  "live so it can be corrected from the ground, not stored so a "
+			  "mistake does not outlive the pass");
+
+	/* Zero would be missed the instant it was set. */
+	zassert_equal(kfsw_health_check_interval_ms(0U), -EINVAL);
+
+	/* This target binds no watchdog, so there is nothing for a slow check
+	 * to outlast and any interval is accepted. Refusing here would refuse
+	 * on every target without watchdog hardware. The refusal itself is
+	 * hardware behaviour and belongs to the hardware acceptance, which is
+	 * where it is recorded.
+	 */
+	zassert_ok(kfsw_health_check_interval_ms(60000U));
+
+	zassert_ok(kfsw_param_get("health_interval_ms", &value));
+	value.scalar.u16 = 250U;
+	zassert_ok(kfsw_param_set("health_interval_ms", &value));
+	zassert_equal(kfsw_health_get_interval_ms(), 250U);
+
+	value.scalar.u16 = 0U;
+	zassert_equal(kfsw_param_set("health_interval_ms", &value), -EINVAL);
+	zassert_equal(kfsw_health_get_interval_ms(), 250U, "a refused write changes nothing");
 }
 
 ZTEST(app_param_tables, test_looking_a_parameter_up_by_name)

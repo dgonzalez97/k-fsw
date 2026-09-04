@@ -156,7 +156,23 @@ Registered tables in the reference composition:
 | 6 | core | `watchdog` | `k-fsw/app/src/parameters/watchdog_table.c`, with the watchdog |
 | 24 | core | `test` | `tests/support/parameter_definitions.c`, opt-in fixtures |
 | 25 | service | `log` | `kfsw-services/src/log.c` |
+| 27 | service | `event` | `kfsw-services/src/event-parameters/`, with the event record |
+| 30 | service | `fwu` | `kfsw-services/src/fwu-parameters/`, with the update service |
+| 31 | service | `health` | `kfsw-services/src/health-parameters/`, with health monitoring |
 | 67 | module | `hw_test` | `kfsw-modules/boton-test` |
+
+The update table is read-only throughout. If an operator could write it, an
+unverified image could be marked ready, which is what the update service exists
+to prevent.
+
+`health_interval_ms` is the one writable value in these tables that can reset a
+working satellite by being set to a number that looks reasonable: the watchdog
+is fed only by a check that finds every component healthy, so a check slower
+than the feed interval resets a board where nothing is wrong. It is validated
+against the watchdog the system is actually running with, and refused in the
+validator rather than the change callback — by the time a change callback runs
+the value is already stored, and undoing it afterwards still reports success
+for something that was rejected.
 
 The core tables live in the composition layer rather than in `kfsw-platform`
 and `kfsw-comms`. Those layers sit below the parameter service and never
@@ -195,6 +211,20 @@ through the scalar union.
 Values travel on the caller's stack in a bounded buffer rather than through an
 allocator: a parameter service that allocated would have to fail at the worst
 moment.
+
+### Console colour
+
+Log lines are coloured by severity: errors red, warnings yellow, information
+white, debug dim. The escape sequences bracket the whole line rather than
+sitting inside it, so `[LEVEL] message` remains one contiguous run of text for
+anything matching on it. `CONFIG_KFSW_LOG_COLOR` turns it off for a console
+that does not understand VT100.
+
+The shell prompt is jade, applied at runtime because Kconfig strings cannot
+carry escape sequences. The shell measures the prompt with a plain string
+length to know where the cursor starts, so the composition corrects that count
+to the visible width; without it, every line edit would land in the wrong
+column.
 
 ### Sampled values
 
