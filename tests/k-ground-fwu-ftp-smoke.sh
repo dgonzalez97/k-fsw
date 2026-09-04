@@ -63,15 +63,24 @@ wait_for_output()
 	local file="$1"
 	local expected="$2"
 	local process_pid="$3"
+	# Seconds. A shell command answers in well under the default; a transfer
+	# of a hundred blocks does not, and the machine running this may be much
+	# slower than the one it was written on.
+	local limit="${4:-30}"
+	local waited=0
 
-	for _ in {1..600}; do
+	while true; do
 		grep -Fq "$expected" "$file" 2>/dev/null && return 0
 		kill -0 "$process_pid" 2>/dev/null || return 1
+		awk -v w="$waited" -v l="$limit" 'BEGIN{exit !(w>=l)}' && return 1
 		sleep 0.05
+		waited="$(awk -v w="$waited" 'BEGIN{printf "%.2f", w+0.05}')"
 	done
-
-	return 1
 }
+
+# How long a whole-image transfer may take. Generous on purpose: an unhelpful
+# timeout here reports a stall that never happened.
+readonly TRANSFER_LIMIT_S=600
 
 trap cleanup EXIT
 trap 'exit 130' INT
@@ -197,7 +206,7 @@ wait_for_output "$work_dir/node16.log" "state: idle" "$node16_pid" || \
 # An ordinary put, addressed to the reserved name. Nothing about the wire
 # protocol changes; only where the bytes land.
 printf '%s\n' 'ftp put 16 /build/image.bin firmware.bin' >&4
-wait_for_output "$work_dir/node19.log" "FTP put" "$node19_pid" 600 || \
+wait_for_output "$work_dir/node19.log" "FTP put" "$node19_pid" "$TRANSFER_LIMIT_S" || \
 	fail "the put did not complete"
 
 # The image must be in the update service, not in the filesystem. A file of

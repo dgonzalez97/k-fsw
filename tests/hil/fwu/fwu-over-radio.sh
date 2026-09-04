@@ -51,9 +51,21 @@ readonly FLASH_BASE=0x08000000
 
 cleanup()
 {
+	local status=$?
+
 	for pid in "$ground_pid" "$bridge_pid" "$debug_capture_pid"; do
 		[[ -n "$pid" ]] && kill "$pid" 2>/dev/null || true
 	done
+
+	# A failed run is the one whose logs are worth having. Removing them on
+	# the way out leaves nothing to diagnose from.
+	if [[ "$status" -ne 0 ]]; then
+		local kept="${KFSW_HIL_LOG_DIR:-$KFSW_ROOT/build/hil/fwu/failed}"
+
+		mkdir -p "$kept" 2>/dev/null || true
+		cp "$work_dir"/*.log "$kept/" 2>/dev/null || true
+		printf 'logs kept in %s\n' "$kept" >&2
+	fi
 	[[ -n "$debug_stty" && -e "$debug_serial" ]] && \
 		stty -F "$debug_serial" "$debug_stty" 2>/dev/null || true
 	[[ -n "$radio_stty" && -e "$radio_device" ]] && \
@@ -256,8 +268,24 @@ printf 'node %s reports revision %s\n' "$FLIGHT_NODE" "$revision_before"
 banner "Upload the second image over the radio"
 printf 'this is tens of minutes at %s baud\n' "$radio_baud"
 printf '%s\n' "fwu send $FLIGHT_NODE $after_image" >&3
-wait_for_output "$work_dir/ground.log" "Image accepted and verified" "$ground_pid" 3600 || \
-	fail "the image was not accepted by the flight node"
+
+# Waiting for success alone turns any failure into the full timeout, which on a
+# transfer this long is an hour of watching nothing happen.
+upload_done=0
+for _ in $(seq 1 3600); do
+	if grep -aq "Image accepted and verified" "$work_dir/ground.log"; then
+		upload_done=1
+		break
+	fi
+	if grep -aq "firmware upload failed" "$work_dir/ground.log"; then
+		printf '%s\n' "$(grep -a "refused\|firmware upload failed" \
+			"$work_dir/ground.log" | tail -2)" >&2
+		fail "the flight node rejected the upload"
+	fi
+	kill -0 "$ground_pid" 2>/dev/null || fail "the ground station stopped"
+	sleep 1
+done
+[[ "$upload_done" -eq 1 ]] || fail "the upload did not finish in time"
 
 resent="$(sed -n 's/.*verified; \([0-9]*\) block(s) resent.*/\1/p' "$work_dir/ground.log" | tail -1)"
 printf 'accepted after %s resent block(s)\n' "${resent:-0}"
