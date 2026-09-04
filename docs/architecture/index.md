@@ -151,7 +151,7 @@ to formal owner synchronization without duplicate storage or PARAM internals
 in this module.
 
 A future housekeeping collector should call the typed snapshot API. The
-logical table name is `hw_test`, and table ID 67 is reserved by the module. It should
+logical table name is `hw_test`, registered under ID 67 in the module band. It should
 not query PARAM by name or read GPIO; HK itself remains unimplemented.
 
 The application source stays focused on order and failure reporting:

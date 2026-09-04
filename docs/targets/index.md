@@ -145,7 +145,7 @@ not constitute physical evidence. Manual blue USER-button acceptance,
 including one-count-per-press, hold behavior, timestamps, remote observation,
 and rejected writes, plus physical LED shell/PARAM control, remains pending
 until it is performed with a user on the named NUCLEO bench. The logical
-`hw_test` table reserves ID 67 for the following generic HK integration.
+`hw_test` table is registered under ID 67, in the module band.
 
 ### Opt-in MCUboot
 

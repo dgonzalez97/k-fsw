@@ -266,10 +266,25 @@ wait_for_output "$work_dir/nucleo.log" "CSP ping 16: success" \
 	fail "NUCLEO node 2 could not ping k-ground node 16 over Holybro"
 
 printf '%s\n' 'param list 2' 'param get 2 log_level' >&3
-wait_for_output "$work_dir/ground.log" "2:0 node_id" "$ground_pid" || \
+# The listing addresses each parameter by table and offset. A remote node's
+# table names are not on the wire, so the number stands in for them: node_id is
+# offset 0 of the core board table, log_level offset 0 of the log service's.
+wait_for_output "$work_dir/ground.log" "1           0x00  node_id" "$ground_pid" || \
 	fail "the production NUCLEO parameter list is missing node_id"
-wait_for_output "$work_dir/ground.log" "2:1 log_level" "$ground_pid" || \
+wait_for_output "$work_dir/ground.log" "25          0x00  log_level" "$ground_pid" || \
 	fail "the production NUCLEO parameter list is missing log_level"
+# Identity as text, which needs the whole string path to survive the radio.
+wait_for_output "$work_dir/ground.log" "1           0x10  uid" "$ground_pid" || \
+	fail "the production NUCLEO parameter list is missing uid"
+wait_for_output "$work_dir/ground.log" "4           0x20  route_table" "$ground_pid" || \
+	fail "the production NUCLEO parameter list is missing route_table"
+# A string read across the radio. This is the whole string path end to end:
+# sampled from the running CSP identity on the NUCLEO, packed into a libparam
+# transfer, carried over RF, and rendered quoted on the ground.
+printf '%s\n' 'param get 2 uid' >&3
+wait_for_output "$work_dir/ground.log" '2:uid = "kfsw-2"' "$ground_pid" || \
+	fail "the NUCLEO identity did not survive the radio as text"
+
 wait_for_output "$work_dir/ground.log" "2:log_level = " "$ground_pid" || \
 	fail "k-ground could not read the NUCLEO log_level parameter"
 if grep -Eq '2:[0-9]+ +test_(u32|i32|float)' "$work_dir/ground.log"; then
@@ -342,10 +357,16 @@ printf '%s\n' \
 	'cmd 2 event_tail 0' \
 	'cmd 2 bogus' >&3
 
-wait_for_output "$work_dir/ground.log" "CSP ping 16: success" "$ground_pid" || \
-	fail "the ground node could not reach itself"
-wait_for_output "$work_dir/ground.log" "noop node=16: OK noop from node 16" \
-	"$ground_pid" || fail "a self-addressed command did not report its own node"
+# The ground node is 16, so this is addressed to itself. There is no link to
+# traverse and reaching the shell at all is the answer; reporting a round-trip
+# time would be a measurement of nothing.
+wait_for_output "$work_dir/ground.log" "CSP ping 16: this node, no link traversed" \
+	"$ground_pid" || fail "the ground node did not answer for itself"
+# Addressed to this node, so the command runs here rather than being sent into
+# the network and back. Source node 0 is the marker for a command that did not
+# arrive over CSP, which is now the truth for it.
+wait_for_output "$work_dir/ground.log" "noop node=16: OK noop from node 0" \
+	"$ground_pid" || fail "a self-addressed command was not run locally"
 wait_for_output "$work_dir/ground.log" "noop node=2: OK noop from node 16" \
 	"$ground_pid" || fail "NUCLEO node 2 did not answer a command over Holybro"
 wait_for_output "$work_dir/ground.log" "info node=2: OK uptime_ms=" "$ground_pid" || \

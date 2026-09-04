@@ -120,35 +120,129 @@ persistence unit suites build with `CONFIG_KFSW_CSP=n`, and
 `tests/param-local-smoke.sh` provides an additional local-only integration
 composition.
 
-### Local table
+### Tables
 
-The base production composition contains two parameters. The explicit
-NUCLEO `boton_test` example contributes five more when the module is enabled:
+A parameter is addressed by **table and offset**, not by a flat identifier.
+The band a table sits in says who owns it, so two independently developed
+components cannot be given the same table by accident:
 
-| Owner | ID | Name | Type | Compiled default | Access | Persistent | Validation/effect |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Application composition | 0 | `node_id` | `u16` | CSP address, or `0` without CSP | Read-only | No | Build-time identity only |
-| Logging service | 1 | `log_level` | `u8` | `CONFIG_KFSW_LOG_MIN_LEVEL` | Writable | Yes | Range 0–4; callback updates runtime logging |
-| `boton_test` | 6 | `boton_test_press_count` | `u32` | `0` | Read-only | No | Live accepted-press count; saturates at `UINT32_MAX` |
-| `boton_test` | 7 | `boton_test_last_press_s` | `u32` | `0` | Read-only | No | Live monotonic seconds since boot; floor conversion and saturation |
-| `boton_test` | 8 | `hw_test_led_green` | `u8` | `0` | Writable | No | Boolean 0/1; owner setter applies LD1 state |
-| `boton_test` | 9 | `hw_test_led_blue` | `u8` | `0` | Writable | No | Boolean 0/1; owner setter applies LD2 state |
-| `boton_test` | 10 | `hw_test_led_red` | `u8` | `0` | Writable | No | Boolean 0/1; owner setter applies LD3 state |
+| Band | Owner | Meaning |
+| --- | --- | --- |
+| 0 | — | Reserved invalid. A zero table identifier is never valid, so an uninitialised field cannot address a real table. |
+| 1–24 | composition, platform, comms | Core: identity, links and hardware. |
+| 25–49 | `kfsw-services` | One table per service. |
+| 50–99 | `kfsw-modules` | Devices and subsystems. |
+| 100–255 | — | Unallocated; left for mission payloads. |
+
+The wire identifier carries the table in its high byte and the offset in its
+low byte. That keeps it unique across the node, which is what the libcsp
+parameter list requires, while decoding back to the table and offset an
+operator reads. Offsets are unique inside a table; names are unique across the
+node and are at most `KFSW_PARAM_NAME_MAX` (32) characters, refused at
+registration rather than truncated.
+
+A table is a definition set: the two are the same thing because a table is
+owned by exactly one component, the one that can validate and apply its values.
+
+Registered tables in the reference composition:
+
+| ID | Band | Name | Owner |
+| --- | --- | --- | --- |
+| 1 | core | `board` | `k-fsw/app/src/parameters/board_table.c` |
+| 2 | core | `system` | `k-fsw/app/src/parameters/system_table.c` |
+| 3 | core | `telemetry` | `k-fsw/app/src/parameters/telemetry_table.c` |
+| 4 | core | `csp` | `k-fsw/app/src/parameters/csp_table.c`, with CSP |
+| 5 | core | `storage` | `k-fsw/app/src/parameters/storage_table.c`, with storage |
+| 6 | core | `watchdog` | `k-fsw/app/src/parameters/watchdog_table.c`, with the watchdog |
+| 24 | core | `test` | `tests/support/parameter_definitions.c`, opt-in fixtures |
+| 25 | service | `log` | `kfsw-services/src/log.c` |
+| 67 | module | `hw_test` | `kfsw-modules/boton-test` |
+
+The core tables live in the composition layer rather than in `kfsw-platform`
+and `kfsw-comms`. Those layers sit below the parameter service and never
+include a services header, so a table there would invert an established
+dependency. Each core table reads its values through the public API the layer
+below already exposes, which leaves the state where it belongs.
+
+### Write modes
+
+A parameter's write behaviour is part of its contract. The mode is derived from
+the definition rather than declared separately, so it cannot drift from what
+the code does:
+
+| Mode | Meaning | How it is built |
+| --- | --- | --- |
+| `r` | Read-only | `KFSW_PARAM_FLAG_READ_ONLY` |
+| `w` | Takes effect immediately | a `changed` callback, or `KFSW_PARAM_FLAG_LIVE` where the owner reads the value every cycle |
+| `b` | Stored; the running system keeps its old value until reboot | `KFSW_PARAM_FLAG_PERSISTENT` with neither of the above |
+| `wb` | Both | |
+
+The service always sets `KFSW_PARAM_FLAG_LIVE` for a definition that supplies a
+change callback, so a parameter that applies its value cannot be reported as
+needing a reboot. A `b` parameter says so on write rather than acknowledging
+with a bare `OK`: a stored value the operator believes is live is the failure
+this scheme exists to prevent.
+
+### Strings
+
+`KFSW_PARAM_STRING` carries text up to `CONFIG_KFSW_PARAM_STRING_MAX` bytes
+including the terminator. A definition declares the storage it owns through
+`capacity`; a write longer than that is refused rather than truncated, because
+a truncated value is a different value and the operator is never told. Strings
+have their own validator and change callback, since neither can be passed
+through the scalar union.
+
+Values travel on the caller's stack in a bounded buffer rather than through an
+allocator: a parameter service that allocated would have to fail at the worst
+moment.
+
+### Sampled values
+
+A definition may supply a `sample` callback, which refreshes the backing store
+immediately before a read. Live housekeeping uses it because a value is worth
+reading only if it is current when it was asked for; an uptime refreshed on a
+timer is wrong by up to one period every time somebody reads it.
+
+The CSP server hands libparam the backing storage directly rather than going
+through that read path, so it refreshes every sampled parameter before serving
+a request. Without that, a remote read answers with whatever the storage last
+held, which for a value nothing writes locally is its compiled default
+forever: an uptime always zero, an identity always empty.
+
+Sampling runs while PARAM serializes access, so a `sample` callback must not
+call back into the parameter API.
+
+### Transport sizing
+
+Listing a table sends one packet per parameter, which makes it the largest
+burst the composition produces. Three limits have to cover it and each fails
+differently when it does not:
+
+| Limit | Symptom when too small |
+| --- | --- |
+| `CSP_BUFFER_COUNT` | Every buffer sits on a connection's receive queue, the interface has none left to assemble the next frame, and the transfer stops outright |
+| `CSP_CONN_RXQUEUE_LEN` | Packets past the queue depth are dropped, so the caller gets a list that looks complete and is not |
+| `CSP_QFIFO_LEN` | The same, one layer lower, at the router's input |
+| `CONFIG_KFSW_PARAM_REMOTE_POOL_SIZE` | The download stops part way with `-ENOSPC` |
+
+The K-FSW compositions set all of them from
+`CONFIG_KFSW_PARAM_MAX_DEFINITIONS`. libcsp's own defaults of 15 and 16 are
+sized for ping-sized traffic.
+
+`CONFIG_KFSW_PARAM_LIST_RDP` puts the list on reliable delivery, on by
+default. The list has no acknowledgement of its own, so over a radio a lost
+descriptor leaves a hole the caller cannot see.
+
+### Local parameters
 
 Software and physical test configurations may enable
-`CONFIG_KFSW_PARAM_TEST_DEFINITIONS`. That opt-in support component owns the
-compatibility fixtures `test_u32` (ID 2, default 42), `test_i32` (ID 3,
-default -7), and `test_float` (ID 4, default 1.5), plus a read-only unit-test
-fixture at ID 5. These are not production application parameters, but their
-IDs remain reserved.
+`CONFIG_KFSW_PARAM_TEST_DEFINITIONS`, which contributes table 24 `test`. These
+are not production parameters, but the table identifier stays reserved.
 
-K-FSW allocates a new parameter ID as the lowest unused value across every
-known production and test definition. Once assigned, an ID is never recycled,
-even when its owner is disabled or later removed. That policy reserves 0
-through 5 and assigns 6 through 10 to `boton_test`; the PARAM core's duplicate-ID
-and duplicate-name checks remain the runtime collision guard. The registry
-allocates numbers centrally for stability, but the definitions and semantics
-remain in their owning component.
+`CONFIG_KFSW_PARAM_MAX_DEFINITIONS` (default 64) bounds parameters across every
+table and `CONFIG_KFSW_PARAM_MAX_TABLES` (default 16) bounds the tables
+themselves. Registration is refused once either is full rather than overrunning
+it.
 
 The two button entries reference the same individually aligned `uint32_t`
 backing fields represented by `kfsw_boton_test_get_status()`; PARAM does not
@@ -159,14 +253,16 @@ the raw-value model does not provide a shared formal C synchronization edge
 with the owner mutex. They are runtime observations rather than configuration,
 so remote or local `set` operations are rejected and the persistent flag is
 absent. `param save`, `param load`, and `param defaults` therefore never change
-or restore them. A future generic owner-read callback belongs in PARAM if
-formal owner synchronization is required for these scalar reads.
+or restore them. PARAM now has an owner-read callback -- see **Sampled values**
+above -- so if formal owner synchronization is required for these scalar reads,
+that is where it belongs.
 
 The three LED entries are non-persistent developer controls. Their validators
 accept only `0` or `1` and call the same owner setter used by the shell. A GPIO
 failure rejects the write before PARAM stores the new value, so reported owner
 state remains truthful. The five values form the logical `hw_test` definition
-set; `KFSW_HW_TEST_TABLE_ID` reserves table ID 67 for future HK collection.
+set, registered as table 67 in the module band. The three LED offsets are
+0x08, 0x09 and 0x0a; the two counters are at 0x00 and 0x04.
 
 The public type enumeration names unsigned, signed, hexadecimal, float,
 double, string, and data categories. The current local core accepts scalar

@@ -43,7 +43,7 @@
 #include <kfsw/testing/parameter_definitions.h>
 #endif
 
-#include "parameter_definitions.h"
+#include "parameters/tables.h"
 #endif
 
 int main(void)
@@ -80,14 +80,28 @@ int main(void)
 #endif
 
 #if CONFIG_KFSW_PARAM
+	/* Core tables first, then services, then modules: the same order the
+	 * identifier bands are allocated in, so a listing reads in one
+	 * direction whatever the composition is.
+	 */
 	const struct kfsw_param_definition_set *const parameter_sets[] = {
-		&kfsw_app_param_definitions,
-		&kfsw_log_param_definitions,
-#if CONFIG_KFSW_BOTON_TEST
-		&kfsw_boton_test_param_definitions,
+		&kfsw_board_param_definitions,      &kfsw_system_param_definitions,
+		&kfsw_telemetry_param_definitions,
+#if CONFIG_KFSW_CSP
+		&kfsw_csp_param_definitions,
+#endif
+#if CONFIG_KFSW_STORAGE
+		&kfsw_storage_param_definitions,
+#endif
+#if CONFIG_KFSW_WATCHDOG
+		&kfsw_watchdog_param_definitions,
 #endif
 #if CONFIG_KFSW_PARAM_TEST_DEFINITIONS
 		&kfsw_test_param_definitions,
+#endif
+		&kfsw_log_param_definitions,
+#if CONFIG_KFSW_BOTON_TEST
+		&kfsw_boton_test_param_definitions,
 #endif
 	};
 
@@ -108,6 +122,16 @@ int main(void)
 			kfsw_log_info("Persistent parameters restored");
 		}
 #endif
+		/* Applied here because this is the first point at which the
+		 * stored value is known: storage is mounted, the snapshot has
+		 * been restored, and nothing that talks to the outside has
+		 * started yet.
+		 */
+		if (kfsw_system_boot_delay_ms() != 0U) {
+			kfsw_log_info("Delaying service start by %u ms",
+				      kfsw_system_boot_delay_ms());
+			k_sleep(K_MSEC(kfsw_system_boot_delay_ms()));
+		}
 	}
 #endif
 
@@ -267,9 +291,16 @@ int main(void)
 		if (health_watching) {
 			(void)kfsw_health_report(health_handle);
 		}
-		/* Well inside the deadline, so an ordinary scheduling delay is
-		 * not mistaken for the thread having stopped. */
+		/* Read every cycle so a change takes effect on the next one.
+		 * The parameter is validated to stay well inside the deadline,
+		 * so an ordinary scheduling delay is never mistaken for the
+		 * thread having stopped.
+		 */
+#if CONFIG_KFSW_PARAM
+		k_sleep(K_MSEC(kfsw_system_app_report_ms()));
+#else
 		k_sleep(K_MSEC(CONFIG_KFSW_APP_HEALTH_DEADLINE_MS / 4U));
+#endif
 #else
 		k_sleep(K_SECONDS(60));
 #endif

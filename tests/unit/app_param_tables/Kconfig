@@ -1,0 +1,10 @@
+# The application thread's deadline is an application option, and the system
+# table validates against it. Declared here so this suite builds the same
+# branch the application does: without it the bound falls back to no bound at
+# all, and the case that matters most would pass without being exercised.
+config KFSW_APP_HEALTH_DEADLINE_MS
+	int "How long the application thread may go without reporting"
+	default 4000
+	range 200 60000
+
+source "Kconfig.zephyr"

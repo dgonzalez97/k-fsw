@@ -12,7 +12,7 @@ static uint8_t test_read_only = 9U;
 
 static const struct kfsw_param_definition test_param_definitions[] = {
 	{
-		.id = 2U,
+		.offset = 0x08U,
 		.type = KFSW_PARAM_U32,
 		.flags = KFSW_PARAM_FLAG_DEBUG | KFSW_PARAM_FLAG_PERSISTENT,
 		.name = "test_u32",
@@ -21,7 +21,7 @@ static const struct kfsw_param_definition test_param_definitions[] = {
 		.default_value = {.u32 = 42U},
 	},
 	{
-		.id = 3U,
+		.offset = 0x0cU,
 		.type = KFSW_PARAM_I32,
 		.flags = KFSW_PARAM_FLAG_DEBUG | KFSW_PARAM_FLAG_PERSISTENT,
 		.name = "test_i32",
@@ -30,7 +30,7 @@ static const struct kfsw_param_definition test_param_definitions[] = {
 		.default_value = {.i32 = -7},
 	},
 	{
-		.id = 4U,
+		.offset = 0x10U,
 		.type = KFSW_PARAM_FLOAT,
 		.flags = KFSW_PARAM_FLAG_DEBUG | KFSW_PARAM_FLAG_PERSISTENT,
 		.name = "test_float",
@@ -39,7 +39,7 @@ static const struct kfsw_param_definition test_param_definitions[] = {
 		.default_value = {.f32 = 1.5F},
 	},
 	{
-		.id = 5U,
+		.offset = 0x14U,
 		.type = KFSW_PARAM_U8,
 		.flags = KFSW_PARAM_FLAG_READ_ONLY | KFSW_PARAM_FLAG_DEBUG,
 		.name = "test_read_only",
@@ -50,6 +50,8 @@ static const struct kfsw_param_definition test_param_definitions[] = {
 };
 
 const struct kfsw_param_definition_set kfsw_test_param_definitions = {
+	.table = 24U,
+	.name = "test",
 	.definitions = test_param_definitions,
 	.count = ARRAY_SIZE(test_param_definitions),
 };

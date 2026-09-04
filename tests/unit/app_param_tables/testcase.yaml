@@ -1,0 +1,12 @@
+---
+tests:
+  kfsw.app.param_tables:
+    tags:
+      - unit
+      - app
+      - param
+      - tables
+    platform_allow:
+      - native_sim/native/64
+    integration_platforms:
+      - native_sim/native/64

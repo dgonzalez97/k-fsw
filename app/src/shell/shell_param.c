@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <inttypes.h>
+#include <string.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,16 +11,88 @@
 
 #include <kfsw/services/parameter.h>
 
+/* Column widths for the listing. The name column is the widest a name may be,
+ * so no value ever pushes the columns out of line; registration refuses a
+ * longer name rather than truncating one here.
+ */
+/* Wide enough for the longest table name in any composition. */
+#define KFSW_PARAM_TABLE_COLUMN 10
+#define KFSW_PARAM_NAME_COLUMN ((int)KFSW_PARAM_NAME_MAX)
+#define KFSW_PARAM_TYPE_COLUMN 6
+#define KFSW_PARAM_MODE_COLUMN 4
+/* Wide enough for a quoted string parameter at full capacity. */
+#define KFSW_PARAM_VALUE_TEXT_SIZE (KFSW_PARAM_STRING_MAX + 3)
+
 struct param_list_context {
 	const struct shell *shell;
+	/* The header is printed on the first row rather than before the walk,
+	 * so a listing that turns out to be empty prints nothing at all
+	 * instead of column titles over nothing.
+	 */
+	bool header_printed;
+	/* False for a remote listing. Values are looked up by name, and a name
+	 * can exist on both nodes, so reading one during a remote listing would
+	 * print this node's value in the other node's table.
+	 */
+	bool local;
 };
+
+static void format_param_value(char *text, size_t size, const struct kfsw_param_value *value);
+
+static void print_list_header(const struct shell *sh)
+{
+	shell_print(sh, "%-*s  %-4s  %-*s  %-*s  %-*s  %s", KFSW_PARAM_TABLE_COLUMN, "table",
+		    "addr", KFSW_PARAM_NAME_COLUMN, "name", KFSW_PARAM_TYPE_COLUMN, "type",
+		    KFSW_PARAM_MODE_COLUMN, "mode", "value");
+	shell_print(sh, "%.*s  %.*s  %.*s  %.*s  %.*s  %s", KFSW_PARAM_TABLE_COLUMN,
+		    "--------------------------------", 4, "--------------------------------",
+		    KFSW_PARAM_NAME_COLUMN, "--------------------------------",
+		    KFSW_PARAM_TYPE_COLUMN, "--------------------------------",
+		    KFSW_PARAM_MODE_COLUMN, "--------------------------------", "-----");
+}
 
 static bool print_param_info(const struct kfsw_param_info *info, void *context)
 {
+	struct param_list_context *list_context = context;
+	struct kfsw_param_value value;
+	char value_text[KFSW_PARAM_VALUE_TEXT_SIZE];
+	char table_text[KFSW_PARAM_TABLE_COLUMN + 1];
+
+	if (!list_context->header_printed) {
+		print_list_header(list_context->shell);
+		list_context->header_printed = true;
+	}
+
+	/* A remote listing carries the table in the identifier but not its
+	 * name, so the name is printed where it is known and the number where
+	 * it is not.
+	 */
+	if (info->table_name != NULL) {
+		(void)snprintf(table_text, sizeof(table_text), "%s", info->table_name);
+	} else {
+		(void)snprintf(table_text, sizeof(table_text), "%" PRIu8, info->table);
+	}
+
+	if (list_context->local && (kfsw_param_get(info->name, &value) == 0)) {
+		format_param_value(value_text, sizeof(value_text), &value);
+	} else {
+		(void)snprintf(value_text, sizeof(value_text), "-");
+	}
+
+	shell_print(list_context->shell, "%-*s  0x%02" PRIx8 "  %-*s  %-*s  %-*s  %s",
+		    KFSW_PARAM_TABLE_COLUMN, table_text, info->offset, KFSW_PARAM_NAME_COLUMN,
+		    info->name, KFSW_PARAM_TYPE_COLUMN, kfsw_param_type_name(info->type),
+		    KFSW_PARAM_MODE_COLUMN, kfsw_param_mode_name(info->flags), value_text);
+	return true;
+}
+
+static bool print_table_info(const struct kfsw_param_table_info *info, void *context)
+{
 	const struct param_list_context *list_context = context;
 
-	shell_print(list_context->shell, "%u:%u %-16s %-6s %s", info->node, info->id, info->name,
-		    kfsw_param_type_name(info->type), info->read_only ? "ro" : "rw");
+	shell_print(list_context->shell, "%3" PRIu8 "  %-7s  %-*s  %6" PRIu16, info->id,
+		    kfsw_param_band_name(info->id), KFSW_PARAM_TABLE_COLUMN, info->name,
+		    info->count);
 	return true;
 }
 
@@ -56,66 +129,74 @@ static int print_param_error(const struct shell *sh, const char *operation, cons
 	return result;
 }
 
-static void print_param_value(const struct shell *sh, uint16_t node, const char *name,
-			      const struct kfsw_param_value *value)
+static void format_param_value(char *text, size_t size, const struct kfsw_param_value *value)
 {
-	char label[64];
-
-	if (node == 0U) {
-		(void)snprintf(label, sizeof(label), "%s", name);
-	} else {
-		(void)snprintf(label, sizeof(label), "%" PRIu16 ":%s", node, name);
-	}
-
 	switch (value->type) {
 	case KFSW_PARAM_U8:
-		shell_print(sh, "%s = %" PRIu8, label, value->scalar.u8);
+		(void)snprintf(text, size, "%" PRIu8, value->scalar.u8);
 		break;
 	case KFSW_PARAM_U16:
-		shell_print(sh, "%s = %" PRIu16, label, value->scalar.u16);
+		(void)snprintf(text, size, "%" PRIu16, value->scalar.u16);
 		break;
 	case KFSW_PARAM_U32:
-		shell_print(sh, "%s = %" PRIu32, label, value->scalar.u32);
+		(void)snprintf(text, size, "%" PRIu32, value->scalar.u32);
 		break;
 	case KFSW_PARAM_U64:
-		shell_print(sh, "%s = %" PRIu64, label, value->scalar.u64);
+		(void)snprintf(text, size, "%" PRIu64, value->scalar.u64);
 		break;
 	case KFSW_PARAM_I8:
-		shell_print(sh, "%s = %" PRId8, label, value->scalar.i8);
+		(void)snprintf(text, size, "%" PRId8, value->scalar.i8);
 		break;
 	case KFSW_PARAM_I16:
-		shell_print(sh, "%s = %" PRId16, label, value->scalar.i16);
+		(void)snprintf(text, size, "%" PRId16, value->scalar.i16);
 		break;
 	case KFSW_PARAM_I32:
-		shell_print(sh, "%s = %" PRId32, label, value->scalar.i32);
+		(void)snprintf(text, size, "%" PRId32, value->scalar.i32);
 		break;
 	case KFSW_PARAM_I64:
-		shell_print(sh, "%s = %" PRId64, label, value->scalar.i64);
+		(void)snprintf(text, size, "%" PRId64, value->scalar.i64);
 		break;
 	case KFSW_PARAM_X8:
-		shell_print(sh, "%s = 0x%02" PRIx8, label, value->scalar.u8);
+		(void)snprintf(text, size, "0x%02" PRIx8, value->scalar.u8);
 		break;
 	case KFSW_PARAM_X16:
-		shell_print(sh, "%s = 0x%04" PRIx16, label, value->scalar.u16);
+		(void)snprintf(text, size, "0x%04" PRIx16, value->scalar.u16);
 		break;
 	case KFSW_PARAM_X32:
-		shell_print(sh, "%s = 0x%08" PRIx32, label, value->scalar.u32);
+		(void)snprintf(text, size, "0x%08" PRIx32, value->scalar.u32);
 		break;
 	case KFSW_PARAM_X64:
-		shell_print(sh, "%s = 0x%016" PRIx64, label, value->scalar.u64);
+		(void)snprintf(text, size, "0x%016" PRIx64, value->scalar.u64);
 		break;
 	case KFSW_PARAM_FLOAT:
-		shell_print(sh, "%s = %.6g", label, (double)value->scalar.f32);
+		(void)snprintf(text, size, "%.6g", (double)value->scalar.f32);
 		break;
 	case KFSW_PARAM_DOUBLE:
-		shell_print(sh, "%s = %.12g", label, value->scalar.f64);
+		(void)snprintf(text, size, "%.12g", value->scalar.f64);
 		break;
 	case KFSW_PARAM_STRING:
+		/* Quoted so a trailing space or an empty value is visible rather
+		 * than looking like a missing one. */
+		(void)snprintf(text, size, "\"%s\"", value->text);
+		break;
 	case KFSW_PARAM_DATA:
 	case KFSW_PARAM_INVALID:
 	default:
-		shell_print(sh, "%s = <unsupported>", label);
+		(void)snprintf(text, size, "<unsupported>");
 		break;
+	}
+}
+
+static void print_param_value(const struct shell *sh, uint16_t node, const char *name,
+			      const struct kfsw_param_value *value)
+{
+	char text[KFSW_PARAM_VALUE_TEXT_SIZE];
+
+	format_param_value(text, sizeof(text), value);
+	if (node == 0U) {
+		shell_print(sh, "%s = %s", name, text);
+	} else {
+		shell_print(sh, "%" PRIu16 ":%s = %s", node, name, text);
 	}
 }
 
@@ -158,7 +239,20 @@ static int parse_param_value(const char *text, struct kfsw_param_value *value)
 	case KFSW_PARAM_DOUBLE:
 		value->scalar.f64 = strtod(text, &end);
 		return ((errno == 0) && (end != text) && (*end == '\0')) ? 0 : -EINVAL;
-	case KFSW_PARAM_STRING:
+	case KFSW_PARAM_STRING: {
+		size_t length = 0U;
+
+		while ((length + 1U < sizeof(value->text)) && (text[length] != '\0')) {
+			value->text[length] = text[length];
+			length++;
+		}
+		if (text[length] != '\0') {
+			return -EMSGSIZE;
+		}
+		value->text[length] = '\0';
+		value->size = length + 1U;
+		return 0;
+	}
 	case KFSW_PARAM_DATA:
 	case KFSW_PARAM_INVALID:
 	default:
@@ -221,7 +315,11 @@ static int parse_param_value(const char *text, struct kfsw_param_value *value)
 
 static int cmd_param_list(const struct shell *sh, size_t argc, char **argv)
 {
-	struct param_list_context context = {.shell = sh};
+	struct param_list_context context = {
+		.shell = sh,
+		.header_printed = false,
+		.local = true,
+	};
 	int result;
 
 #if CONFIG_KFSW_PARAM_CSP
@@ -234,6 +332,7 @@ static int cmd_param_list(const struct shell *sh, size_t argc, char **argv)
 		if (result != 0) {
 			return result;
 		}
+		context.local = false;
 		result = kfsw_param_remote_visit(node, print_param_info, &context);
 	}
 #else
@@ -242,7 +341,16 @@ static int cmd_param_list(const struct shell *sh, size_t argc, char **argv)
 	result = kfsw_param_visit(print_param_info, &context);
 #endif
 
-	if (result != 0) {
+	if (result == -ENOSPC) {
+		/* The descriptor cache filled part way through the download, so
+		 * the parameters after that point never arrived. Naming the
+		 * option is the difference between a number and a fix.
+		 */
+		shell_error(sh,
+			    "parameter list failed: the remote cache holds %d descriptors; "
+			    "raise CONFIG_KFSW_PARAM_REMOTE_POOL_SIZE",
+			    CONFIG_KFSW_PARAM_REMOTE_POOL_SIZE);
+	} else if (result != 0) {
 		shell_error(sh, "parameter list failed (%d)", result);
 	}
 	return result;
@@ -331,7 +439,44 @@ static int cmd_param_set(const struct shell *sh, size_t argc, char **argv)
 		return print_param_error(sh, "set", name, result);
 	}
 	print_param_value(sh, node, name, &value);
+
+	/* A stored parameter that lets the operator believe it is live is the
+	 * failure this whole scheme exists to prevent, so the write says which
+	 * one it was rather than a bare acknowledgement.
+	 */
+	if (node == 0U) {
+		struct kfsw_param_info info;
+
+		if ((kfsw_param_get_info(name, &info) == 0) &&
+		    (strcmp(kfsw_param_mode_name(info.flags), "b") == 0)) {
+			shell_print(sh, "stored; takes effect after reboot");
+		}
+	}
 	return 0;
+}
+
+static int cmd_param_tables(const struct shell *sh, size_t argc, char **argv)
+{
+	struct param_list_context context = {
+		.shell = sh,
+		.header_printed = false,
+		.local = true,
+	};
+	int result;
+
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+	shell_print(sh, "%3s  %-7s  %-*s  %6s", " id", "band", KFSW_PARAM_TABLE_COLUMN, "name",
+		    "params");
+	shell_print(sh, "%.3s  %.7s  %.*s  %.6s", "---------", "---------", KFSW_PARAM_TABLE_COLUMN,
+		    "--------------------------------", "---------");
+
+	result = kfsw_param_visit_tables(print_table_info, &context);
+	if (result != 0) {
+		shell_error(sh, "parameter tables failed (%d)", result);
+	}
+	return result;
 }
 
 #if CONFIG_KFSW_PARAM_PERSISTENCE
@@ -436,6 +581,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 #else
 		      "Set a local value: set <name> <value>.", cmd_param_set, 3, 0),
 #endif
+	SHELL_CMD_ARG(tables, NULL, "List registered parameter tables.", cmd_param_tables, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(param, &param_commands, "K-FSW parameter commands.", NULL);

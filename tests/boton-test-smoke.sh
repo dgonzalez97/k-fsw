@@ -46,6 +46,7 @@ run_image()
 	local output_log="$3"
 
 	printf '%s\n' \
+		'param tables' \
 		'param list' \
 		'param get boton_test_press_count' \
 		'param get boton_test_last_press_s' \
@@ -76,7 +77,7 @@ run_image()
 		'param get boton_test_press_count' \
 		'param get boton_test_last_press_s' \
 		'param get hw_test_led_green' |
-		"$executable" --uart_stdinout --stop_at=1.0 --no-color \
+		"$executable" --uart_stdinout --stop_at=2.0 --no-color \
 			-flash="$flash_image" -flash_erase -flash_rm \
 			>"$output_log" 2>&1
 }
@@ -100,11 +101,19 @@ expect "$disabled_log" \
 expect "$disabled_log" \
 	"get: parameter 'boton_test_last_press_s' not found" \
 	"the disabled composition unexpectedly exposed last_press_s"
-if grep -Eq '^[0-9]+:[0-9]+ +boton_test_' "$disabled_log"; then
-	fail "the disabled parameter list contains boton_test definitions"
+# The listing is one row per parameter: table name, offset, then the name. A
+# composition without the module must not carry the table at all.
+if grep -Eq '^hw_test +0x[0-9a-f]{2} ' "$disabled_log"; then
+	fail "the disabled parameter list contains the hw_test table"
 fi
-if grep -Eq '^[0-9]+:[0-9]+ +hw_test_led_' "$disabled_log"; then
-	fail "the disabled parameter list contains hw_test LED definitions"
+# Anchored to a listing row rather than the name alone: the shell echoes the
+# commands, so an unanchored match would find the module's name in the very
+# `param get` that is supposed to report it missing.
+if grep -Eq '^[a-z_]+ +0x[0-9a-f]{2} +(boton_test_|hw_test_led_)' "$disabled_log"; then
+	fail "the disabled parameter list contains module definitions"
+fi
+if grep -Eq '^ *67 +module' "$disabled_log"; then
+	fail "the disabled composition registered table 67"
 fi
 
 KFSW_BUILD_DIR="$enabled_build_dir" \
@@ -126,17 +135,25 @@ run_image "$enabled_build_dir/zephyr/zephyr.exe" \
 
 expect "$enabled_log" 'boton_test initialized' \
 	"the enabled module did not initialize"
-if ! grep -Eq '^0:[0-9]+ +boton_test_press_count +u32 +ro' "$enabled_log"; then
-	fail "the enabled parameter list omitted read-only press_count"
+# Table, offset, name, type and write mode together. The mode is derived from
+# the definition, so a read-only value reported as writable would show up here
+# rather than only when an operator tried to set it.
+if ! grep -Eq '^hw_test +0x00 +boton_test_press_count +u32 +r ' "$enabled_log"; then
+	fail "the enabled parameter list omitted read-only press_count at table 67 offset 0"
 fi
-if ! grep -Eq '^0:[0-9]+ +boton_test_last_press_s +u32 +ro' "$enabled_log"; then
-	fail "the enabled parameter list omitted read-only last_press_s"
+if ! grep -Eq '^hw_test +0x04 +boton_test_last_press_s +u32 +r ' "$enabled_log"; then
+	fail "the enabled parameter list omitted read-only last_press_s at table 67 offset 4"
 fi
 for led in green blue red; do
-	if ! grep -Eq "^0:[0-9]+ +hw_test_led_${led} +u8 +rw" "$enabled_log"; then
+	if ! grep -Eq "^hw_test +0x0[89a] +hw_test_led_${led} +u8 +w " "$enabled_log"; then
 		fail "the enabled parameter list omitted writable ${led} LED state"
 	fi
 done
+# The module band is where a module's table belongs; a core or service number
+# would collide with another node's table of the same number.
+if ! grep -Eq '^ *67 +module +hw_test +' "$enabled_log"; then
+	fail "hw_test was not registered as table 67 in the module band"
+fi
 expect "$enabled_log" 'boton_test_press_count = 0' \
 	"the live press_count did not start at zero"
 expect "$enabled_log" 'boton_test_last_press_s = 0' \
