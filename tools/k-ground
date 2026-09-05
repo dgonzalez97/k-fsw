@@ -80,7 +80,7 @@ load_role_config()
 		fail "ground role is not configured: $role_key ($config_file)"
 
 	unset KFSW_ROLE KFSW_NAME KFSW_CSP_NODE KFSW_CSP_PEER KFSW_CSP_ROUTES \
-		KFSW_RADIO_UHF KFSW_EXTRA_KCONFIG
+		KFSW_RADIO_UHF KFSW_EXTRA_KCONFIG KFSW_EXTRA_OVERLAY KFSW_CAN_INTERFACE
 	# Node files are deliberately simple shell-compatible environment files.
 	set -a
 	# shellcheck disable=SC1090
@@ -197,8 +197,20 @@ build_ground_node()
 	config_file="$(write_ground_config)"
 
 	echo "K-GROUND BUILD: role=$ground_role node=$ground_node peer=$ground_peer"
+
+	# A node that needs a devicetree change, such as enabling the host CAN
+	# device, names an overlay in its env file. Passed through the same way
+	# KFSW_EXTRA_KCONFIG is, so a station can compose one without a profile
+	# per combination.
+	local overlay="${KFSW_EXTRA_OVERLAY:-}"
+	if [[ -n "$overlay" ]]; then
+		[[ "$overlay" = /* ]] || overlay="$KGROUND_REPO_DIR/$overlay"
+		[[ -f "$overlay" ]] || fail "KFSW_EXTRA_OVERLAY does not exist: $overlay"
+	fi
+
 	KFSW_BUILD_DIR="$build_dir" \
 		KFSW_EXTRA_CONF_FILE="$config_file" \
+		KFSW_EXTRA_DTC_OVERLAY_FILE="$overlay" \
 		"$KGROUND_TOOLS_DIR/build.sh" linux
 }
 

@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -10,6 +11,9 @@
 
 #if CONFIG_KFSW_CSP
 #include <kfsw/comms/csp.h>
+#if CONFIG_KFSW_CSP_CAN
+#include <kfsw/comms/can.h>
+#endif
 #define KFSW_BOARD_NODE_ID_DEFAULT CONFIG_KFSW_CSP_ADDRESS
 #else
 #define KFSW_BOARD_NODE_ID_DEFAULT 0U
@@ -41,6 +45,10 @@ static uint8_t board_csp_enabled = IS_ENABLED(CONFIG_KFSW_CSP);
 static uint8_t board_kiss_enabled = IS_ENABLED(CONFIG_KFSW_CSP_KISS_UART);
 static uint8_t board_shell_enabled = IS_ENABLED(CONFIG_SHELL);
 static uint8_t board_storage_enabled = IS_ENABLED(CONFIG_KFSW_STORAGE);
+static uint8_t board_can_enabled = IS_ENABLED(CONFIG_KFSW_CSP_CAN);
+#if CONFIG_KFSW_CSP_CAN
+static uint32_t board_can_speed = CONFIG_KFSW_CSP_CAN_BITRATE;
+#endif
 
 /* Copied out of the running CSP identity rather than duplicated as build
  * constants: two sources for one fact eventually disagree, and the one an
@@ -122,6 +130,34 @@ static void sample_reset_cause(void *value)
 	*(uint32_t *)value = cause;
 }
 
+#if CONFIG_KFSW_CSP_CAN
+static void sample_can_speed(void *value)
+{
+	struct kfsw_can_info info;
+
+	kfsw_can_get_info(&info);
+	*(uint32_t *)value = info.bitrate;
+}
+
+/* Refused here rather than in the change callback, because a change callback
+ * runs after the value has already been stored and cannot put the old one
+ * back. A rate the controller would reject has to be stopped before that.
+ */
+static int validate_can_speed(const union kfsw_param_scalar *value)
+{
+	return kfsw_can_bitrate_supported(value->u32) ? 0 : -EINVAL;
+}
+
+/* Both ends of a CAN bus have to agree, so a node reconfigured on its own goes
+ * quiet until whatever is at the other end follows. Writing this over CAN
+ * therefore cuts the link that carried the write.
+ */
+static void changed_can_speed(const union kfsw_param_scalar *value)
+{
+	(void)kfsw_can_set_bitrate(value->u32);
+}
+#endif
+
 static const struct kfsw_param_definition board_param_definitions[] = {
 	{
 		.offset = 0x00U,
@@ -172,6 +208,28 @@ static const struct kfsw_param_definition board_param_definitions[] = {
 		.value = &board_csp_enabled,
 		.default_value = {.u8 = IS_ENABLED(CONFIG_KFSW_CSP)},
 	},
+	{
+		.offset = 0x05U,
+		.type = KFSW_PARAM_U8,
+		.flags = KFSW_PARAM_FLAG_READ_ONLY | KFSW_PARAM_FLAG_SYSTEM_INFO,
+		.name = "can_enabled",
+		.description = "Whether the CAN interface is composed",
+		.value = &board_can_enabled,
+		.default_value = {.u8 = IS_ENABLED(CONFIG_KFSW_CSP_CAN)},
+	},
+#if CONFIG_KFSW_CSP_CAN
+	{
+		.offset = 0x0cU,
+		.type = KFSW_PARAM_U32,
+		.name = "can_speed",
+		.description = "CAN bitrate: 125000, 250000, 500000, 800000 or 1000000",
+		.value = &board_can_speed,
+		.default_value = {.u32 = CONFIG_KFSW_CSP_CAN_BITRATE},
+		.sample = sample_can_speed,
+		.validate = validate_can_speed,
+		.changed = changed_can_speed,
+	},
+#endif
 	{
 		.offset = 0x03U,
 		.type = KFSW_PARAM_U8,
