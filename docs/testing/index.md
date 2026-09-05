@@ -493,14 +493,13 @@ FTP, firmware update and parameter tables. Reports are written below
 
 ### Parameter tables
 
-`tests/hil/param-tables.robot` wraps `tests/param-tables-smoke.sh`.
-
-Recorded on 5 September 2026 against `43ac957`: `PARAM TABLES RESULT: PASS`
-read from a NUCLEO-L496ZG over its ST-LINK debug UART, covering eleven tables,
-their addressing, the string rows and the write mode of every settable value. It checks
+`tests/hil/param-tables.robot` wraps `tests/param-tables-smoke.sh`. It checks
 that every table a composition declares is present under its own identifier and
 band, that one offset repeats across tables the way the scheme intends, and
 that the listing reports each parameter's write mode.
+
+Recorded on 5 September 2026 against `43ac957`: `PARAM TABLES RESULT: PASS`
+read from a NUCLEO-L496ZG over its ST-LINK debug UART, across eleven tables.
 
 It is deliberately about existence and addressing rather than content. A value
 is only as good as the layer underneath it, so asserting a particular
