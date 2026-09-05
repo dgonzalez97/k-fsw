@@ -203,6 +203,13 @@ int main(void)
 #if CONFIG_KFSW_CSP
 	bool csp_started = false;
 
+	/* Name the build before CSP starts, so `csp ident` reports the image
+	 * that is running rather than a fixed string. The composition is where
+	 * this can happen: kfsw-comms sits below the boot service and cannot
+	 * reach up for the version itself.
+	 */
+	kfsw_csp_set_revision(kfsw_boot_get_image_version());
+
 	result = kfsw_csp_init();
 
 	if (result != 0) {
