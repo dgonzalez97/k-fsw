@@ -56,6 +56,12 @@ target_sources_ifdef(CONFIG_KFSW_DEBUG_SHELL app PRIVATE
     src/shell/shell_prompt.c
 )
 
+# Runs before Zephyr's default handler so a crash leaves its address behind,
+# then hands over unchanged.
+target_sources_ifdef(CONFIG_KFSW_LASTWORDS app PRIVATE
+    src/fatal.c
+)
+
 if(CONFIG_KFSW_DEBUG_SHELL AND CONFIG_KFSW_COMMAND)
     target_sources(app PRIVATE src/shell/shell_echo.c)
 endif()

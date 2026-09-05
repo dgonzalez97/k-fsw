@@ -1,6 +1,8 @@
 #ifndef KFSW_APP_PARAMETERS_TABLES_H
 #define KFSW_APP_PARAMETERS_TABLES_H
 
+#include <stdbool.h>
+
 #include <kfsw/services/parameter.h>
 
 /**
@@ -60,5 +62,21 @@ uint16_t kfsw_system_boot_delay_ms(void);
 
 /** Application health reporting period in milliseconds, read from table 2. */
 uint16_t kfsw_system_app_report_ms(void);
+
+/** Longest reboot PIN, plus a terminator. */
+#define KFSW_SYSTEM_REBOOT_PIN_SIZE 9U
+
+/**
+ * @brief Whether a supplied PIN matches the one this node will accept.
+ *
+ * The PIN is a guard against a mistake, not against an adversary: it crosses
+ * the link in the clear, so anyone listening has it. What it stops is a
+ * mistyped node number resetting the wrong spacecraft, which is the failure
+ * that actually happens. Treating it as security would be a mistake.
+ *
+ * Compared over the full width regardless of where the first difference is,
+ * so the time taken says nothing about how much of the PIN was right.
+ */
+bool kfsw_system_reboot_pin_matches(const char *pin);
 
 #endif
