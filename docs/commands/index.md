@@ -200,10 +200,11 @@ These commands exist only with `CONFIG_KFSW_CSP=y`.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `csp info` | none | Show local address/identity, initialization state, router state, and free packet buffers |
+| `csp info` | none | Show local address, identity, build date and free packet buffers |
 | `csp interfaces` | none | List registered interfaces with addresses and packet/error/drop counters |
 | `csp routes` | none | List address prefixes, selected interface, and optional next hop |
 | `csp ping` | `<node>` | Send libcsp's standard ping with CRC32, bounded payload, and a one-second timeout |
+| `csp reboot` | `<node> <pin>` | Restart a node, if it quotes the pin that node holds |
 
 ```text
 kfsw:~$ csp info
@@ -227,6 +228,43 @@ KISS_2 addr=9/14 ...
 
 Routes are static startup configuration. The debug shell intentionally has no
 route-load/save command; `csp routes` is inspection-only.
+
+### Restarting a node
+
+`csp reboot <node> <pin>` restarts a node, and the node checks the pin before
+it agrees:
+
+```text
+kfsw:~$ csp reboot 2 1234
+reboot node=2: denied wrong pin
+
+kfsw:~$ csp reboot 2 0000
+reboot node=2: OK rebooting in 500 ms
+```
+
+The pin is `reboot_pin` in the system table, persistent, settable from the
+ground, and `0000` out of the box. It is text rather than a number, so `0000`
+stays four characters: read as an integer it would be zero, and a node whose
+pin was `0007` would then accept `7`.
+
+**It guards against a mistake, not against an adversary.** The pin crosses the
+link in the clear, so anyone listening has it. What it stops is a mistyped node
+number restarting the wrong spacecraft, which is the failure that actually
+happens. The node that would restart is the one that checks, never the caller:
+a guard the asker applies to itself guards nothing. The comparison runs over
+the pin's full width, so how long the answer takes says nothing about how much
+of it was right.
+
+After a restart, the boot table says why the previous run ended:
+
+```text
+kfsw:~$ param table 2 32
+32  0x30  last_reason      u8   r  1          commanded
+32  0x34  last_detail      x32  r  0x00000000 the faulting address, for a fault
+32  0x38  last_uptime_ms   u32  r  5427214
+```
+
+All three zero means the node lost power outright and left nothing behind.
 
 A ping timeout can mean no peer, no physical bridge, wrong address, wrong
 route, a stopped router, framing errors, or packet exhaustion. Inspect
@@ -520,7 +558,7 @@ kfsw:~$ cmd list
   2 info         0 args Report uptime and storage state.
   4 event_stats  0 args Report event record counters.
   5 event_tail   1 arg  Read one recorded event by age, newest is 0.
-  3 reboot       0 args [mutating] Reset this node after a short delay.
+  3 reboot       1 arg  [mutating] Reset this node after a short delay: reboot <pin>.
 
 kfsw:~$ cmd info
 info node=0: OK uptime_ms=10 storage=ready free_bytes=40960
