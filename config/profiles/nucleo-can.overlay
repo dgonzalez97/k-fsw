@@ -1,0 +1,22 @@
+/* CSP over CAN on the NUCLEO-L496ZG.
+ *
+ * The L496ZG offers CAN1 on three pin pairs and two are already taken on this
+ * board: PA11/PA12 carry USB, PB8/PB9 carry I2C1. PD0/PD1 are free, and they
+ * stay clear of USART3 on PD8/PD9, which is the ST-LINK console, so the
+ * console survives while the bus is up.
+ *
+ * There is no transceiver on the board. PD0 and PD1 are logic level and a
+ * transceiver has to sit between them and CAN_H/CAN_L.
+ */
+&can1 {
+	pinctrl-0 = <&can1_rx_pd0 &can1_tx_pd1>;
+	pinctrl-names = "default";
+	bus-speed = <500000>;
+	status = "okay";
+};
+
+/ {
+	chosen {
+		kfsw,csp-can = &can1;
+	};
+};

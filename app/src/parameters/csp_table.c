@@ -48,11 +48,25 @@ static char csp_route_table[KFSW_CSP_ROUTE_TABLE_MAX_LENGTH + 1U] = CONFIG_KFSW_
 static int validate_route_table(const char *text)
 {
 	size_t entries = 0U;
+	int result;
 
 	if (text[0] == '\0') {
 		return 0;
 	}
-	if (kfsw_csp_route_table_check(text, &entries) != 0) {
+
+	result = kfsw_csp_route_table_check(text, &entries);
+	if (result == -ENETDOWN) {
+		/* Registration happens before CSP starts, so the interfaces a
+		 * compiled table names do not exist yet and nothing here can
+		 * judge it. Accepting is the only option that leaves the table
+		 * registered, and it costs nothing: the same table is checked
+		 * again when CSP applies it, which is where a bad compiled
+		 * value is reported. Any write an operator makes arrives after
+		 * CSP is up and gets the full check.
+		 */
+		return 0;
+	}
+	if (result != 0) {
 		return -EINVAL;
 	}
 	return (entries == 0U) ? -EINVAL : 0;

@@ -1,0 +1,17 @@
+/* Ground node on a host CAN interface.
+ *
+ * native_sim carries a CAN device that bridges to a Linux SocketCAN interface,
+ * so the same libcsp Zephyr CAN driver serves a controller on a board and a USB
+ * adapter on a desk. The host interface defaults to zcan0 and is overridden at
+ * run time with --can-if, which is how a node reaches whatever the adapter came
+ * up as.
+ */
+&can0 {
+	status = "okay";
+};
+
+/ {
+	chosen {
+		kfsw,csp-can = &can0;
+	};
+};
