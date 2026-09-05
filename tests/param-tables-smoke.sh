@@ -127,6 +127,9 @@ expect 'echo_enabled                      u8      w     0'
 expect 'ftp_timeout_ms                    u32     w'
 expect 'cmd_invoked                       u32     r'
 expect 'boot_image                        string  r'
+# One level per module, rendered as a list because the elements mean something
+# positionally and a hex blob would hide which module is which.
+expect 'log_levels                        data    wb'
 
 printf '\n=== Result ===\n'
 if [[ "$failures" -eq 0 ]]; then

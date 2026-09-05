@@ -42,6 +42,8 @@
 #if CONFIG_KFSW_HEALTH
 #include <kfsw/services/health.h>
 #endif
+/* Attributes this file's messages, so its level can be raised alone. */
+#define KFSW_LOG_MODULE KFSW_LOG_MODULE_APP
 #include <kfsw/services/log.h>
 #if CONFIG_KFSW_PARAM
 #include <kfsw/services/parameter.h>

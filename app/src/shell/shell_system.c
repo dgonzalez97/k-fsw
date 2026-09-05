@@ -3,6 +3,8 @@
 #include <zephyr/version.h>
 
 #include <kfsw/platform/time.h>
+/* Attributes this file's messages, so its level can be raised alone. */
+#define KFSW_LOG_MODULE KFSW_LOG_MODULE_APP
 #include <kfsw/services/log.h>
 
 static int cmd_status(const struct shell *sh, size_t argc, char **argv)

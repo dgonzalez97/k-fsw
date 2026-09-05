@@ -105,7 +105,11 @@ GENERATE_DOCBOOK       = NO
 ENABLE_PREPROCESSING   = YES
 MACRO_EXPANSION        = YES
 EXPAND_ONLY_PREDEF     = YES
-PREDEFINED             = CONFIG_KFSW_LOG_MIN_LEVEL=0 \
+# The logging entry points are function-like macros so a call site can carry
+# its module without changing. Doxygen 1.9.1 segfaults on a documented variadic
+# macro, so the header shows it the equivalent function declarations instead.
+PREDEFINED             = __DOXYGEN__=1 \
+                         CONFIG_KFSW_LOG_MIN_LEVEL=0 \
                          CONFIG_KFSW_PARAM=1 \
                          CONFIG_KFSW_PARAM_CSP=1 \
                          CONFIG_KFSW_PARAM_PERSISTENCE=1
