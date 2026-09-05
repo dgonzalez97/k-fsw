@@ -230,10 +230,10 @@ for led in green blue red; do
 done
 
 banner "Parameter agreement"
-send "param get boton_test_press_count"
-send "param get boton_test_last_press_s"
+send "param get press_count"
+send "param get last_press_s"
 sleep 1
-grep -a "boton_test_press_count = \|boton_test_last_press_s = " \
+grep -a "press_count = \|last_press_s = " \
 	"$work_dir/nucleo.log" | tail -2
 printf 'module status press_count: %s\n' "$final_count"
 

@@ -273,7 +273,7 @@ otherwise converts uptime ticks. The API promises monotonic elapsed time, not
 a specific hardware clock resolution. Absolute spacecraft time and clock
 correlation are not implemented in the current composition.
 
-`boton_test_last_press_s` is explicitly elapsed monotonic seconds since boot,
+`last_press_s` is explicitly elapsed monotonic seconds since boot,
 not wall time. It uses the same platform monotonic clock and does not implement
 another uptime counter.
 

@@ -314,7 +314,7 @@ afterwards removes that failure mode.
 Recorded on 3 September 2026 against a NUCLEO-L496ZG: a ten-second untouched
 baseline held `press_count` at 0, physical presses advanced it to 7, the
 operator observed green, blue and red lighting through `test led` and through
-`param set hw_test_led_*`, and `param get boton_test_press_count` agreed with
+`param set hw_test_led_*`, and `param get press_count` agreed with
 `boton_test status`. Per-gesture attribution was lost to the window design and
 is not claimed.
 
