@@ -107,7 +107,10 @@ validate_log_callback()
 	local active_level="$1"
 	local callback_output
 
-	callback_output="$(sed -n '/kfsw:~\$ log test/,$p' "$work_dir/nucleo.log")"
+	# Anchored on the echoed command alone. The prompt is coloured, so an
+	# escape sequence sits between it and the command and the two are no
+	# longer one contiguous run of text.
+	callback_output="$(sed -n '/log test/,$p' "$work_dir/nucleo.log")"
 	grep -Fq '[ERROR] K-FSW shell log test: error' <<<"$callback_output" || return 1
 	if [[ "$active_level" == 2 ]]; then
 		grep -Fq '[WARNING] K-FSW shell log test: warning' \
@@ -199,6 +202,13 @@ west flash -d "$nucleo_build_dir" --runner openocd || \
 wait_for_output "$work_dir/nucleo.log" "@READY " "$debug_capture_pid" || \
 	fail "NUCLEO did not report readiness"
 
+# Console echo is off by default, so a scripted session does not show every
+# command twice. This fixture windows the board's output by looking for the
+# command it sent, which only exists when the console repeats it, so the test
+# asks for what it needs to read.
+printf '%s\r\n' 'param set echo_enabled 1' >"$debug_serial"
+sleep 1
+
 printf '%s\r\n' 'status' 'uhf status' 'uart info' 'csp interfaces' 'csp routes' \
 	>"$debug_serial"
 wait_for_output "$work_dir/nucleo.log" "CSP node: 2" "$debug_capture_pid" || \
@@ -278,6 +288,14 @@ wait_for_output "$work_dir/ground.log" "1           0x10  uid" "$ground_pid" || 
 	fail "the production NUCLEO parameter list is missing uid"
 wait_for_output "$work_dir/ground.log" "4           0x20  route_table" "$ground_pid" || \
 	fail "the production NUCLEO parameter list is missing route_table"
+# A writable service setting changed from the ground, and the image identity
+# read back. Between them these are the point of the service tables: something
+# an operator can see, and something they can change on a pass.
+printf '%s\n' 'param get 2 boot_image' 'param set 2 ftp_timeout_ms 20000' \
+	'param get 2 ftp_timeout_ms' >&3
+wait_for_output "$work_dir/ground.log" "2:ftp_timeout_ms = 20000" "$ground_pid" || \
+	fail "a service setting could not be changed over the radio"
+
 # A string read across the radio. This is the whole string path end to end:
 # sampled from the running CSP identity on the NUCLEO, packed into a libparam
 # transfer, carried over RF, and rendered quoted on the ground.

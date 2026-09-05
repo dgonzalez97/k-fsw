@@ -170,7 +170,11 @@ ZTEST(services_param, test_kfsw_parameter_lifecycle)
 	zassert_ok(kfsw_param_init(parameter_sets, ARRAY_SIZE(parameter_sets)));
 	zassert_true(kfsw_param_is_initialized());
 	zassert_ok(kfsw_param_visit(summarize_parameter, &table));
-	zassert_equal(table.count, 5U);
+	/* Both sets, whatever each holds: asserting the sum of the two tables
+	 * rather than a literal keeps this from breaking every time a service
+	 * publishes one more value. */
+	zassert_equal(table.count,
+		      kfsw_log_param_definitions.count + kfsw_test_param_definitions.count);
 	zassert_true(table.saw_read_only);
 	zassert_true(table.saw_u8);
 	zassert_true(table.saw_u32);

@@ -158,7 +158,11 @@ Registered tables in the reference composition:
 | 25 | service | `log` | `kfsw-services/src/log.c` |
 | 27 | service | `event` | `kfsw-services/src/event-parameters/`, with the event record |
 | 30 | service | `fwu` | `kfsw-services/src/fwu-parameters/`, with the update service |
+| 26 | service | `param` | `kfsw-services/src/param-parameters/`, the service describing itself |
+| 28 | service | `command` | `kfsw-services/src/command-parameters/`, with the command service |
+| 29 | service | `ftp` | `kfsw-services/src/ftp-parameters/`, with the file transfer service |
 | 31 | service | `health` | `kfsw-services/src/health-parameters/`, with health monitoring |
+| 32 | service | `boot` | `kfsw-services/src/boot-parameters/`, with the boot service |
 | 67 | module | `hw_test` | `kfsw-modules/boton-test` |
 
 The update table is read-only throughout. If an operator could write it, an
@@ -212,6 +216,30 @@ Values travel on the caller's stack in a bounded buffer rather than through an
 allocator: a parameter service that allocated would have to fail at the worst
 moment.
 
+### Counters
+
+FTP and the command service recorded every outcome as an event and counted
+nothing, which answers what happened but not how often. Both now keep lifetime
+totals, incremented where the outcome is already known and outside the event
+guard, so a composition without the event record still has the numbers. They
+saturate and are never reset: a counter that wraps or restarts hides the thing
+it was counting.
+
+### Console echo
+
+`echo_enabled` in table 28 is off by default. The shell prints every input byte
+back, so a session driven by a script shows each command twice — once as the
+sender typed it and once as the shell repeated it. The setting is live rather
+than stored, because it is worth changing while watching a console.
+
+The console belongs to the composition, not to the command service, so the
+service holds the setting and the composition registers what applies it.
+Registering also applies the current value, so the default reaches the shell at
+start-up without waiting for anyone to write the parameter.
+
+A test that needs to see what it typed — checking tab completion, or windowing
+output by the command that produced it — has to ask for echo itself.
+
 ### Console colour
 
 Log lines are coloured by severity: errors red, warnings yellow, information
@@ -241,6 +269,15 @@ forever: an uptime always zero, an identity always empty.
 
 Sampling runs while PARAM serializes access, so a `sample` callback must not
 call back into the parameter API.
+
+A parameter that is both sampled and writable needs care on one path. A write
+arriving over CSP lands in the backing store and is handed back to be applied;
+sampling at that moment would overwrite the value that just arrived with the
+one the owner still holds, and the change callback would be given the old
+value. The write would report success and change nothing. The change path
+therefore reads the store without refreshing it, which is what
+`kfsw_param_read_stored_entry()` exists for. Only the remote path goes through
+that code, so the defect is invisible to a local test.
 
 ### Transport sizing
 

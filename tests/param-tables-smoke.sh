@@ -86,6 +86,11 @@ expect '  3  core     telemetry'
 expect '  4  core     csp'
 expect '  5  core     storage'
 expect ' 25  service  log'
+expect ' 26  service  param'
+expect ' 27  service  event'
+expect ' 28  service  command'
+expect ' 29  service  ftp'
+expect ' 32  service  boot'
 
 printf '\n=== Addressing ===\n'
 # One offset repeating across tables is the point of the scheme, so each of
@@ -115,6 +120,13 @@ expect 'app_report_ms                     u16     wb'
 # setting that can put a node out of reach, so a wrong one must not survive a
 # reboot.
 expect 'route_table                       string  w'
+# Off by default: the shell repeats every input byte, so a scripted session
+# would show each command twice.
+expect 'echo_enabled                      u8      w     0'
+# Read-only counters the services keep, and the settings they apply.
+expect 'ftp_timeout_ms                    u32     w'
+expect 'cmd_invoked                       u32     r'
+expect 'boot_image                        string  r'
 
 printf '\n=== Result ===\n'
 if [[ "$failures" -eq 0 ]]; then

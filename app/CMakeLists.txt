@@ -50,6 +50,10 @@ target_sources_ifdef(CONFIG_KFSW_DEBUG_SHELL app PRIVATE
     src/shell/shell_prompt.c
 )
 
+if(CONFIG_KFSW_DEBUG_SHELL AND CONFIG_KFSW_COMMAND)
+    target_sources(app PRIVATE src/shell/shell_echo.c)
+endif()
+
 target_sources_ifdef(CONFIG_KFSW_PARAM app PRIVATE
     src/parameters/board_table.c
     src/parameters/system_table.c

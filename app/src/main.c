@@ -52,6 +52,9 @@
 #include "parameters/tables.h"
 #if CONFIG_KFSW_DEBUG_SHELL
 #include "shell/shell_prompt.h"
+#if CONFIG_KFSW_COMMAND
+#include "shell/shell_echo.h"
+#endif
 #endif
 #endif
 
@@ -108,9 +111,16 @@ int main(void)
 #if CONFIG_KFSW_PARAM_TEST_DEFINITIONS
 		&kfsw_test_param_definitions,
 #endif
-		&kfsw_log_param_definitions,
+		&kfsw_log_param_definitions,        &kfsw_param_param_definitions,
+		&kfsw_boot_param_definitions,
 #if CONFIG_KFSW_EVENT
 		&kfsw_event_param_definitions,
+#endif
+#if CONFIG_KFSW_COMMAND
+		&kfsw_command_param_definitions,
+#endif
+#if CONFIG_KFSW_FTP
+		&kfsw_ftp_param_definitions,
 #endif
 #if CONFIG_KFSW_FWU
 		&kfsw_fwu_param_definitions,
@@ -145,6 +155,10 @@ int main(void)
 		 * been restored, and nothing that talks to the outside has
 		 * started yet.
 		 */
+		/* After the snapshot, so the count continues from what was
+		 * stored rather than restarting at zero every boot. */
+		kfsw_boot_count_restart();
+
 		if (kfsw_system_boot_delay_ms() != 0U) {
 			kfsw_log_info("Delaying service start by %u ms",
 				      kfsw_system_boot_delay_ms());
@@ -304,6 +318,9 @@ int main(void)
 
 #if CONFIG_KFSW_DEBUG_SHELL
 	kfsw_shell_prompt_apply();
+#if CONFIG_KFSW_COMMAND
+	kfsw_shell_echo_apply();
+#endif
 #endif
 
 	kfsw_boot_service_start();

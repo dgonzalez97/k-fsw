@@ -313,6 +313,19 @@ stored; takes effect after reboot
 Names are at most 32 characters, refused at registration rather than truncated:
 a truncated name is printed but cannot be typed.
 
+`echo_enabled` controls whether the console repeats what is typed at it. It is
+off by default, because the shell prints back every input byte and a session
+driven by a script would otherwise show each command twice:
+
+```text
+kfsw:~$ param set echo_enabled 1
+kfsw:~$ status          <- the command, repeated by the shell
+K-FSW status
+```
+
+Turn it on when you need to see what the console received, such as checking tab
+completion.
+
 `node_id` is read-only. `log_level` accepts 0 through 4. Integer parsing rejects
 overflow and unsigned-negative input; the command reads the parameter
 description first so it can parse the exact type.
