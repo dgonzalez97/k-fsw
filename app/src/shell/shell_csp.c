@@ -23,8 +23,7 @@ static int cmd_csp_info(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "hostname: %s", info.hostname);
 	shell_print(sh, "model: %s", info.model);
 	shell_print(sh, "revision: %s", info.revision);
-	shell_print(sh, "initialized: %s", info.initialized ? "yes" : "no");
-	shell_print(sh, "router: %s", info.router_running ? "running" : "stopped");
+	shell_print(sh, "date: %s %s", info.build_date, info.build_time);
 	shell_print(sh, "free_buffers: %zu", info.free_buffers);
 
 	return 0;
@@ -143,6 +142,8 @@ static int cmd_csp_ident(const struct shell *sh, size_t argc, char **argv)
 		shell_print(sh, "hostname: %s", info.hostname);
 		shell_print(sh, "model: %s", info.model);
 		shell_print(sh, "revision: %s", info.revision);
+		shell_print(sh, "date: %s", info.build_date);
+		shell_print(sh, "time: %s", info.build_time);
 		return 0;
 	}
 

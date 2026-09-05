@@ -16,7 +16,13 @@ list(APPEND ZEPHYR_EXTRA_MODULES
 
 # Apply K-FSW's libcsp feature policy before Zephyr loads the module. The FTP
 # service uses RDP for bounded flow control and retransmission.
-set(CSP_REPRODUCIBLE_BUILDS ON CACHE BOOL "" FORCE)
+#
+# Reproducible builds are off, deliberately. With them on libcsp blanks the
+# date and time in its identity reply, and that reply is how ground tells one
+# image from another: an identity that cannot say when it was built defeats the
+# question it exists to answer. ccache will not reuse an object compiled from a
+# file containing __DATE__ unless told to be sloppy, so the date stays true.
+set(CSP_REPRODUCIBLE_BUILDS OFF CACHE BOOL "" FORCE)
 set(CSP_USE_RDP ON CACHE BOOL "" FORCE)
 set(CSP_USE_HMAC OFF CACHE BOOL "" FORCE)
 set(CSP_USE_PROMISC OFF CACHE BOOL "" FORCE)
