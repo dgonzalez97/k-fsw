@@ -21,6 +21,9 @@
 #if CONFIG_KFSW_BOTON_TEST
 #include <kfsw/modules/boton_test.h>
 #endif
+#if CONFIG_KFSW_LASTWORDS
+#include <kfsw/platform/lastwords.h>
+#endif
 #include <kfsw/services/boot.h>
 #if CONFIG_KFSW_COMMAND
 #include <kfsw/services/command.h>
@@ -339,6 +342,19 @@ int main(void)
 #if CONFIG_KFSW_COMMAND
 	kfsw_shell_echo_apply();
 #endif
+#endif
+
+#if CONFIG_KFSW_LASTWORDS
+	/* Armed before the services start, so a dip during start-up is still
+	 * described. -ENOTSUP means the SoC has no detector, which is not a
+	 * failure: every other reason still reaches the record.
+	 */
+	result = kfsw_lastwords_watch_supply();
+	if (result == 0) {
+		kfsw_log_info("Watching the supply");
+	} else if (result != -ENOTSUP) {
+		kfsw_log_warning("Supply watch unavailable: %d", result);
+	}
 #endif
 
 	kfsw_boot_service_start();
