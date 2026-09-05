@@ -90,8 +90,9 @@ running code that arrived over the air.
   100 of them across 16 tables in the full composition, fewer when a
   composition enables less. Each is owned by the code it describes, which
   validates a write before it lands and decides what a change means.
-- **CSP over a radio.** libcsp routing with independently named UART/KISS
-  interfaces, static routes, and RDP where a stream needs it.
+- **CSP over a radio, or over CAN.** libcsp routing with independently named
+  UART/KISS interfaces, static routes, and RDP where a stream needs it. The
+  same router carries CAN, so a route decides which link a destination takes.
 - **Files.** LittleFS storage, and transfers in either direction with a whole
   file CRC32 checked before anything is committed.
 - **Commands, events and health.** A command service with typed arguments and
@@ -253,21 +254,3 @@ A printable guide, after installing its Python requirements:
 
 The [development guide](docs/development/index.md) covers contributions and how
 a change spanning several pinned repositories is landed.
-
-## Related work
-
-K-FSW is not the only open-source flight software built on Zephyr, and these
-are worth knowing about:
-
-- [scsat1-fsw](https://github.com/spacecubics/scsat1-fsw) — Space Cubics' flight
-  software for SC-Sat1, also Zephyr and also CSP, flown rather than
-  bench-tested. Their
-  [board documentation](https://docs.spacecubics.com/scobc-a1-ja/latest/software/use-zephyr-drivers/gpio.html)
-  is a good model for writing up how a driver is actually wired in.
-- [RDFM](https://github.com/antmicro/rdfm) — Antmicro's over-the-air update and
-  fleet-management framework, with a Zephyr client. It solves the update
-  problem at a fleet scale that K-FSW's single-image path does not attempt.
-- [Yamcs](https://yamcs.org/) — mission control that speaks to a spacecraft
-  rather than a shell, used by
-  [scsat1-mcs](https://github.com/spacecubics/scsat1-mcs). It is where the
-  ground side of K-FSW would go beyond a console.
