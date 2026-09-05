@@ -5,6 +5,7 @@
 #include <zephyr/sys/util.h>
 
 #include <kfsw/platform/reset.h>
+#include <kfsw/services/boot.h>
 #include <kfsw/services/parameter.h>
 
 #include "tables.h"
@@ -118,16 +119,13 @@ static void sample_node_id(void *value)
 
 static void sample_reset_cause(void *value)
 {
-	uint32_t cause = 0U;
-
-	/* Latched by the platform at boot; a failed read reports zero rather
-	 * than the previous sample, so a stale cause cannot be mistaken for a
-	 * fresh one.
+	/* Read from the boot service, not the platform. Reading the platform
+	 * clears the latched hardware flags, and the boot service is the first
+	 * reader: calling it again here returned an empty register, so this
+	 * parameter reported zero on every board while the boot event carried
+	 * the real cause. Two places describing the same reset disagreed.
 	 */
-	if (kfsw_platform_get_reset_cause(&cause) != 0) {
-		cause = 0U;
-	}
-	*(uint32_t *)value = cause;
+	*(uint32_t *)value = kfsw_boot_get_reset_cause();
 }
 
 #if CONFIG_KFSW_CSP_CAN
