@@ -1,20 +1,19 @@
 # K-FSW {#k_fsw_manual}
 
 K Flight Software (K-FSW) is a small, modular flight-software framework. It
-provides a reusable application structure, platform capabilities, operational
-services, communications, developer tooling, and test infrastructure without
-assuming one spacecraft or one processor family.
+gives a spacecraft the things every mission needs before it can do anything
+mission-specific: a console, a link to the ground, named settings you can read
+and change from that link, files, events, commands, a watchdog, and a way to
+replace the running image.
 
-K-FSW is not defined by a particular RTOS or network protocol. Zephyr is the
-current reference RTOS and hardware-integration layer. Cubesat Space Protocol
-(CSP) is an optional communications capability for compositions that need
-packet routing or remote services. The local parameter service, logging, time,
-and shell-only targets do not require CSP.
+Nothing here is tied to one RTOS or one network protocol. Zephyr is the current
+reference, and Cubesat Space Protocol (CSP) is optional — a composition that
+only needs local parameters, logging, time and a shell builds without it.
 
-The project is deliberately at an engineering-development stage. Its current
-software gates and physical bench results are useful evidence, but they are not
-flight qualification. @ref project_status records what has actually been
-implemented and tested.
+This is engineering-development software. The test gates and bench results are
+real evidence, and they are not flight qualification. @ref project_status is
+the honest inventory: what exists, what has been tested in software, and what
+has been read off a board.
 
 ## How the pieces fit
 
@@ -46,32 +45,37 @@ then updates the composition pin in a separate `k-fsw` pull request.
 
 ## Current reference composition
 
-The full reference application is configured for KFSW-Linux and
-NUCLEO-L496ZG. It currently includes:
+The full reference application runs on KFSW-Linux and NUCLEO-L496ZG:
 
-- monotonic time and reset-cause access;
-- runtime-filtered logging;
+- monotonic time, a latched reset cause, and a watchdog fed by a health policy
+  rather than a timer;
+- logging with a level per module, so raising CSP to debug does not drown the
+  output in everything else;
 - LittleFS storage mounted at `/kfsw`;
-- typed local parameters with explicit, CRC-protected snapshots;
-- an optional libcsp router and one or more named UART/KISS interfaces;
-- an optional CSP parameter adapter; and
-- a K-FSW-specific file-transfer service over CSP/RDP.
+- 100 parameters across 16 tables, addressed by table and offset, carrying
+  scalars, strings and byte arrays, with explicit CRC-protected snapshots;
+- a libcsp router with named UART/KISS interfaces, and remote parameter access
+  over it;
+- file transfer over CSP with RDP;
+- a command service with typed arguments and results, and a bounded event
+  record with stable identifiers; and
+- firmware update, streamed into the secondary slot and handed to MCUboot.
 
 The UHF ground/NUCLEO test compositions additionally select the reusable
 `radio-uhf` module with Holybro SiK identity and bounded status. They continue
 to use the same `kfsw-comms` CSP/KISS/UART path.
 
-An explicit NUCLEO example profile additionally composes the reusable
-`boton_test` module. It maps the board USER button through devicetree, debounces
-presses on the system workqueue, exposes a coherent typed snapshot, and makes
-the same live scalar storage remotely observable through optional PARAM/CSP.
-Automated software verification and physical USER-button acceptance are
-tracked separately; the physical step remains pending.
+An opt-in NUCLEO profile composes the `boton_test` module, which exists as a
+worked example of owning hardware: the board USER button mapped through
+devicetree, presses debounced on the system workqueue, a typed snapshot whose
+five fields agree with each other, and the same values readable from the ground
+through table 67. It has been accepted on hardware apart from per-gesture
+attribution.
 
-FRDM-K64F and Raspberry Pi Pico W profiles intentionally select a much smaller
-composition: boot markers, the debug shell, and the root `status`, `version`,
-and `help` paths. Their successful shell bring-up is not evidence that storage,
-CSP, parameters, or FTP work on those boards.
+FRDM-K64F and Raspberry Pi Pico W run a much smaller composition on purpose:
+boot markers, the debug shell, and `status`, `version` and `help`. A shell that
+comes up on those boards says nothing about storage, CSP, parameters or files,
+none of which are built into them.
 
 ## Reading the manual
 
