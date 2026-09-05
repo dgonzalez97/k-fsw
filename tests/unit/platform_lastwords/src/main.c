@@ -69,6 +69,43 @@ ZTEST(kfsw_platform_lastwords, test_the_last_note_wins)
 	zassert_equal(record.detail, 2U);
 }
 
+ZTEST(kfsw_platform_lastwords, test_a_writer_can_take_its_own_note_back)
+{
+	struct kfsw_lastwords record;
+
+	clear_record();
+	kfsw_lastwords_write(KFSW_LASTWORDS_STARVED, 0U, 10U, 1U);
+
+	/* A writer that predicts a restart has to be able to withdraw when the
+	 * restart does not come, or a later reset for an unrelated cause would
+	 * be blamed on it.
+	 */
+	zassert_true(kfsw_lastwords_withdraw(KFSW_LASTWORDS_STARVED));
+	zassert_false(kfsw_lastwords_take(&record), "a withdrawn note must be gone");
+}
+
+ZTEST(kfsw_platform_lastwords, test_a_writer_cannot_take_back_someone_elses)
+{
+	struct kfsw_lastwords record;
+
+	clear_record();
+	kfsw_lastwords_write(KFSW_LASTWORDS_FATAL, 0x0800abcdU, 10U, 1U);
+
+	/* Health withdrawing a crash report would lose the account that
+	 * mattered, so the reason has to match before anything is discarded.
+	 */
+	zassert_false(kfsw_lastwords_withdraw(KFSW_LASTWORDS_STARVED));
+	zassert_true(kfsw_lastwords_take(&record));
+	zassert_equal(record.reason, KFSW_LASTWORDS_FATAL);
+	zassert_equal(record.detail, 0x0800abcdU);
+}
+
+ZTEST(kfsw_platform_lastwords, test_withdrawing_nothing_is_not_an_error)
+{
+	clear_record();
+	zassert_false(kfsw_lastwords_withdraw(KFSW_LASTWORDS_STARVED));
+}
+
 ZTEST(kfsw_platform_lastwords, test_every_reason_has_a_name)
 {
 	/* Ground and the log both print these, so a missing one would surface
