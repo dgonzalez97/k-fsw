@@ -89,7 +89,6 @@ expected_output=(
     'uptime_ms: '
     'monotonic_ms: '
     'monotonic_us: '
-    'K-FSW: kfsw-dev'
     'Zephyr: 4.4.0'
     'Board: native_sim/native/64'
     'UART transport'
@@ -156,6 +155,15 @@ for expected in "${expected_output[@]}"; do
         exit 1
     fi
 done
+
+# The version is resolved from the build, so asserting a literal would either
+# pin one commit or, as it did, keep asserting a placeholder the code stopped
+# printing. What matters is that a non-empty version is reported.
+if ! grep -Eq '^K-FSW: .+' "$capture_file"; then
+	echo "SHELL RESULT: FAIL"
+	echo "  version reported no image version"
+	exit 1
+fi
 
 if grep -Eq '^  kfsw +:' "$capture_file"; then
 	echo "SHELL RESULT: FAIL"

@@ -190,8 +190,10 @@ echo "PASS: prompt"
 run_shell_command status \
 	"K-FSW status" \
 	"board: $ZEPHYR_BOARD"
+# "K-FSW:" without its value: the version comes from the build, so a literal
+# would pin one commit.
 run_shell_command version \
-	"K-FSW: kfsw-dev" \
+	"K-FSW:" \
 	"Zephyr: 4.4.0" \
 	"Board: $ZEPHYR_BOARD"
 run_shell_command help \

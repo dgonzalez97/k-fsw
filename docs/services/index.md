@@ -27,9 +27,13 @@ the platform API, prints a structured `@BOOT` line, logs the elapsed startup
 time, and prints `@READY`.
 
 ```text
-@BOOT sw=kfsw-dev board=<CONFIG_BOARD_TARGET> reset=<flags> reset_rc=<result>
+@BOOT sw=<image version> board=<CONFIG_BOARD_TARGET> reset=<flags> reset_rc=<result>
 @READY uptime_ms=<monotonic milliseconds>
 ```
+
+The image version is `git describe` on the composition repository, resolved
+when the build is configured, so the banner names the source it was built
+from. The `version` command reports the same string.
 
 These markers are stable automation points used by software and HIL tests.
 They are not a health report. The current startup path can log a service error

@@ -3,6 +3,7 @@
 #include <zephyr/version.h>
 
 #include <kfsw/platform/time.h>
+#include <kfsw/services/boot.h>
 /* Attributes this file's messages, so its level can be raised alone. */
 #define KFSW_LOG_MODULE KFSW_LOG_MODULE_APP
 #include <kfsw/services/log.h>
@@ -40,7 +41,7 @@ static int cmd_version(const struct shell *sh, size_t argc, char **argv)
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 
-	shell_print(sh, "K-FSW: kfsw-dev");
+	shell_print(sh, "K-FSW: %s", kfsw_boot_get_image_version());
 	shell_print(sh, "Zephyr: %s", KERNEL_VERSION_STRING);
 	shell_print(sh, "Board: %s", CONFIG_BOARD_TARGET);
 

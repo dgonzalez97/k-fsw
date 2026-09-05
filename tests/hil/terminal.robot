@@ -9,7 +9,7 @@ KFSW Linux Can Command Remote CSP Node
     [Tags]    terminal    shell    csp
     Open KFSW Linux CSP Console
     Execute KFSW Command    status    K-FSW status
-    Execute KFSW Command    version    K-FSW: kfsw-dev
+    Execute KFSW Command    version    K-FSW:
     Execute KFSW Command    csp info    CSP node: 1
     Execute KFSW Command    csp routes    0/0 -> KISS direct
     Execute KFSW Command    csp ping 2    CSP ping 2: success
