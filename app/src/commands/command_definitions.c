@@ -10,6 +10,10 @@
 
 /* Attributes this file's messages, so its level can be raised alone. */
 #define KFSW_LOG_MODULE KFSW_LOG_MODULE_COMMAND
+#if CONFIG_KFSW_LASTWORDS
+#include <kfsw/platform/lastwords.h>
+#include <kfsw/services/boot.h>
+#endif
 #include <kfsw/services/log.h>
 
 #if CONFIG_KFSW_STORAGE
@@ -79,6 +83,17 @@ static void reboot_work_handler(struct k_work *work)
 	ARG_UNUSED(work);
 
 	kfsw_log_warning("Rebooting on command");
+#if CONFIG_KFSW_LASTWORDS
+	/* Left immediately before the reset, so a restart that turns out badly
+	 * can still be told apart from one nobody asked for.
+	 */
+#if CONFIG_KFSW_PARAM
+	kfsw_lastwords_write(KFSW_LASTWORDS_COMMANDED, 0U, k_uptime_get_32(),
+			     kfsw_boot_get_count());
+#else
+	kfsw_lastwords_write(KFSW_LASTWORDS_COMMANDED, 0U, k_uptime_get_32(), 0U);
+#endif
+#endif
 	sys_reboot(SYS_REBOOT_COLD);
 }
 
