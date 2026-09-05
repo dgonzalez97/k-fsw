@@ -108,12 +108,18 @@ not implemented.
 
 Parameters are addressed by table and offset, in bands that say who owns a
 table: 1 to 24 core, 25 to 49 services, 50 to 99 modules, with zero reserved so
-an uninitialised field cannot address a real table. Six core tables exist and
-are almost entirely read-only observability. Two limits are the reason: the
-service supports no strings, data or arrays, and the platform and comms layers
-sit below it and cannot read a stored value back at initialization. Until those
-are addressed, publishing a configuration value as writable would let an
-operator change something that nothing applies.
+an uninitialised field cannot address a real table. Sixteen tables exist: six
+core, eight owned by services, and two by modules.
+
+The core six remain almost entirely read-only observability, for a reason that
+still holds: the platform and comms layers sit below the parameter service and
+cannot read a stored value back at initialization, so publishing one of their
+settings as writable would let an operator change something that nothing
+applies. The service tables are not bound by that, and several of their values
+are settable from the ground while the system runs.
+
+What a table can hold is no longer the limit. Scalars, strings and byte arrays
+all work, over the link as well as locally.
 
 Persistence has one snapshot and basic name/type compatibility rather than
 schema versions and mission migrations. FTP has one static worker and no multi-user or authorization
