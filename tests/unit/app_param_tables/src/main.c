@@ -7,8 +7,11 @@
 #include <zephyr/ztest.h>
 
 #include <kfsw/comms/csp.h>
+#include <kfsw/services/ftp.h>
 #include <kfsw/platform/storage.h>
 #include <kfsw/platform/watchdog.h>
+#include <kfsw/services/boot.h>
+#include <kfsw/services/command.h>
 #include <kfsw/services/event.h>
 #include <kfsw/services/fwu.h>
 #include <kfsw/services/health.h>
@@ -27,7 +30,7 @@
  */
 
 #define CORE_TABLE_COUNT 6U
-#define SERVICE_TABLE_COUNT 4U
+#define SERVICE_TABLE_COUNT 8U
 
 struct table_seen {
 	uint8_t ids[KFSW_PARAM_TABLE_MODULE_LAST + 1U];
@@ -57,13 +60,44 @@ static const struct kfsw_param_definition_set *const core_sets[] = {
 	/* Service tables, so one listing carries both bands and they can be
 	 * told apart. */
 	&kfsw_log_param_definitions,
+	&kfsw_param_param_definitions,
+	&kfsw_boot_param_definitions,
+	&kfsw_command_param_definitions,
+	&kfsw_ftp_param_definitions,
 	&kfsw_event_param_definitions,
 	&kfsw_fwu_param_definitions,
 	&kfsw_health_param_definitions,
 };
 
+/* The counters only move for invocations that reach the service, and an
+ * uninitialised registry refuses one before it gets there. A registry of one
+ * command is enough to exercise the path the counters describe.
+ */
+static int handler_ok(const struct kfsw_command_arg *args, size_t arg_count,
+		      const struct kfsw_command_source *source, struct kfsw_command_result *result)
+{
+	ARG_UNUSED(args);
+	ARG_UNUSED(arg_count);
+	ARG_UNUSED(source);
+	ARG_UNUSED(result);
+	return 0;
+}
+
+static const struct kfsw_command_definition test_commands[] = {
+	{.id = 1U, .name = "counted", .help = "none", .handler = handler_ok},
+};
+
+static const struct kfsw_command_definition_set test_command_set = {
+	.commands = test_commands,
+	.count = ARRAY_SIZE(test_commands),
+};
+
 static void *tables_setup(void)
 {
+	const struct kfsw_command_definition_set *const command_sets[] = {&test_command_set};
+
+	(void)kfsw_command_init(command_sets, ARRAY_SIZE(command_sets));
+
 	/* Storage is mounted first so the two tables that report it have
 	 * something real to read; the parameter service does not depend on it,
 	 * but a filesystem that never mounted would make those rows
@@ -156,9 +190,13 @@ ZTEST(app_param_tables, test_every_core_table_is_registered)
 	zassert_equal(seen.ids[5], KFSW_PARAM_TABLE_WATCHDOG);
 
 	zassert_equal(seen.ids[6], KFSW_LOG_PARAM_TABLE_ID);
-	zassert_equal(seen.ids[7], KFSW_EVENT_PARAM_TABLE_ID);
-	zassert_equal(seen.ids[8], KFSW_FWU_PARAM_TABLE_ID);
-	zassert_equal(seen.ids[9], KFSW_HEALTH_PARAM_TABLE_ID);
+	zassert_equal(seen.ids[7], KFSW_PARAM_PARAM_TABLE_ID);
+	zassert_equal(seen.ids[8], KFSW_EVENT_PARAM_TABLE_ID);
+	zassert_equal(seen.ids[9], KFSW_COMMAND_PARAM_TABLE_ID);
+	zassert_equal(seen.ids[10], KFSW_FTP_PARAM_TABLE_ID);
+	zassert_equal(seen.ids[11], KFSW_FWU_PARAM_TABLE_ID);
+	zassert_equal(seen.ids[12], KFSW_HEALTH_PARAM_TABLE_ID);
+	zassert_equal(seen.ids[13], KFSW_BOOT_PARAM_TABLE_ID);
 
 	zassert_true(seen.ascending, "a listing must read in one direction");
 	zassert_true(seen.bands_match_owners,
@@ -538,6 +576,93 @@ ZTEST(app_param_tables, test_a_check_slower_than_the_watchdog_is_refused)
 	value.scalar.u16 = 0U;
 	zassert_equal(kfsw_param_set("health_interval_ms", &value), -EINVAL);
 	zassert_equal(kfsw_health_get_interval_ms(), 250U, "a refused write changes nothing");
+}
+
+ZTEST(app_param_tables, test_a_counter_moves_when_the_thing_it_counts_happens)
+{
+	struct kfsw_param_value before;
+	struct kfsw_param_value after;
+
+	/* Asserted as a delta, not a value: these are lifetime counters and
+	 * anything else in the image may have moved them first. */
+	{
+		struct kfsw_command_result command_result = {0};
+
+		zassert_ok(kfsw_param_get("cmd_invoked", &before));
+		zassert_ok(kfsw_command_invoke("counted", NULL, 0U, &command_result));
+		zassert_ok(kfsw_param_get("cmd_invoked", &after));
+	}
+	zassert_true(after.scalar.u32 > before.scalar.u32,
+		     "an invocation that reached the service must be counted");
+
+	zassert_ok(kfsw_param_get("log_emitted", &before));
+	kfsw_log_error("a message the counter has to see");
+	zassert_ok(kfsw_param_get("log_emitted", &after));
+	zassert_true(after.scalar.u32 > before.scalar.u32);
+}
+
+ZTEST(app_param_tables, test_a_transfer_size_larger_than_the_buffer_is_refused)
+{
+	struct kfsw_param_value value;
+
+	/* The workspace is sized at build time and the protocol codec refuses
+	 * anything larger, so a bigger value would be stored here and rejected
+	 * at the first transfer. */
+	zassert_ok(kfsw_param_get("ftp_chunk_size", &value));
+	value.scalar.u16 = KFSW_FTP_CHUNK_SIZE + 1U;
+	zassert_equal(kfsw_param_set("ftp_chunk_size", &value), -ERANGE);
+
+	value.scalar.u16 = 0U;
+	zassert_equal(kfsw_param_set("ftp_chunk_size", &value), -ERANGE);
+
+	value.scalar.u16 = 64U;
+	zassert_ok(kfsw_param_set("ftp_chunk_size", &value));
+	zassert_equal(kfsw_ftp_get_chunk_size(), 64U);
+}
+
+ZTEST(app_param_tables, test_echo_is_off_until_asked_for)
+{
+	struct kfsw_param_info info;
+	struct kfsw_param_value value;
+
+	/* Off by default: the shell repeats every input byte, so a session
+	 * driven by a script shows each command twice. */
+	zassert_ok(kfsw_param_get_info("echo_enabled", &info));
+	zassert_equal(info.table, KFSW_COMMAND_PARAM_TABLE_ID);
+	zassert_str_equal(kfsw_param_mode_name(info.flags), "w",
+			  "worth toggling while watching the console, not at the next boot");
+
+	zassert_ok(kfsw_param_get("echo_enabled", &value));
+	zassert_equal(value.scalar.u8, 0U);
+
+	value.scalar.u8 = 1U;
+	zassert_ok(kfsw_param_set("echo_enabled", &value));
+	zassert_true(kfsw_command_echo_enabled());
+
+	value.scalar.u8 = 2U;
+	zassert_equal(kfsw_param_set("echo_enabled", &value), -ERANGE);
+	zassert_true(kfsw_command_echo_enabled(), "a refused write changes nothing");
+
+	value.scalar.u8 = 0U;
+	zassert_ok(kfsw_param_set("echo_enabled", &value));
+	zassert_false(kfsw_command_echo_enabled());
+}
+
+ZTEST(app_param_tables, test_the_boot_table_reports_a_real_image)
+{
+	struct kfsw_param_value value;
+
+	/* The version has to name the source it was built from, or comparing a
+	 * node against a build record proves nothing. */
+	zassert_ok(kfsw_param_get("boot_image", &value));
+	zassert_equal(value.type, KFSW_PARAM_STRING);
+	zassert_true(strlen(value.text) > 0U);
+	zassert_str_equal(value.text, kfsw_boot_get_image_version());
+
+	/* Read-only and persistent together: the service writes it, a snapshot
+	 * keeps it, and nobody rewrites how often the node has restarted. */
+	zassert_ok(kfsw_param_get("boot_count", &value));
+	zassert_equal(kfsw_param_set("boot_count", &value), -EACCES);
 }
 
 ZTEST(app_param_tables, test_looking_a_parameter_up_by_name)

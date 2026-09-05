@@ -22,6 +22,11 @@ if [[ ! -x "$executable" ]]; then
 fi
 
 {
+	# Completion is only observable when the console repeats what it built,
+	# and echo is off by default so a scripted session does not show every
+	# command twice. The test asks for what it needs to see.
+	printf 'param set echo_enabled 1\n'
+	sleep 0.2
 	printf 'pa\t g\t test_u32\n'
 	printf '%s\n' \
 		'help' \
@@ -68,6 +73,8 @@ expected_output=(
     # Not anchored to the prompt: it carries colour escapes, so the prompt and
     # the echoed command are no longer one contiguous run of text.
     'param  get  test_u32'
+    # Off by default, and the test turned it on for the completion check above.
+    'echo_enabled = 1'
 	'Available commands:'
 	'csp      : K-FSW CSP commands.'
 	'ftp      : K-FSW file transfer:'

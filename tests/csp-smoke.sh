@@ -152,6 +152,8 @@ printf '%s\n' \
 	'param set 2 test_u32 1234' \
 	'param get 2 test_u32' \
 	$'pa\t g\t 2 test_u32' \
+	'param set 2 log_level 3' \
+	'param get 2 log_level' \
 	'param get 2 uid' \
 	'param get 2 csp_buf_free' \
 	'param get 2 log_level' \
@@ -209,6 +211,14 @@ wait_for_output "$work_dir/node2.log" "UART CSP test: PASS" \
     "$node2_pid" || fail "node 2 UART transport test did not pass"
 wait_for_output "$work_dir/node1.log" "2:test_u32 = 1234" \
     "$node1_pid" || fail "remote parameter set/readback did not pass"
+# A remote write to a parameter that also samples. The change arrives in the
+# backing store and is handed back to be applied; sampling at that moment would
+# overwrite it with the value the owner still holds, so the write would report
+# success and change nothing. Only the remote path goes through that code, so
+# this is the only place it shows.
+wait_for_output "$work_dir/node1.log" "2:log_level = 3" \
+    "$node1_pid" || fail "a remote write to a sampled parameter did not take effect"
+
 # A string across the link, and a sampled value that is current when it is
 # asked for. The server hands libparam the backing storage directly, so a
 # sampled parameter that is not refreshed first answers with whatever the
