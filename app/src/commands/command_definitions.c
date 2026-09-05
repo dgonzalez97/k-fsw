@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <zephyr/kernel.h>
 #include <zephyr/sys/reboot.h>
@@ -15,6 +16,10 @@
 #include <kfsw/services/boot.h>
 #endif
 #include <kfsw/services/log.h>
+
+#if CONFIG_KFSW_PARAM
+#include "../parameters/tables.h"
+#endif
 
 #if CONFIG_KFSW_STORAGE
 #include <kfsw/platform/storage.h>
@@ -99,12 +104,35 @@ static void reboot_work_handler(struct k_work *work)
 
 static K_WORK_DELAYABLE_DEFINE(reboot_work, reboot_work_handler);
 
+/* Text, not a number, so 0000 stays four characters. Read as an integer it
+ * would be zero, and a node whose pin was 0007 would then accept 7.
+ */
+static const enum kfsw_command_type reboot_arg_types[] = {KFSW_COMMAND_TYPE_TEXT};
+
 static int command_reboot(const struct kfsw_command_arg *args, size_t arg_count,
 			  const struct kfsw_command_source *source,
 			  struct kfsw_command_result *result)
 {
-	ARG_UNUSED(args);
 	ARG_UNUSED(arg_count);
+
+	/* Checked here, on the node that would restart, rather than by whatever
+	 * asked. A guard the caller applies to itself guards nothing.
+	 */
+	/* With no parameter service there is no settable pin, so the compiled
+	 * default is the whole guard. Still required rather than skipped: a
+	 * composition that quietly stopped asking would be the one surprise
+	 * nobody wants from a reboot command.
+	 */
+#if CONFIG_KFSW_PARAM
+	if (!kfsw_system_reboot_pin_matches(args[0].value.text)) {
+#else
+	if (strcmp(args[0].value.text, "0000") != 0) {
+#endif
+		kfsw_log_warning("Reboot refused: node %u quoted the wrong pin", source->node);
+		result->status = KFSW_COMMAND_DENIED;
+		(void)snprintf(result->detail, sizeof(result->detail), "wrong pin");
+		return -EACCES;
+	}
 
 	/*
 	 * Rebooting inside the handler would drop the connection before the
@@ -218,8 +246,10 @@ static const struct kfsw_command_definition app_commands[] = {
 	{
 		.id = KFSW_COMMAND_ID_REBOOT,
 		.name = "reboot",
-		.help = "Reset this node after a short delay.",
+		.help = "Reset this node after a short delay: reboot <pin>.",
 		.flags = KFSW_COMMAND_FLAG_MUTATING,
+		.arg_count = 1U,
+		.arg_types = reboot_arg_types,
 		.handler = command_reboot,
 	},
 #endif
