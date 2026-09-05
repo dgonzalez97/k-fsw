@@ -131,6 +131,9 @@ K-FSW runs project-owned suites on `native_sim/native/64`. Current suites cover:
   configuration;
 - parameter persistence encoding, loading, corruption/mismatch handling,
   defaults, and clear behavior with CSP disabled;
+- byte arrays: that one is written and validated whole or not at all, that a
+  short or over-long write is refused, and that an owner judges the array
+  together rather than element by element;
 - the parameter table scheme: that every core table registers under the
   identifier its owner is allocated and in that owner's band, that a reserved,
   unallocated or unnamed table is refused, that a name past 32 characters is
@@ -490,7 +493,11 @@ FTP, firmware update and parameter tables. Reports are written below
 
 ### Parameter tables
 
-`tests/hil/param-tables.robot` wraps `tests/param-tables-smoke.sh`. It checks
+`tests/hil/param-tables.robot` wraps `tests/param-tables-smoke.sh`.
+
+Recorded on 5 September 2026 against `43ac957`: `PARAM TABLES RESULT: PASS`
+read from a NUCLEO-L496ZG over its ST-LINK debug UART, covering eleven tables,
+their addressing, the string rows and the write mode of every settable value. It checks
 that every table a composition declares is present under its own identifier and
 band, that one offset repeats across tables the way the scheme intends, and
 that the listing reports each parameter's write mode.
@@ -564,23 +571,29 @@ restored around the run.
 
 ### Recorded result
 
-Run of 3 September 2026, `k-fsw` main `29d0c4a` with `kfsw-comms` pinned at
-`bca9c1e`, NUCLEO-L496ZG as CSP node 2 and a `native_sim` ground node 16 over a
-Holybro SiK pair at 57600 8N1. No persistent radio setting was changed.
+Run of 5 September 2026, `k-fsw` main `43ac957`, NUCLEO-L496ZG as CSP node 2
+and a `native_sim` ground node 16 over a Holybro SiK pair at 57600 8N1. No
+persistent radio setting was changed.
 
 ```text
-ping        16 -> 2 success rtt_ms=210    2 -> 16 success rtt_ms=202
-self        csp ping 16 success rtt_ms=0
-command     noop node=16: OK noop from node 16      self-addressed
+ping        16 -> 2 success rtt_ms=230
+self        csp ping 16: this node, no link traversed
+command     noop node=16: OK noop from node 0       ran locally, not sent
             noop node=2:  OK noop from node 16      across the radio
-            info node=2:  OK uptime_ms=5017 storage=ready free_bytes=47104
+            info node=2:  OK uptime_ms=12733 storage=ready free_bytes=53248
 event       event_stats node=2: OK held=5/32 recorded=5 overwritten=0 rejected=0
-            event_tail  node=2: OK seq=3 command/1 sev=0 0004001000
-transfer    put 256 B 800 ms 320 B/s     get 256 B 560 ms 457 B/s
-            crc32=0ce9d363 on both nodes and both local copies; verify PASS
+parameters  the whole descriptor list arrived: every table read across the link
+            2:uid = "kfsw-2"                        a string, read as text
+            2:ftp_timeout_ms = 20000                a setting written from the ground
+transfer    put/get 256 B, crc32=0ce9d363 on both nodes and both local copies
 negative    csp ping 3 failed; unknown command rejected; missing file not found
-counters    ground KISS tx=45 rx=43   NUCLEO KISS tx=43 rx=45   all errors 0
+counters    NUCLEO KISS tx=127 rx=81  all errors 0
 ```
+
+Two results here changed meaning rather than value. A node addressed to itself
+now answers without traversing a link, and a command addressed to this node
+runs here rather than being sent into the network and back, which is why the
+reply names source node 0.
 
 The `event_tail` payload is the flight node's own record of the command that
 produced it: command `0x0004` from node `0x0010`, status `0x00`. Commanding,
