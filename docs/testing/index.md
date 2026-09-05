@@ -212,6 +212,34 @@ The revision string is the evidence rather than the transfer succeeding: the
 two images differ only in what they report, so a node answering `fwu-after` is
 running code that arrived over the air.
 
+### CSP over CAN
+
+`tests/hil/can.robot` wraps `tests/hil/stm32/nucleo-l496zg/can-smoke.sh`. It is
+physical only: it needs the board, a transceiver and an adapter on one bus, so
+there is no software-tagged half that could suggest otherwise.
+
+It **skips rather than fails** when the interface is down. A CAN transmitter
+needs another node to acknowledge its frames, so a node talking to a bus nobody
+is on accumulates errors that only mean the link was never there — reporting
+that as a failure would blame the software for the wiring.
+
+The evidence is the adapter's own frame counters and both nodes' error state,
+not just the replies: two nodes can agree while the bus carries nothing.
+
+Recorded on 5 September 2026:
+
+```text
+CAN SMOKE RESULT: PASS interface=can0 bitrate=500000 rtt_ms=50
+                  ident=yes params=yes packets=rx:4732/tx:2260 berr=tx0/rx0
+```
+
+Bring the host interface up first, which is the one step needing root:
+
+```bash
+sudo k-fsw/tests/hil/stm32/nucleo-l496zg/can-up.sh 500000 normal
+k-fsw/tests/hil/stm32/nucleo-l496zg/can-smoke.sh
+```
+
 ### MCUboot rollback acceptance
 
 `tests/hil/mcuboot/rollback.sh` is the acceptance for `k-fsw#2`. It proves the

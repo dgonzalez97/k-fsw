@@ -19,6 +19,7 @@ or a release qualification record.
 | --- | --- | --- | --- | --- |
 | Platform/time | Monotonic ms/us and reset-cause API implemented over Zephyr | Time ztest; used by native boot/shell tests | Reset/boot path exercised on NUCLEO; no separate clock-accuracy qualification | No UTC/TAI/GNSS or clock correlation |
 | Logging | Fixed-buffer DEBUG/INFO/WARNING/ERROR with compile/runtime filters | Shell and integration diagnostics | Console logging observed in board HIL | Not a structured/persistent event service; no rate limiting |
+| CSP over CAN | libcsp CFP over a CAN controller, selected by a chosen node so the same driver serves a board and a host USB adapter; bitrate published and settable from the ground | A composed NUCLEO profile and a ground node build; the route table selects CAN or the serial link per destination | **PHYSICALLY VERIFIED** on 5 September 2026: a NUCLEO-L496ZG on CAN1 and a PCAN-USB adapter on one bus at 500 kbit/s. Ping, identity and remote parameters all crossed it, the adapter's counters showed the frames, and both nodes stayed error-active | No transceiver on the NUCLEO, so wiring and termination are the operator's; changing the bitrate cuts the link that carried the change until the other end follows |
 | CSP core | Optional libcsp identity, loopback, validated native static routes with destination/prefix/interface/VIA, ping, one router | Route validation/precedence ztest; two-node and three-node native integration | Bidirectional CSP ping on NUCLEO/FTDI UART bench | No dynamic route mutation, redundant-link failover policy, or flight routing plan |
 | UART/KISS | Legacy chosen UART or generic independently named devicetree instances with separate state/counters | Two-node PTY tests plus simultaneous `KISS_1`/`KISS_2` direct selection and bidirectional transit | One NUCLEO USART3/FTDI and one Holybro link physically verified | Multiple links are software-verified only; 115200 reference profiles and 57600 Holybro overlays |
 | k-ground | Configured `native_sim` roles using the normal K-FSW shell/services and optional route string | UHF node 16 and ops node 19 report role-specific identity and ping both ways | No physical evidence required for the local profile | Launcher connects one direct peer link; no generic router orchestration or mission-control framework |
@@ -91,8 +92,10 @@ future health/FDIR design will need explicit required/optional service policy.
 One-interface profiles retain a direct `0/0` KISS default suitable for a
 two-node test link. Multi-interface profiles use validated static libcsp routes
 and have software evidence for two different UART/KISS links plus bidirectional
-transit. There is no CAN/CFP, SocketCAN/vcan, ZMQ, redundant link selection, or
-dynamic route management. The Holybro module complements the existing serial
+transit. CSP also runs over CAN, where libcsp fragments a packet across frames
+with its own protocol; the same driver serves a controller on a board and a USB
+adapter on a host, so a ground node needs no second implementation. There is no
+ZMQ, redundant link selection, or dynamic route management. The Holybro module complements the existing serial
 KISS path; it does not replace or wrap that data plane. Only one Holybro/KISS
 link has physical evidence; `KISS_2` has not been physically tested. After the
 bench power/USB arrangement was corrected, raw traffic and bidirectional CSP
@@ -189,13 +192,6 @@ test/confirm/revert behavior
 platform watchdog and reset diagnostics needed by later health policy
 ([kfsw-platform issue #3](https://github.com/dgonzalez97/kfsw-platform/issues/3)).
 Transporting a candidate image is separate from bootloader recovery mechanics.
-
-### Add the next physical network
-
-Implement raw CAN and then libcsp CAN/CFP with a Linux SocketCAN equivalent
-([kfsw-comms issue #2](https://github.com/dgonzalez97/kfsw-comms/issues/2)).
-Keep current UART/KISS working and add routing/error-state visibility before
-describing CAN as supported.
 
 ### Improve measurement and fault evidence
 
