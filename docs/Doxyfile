@@ -1,6 +1,6 @@
 PROJECT_NAME           = "K-FSW"
-PROJECT_NUMBER         =
-PROJECT_BRIEF          = "Modular embedded flight-software framework"
+PROJECT_NUMBER         = $(KFSW_DOCS_VERSION)
+PROJECT_BRIEF          = "Flight software for small satellites, on Zephyr"
 
 OUTPUT_DIRECTORY       = ../build/docs
 CREATE_SUBDIRS         = NO

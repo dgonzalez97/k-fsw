@@ -1,19 +1,20 @@
 # K-FSW Application
 
-Embedded image composition root.
+Where the image is put together. This layer stays small on purpose: behaviour
+belongs to the repository that owns it, not to `main.c`.
 
-Keep this application layer intentionally small.
+What lives here is the part that cannot live anywhere else — the core parameter
+tables, because `kfsw-platform` and `kfsw-comms` sit below the parameter
+service and must not depend on it, and the shell adapters, which parse
+arguments, call a service API, and print.
 
-Functionality belongs in the reusable repositories rather than in main.c.
+## Communications
 
-## Communications composition
-
-The application selects Kconfig values and devicetree UART instances, then
-starts the single router owned by `kfsw-comms`. A legacy chosen UART produces
-one interface named `KISS` and the historical direct default route. A
-multi-link overlay declares any number of independently named UART/KISS
-children and supplies an explicit libcsp-native route table; route selection
-remains inside libcsp rather than application code.
+The application picks Kconfig values and devicetree UART instances, then starts
+the single router that `kfsw-comms` owns. One chosen UART gives one interface
+named `KISS` and a direct default route. A multi-link overlay declares any
+number of named UART/KISS children and supplies a route table, which libcsp
+parses and uses — route selection never happens in application code.
 
 ## Storage composition
 
@@ -30,14 +31,14 @@ flash) for the filesystem:
 | `0x00000000` | 960 KiB | K-FSW application partition |
 | `0x000F0000` | 64 KiB | LittleFS storage partition |
 
-This is intentionally conservative: it is large enough for small parameter,
-FTP, staging-metadata, and log users without consuming a large fraction of the
-device. The current application is far below the 960 KiB ceiling.
+That is a conservative split: enough for parameter snapshots, transferred
+files and staging metadata, without spending a large share of the device on a
+filesystem. The application sits well below the 960 KiB ceiling.
 
-A future MCUboot/A-B layout can retain the storage location and use, for
-example, a 32 KiB bootloader plus two 464 KiB image slots. That exact boot
-layout is deferred until the MCUboot roadmap item, but all four boundaries are
-2 KiB-aligned and the current image fits comfortably in either proposed slot.
+This is the layout without a bootloader. The MCUboot composition rearranges the
+front of the flash into a boot partition and two image slots and **leaves the
+storage partition exactly where it is** — that is what lets an existing
+filesystem, with its snapshots and files, survive the migration.
 
 KFSW-Linux uses the same lifecycle, Zephyr flash map, and LittleFS code over
 native_sim's simulated flash. `tools/run-linux.sh` gives each Linux instance a
@@ -47,11 +48,13 @@ data is cleaned up.
 
 ## Persistent parameters
 
-Configurations with PARAM and storage enabled restore the service-owned
-snapshot after the parameter table is initialized and before its CSP server
-starts. A missing or invalid snapshot leaves compiled defaults active and does
-not stop the application. Runtime `set` operations never write flash
-automatically.
+With parameters and storage both enabled, the snapshot is restored after the
+tables are built and before the CSP server starts, so a remote reader never
+sees a value that is about to change. A missing or invalid snapshot leaves the
+compiled defaults in place and does not stop the application.
+
+Writing a value never touches flash on its own. Saving is a separate,
+deliberate act.
 
 The single `/kfsw/params/parameters.dat` file contains explicitly selected
 writable values, a versioned header, portable name/type/value entries, and an
@@ -61,10 +64,9 @@ clear` deletes saved state only.
 
 ## CSP file transfer
 
-The application enables the K-FSW file-transfer service after storage is
-mounted and the CSP router is running, before `@READY`. The service listens on
-configurable CSP port 9 and requires libcsp RDP plus CSP CRC32. It does not own
-another router and is independent of the underlying KISS/UART transport.
+File transfer starts after storage is mounted and the router is running, and
+before `@READY`. It listens on CSP port 9 with RDP and CRC32, does not own a
+second router, and does not care which transport is underneath it.
 
 Remote and KFSW-Linux client paths are virtual paths below `/kfsw/ftp`. The
 service creates `/kfsw/ftp/build` as the local exchange directory, so the
