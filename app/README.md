@@ -101,5 +101,5 @@ chunks. PUT/GET validate total size and IEEE CRC32, and receivers commit a
 synced `.part` file with atomic rename only after validation. Successful PUT
 replaces an existing final file; failed transfers preserve it. One request is
 active per server, overlapping clients receive `busy`, and resume is not
-supported in version 1. This K-FSW-owned protocol does not claim GomSpace or
-other FTP/TFTP wire compatibility.
+supported in version 1. This protocol is K-FSW's own and claims no wire
+compatibility with anything else that uses the FTP or TFTP name.
