@@ -4,6 +4,8 @@
 #include <zephyr/sys/util.h>
 
 #include <kfsw/comms/csp.h>
+/* Attributes this file's messages, so its level can be raised alone. */
+#define KFSW_LOG_MODULE KFSW_LOG_MODULE_CSP
 #include <kfsw/services/log.h>
 #include <kfsw/services/parameter.h>
 

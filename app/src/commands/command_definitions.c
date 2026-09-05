@@ -8,6 +8,8 @@
 #include <zephyr/sys/reboot.h>
 #include <zephyr/sys/util.h>
 
+/* Attributes this file's messages, so its level can be raised alone. */
+#define KFSW_LOG_MODULE KFSW_LOG_MODULE_COMMAND
 #include <kfsw/services/log.h>
 
 #if CONFIG_KFSW_STORAGE

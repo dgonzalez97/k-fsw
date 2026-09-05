@@ -22,7 +22,9 @@
 #define SNAPSHOT_HEADER_SIZE 20U
 #define SNAPSHOT_CRC_OFFSET 16U
 #define SNAPSHOT_MAX_SIZE 256U
-#define SNAPSHOT_EXPECTED_SIZE 84U
+/* Entry overhead in the snapshot: the name length, the type, and the value
+ * length as a big-endian u16. */
+#define SNAPSHOT_ENTRY_HEADER_SIZE 4U
 
 static uint8_t snapshot[SNAPSHOT_MAX_SIZE];
 
@@ -210,13 +212,66 @@ ZTEST(param_persistence, test_pre_refactor_kpar_v1_snapshot_is_restored)
 	zassert_equal(get_float("test_float"), 2.25F, "pre-refactor float was not restored");
 }
 
+static bool accumulate_entry_size(const struct kfsw_param_info *info, void *context)
+{
+	size_t *total = context;
+	size_t value_size;
+
+	if (((info->flags & KFSW_PARAM_FLAG_PERSISTENT) == 0U) || (info->node != 0U)) {
+		return true;
+	}
+
+	switch (info->type) {
+	case KFSW_PARAM_U8:
+		value_size = 1U;
+		break;
+	case KFSW_PARAM_U16:
+	case KFSW_PARAM_I16:
+		value_size = 2U;
+		break;
+	case KFSW_PARAM_U32:
+	case KFSW_PARAM_I32:
+	case KFSW_PARAM_FLOAT:
+		value_size = 4U;
+		break;
+	case KFSW_PARAM_DATA:
+		value_size = info->array_size;
+		break;
+	case KFSW_PARAM_STRING: {
+		struct kfsw_param_value value;
+
+		/* Stored at its current length, not its capacity. */
+		value_size = (kfsw_param_get(info->name, &value) == 0) ? value.size : 0U;
+		break;
+	}
+	default:
+		return true;
+	}
+
+	*total += SNAPSHOT_ENTRY_HEADER_SIZE + strlen(info->name) + value_size;
+	return true;
+}
+
+static size_t expected_snapshot_size(void)
+{
+	size_t total = SNAPSHOT_HEADER_SIZE;
+
+	(void)kfsw_param_visit(accumulate_entry_size, &total);
+	return total;
+}
+
 ZTEST(param_persistence, test_save_modify_load_and_repeated_operations)
 {
 	set_u32("test_u32", 1234U);
 	set_i32("test_i32", -1234);
 	zassert_ok(kfsw_param_persist_save(), "first save failed");
 	zassert_ok(kfsw_param_persist_save(), "repeated save failed");
-	zassert_equal(read_snapshot(), SNAPSHOT_EXPECTED_SIZE, "unexpected snapshot size");
+	/* Derived from the parameters actually registered rather than a literal.
+	 * A byte count written here has to be edited every time any service
+	 * publishes one more persistent value, which makes it a record of the
+	 * last edit rather than a check of the format.
+	 */
+	zassert_equal(read_snapshot(), expected_snapshot_size(), "unexpected snapshot size");
 
 	set_u32("test_u32", 9U);
 	set_i32("test_i32", 9);

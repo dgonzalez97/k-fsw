@@ -179,7 +179,19 @@ static void format_param_value(char *text, size_t size, const struct kfsw_param_
 		 * than looking like a missing one. */
 		(void)snprintf(text, size, "\"%s\"", value->text);
 		break;
-	case KFSW_PARAM_DATA:
+	case KFSW_PARAM_DATA: {
+		/* Rendered as a list because the elements of an array mean
+		 * something positionally, and a hex blob hides which one is
+		 * which. */
+		size_t used = 0U;
+
+		for (size_t index = 0U; (index < value->size) && (used + 5U < size); index++) {
+			used += (size_t)snprintf(&text[used], size - used, "%s%u",
+						 (index == 0U) ? "[" : ",", value->bytes[index]);
+		}
+		(void)snprintf(&text[used], size - used, "]");
+		break;
+	}
 	case KFSW_PARAM_INVALID:
 	default:
 		(void)snprintf(text, size, "<unsupported>");
@@ -253,7 +265,35 @@ static int parse_param_value(const char *text, struct kfsw_param_value *value)
 		value->size = length + 1U;
 		return 0;
 	}
-	case KFSW_PARAM_DATA:
+	case KFSW_PARAM_DATA: {
+		/* Comma-separated, and the count has to match what the parameter
+		 * declares: an array is written whole or not at all. */
+		const char *cursor = text;
+		size_t count = 0U;
+
+		while ((*cursor != '\0') && (count < sizeof(value->bytes))) {
+			unsigned long element;
+
+			errno = 0;
+			element = strtoul(cursor, &end, 0);
+			if ((errno != 0) || (end == cursor) || (element > UINT8_MAX)) {
+				return -EINVAL;
+			}
+			value->bytes[count] = (uint8_t)element;
+			count++;
+			cursor = end;
+			if (*cursor == ',') {
+				cursor++;
+			} else if (*cursor != '\0') {
+				return -EINVAL;
+			}
+		}
+		if (count == 0U) {
+			return -EINVAL;
+		}
+		value->size = count;
+		return 0;
+	}
 	case KFSW_PARAM_INVALID:
 	default:
 		return -ENOTSUP;
