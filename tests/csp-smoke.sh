@@ -154,6 +154,8 @@ printf '%s\n' \
 	$'pa\t g\t 2 test_u32' \
 	'param set 2 log_level 3' \
 	'param get 2 log_level' \
+	'param tablelist 2' \
+	'param table 2 32' \
 	'param get 2 uid' \
 	'param get 2 csp_buf_free' \
 	'param get 2 log_level' \
@@ -218,6 +220,16 @@ wait_for_output "$work_dir/node1.log" "2:test_u32 = 1234" \
 # this is the only place it shows.
 wait_for_output "$work_dir/node1.log" "2:log_level = 3" \
     "$node1_pid" || fail "a remote write to a sampled parameter did not take effect"
+
+# One table rather than the whole listing, and the tables a node carries. Both
+# reuse the descriptors the first remote read fetched: a node's descriptors do
+# not change while it is up, so paying for them once is the difference between
+# reading one value and reading the whole table on a link that can barely
+# carry either.
+wait_for_output "$work_dir/node1.log" " 32  service" \
+    "$node1_pid" || fail "the remote table summary did not list the boot table"
+wait_for_output "$work_dir/node1.log" "32          0x00  boot_image" \
+    "$node1_pid" || fail "the remote table did not list its parameters"
 
 # A string across the link, and a sampled value that is current when it is
 # asked for. The server hands libparam the backing storage directly, so a
