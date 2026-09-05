@@ -29,8 +29,8 @@ or a release qualification record.
 | MCUboot boot and rollback | Bootloader plus two 352 KB slots and a reserved 192 KB golden region, ECDSA P-256 signature check, swap with automatic revert, `mcuboot` shell for confirm and upgrade | Opt-in sysbuild composition builds bootloader and signed application; the signed artefact is checked against the project key and against MCUboot's default | **PHYSICALLY VERIFIED** on 3 September 2026: an unconfirmed test image reverted to its predecessor, a confirmed one persisted across two reboots, an image signed with MCUboot's public default key was refused, and a value written to storage under the first image was still readable after every swap and revert | Update transport is out of scope; golden region reserved but unwritten and not selectable; images must be written one sector into the secondary slot |
 | Health monitoring | Components register with a deadline and report as they run; the watchdog is fed only by a check that finds every one within its deadline. Registration can be undone so a stopped service does not reset a working board | 14 `native_sim` cases covering registration, deadlines, recovery and the refusal to supervise without a watchdog | **PHYSICALLY VERIFIED** on 4 September 2026: healthy for three watchdog timeouts with no reset, then a genuinely overdue component caused a withheld feed, a reset, and `reset_cause=watchdog` on the next boot | Liveness only, no resource or subsystem checks; the application thread is the only component watched so far |
 | Platform watchdog | Chosen-bound device, timeout and keep-alive at a third of it, deliberate starvation, reset-cause decoding with the watchdog preferred among latched causes | Six-case `native_sim` suite covering the interval margin across the configurable range, cause decoding, and the no-hardware `-ENODEV` contract | **PHYSICALLY VERIFIED** on 3 September 2026: armed on a NUCLEO-L496ZG, survived 18 s fed with the feed counter advancing, reset within 13 s of deliberate starvation, and the next boot reported `reset_cause=watchdog` from a mask that also latched the pin bit | Mechanism only, no health policy; one timeout channel; cannot be disarmed once armed on the STM32 independent watchdog |
-| Local parameters | Tables addressed by identifier and offset in owner bands, exact scalar checks, read-only flags, callbacks, sample-on-read, derived write modes | CSP-disabled ztest, a core-table ztest, and local/full shell integration | Local tables run in the NUCLEO composition; physical bench checks remote access to them | Strings, data and arrays absent, which holds back several planned rows; most configuration values are read-only until the layers below can read a stored value back |
-| Core parameter tables | Tables 1–6: `board`, `system`, `telemetry`, `csp`, `storage`, `watchdog` | **SOFTWARE VERIFIED**: 13-case ztest suite, `param-tables-smoke.sh`, and three Robot software scenarios | Not yet read from a board; `param-tables.robot` carries a `physical` case for it | Observability plus two configuration values; every other planned row is deferred behind string support or a stored-value read-back path |
+| Local parameters | Tables addressed by identifier and offset in owner bands, scalars, strings and byte arrays, exact size checks, read-only flags, validate and change callbacks, sample-on-read, derived write modes | CSP-disabled ztest, a string and array ztest, a core-table ztest, and local/full shell integration | Local tables run in the NUCLEO composition; physical bench checks remote access to them | Most configuration values in the core tables are read-only, because applying them needs the layer below to read a stored value back at start-up and that path does not exist |
+| Parameter tables | Sixteen tables: core 1–6, services 25–32, module 50 and 67, with 100 parameters across them | **SOFTWARE VERIFIED**: a 24-case core-table ztest, a string and array ztest, `param-tables-smoke.sh`, and Robot software scenarios | **PHYSICALLY VERIFIED** on 5 September 2026: `PARAM TABLES RESULT: PASS` read from a NUCLEO-L496ZG over its debug UART, and every table read across a Holybro link including a string value and a setting written from the ground | Housekeeping collection is still absent, so a pass reads values one round trip at a time |
 | PARAM CSP adapter | Optional libparam-compatible server/client/cache | Two-node native remote list/get/set plus Robot errors | Holybro RF bench passed production list/get/set and the valid owner callback; the corrected reset-to-default oracle passed physically on 3 September 2026 (`1` to `3`, then invalid `5` restoring the compiled `1`) | Fixed remote descriptor pool; no remote persistence command |
 | Parameter persistence | Explicit bounded versioned CRC snapshot and defaults/load/save/clear | CSP-disabled unit suite, cross-process integration, corrupt snapshot fallback, Valgrind | No dedicated NUCLEO reboot/persistence acceptance | Local only; no migration framework beyond name/type compatibility |
 | Storage | LittleFS lifecycle at `/kfsw`, cautious first-format policy, capacity API | Storage ztest and native cross-process integration | NUCLEO storage info/test passes in UART HIL | Linux/NUCLEO full profiles only; one 64 KiB volume per profile |
@@ -108,12 +108,18 @@ not implemented.
 
 Parameters are addressed by table and offset, in bands that say who owns a
 table: 1 to 24 core, 25 to 49 services, 50 to 99 modules, with zero reserved so
-an uninitialised field cannot address a real table. Six core tables exist and
-are almost entirely read-only observability. Two limits are the reason: the
-service supports no strings, data or arrays, and the platform and comms layers
-sit below it and cannot read a stored value back at initialization. Until those
-are addressed, publishing a configuration value as writable would let an
-operator change something that nothing applies.
+an uninitialised field cannot address a real table. Sixteen tables exist: six
+core, eight owned by services, and two by modules.
+
+The core six remain almost entirely read-only observability, for a reason that
+still holds: the platform and comms layers sit below the parameter service and
+cannot read a stored value back at initialization, so publishing one of their
+settings as writable would let an operator change something that nothing
+applies. The service tables are not bound by that, and several of their values
+are settable from the ground while the system runs.
+
+What a table can hold is no longer the limit. Scalars, strings and byte arrays
+all work, over the link as well as locally.
 
 Persistence has one snapshot and basic name/type compatibility rather than
 schema versions and mission migrations. FTP has one static worker and no multi-user or authorization
@@ -130,8 +136,10 @@ There is no persistent journal, rate limiting, coalescing, or downlink stream.
 Logging remains console-oriented and separate; events are the record, not a
 replacement for log messages.
 
-There is no current local message bus, housekeeping, health/watchdog policy,
-flight planner, telemetry serialization, or firmware update application.
+There is no current local message bus, housekeeping collection, flight planner,
+or telemetry serialization. Health policy and the update service both exist and
+are covered above; what is missing around them is a collector that can gather
+what they report into one downlink rather than one value per round trip.
 
 ### Qualification and release
 
