@@ -52,11 +52,17 @@
 #endif
 
 #include "parameters/tables.h"
+#endif
+
+/* The prompt and the echo belong to the shell, not to the parameter service,
+ * so they are included on their own conditions. Nesting them under PARAM left
+ * the boards that run a shell without parameters calling an undeclared
+ * function.
+ */
 #if CONFIG_KFSW_DEBUG_SHELL
 #include "shell/shell_prompt.h"
 #if CONFIG_KFSW_COMMAND
 #include "shell/shell_echo.h"
-#endif
 #endif
 #endif
 

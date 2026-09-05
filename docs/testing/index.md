@@ -191,6 +191,27 @@ exercised directly: a block out of order, a block failing its own checksum and
 then succeeding when resent, a short block in the middle, a second transfer
 while one is running, and an unknown opcode being answered rather than ignored.
 
+#### Over the radio, end to end
+
+The whole chain has also been run across a Holybro pair rather than a wired
+link, which is the case the service exists for. On 5 September 2026, against
+`db64963`, a signed image was sent from a `native_sim` ground node 16 to a
+NUCLEO-L496ZG node 2, flashed, and booted:
+
+```text
+before      csp ident node 2 reports  revision: fwu-before
+send        fwu send 2 fwu-after.signed.bin
+flash       fwu flash 2
+reboot      cmd reboot, then the CSP link recovers without intervention
+after       csp ident node 2 reports  revision: fwu-after
+confirm     mcuboot confirm, then mcuboot reports  confirmed: 1
+image       sha256 d83e07a4ae4c65c46ada7d7ba4591dba6696b96cf3eeb879e93b86f93f5abe29
+```
+
+The revision string is the evidence rather than the transfer succeeding: the
+two images differ only in what they report, so a node answering `fwu-after` is
+running code that arrived over the air.
+
 ### MCUboot rollback acceptance
 
 `tests/hil/mcuboot/rollback.sh` is the acceptance for `k-fsw#2`. It proves the

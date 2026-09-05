@@ -632,7 +632,7 @@ with no echo.
 After the reset the boot banner names the cause:
 
 ```
-@BOOT sw=kfsw-dev board=nucleo_l496zg/stm32l496xx reset=0x00000011 reset_rc=0 reset_cause=watchdog
+@BOOT sw=7c592ef board=nucleo_l496zg/stm32l496xx reset=0x00000011 reset_rc=0 reset_cause=watchdog
 ```
 
 The raw mask is kept alongside the decoded name because a reset can latch
