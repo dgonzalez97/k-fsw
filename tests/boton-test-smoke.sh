@@ -48,35 +48,35 @@ run_image()
 	printf '%s\n' \
 		'param tables' \
 		'param list' \
-		'param get boton_test_press_count' \
-		'param get boton_test_last_press_s' \
-		'param get hw_test_led_green' \
-		'param get hw_test_led_blue' \
-		'param get hw_test_led_red' \
-		'param set boton_test_press_count 100' \
-		'param set boton_test_last_press_s 100' \
+		'param get press_count' \
+		'param get last_press_s' \
+		'param get led_green' \
+		'param get led_blue' \
+		'param get led_red' \
+		'param set press_count 100' \
+		'param set last_press_s 100' \
 		'test led green on' \
-		'param get hw_test_led_green' \
+		'param get led_green' \
 		'test led green off' \
-		'param get hw_test_led_green' \
+		'param get led_green' \
 		'test led blue on' \
-		'param get hw_test_led_blue' \
+		'param get led_blue' \
 		'test led blue off' \
-		'param get hw_test_led_blue' \
+		'param get led_blue' \
 		'test led red on' \
-		'param get hw_test_led_red' \
+		'param get led_red' \
 		'test led red off' \
-		'param get hw_test_led_red' \
+		'param get led_red' \
 		'test led purple on' \
 		'test led red blink' \
-		'param set hw_test_led_green 1' \
-		'param get hw_test_led_green' \
-		'param set hw_test_led_green 2' \
-		'param get hw_test_led_green' \
-		'param set hw_test_led_green 0' \
-		'param get boton_test_press_count' \
-		'param get boton_test_last_press_s' \
-		'param get hw_test_led_green' |
+		'param set led_green 1' \
+		'param get led_green' \
+		'param set led_green 2' \
+		'param get led_green' \
+		'param set led_green 0' \
+		'param get press_count' \
+		'param get last_press_s' \
+		'param get led_green' |
 		"$executable" --uart_stdinout --stop_at=2.0 --no-color \
 			-flash="$flash_image" -flash_erase -flash_rm \
 			>"$output_log" 2>&1
@@ -96,20 +96,20 @@ run_image "$disabled_build_dir/zephyr/zephyr.exe" \
 	"$work_dir/disabled-flash.bin" "$disabled_log"
 
 expect "$disabled_log" \
-	"get: parameter 'boton_test_press_count' not found" \
+	"get: parameter 'press_count' not found" \
 	"the disabled composition unexpectedly exposed press_count"
 expect "$disabled_log" \
-	"get: parameter 'boton_test_last_press_s' not found" \
+	"get: parameter 'last_press_s' not found" \
 	"the disabled composition unexpectedly exposed last_press_s"
 # The listing is one row per parameter: table name, offset, then the name. A
 # composition without the module must not carry the table at all.
 if grep -Eq '^hw_test +0x[0-9a-f]{2} ' "$disabled_log"; then
 	fail "the disabled parameter list contains the hw_test table"
 fi
-# Anchored to a listing row rather than the name alone: the shell echoes the
-# commands, so an unanchored match would find the module's name in the very
-# `param get` that is supposed to report it missing.
-if grep -Eq '^[a-z_]+ +0x[0-9a-f]{2} +(boton_test_|hw_test_led_)' "$disabled_log"; then
+# Anchored to a listing row in the module's own table. The names no longer
+# carry a prefix -- the table already says which component owns them -- so a
+# bare name like led_green is not distinctive enough to search for on its own.
+if grep -Eq '^hw_test +0x[0-9a-f]{2} +(press_count|last_press_s|led_)' "$disabled_log"; then
 	fail "the disabled parameter list contains module definitions"
 fi
 if grep -Eq '^ *67 +module' "$disabled_log"; then
@@ -138,14 +138,14 @@ expect "$enabled_log" 'boton_test initialized' \
 # Table, offset, name, type and write mode together. The mode is derived from
 # the definition, so a read-only value reported as writable would show up here
 # rather than only when an operator tried to set it.
-if ! grep -Eq '^hw_test +0x00 +boton_test_press_count +u32 +r ' "$enabled_log"; then
+if ! grep -Eq '^hw_test +0x00 +press_count +u32 +r ' "$enabled_log"; then
 	fail "the enabled parameter list omitted read-only press_count at table 67 offset 0"
 fi
-if ! grep -Eq '^hw_test +0x04 +boton_test_last_press_s +u32 +r ' "$enabled_log"; then
+if ! grep -Eq '^hw_test +0x04 +last_press_s +u32 +r ' "$enabled_log"; then
 	fail "the enabled parameter list omitted read-only last_press_s at table 67 offset 4"
 fi
 for led in green blue red; do
-	if ! grep -Eq "^hw_test +0x0[89a] +hw_test_led_${led} +u8 +w " "$enabled_log"; then
+	if ! grep -Eq "^hw_test +0x0[89a] +led_${led} +u8 +w " "$enabled_log"; then
 		fail "the enabled parameter list omitted writable ${led} LED state"
 	fi
 done
@@ -154,42 +154,42 @@ done
 if ! grep -Eq '^ *67 +module +hw_test +' "$enabled_log"; then
 	fail "hw_test was not registered as table 67 in the module band"
 fi
-expect "$enabled_log" 'boton_test_press_count = 0' \
+expect "$enabled_log" 'press_count = 0' \
 	"the live press_count did not start at zero"
-expect "$enabled_log" 'boton_test_last_press_s = 0' \
+expect "$enabled_log" 'last_press_s = 0' \
 	"the live last_press_s did not start at zero"
-expect "$enabled_log" 'hw_test_led_green = 0' \
+expect "$enabled_log" 'led_green = 0' \
 	"the green LED state did not start off"
-expect "$enabled_log" 'hw_test_led_blue = 0' \
+expect "$enabled_log" 'led_blue = 0' \
 	"the blue LED state did not start off"
-expect "$enabled_log" 'hw_test_led_red = 0' \
+expect "$enabled_log" 'led_red = 0' \
 	"the red LED state did not start off"
 expect "$enabled_log" \
-	"set: parameter 'boton_test_press_count' is read-only or service is not ready" \
+	"set: parameter 'press_count' is read-only or service is not ready" \
 	"press_count was not read-only"
 expect "$enabled_log" \
-	"set: parameter 'boton_test_last_press_s' is read-only or service is not ready" \
+	"set: parameter 'last_press_s' is read-only or service is not ready" \
 	"last_press_s was not read-only"
 for led in green blue red; do
 	expect "$enabled_log" "${led}: on" "the ${led} shell command did not turn on"
 	expect "$enabled_log" "${led}: off" "the ${led} shell command did not turn off"
-	expect "$enabled_log" "hw_test_led_${led} = 1" \
+	expect "$enabled_log" "led_${led} = 1" \
 		"the ${led} shell command did not update PARAM state"
 done
 expect "$enabled_log" 'unknown LED colour: purple' \
 	"an invalid LED colour was not rejected"
 expect "$enabled_log" 'LED state must be on or off' \
 	"an invalid LED operation was not rejected"
-expect "$enabled_log" "set: parameter 'hw_test_led_green' failed (-34)" \
+expect "$enabled_log" "set: parameter 'led_green' failed (-34)" \
 	"an invalid LED boolean was not rejected"
 
-if [[ "$(grep -Fc 'boton_test_press_count = 0' "$enabled_log")" -lt 2 ]]; then
+if [[ "$(grep -Fc 'press_count = 0' "$enabled_log")" -lt 2 ]]; then
 	fail "the rejected press_count write changed owner state"
 fi
-if [[ "$(grep -Fc 'boton_test_last_press_s = 0' "$enabled_log")" -lt 2 ]]; then
+if [[ "$(grep -Fc 'last_press_s = 0' "$enabled_log")" -lt 2 ]]; then
 	fail "the rejected last_press_s write changed owner state"
 fi
-if [[ "$(grep -Fc 'hw_test_led_green = 1' "$enabled_log")" -lt 3 ]]; then
+if [[ "$(grep -Fc 'led_green = 1' "$enabled_log")" -lt 3 ]]; then
 	fail "the invalid green LED write changed owner state"
 fi
 

@@ -163,6 +163,7 @@ Registered tables in the reference composition:
 | 29 | service | `ftp` | `kfsw-services/src/ftp-parameters/`, with the file transfer service |
 | 31 | service | `health` | `kfsw-services/src/health-parameters/`, with health monitoring |
 | 32 | service | `boot` | `kfsw-services/src/boot-parameters/`, with the boot service |
+| 50 | module | `radio_uhf` | `kfsw-modules/radio-uhf/parameters/`, with the radio module |
 | 67 | module | `hw_test` | `kfsw-modules/boton-test` |
 
 The update table is read-only throughout. If an operator could write it, an
@@ -224,6 +225,25 @@ totals, incremented where the outcome is already known and outside the event
 guard, so a composition without the event record still has the numbers. They
 saturate and are never reset: a counter that wraps or restarts hides the thing
 it was counting.
+
+### What stays compile-time, and why
+
+Not everything a table reports can be changed from the ground, and the tables
+say which is which through the mode column rather than leaving it to be
+discovered.
+
+`ftp_root` is read-only because the path resolver takes the root's length from
+`sizeof()` on a compile-time literal, and changing the sandbox under a running
+transfer is not a failure worth having. `ftp_chunk_size` can only be shortened:
+the workspace buffer is sized at build time and the protocol codec refuses
+anything larger, so a bigger value would be stored here and rejected at the
+first transfer. `fwu_lite_block_size` is read-only for the same reason.
+
+The radio table is read-only throughout. The module selects an implementation
+at build time and never interrogates the modem, so `uhf_link_state` reports
+`unknown` unless the implementation can actually read it back. Unknown is a
+real value there: reporting a link as up on no evidence is the reading that
+gets acted on wrongly.
 
 ### Console echo
 
@@ -414,12 +434,12 @@ When the NUCLEO button example is selected, the same generic adapter makes its
 live owner state observable without adding CSP knowledge to the module:
 
 ```text
-kfsw:~$ param get 2 boton_test_press_count
-kfsw:~$ param get 2 boton_test_last_press_s
-kfsw:~$ param set 2 hw_test_led_green 1
-kfsw:~$ param get 2 hw_test_led_green
-kfsw:~$ param set 2 boton_test_press_count 100
-set: parameter 'boton_test_press_count' is read-only or service is not ready
+kfsw:~$ param get 2 press_count
+kfsw:~$ param get 2 last_press_s
+kfsw:~$ param set 2 led_green 1
+kfsw:~$ param get 2 led_green
+kfsw:~$ param set 2 press_count 100
+set: parameter 'press_count' is read-only or service is not ready
 ```
 
 The rejected write leaves both fields unchanged. Routing and the physical link

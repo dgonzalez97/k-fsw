@@ -335,14 +335,14 @@ live values. The button values remain read-only; LED values are writable
 non-persistent booleans and accept only `0` or `1`:
 
 ```text
-kfsw:~$ param get boton_test_press_count
-boton_test_press_count = 0
-kfsw:~$ param get boton_test_last_press_s
-boton_test_last_press_s = 0
-kfsw:~$ param get hw_test_led_green
-hw_test_led_green = 0
-kfsw:~$ param set hw_test_led_green 1
-hw_test_led_green = 1
+kfsw:~$ param get press_count
+press_count = 0
+kfsw:~$ param get last_press_s
+last_press_s = 0
+kfsw:~$ param get led_green
+led_green = 0
+kfsw:~$ param set led_green 1
+led_green = 1
 ```
 
 All five reset to zero/off on boot. A rejected `param set`, including an LED
@@ -370,10 +370,10 @@ kfsw:~$ param set 2 log_level 2
 The same adapter can observe the button module on node 2:
 
 ```text
-kfsw:~$ param get 2 boton_test_press_count
-2:boton_test_press_count = 0
-kfsw:~$ param get 2 boton_test_last_press_s
-2:boton_test_last_press_s = 0
+kfsw:~$ param get 2 press_count
+2:press_count = 0
+kfsw:~$ param get 2 last_press_s
+2:last_press_s = 0
 ```
 
 Remote writes to either value fail as read-only. This visibility does not make

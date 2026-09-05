@@ -138,6 +138,14 @@ static int run_command(const struct shell *sh, uint16_t node, const char *name, 
 	}
 	outcome = kfsw_command_find(name, &info);
 	if (outcome != 0) {
+		/* Asked anyway when it is meant for this node, so the service
+		 * records the attempt. Refusing here without telling it left
+		 * cmd_unknown counting only the mistakes that arrived over a
+		 * link, which is the smaller half of them.
+		 */
+		if (node == 0U) {
+			(void)kfsw_command_invoke(name, NULL, 0U, &result);
+		}
 		shell_error(sh, "unknown command '%s'; try 'cmd list'", name);
 		return outcome;
 	}

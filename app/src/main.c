@@ -130,6 +130,9 @@ int main(void)
 #if CONFIG_KFSW_HEALTH
 		&kfsw_health_param_definitions,
 #endif
+#if CONFIG_KFSW_RADIO_UHF
+		&kfsw_radio_uhf_param_definitions,
+#endif
 #if CONFIG_KFSW_BOTON_TEST
 		&kfsw_boton_test_param_definitions,
 #endif
