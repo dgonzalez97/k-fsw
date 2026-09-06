@@ -31,7 +31,7 @@ or a release qualification record.
 | Health monitoring | Components register with a deadline and report as they run; the watchdog is fed only by a check that finds every one within its deadline. Registration can be undone so a stopped service does not reset a working board | 14 `native_sim` cases covering registration, deadlines, recovery and the refusal to supervise without a watchdog | **PHYSICALLY VERIFIED** on 4 September 2026: healthy for three watchdog timeouts with no reset, then a genuinely overdue component caused a withheld feed, a reset, and `reset_cause=watchdog` on the next boot | Liveness only, no resource or subsystem checks; the application thread is the only component watched so far |
 | Platform watchdog | Chosen-bound device, timeout and keep-alive at a third of it, deliberate starvation, reset-cause decoding with the watchdog preferred among latched causes | Six-case `native_sim` suite covering the interval margin across the configurable range, cause decoding, and the no-hardware `-ENODEV` contract | **PHYSICALLY VERIFIED** on 3 September 2026: armed on a NUCLEO-L496ZG, survived 18 s fed with the feed counter advancing, reset within 13 s of deliberate starvation, and the next boot reported `reset_cause=watchdog` from a mask that also latched the pin bit | Mechanism only, no health policy; one timeout channel; cannot be disarmed once armed on the STM32 independent watchdog |
 | Local parameters | Tables addressed by identifier and offset in owner bands, scalars, strings and byte arrays, exact size checks, read-only flags, validate and change callbacks, sample-on-read, derived write modes | CSP-disabled ztest, a string and array ztest, a core-table ztest, and local/full shell integration | Local tables run in the NUCLEO composition; physical bench checks remote access to them | Most configuration values in the core tables are read-only, because applying them needs the layer below to read a stored value back at start-up and that path does not exist |
-| Parameter tables | Sixteen tables: core 1–6, services 25–32, module 50 and 67, with 103 parameters across them | **SOFTWARE VERIFIED**: a 24-case core-table ztest, a string and array ztest, `param-tables-smoke.sh`, and Robot software scenarios | **PHYSICALLY VERIFIED** on 5 September 2026: `PARAM TABLES RESULT: PASS` read from a NUCLEO-L496ZG over its debug UART, and every table read across a Holybro link including a string value and a setting written from the ground | Housekeeping collection is still absent, so a pass reads values one round trip at a time |
+| Parameter tables | Seventeen tables: core 1–6, services 25–33, module 50 and 67, with 113 parameters across them | **SOFTWARE VERIFIED**: a 24-case core-table ztest, a string and array ztest, `param-tables-smoke.sh`, and Robot software scenarios | **PHYSICALLY VERIFIED** on 5 September 2026: `PARAM TABLES RESULT: PASS` read from a NUCLEO-L496ZG over its debug UART, and every table read across a Holybro link including a string value and a setting written from the ground | Housekeeping now collects a named set in one exchange |
 | PARAM CSP adapter | Optional libparam-compatible server/client/cache | Two-node native remote list/get/set plus Robot errors | Holybro RF bench passed production list/get/set and the valid owner callback; the corrected reset-to-default oracle passed physically on 3 September 2026 (`1` to `3`, then invalid `5` restoring the compiled `1`) | Fixed remote descriptor pool; no remote persistence command |
 | Parameter persistence | Explicit bounded versioned CRC snapshot and defaults/load/save/clear | CSP-disabled unit suite, cross-process integration, corrupt snapshot fallback, Valgrind | No dedicated NUCLEO reboot/persistence acceptance | Local only; no migration framework beyond name/type compatibility |
 | Storage | LittleFS lifecycle at `/kfsw`, cautious first-format policy, capacity API | Storage ztest and native cross-process integration | NUCLEO storage info/test passes in UART HIL | Linux/NUCLEO full profiles only; one 64 KiB volume per profile |
@@ -140,7 +140,7 @@ There is no persistent journal, rate limiting, coalescing, or downlink stream.
 Logging remains console-oriented and separate; events are the record, not a
 replacement for log messages.
 
-There is no current local message bus, housekeeping collection, flight planner,
+There is no current local message bus, flight planner,
 or telemetry serialization. Health policy and the update service both exist and
 are covered above; what is missing around them is a collector that can gather
 what they report into one downlink rather than one value per round trip.
@@ -213,15 +213,14 @@ allocates dynamically today, and a collector that pauses for an unbounded time
 in the image that feeds the watchdog is a larger change to how this software
 behaves than the expressiveness would repay.
 
-**Housekeeping**
-([kfsw-services issue #8](https://github.com/dgonzalez97/kfsw-services/issues/8))
-names a set of values once so a pass can ask for the set rather than its
-members. Reading 103 parameters one round trip at a time is the difference
-between knowing how a spacecraft is and guessing. Sampling them together also
-makes the set agree with itself, which reading them separately does not.
+**Housekeeping** is now in. A report names a set of values once and a pass asks
+for the set; the frame is asserted against reading the same parameters
+individually, because a set that is fast and disagrees with its members would
+be worse than the round trips it replaced.
 
-Both waited on the same two things, and both are now in: parameters addressed
-by table and offset, and a clock so a report can say when it was taken.
+Periodic beacons are the part deliberately left out: a node that transmits
+unprompted can flood a link, and that wants its own floor and its own bench
+evidence.
 
 ### Improve measurement and fault evidence
 

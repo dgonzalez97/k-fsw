@@ -33,6 +33,9 @@
 #if CONFIG_KFSW_EVENT
 #include <kfsw/services/event.h>
 #endif
+#if CONFIG_KFSW_HK
+#include <kfsw/services/hk.h>
+#endif
 #if CONFIG_KFSW_FTP
 #include <kfsw/services/ftp.h>
 #endif
@@ -127,6 +130,9 @@ int main(void)
 		&kfsw_boot_param_definitions,
 #if CONFIG_KFSW_EVENT
 		&kfsw_event_param_definitions,
+#endif
+#if CONFIG_KFSW_HK
+		&kfsw_hk_param_definitions,
 #endif
 #if CONFIG_KFSW_COMMAND
 		&kfsw_command_param_definitions,
@@ -289,6 +295,28 @@ int main(void)
 		}
 	}
 #endif
+
+#if CONFIG_KFSW_HK_CSP
+	if (csp_started) {
+		result = kfsw_hk_server_start();
+		if (result != 0) {
+			kfsw_log_error("Failed to start the housekeeping server: %d", result);
+		}
+	}
+#endif
+#endif
+
+#if CONFIG_KFSW_HK
+	/* After the parameter tables exist, because a saved definition names
+	 * them, and after CSP where there is one, because a definition may name
+	 * another node.
+	 */
+	result = kfsw_hk_init();
+	if (result != 0) {
+		kfsw_log_error("Failed to initialize housekeeping: %d", result);
+	} else {
+		(void)kfsw_hk_start();
+	}
 #endif
 
 #if CONFIG_KFSW_WATCHDOG

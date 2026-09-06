@@ -25,6 +25,11 @@
 /* Largest table this shell will fetch whole. */
 #define KFSW_PARAM_TABLE_NAMES_MAX 32U
 
+/* Values are fetched a window at a time so one refused packet costs a window
+ * rather than the table, and so the buffer stays small enough to hold.
+ */
+#define KFSW_PARAM_REMOTE_WINDOW 8U
+
 struct param_list_context {
 	const struct shell *shell;
 	/* When set, only this table is printed. A whole listing is one line per
@@ -593,9 +598,10 @@ static int cmd_param_table(const struct shell *sh, size_t argc, char **argv)
 		if (result != 0) {
 			return result;
 		}
-		/* Names first, then one fetch each. A table is a handful of
-		 * parameters, so this is bounded; the whole listing is not,
-		 * which is why only this command reads values remotely. */
+		/* Names first, then one request for the lot. A table is a
+		 * handful of parameters, so this is bounded; the whole listing
+		 * is not, which is why only this command reads values remotely.
+		 */
 		result = kfsw_param_remote_visit(node, collect_table_names, &context);
 		if (result != 0) {
 			shell_error(sh, "parameter table failed (%d)", result);
@@ -606,24 +612,47 @@ static int cmd_param_table(const struct shell *sh, size_t argc, char **argv)
 			return 0;
 		}
 
-		print_list_header(sh);
-		for (size_t index = 0U; index < context.name_count; index++) {
-			struct kfsw_param_value value;
-			char value_text[KFSW_PARAM_VALUE_TEXT_SIZE];
-			char table_text[KFSW_PARAM_TABLE_COLUMN + 1];
+		/* One exchange per window rather than one per value. Over a
+		 * radio each round trip waits up to a second, so a table that
+		 * took a dozen now takes one or two.
+		 *
+		 * The window is static, not a local: a kfsw_param_value is
+		 * about 120 bytes because of its string field, and the shell
+		 * thread was measured at 2208 bytes of its 3072 doing exactly
+		 * this command. Eight of them on the stack would overflow it.
+		 */
+		static struct kfsw_param_value window[KFSW_PARAM_REMOTE_WINDOW];
 
-			if (kfsw_param_remote_get(node, context.names[index], &value) == 0) {
-				format_param_value(value_text, sizeof(value_text), &value);
-			} else {
-				(void)snprintf(value_text, sizeof(value_text), "-");
+		print_list_header(sh);
+		for (size_t base = 0U; base < context.name_count;
+		     base += KFSW_PARAM_REMOTE_WINDOW) {
+			size_t span = MIN(context.name_count - base, KFSW_PARAM_REMOTE_WINDOW);
+			bool read_ok;
+
+			read_ok = (kfsw_param_remote_get_many(node, &context.names[base], span,
+							      window) == 0);
+
+			for (size_t offset = 0U; offset < span; offset++) {
+				size_t index = base + offset;
+				char value_text[KFSW_PARAM_VALUE_TEXT_SIZE];
+				char table_text[KFSW_PARAM_TABLE_COLUMN + 1];
+
+				if (read_ok) {
+					format_param_value(value_text, sizeof(value_text),
+							   &window[offset]);
+				} else {
+					(void)snprintf(value_text, sizeof(value_text), "-");
+				}
+				(void)snprintf(table_text, sizeof(table_text), "%u", context.table);
+				shell_print(sh, "%-*s  0x%02x  %-*s  %-*s  %-*s  %s",
+					    KFSW_PARAM_TABLE_COLUMN, table_text,
+					    context.offsets[index], KFSW_PARAM_NAME_COLUMN,
+					    context.names[index], KFSW_PARAM_TYPE_COLUMN,
+					    kfsw_param_type_name(context.types[index]),
+					    KFSW_PARAM_MODE_COLUMN,
+					    kfsw_param_mode_name(context.param_flags[index]),
+					    value_text);
 			}
-			(void)snprintf(table_text, sizeof(table_text), "%u", context.table);
-			shell_print(
-				sh, "%-*s  0x%02x  %-*s  %-*s  %-*s  %s", KFSW_PARAM_TABLE_COLUMN,
-				table_text, context.offsets[index], KFSW_PARAM_NAME_COLUMN,
-				context.names[index], KFSW_PARAM_TYPE_COLUMN,
-				kfsw_param_type_name(context.types[index]), KFSW_PARAM_MODE_COLUMN,
-				kfsw_param_mode_name(context.param_flags[index]), value_text);
 		}
 		return 0;
 	}

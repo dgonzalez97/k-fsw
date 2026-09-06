@@ -26,6 +26,9 @@ echo "INTEGRATION: storage"
 echo "INTEGRATION: PARAM persistence"
 "$KFSW_REPO_DIR/tests/param-persistence-smoke.sh"
 
+echo "INTEGRATION: housekeeping collection"
+"$KFSW_REPO_DIR/tests/hk-smoke.sh"
+
 echo "INTEGRATION: CSP, remote PARAM, storage, and FTP"
 "$KFSW_REPO_DIR/tests/csp-smoke.sh"
 
