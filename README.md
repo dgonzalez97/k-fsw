@@ -53,7 +53,7 @@ a UHF radio, and a small worked example of the whole boundary.
 
 ## What it does
 
-- **Settings you can change from the ground.** 100 named values in 16 tables,
+- **Settings you can change from the ground.** 103 named values in 16 tables,
   each owned by the code it describes, which checks a write before it lands.
 - **CSP over a radio or over CAN.** One router, and a route decides which link
   a destination takes.
@@ -112,11 +112,15 @@ terminals:
 
 The [ground guide](docs/ground/index.md) covers the configuration model.
 
+The recordings below share one bench: a ground node on the left, the STM32
+Nucleo top right, and a second K-FSW node running as a Linux process below it.
+
 ### Settings, across a link
 
 `param tables` lists what a node carries and `param table <id>` prints one.
-Add a node number to either to read the same thing from the other end — and a
-write from the ground lands in the node and stays there.
+Add a node number to either to read the same thing from the other end. A write
+from the ground lands in the node and stays there — here the same setting is
+changed on both nodes and read back.
 
 ![Reading and writing parameters across a link](docs/media/param-over-a-link.gif)
 
