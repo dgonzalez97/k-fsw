@@ -40,8 +40,25 @@ jobs:
       - name: Install Doxygen
         run: sudo apt-get install --yes doxygen
 
+      - name: Install gcovr
+        run: pip install gcovr
+
       - name: Build and validate SDK documentation
         run: ./k-fsw/tools/ci/docs.sh
+
+      # Published alongside the manual rather than as its own site, so one link
+      # reaches both and neither can drift to a different commit.
+      - name: Measure coverage
+        run: ./k-fsw/tools/ci/coverage.sh
+
+      - name: Add coverage to the documentation
+        run: |
+          mkdir -p build/docs/html/coverage
+          cp -r build/coverage/index.html build/docs/html/coverage/
+          for repository in k-fsw kfsw-platform kfsw-services kfsw-comms kfsw-modules; do
+            [ -d "build/coverage/$repository" ] || continue
+            cp -r "build/coverage/$repository" build/docs/html/coverage/
+          done
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6

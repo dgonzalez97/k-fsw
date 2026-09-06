@@ -106,9 +106,14 @@ PY
 	fi
 done
 
+# A landing page, so the five reports are one link rather than five. Written
+# here rather than in the workflow, so what is published is what a developer
+# sees locally.
+python3 "$KFSW_TOOLS_DIR/docs/coverage_index.py" "$out_dir" >"$out_dir/index.html"
+
 echo
 echo "COVERAGE: line coverage of the unit suites"
 cat "$summary"
 echo
-echo "COVERAGE: reports under $out_dir/<repository>/index.html"
+echo "COVERAGE: $out_dir/index.html"
 echo "COVERAGE RESULT: PASS"

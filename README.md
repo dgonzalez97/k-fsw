@@ -151,7 +151,14 @@ Eight jobs run on every push, and all must pass before anything merges:
 | `ROBOT / dry-run + software` | Every suite parses; the software-tagged cases run |
 | `DOCS / Doxygen` | The documentation builds and the API is documented |
 
-The unit suites cover each layer on its own; the integration robot scripts, booting a real image and talking to it the way an operator would, using a ground node.
+The unit suites cover each layer on its own; the integration scripts go the
+other way, booting a real image and talking to it through a ground node the way
+an operator would.
+
+[Coverage is reported per repository](https://dgonzalez97.github.io/k-fsw/coverage/),
+because one number for the whole workspace would hide a thin layer behind a
+well covered one. It measures the unit suites only, so a low figure means a
+layer is tested mostly on a bench rather than that it is untested.
 
 ### Hardware in the loop
 
