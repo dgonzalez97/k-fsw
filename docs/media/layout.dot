@@ -1,0 +1,30 @@
+/* The repository layout, rendered to SVG by tools/docs/diagrams.sh.
+ *
+ * Colours are given for both themes by using mid-tones that hold on a white
+ * page and a dark one, since GitHub picks the reader's theme and an SVG cannot
+ * ask which it got.
+ */
+digraph kfsw {
+	bgcolor="transparent";
+	rankdir=TB;
+	node [shape=box, style="rounded,filled", fontname="Helvetica",
+	      fontsize=11, color="#2f9e68", fillcolor="#e8f5ee", fontcolor="#143122",
+	      margin="0.18,0.10"];
+	edge [color="#7a8b83", arrowsize=0.7];
+
+	app [label="k-fsw\ncomposition, targets, tools, tests, docs",
+	     fillcolor="#28a96b", fontcolor="#ffffff", color="#1c7a4d"];
+
+	modules  [label="kfsw-modules\nradio, I/O"];
+	services [label="kfsw-services\nlog, param, files, events,\ncommands, health, update"];
+	comms    [label="kfsw-comms\nCSP, routing, KISS, CAN"];
+	platform [label="kfsw-platform\ntime, storage, reset cause,\nwatchdog"];
+
+	zephyr [label="Zephyr\nkernel, devices, drivers, build",
+	        fillcolor="#dfe7e3", color="#8fa39a", fontcolor="#25352e"];
+
+	app -> {modules services comms platform};
+	{modules services comms platform} -> zephyr;
+
+	{rank=same; modules; services; comms; platform;}
+}

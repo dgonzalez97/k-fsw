@@ -24,45 +24,19 @@ Five repositories. `k-fsw` composes the application and owns the targets,
 tools, integration tests and documentation; the other four hold everything
 reusable, pinned by [`west.yml`](west.yml).
 
-```text
-                         k-fsw
-        application composition, targets, tests, tools, docs
-                            |
-       +-------------+-------------+-------------+-------------+
-       |             |             |             |
-kfsw-modules   kfsw-services   kfsw-comms   kfsw-platform
-  hardware:     log, param,     CSP, routing,  time, storage,
-  radio, I/O    files, events,  UART/KISS,     reset cause,
-                commands,       CAN            watchdog
-                health, update
-       |             |             |             |
-       +-------------+-------------+-------------+
-                            |
-                          Zephyr
-                kernel, devices, drivers, build
-                            |
-          +-----------------+------------------+
-          |                 |                  |
-       Linux         STM32 Nucleo board   shell bring-ups
-    native_sim           L496ZG            FRDM / Pico W
-```
+![How the repositories fit together](docs/media/layout.svg)
 
-Dependencies run one way, down. A layer never includes a header from a layer
-above it — which is why the core parameter tables live in the composition
-rather than in `platform` or `comms`: those sit *below* the parameter service,
-so they cannot reach up to it.
+| Repository | Owns |
+| --- | --- |
+| [`k-fsw`](https://github.com/dgonzalez97/k-fsw) | Composition, targets, tools, integration tests, docs |
+| [`kfsw-modules`](https://github.com/dgonzalez97/kfsw-modules) | Device and subsystem modules: `radio-uhf`, `hw_test` |
+| [`kfsw-services`](https://github.com/dgonzalez97/kfsw-services) | Logging, parameters, persistence, files, events, commands, health, firmware update |
+| [`kfsw-comms`](https://github.com/dgonzalez97/kfsw-comms) | CSP lifecycle, routing, UART/KISS and CAN transports |
+| [`kfsw-platform`](https://github.com/dgonzalez97/kfsw-platform) | Zephyr-facing mechanisms: time, storage, reset cause, watchdog |
 
-| Repository | Owns | CI |
-| --- | --- | --- |
-| [`k-fsw`](https://github.com/dgonzalez97/k-fsw) | Composition, targets, tools, integration tests, docs | [![Software CI](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml) |
-| [`kfsw-modules`](https://github.com/dgonzalez97/kfsw-modules) | Device and subsystem modules: `radio-uhf`, `hw_test` | via `k-fsw` |
-| [`kfsw-services`](https://github.com/dgonzalez97/kfsw-services) | Logging, parameters, persistence, files, events, commands, health, firmware update | via `k-fsw` |
-| [`kfsw-comms`](https://github.com/dgonzalez97/kfsw-comms) | CSP lifecycle, routing, UART/KISS and CAN transports | via `k-fsw` |
-| [`kfsw-platform`](https://github.com/dgonzalez97/kfsw-platform) | Zephyr-facing mechanisms: time, storage, reset cause, watchdog | via `k-fsw` |
-
-The dependencies have no CI of their own, deliberately. A commit in one of them
-means nothing until a composition pins it, so `k-fsw` builds and tests the
-exact set of revisions that make one working system.
+CI runs in `k-fsw`, and covers all five: a commit in a dependency means nothing
+until a composition pins it, so what gets built and tested is the exact set of
+revisions that make one working system.
 
 ## Modules
 
@@ -70,18 +44,12 @@ The framework is meant to be composed, not forked. A **module** is the code
 that knows about one piece of hardware — a radio, a sensor, a subsystem. It
 owns its own interface, its settings, its shell command and its tests.
 
-What it does *not* own is the plumbing it uses to get there. The UHF radio
-moves bytes over a serial link without taking UART, KISS, CSP or routing with
-it; those belong to the layers below and stay generic.
-
 Adding one touches nothing shared. A module claims its own block of settings
 and hands them to the composition, so no existing file changes and the module
 never has to learn that a network exists.
 
-Two ship today, both in
-[`kfsw-modules`](https://github.com/dgonzalez97/kfsw-modules): the UHF radio,
-and `hw_test` — a deliberately small worked example of the whole boundary,
-readable in one sitting.
+Two ship today in [`kfsw-modules`](https://github.com/dgonzalez97/kfsw-modules):
+a UHF radio, and a small worked example of the whole boundary.
 
 ## What it does
 
@@ -91,19 +59,21 @@ readable in one sitting.
   a destination takes.
 - **Files** in either direction, checksummed before anything is committed.
 - **Firmware update** over the air, with rollback if the new image never
-  confirms itself.
+  confirms itself.  
 - **Commands, events and health.** Typed calls with typed results, a bounded
   record of what the node did, and a watchdog fed by a policy rather than a
   timer.
-- **Ground nodes.** `k-ground` builds the other end of the link as a Linux
-  process, so two nodes need one board.
+- **Ground nodes.** The ground segment lives in this same workspace, built from
+  the same sources as the flight side. One CSP, one parameter model, one file
+  protocol, one set of pinned versions — so a change to the wire cannot land on
+  one side and not the other.
 
 ## Hardware
 
-The full composition runs in native simulation and on an
-**STM32 Nucleo board (L496ZG)**. Parameter tables, file transfer, commands,
-events, CAN and a firmware update have all been exercised on that board from a
-ground node over a real radio link — not only in simulation.
+The board in use today is an **STM32 Nucleo (L496ZG)**, and several more will
+join it before the first release. Parameter tables, file transfer, commands,
+events, CAN and a firmware update have all been exercised on it from a ground
+node over a real radio link — not only in simulation.
 
 Firmware update is the one worth showing, because it is the whole chain in one
 go: send, flash, reboot, confirm.
@@ -128,20 +98,8 @@ west manifest --validate
 ./k-fsw/tools/kfsw-linux run
 ```
 
-That gives you a shell:
-
-```text
-kfsw:~$ status
-kfsw:~$ param tables
-kfsw:~$ param table 1
-kfsw:~$ storage info
-```
-
-`param tables` lists what this node carries, and `param table <id>` prints one
-of them. Add a node number to either — `param table 2 1` — to read the same
-thing from across a link.
-
-To bring up the other end, in two more terminals:
+That gives you a shell. To bring up the other end of a link, in two more
+terminals:
 
 ```bash
 ./k-fsw/tools/k-ground init
@@ -152,19 +110,40 @@ To bring up the other end, in two more terminals:
 ./k-fsw/tools/k-ground run kfsw-ops
 ```
 
-`csp ping 16` from the operator node checks the local link. The
-[ground guide](docs/ground/index.md) covers the configuration model, the other
-reserved roles, and where the radio bench begins.
+The [ground guide](docs/ground/index.md) covers the configuration model.
+
+### Settings, across a link
+
+`param tables` lists what a node carries and `param table <id>` prints one.
+Add a node number to either to read the same thing from the other end — and a
+write from the ground lands in the node and stays there.
+
+![Reading and writing parameters across a link](docs/media/param-over-a-link.gif)
+
+### Files
+
+Up, checked on the node, back down, and compared. The same CRC32 appears at
+every step, which is what makes it a round trip rather than two transfers.
+
+![A file sent and fetched back](docs/media/file-transfer.gif)
+
+### Restarting a node
+
+A remote reboot has to quote a pin the node holds, so a mistyped node number
+does not restart the wrong spacecraft. Afterwards the node can say why it went
+down.
+
+![Restarting a node with a pin](docs/media/reboot-with-a-pin.gif)
 
 ## Targets
-
+ 
 | Target | Board | Links | What runs on it |
 | --- | --- | --- | --- |
 | `linux` | `native_sim/native/64` | KISS over a PTY, CAN via SocketCAN | Everything |
 | `nucleo_l496zg` | STM32 Nucleo L496ZG | KISS on USART3, CAN on PD0/PD1 | Everything |
 
-Two more boards run a shell and nothing else. They are bring-up profiles, not
-flight targets, and build without CSP, parameters, storage or files:
+They are bring-up profiles, not
+flight targets, and build without CSP, parameters, storage or files, to test Zephyr
 
 | Target | Board | Verified scope |
 | --- | --- | --- |
@@ -185,8 +164,8 @@ Eight jobs run on every push, and all must pass before anything merges:
 | `ROBOT / dry-run + software` | Every suite parses; the software-tagged cases run |
 | `DOCS / Doxygen` | The documentation builds and the API is documented |
 
-The unit suites cover each layer on its own. The integration scripts go the
-other way: they boot a real image and talk to it the way an operator would.
+The unit suites cover each layer on its own; the integration scripts go the
+other way, booting a real image and talking to it the way an operator would.
 
 ### Hardware in the loop
 
