@@ -10,7 +10,7 @@ mission-specific: a console, a link to the ground, settings you can read and
 change over that link, files, events, logs, commands, housekeeping, and a firmware update mechanism over the air. 
 
 
-It is written for on-board computers, but can be used for anything in a spacecraft. Because it
+It is written with on-board computers in mind, but can be used for anything in a spacecraft. Because it
 is composed rather than hardcoded, the same framework runs on a radio, ADCS, an EPS or
 any other board with a processor: you enable what that subsystem needs and leave
 the rest out.
@@ -70,14 +70,14 @@ pseudo-terminals exactly as they would over a radio, kiss or CAN )
 ```bash
 west manifest --validate
 ./k-fsw/tools/kfsw-linux build
-./k-fsw/tools/kfsw-linux run
+./k-fsw/tools/k-ground init   
 ```
 
 Then, in other terminal:
 
-```bash
-./k-fsw/tools/k-ground init                
-./k-fsw/tools/k-ground run kfsw-gnd-uhf      
+```bash              
+./k-fsw/tools/k-ground run kfsw-gnd-uhf 
+./k-fsw/tools/kfsw-linux run     
 ```
 
 
@@ -86,22 +86,19 @@ Then, in other terminal:
 other ground roles.
 
 
-### Settings, across a link
+### Settings and configuration, across all nodes
 
-`param tables` lists what a node carries and `param table <id>` prints one.
+`param tables` lists the table from every node and `param table <id>` prints one.
 
-The settings themselves know nothing about the network. Each one belongs to
-the code it describes, which holds it and decides whether a write is allowed;
-reaching them from the ground is a separate, optional piece that speaks
-[Space Inventor's libparam](https://github.com/spaceinventor/libparam) on the
-wire. A node with no radio at all still has every setting, and the code that
-owns one never learns that CSP exists.
+Reaching them from the ground is a separate, optional piece that speaks
+[Space Inventor's libparam](https://github.com/spaceinventor/libparam).
+
 
 ![Reading and writing parameters across a link](docs/media/param-over-a-link.gif)
 
 ### Files
 
-Up, checked on the node, back down, and compared. The same CRC32 appears at every step, which is what makes it a round trip.
+Up, checked on the node, back down, and compared.The CRC32 of the file is what makes it a round trip. RDP can be activated for loss-less connections, and files that stop while being sent, generate a .map file that can be reused, on links that may loss connection.
 
 ![A file sent and fetched back](docs/media/file-transfer.gif)
 
