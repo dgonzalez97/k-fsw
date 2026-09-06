@@ -21,7 +21,7 @@ architecture, operations, testing, and the API.
 ## Layout of K-FSW
 
 
-![How the repositories fit together](docs/media/layout.svg) @dd the layout make the titles in bold, in modules add gnss, sensors.
+![How the repositories fit together](docs/media/layout.svg)
 
 | Repository | Owns |
 | --- | --- |
@@ -58,26 +58,6 @@ a UHF radio, and a small worked example using LEDs and buttons of development bo
   timer.
 - **Ground nodes.** The ground segment lives in this same workspace, built from
   the same sources as the flight side, as if it was one extra node on the satelite.
-## Hardware
-
-The board in use today is an **STM32 Nucleo (L496ZG)**, and several more will
-join it before the first release. Parameter tables, file transfer, commands,
-events, CAN and a firmware update have all been exercised on it from a ground
-node over a real radio link, but also in simulation.
-
-Firmware update is the one worth showing, because it is the whole chain in one
-go: send, flash, reboot, confirm.
-
-![Firmware update over a radio link](docs/media/firmware-update-over-radio.gif)
-
-An image that arrives intact is not the same as one you want to boot, so
-receiving and committing are separate steps, and MCUboot puts the old image
-back if the new one never confirms itself. A bad upload costs a reboot, not the
-spacecraft.
-
-What has and has not been proven on hardware is tracked in the
-[project status](docs/status/index.md).
-
 ## Try it
 
 Three commands build a node and give you its shell. Two more start the other
@@ -108,8 +88,9 @@ Then, in two more terminals:
 [ground guide](docs/ground/index.md) covers the configuration model and the
 other roles.
 
-Everything below runs on real hardware instead: a ground node on the left, an
-STM32 Nucleo top right, and a second K-FSW node as a Linux process beneath it.
+The recordings below are the same three nodes on a bench, with a real board and
+a real radio in the middle: a ground node on the left, an STM32 Nucleo top
+right, and a second K-FSW node as a Linux process beneath it.
 
 ### Settings, across a link
 
@@ -127,13 +108,24 @@ every step, which is what makes it a round trip rather than two transfers.
 
 ![A file sent and fetched back](docs/media/file-transfer.gif)
 
-### Restarting a node
+### Firmware update
 
-A remote reboot has to quote a pin the node holds, so a mistyped node number
-does not restart the wrong spacecraft. Afterwards the node can say why it went
-down.
+The whole chain in one go: send, flash, reboot, confirm. An image that arrives
+intact is not the same as one you want to boot, so receiving and committing are
+separate steps, and MCUboot puts the old image back if the new one never
+confirms itself. A bad upload costs a reboot, not the spacecraft.
 
-![Restarting a node with a pin](docs/media/reboot-with-a-pin.gif)
+![Firmware update over a radio link](docs/media/firmware-update-over-radio.gif)
+
+## Hardware
+
+The board in use today is an **STM32 Nucleo (L496ZG)**, and several more will
+join it before the first release. Parameter tables, file transfer, commands,
+events, CAN and a firmware update have all been exercised on it from a ground
+node over a real radio link, but also in simulation.
+
+What has and has not been proven on hardware is tracked in the
+[project status](docs/status/index.md).
 
 ## Targets
  
@@ -184,7 +176,7 @@ Cases needing the board are tagged, so the same files run in CI without
 hardware and on the bench with it. The [testing guide](docs/testing/index.md)
 has the full matrix and how to run them.
 
-The parameter-table suite running against the Nucleo:
+The parameter-table suite running against the Nucleo over CAN and RF.
 
 ![Hardware test suite running](docs/media/hardware-test-robot.gif)
 
@@ -198,14 +190,12 @@ tested in software and what has been read off a board.
 
 ## Development
 
-Run the full software gate from the workspace root before opening anything:
-
-```bash
-./k-fsw/tools/ci/all.sh
-```
 
 The [documentation site](https://dgonzalez97.github.io/k-fsw/) covers setup,
 architecture, operations and the C API, and the same content builds as a
-printable guide with `./k-fsw/tools/docs/pdf.sh`. The
-[development guide](docs/development/index.md) covers contributions and how a
-change spanning several pinned repositories is landed.
+printable guide with 
+
+`./k-fsw/tools/docs/pdf.sh`. 
+
+The [development guide](docs/development/index.md) covers contributions and how to add modules or
+changes. 

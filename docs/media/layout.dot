@@ -12,15 +12,15 @@ digraph kfsw {
 	      margin="0.18,0.10"];
 	edge [color="#7a8b83", arrowsize=0.7];
 
-	app [label="k-fsw\ncomposition, targets, tools, tests, docs",
+	app [label=<<b>k-fsw</b><br/>composition, targets, tools, tests, docs>,
 	     fillcolor="#28a96b", fontcolor="#ffffff", color="#1c7a4d"];
 
-	modules  [label="kfsw-modules\nradio, I/O"];
-	services [label="kfsw-services\nlog, param, files, events,\ncommands, health, update"];
-	comms    [label="kfsw-comms\nCSP, routing, KISS, CAN"];
-	platform [label="kfsw-platform\ntime, storage, reset cause,\nwatchdog"];
+	modules  [label=<<b>kfsw-modules</b><br/>radio, GNSS, sensors, I/O>];
+	services [label=<<b>kfsw-services</b><br/>log, param, files, events,<br/>commands, health, update>];
+	comms    [label=<<b>kfsw-comms</b><br/>CSP, routing, KISS, CAN>];
+	platform [label=<<b>kfsw-platform</b><br/>time, storage, reset cause,<br/>watchdog>];
 
-	zephyr [label="Zephyr\nkernel, devices, drivers, build",
+	zephyr [label=<<b>Zephyr</b><br/>kernel, devices, drivers, build>,
 	        fillcolor="#dfe7e3", color="#8fa39a", fontcolor="#25352e"];
 
 	app -> {modules services comms platform};
