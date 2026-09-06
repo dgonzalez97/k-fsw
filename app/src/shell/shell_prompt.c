@@ -3,15 +3,11 @@
 #include <zephyr/shell/shell_uart.h>
 
 /*
- * The prompt is the one piece of the console that is always on screen, so it
- * is worth making it identifiable at a glance: jade separates what the node
- * says from what the operator typed, and separates one node's console from
- * another's when several are open at once.
+ * The prompt is always on screen, so jade makes it identifiable at a glance --
+ * node output from operator input, and one node's console from another's.
  *
- * The colour is applied at runtime rather than baked into
- * CONFIG_SHELL_PROMPT_UART because Kconfig strings do not carry escape
- * sequences, and because the prompt text itself stays readable in the build
- * configuration that way.
+ * Applied at runtime rather than in CONFIG_SHELL_PROMPT_UART, because Kconfig
+ * strings do not carry escape sequences.
  */
 
 /* 256-colour 36 is the closest terminal approximation to jade. */
