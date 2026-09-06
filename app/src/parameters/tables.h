@@ -9,15 +9,13 @@
  * @file
  * Core parameter tables, identifiers 1 to 24.
  *
- * These describe the composition, the platform and the links: the things
- * without which a node cannot be reached or diagnosed. They live here rather
- * than in `kfsw-platform` or `kfsw-comms` because those layers sit below the
- * parameter service and must not depend on it. The app is the composition
- * layer, so it is where a platform mechanism and a service can be joined
- * without inverting an established dependency.
+ * The composition, the platform and the links -- what a node cannot be reached
+ * or diagnosed without. They live here rather than in `kfsw-platform` or
+ * `kfsw-comms` because those sit below the parameter service and must not
+ * depend on it; the composition is where the two can meet.
  *
- * Each table reads its values through the owning layer's public API, so the
- * layer below still owns the state and this code only publishes it.
+ * Each reads through the owning layer's public API, so that layer still owns
+ * the state and this only publishes it.
  */
 
 /** Table 1: identity and the composition switches that decide reachability. */

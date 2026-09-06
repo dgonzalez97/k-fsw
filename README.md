@@ -164,9 +164,17 @@ layer is tested mostly on a bench rather than that it is untested.
 
 [Robot Framework](https://robotframework.org/) drives the physical suites,
 because a HIL run is a sequence of operator actions and Robot is honest about
-which ones passed. It works the boards through @dd here i mention that spend a couple paragraphs on showing the link to tmux-robot-framework which is the one used in testing (its mine so add maybe the CI status too)
- so the same session a person would drive
-by hand is the one the suite drives, easy to edit for V&V
+which ones passed.
+
+It reaches the boards through
+[`robot-terminal-runner`](https://github.com/dgonzalez97/robot-terminal-runner)
+[![CI](https://github.com/dgonzalez97/robot-terminal-runner/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgonzalez97/robot-terminal-runner/actions/workflows/ci.yml),
+which attaches Robot to a [tmux](https://github.com/tmux/tmux) session and
+types into it. It is a submodule under `tests/platform`.
+
+So the session a person would drive by hand is the one the suite drives. A case
+is a recording of operator actions rather than a harness that has to resemble
+one, which is what makes it easy to read and edit for V&V.
 
 | Suite | Needs | Covers |
 | --- | --- | --- |

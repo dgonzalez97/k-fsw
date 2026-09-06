@@ -11,15 +11,12 @@
 
 /* A ground node takes the time from the machine it runs on.
  *
- * Nothing on a board knows the date at power-on, which is why a flight node has
- * to be told. A node running as a Linux process is in the opposite position: it
- * is sitting on a computer that already knows, and making an operator type the
- * time into it before handing it on would be asking for a mistake.
+ * A board has to be told the date; a node running as a Linux process is sitting
+ * on a machine that already knows, so making someone type it in would be asking
+ * for a mistake.
  *
- * The simulator's real-time clock carries the host wall clock, so this only
- * moves it into the clock the rest of the system reads. It runs from main
- * rather than an init hook because the subsystems that come up in between
- * reset the wall clock, and a time set before them does not survive.
+ * Runs from main rather than an init hook: the subsystems that come up in
+ * between reset the wall clock, and a time set before them does not survive.
  */
 int kfsw_clock_from_host(void)
 {
