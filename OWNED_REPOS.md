@@ -26,3 +26,5 @@ Reserved name for future external spacecraft equipment, subsystem, and device
 clients. The local placeholder has no committed implementation and is not a
 project in the current `west.yml`; it is not part of the reproducible K-FSW
 composition.
+
+ @dd is this file even needed? its explained on the readme, so you can just kill it i think

@@ -1,0 +1,10 @@
+/* The real-time clock, for a node that has to know when something happened.
+ *
+ * It runs from the low-speed oscillator rather than the system clock, so it
+ * keeps counting across a reset and across the low-power states. With VBAT
+ * wired it survives losing the main supply too, which is the difference
+ * between a node that knows the date after a power cut and one that does not.
+ */
+&rtc {
+	status = "okay";
+};

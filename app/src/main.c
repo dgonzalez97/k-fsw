@@ -54,6 +54,7 @@
 #include <kfsw/testing/parameter_definitions.h>
 #endif
 
+#include "clock_host.h"
 #include "parameters/tables.h"
 #endif
 
@@ -355,6 +356,13 @@ int main(void)
 	} else if (result != -ENOTSUP) {
 		kfsw_log_warning("Supply watch unavailable: %d", result);
 	}
+#endif
+
+#if CONFIG_KFSW_CSP && CONFIG_BOARD_NATIVE_SIM
+	/* After every subsystem is up, because the ones that initialise in
+	 * between reset the wall clock and a time set earlier does not survive.
+	 */
+	(void)kfsw_clock_from_host();
 #endif
 
 	kfsw_boot_service_start();
