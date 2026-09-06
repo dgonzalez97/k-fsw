@@ -52,7 +52,7 @@ The full reference application runs on KFSW-Linux and NUCLEO-L496ZG:
 - logging with a level per module, so raising CSP to debug does not drown the
   output in everything else;
 - LittleFS storage mounted at `/kfsw`;
-- 103 parameters across 16 tables, addressed by table and offset, carrying
+- 113 parameters across 17 tables, addressed by table and offset, carrying
   scalars, strings and byte arrays, with explicit CRC-protected snapshots;
 - a libcsp router with named UART/KISS interfaces, and remote parameter access
   over it;

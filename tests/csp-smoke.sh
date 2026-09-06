@@ -156,6 +156,7 @@ printf '%s\n' \
 	'param get 2 log_level' \
 	'param tablelist 2' \
 	'param table 2 32' \
+	'param table 2 1' \
 	'param get 2 uid' \
 	'param get 2 csp_buf_free' \
 	'param get 2 log_level' \
@@ -230,6 +231,21 @@ wait_for_output "$work_dir/node1.log" " 32  service" \
     "$node1_pid" || fail "the remote table summary did not list the boot table"
 wait_for_output "$work_dir/node1.log" "32          0x00  boot_image" \
     "$node1_pid" || fail "the remote table did not list its parameters"
+
+# A table listing asks for its values in one exchange per window; a single get
+# asks for one. Both must answer the same thing, or the batch has bought speed
+# by returning something else. `uid` is the check because it is a string, which
+# is where a queue that packed several values would go wrong first.
+wait_for_output "$work_dir/node1.log" "1           0x10  uid" \
+    "$node1_pid" || fail "the batched table read did not list the board identity"
+if ! grep -Eq '^1 +0x10 +uid +string +r +"kfsw-2"' "$work_dir/node1.log"; then
+    fail "the batched table read disagreed with the single read of uid"
+fi
+# The same listing must also carry a scalar, so a queue that packed a string
+# correctly and everything after it wrongly does not pass.
+if ! grep -Eq '^1 +0x00 +node_id +u16 +r +2' "$work_dir/node1.log"; then
+    fail "the batched table read did not return the node identifier"
+fi
 
 # A string across the link, and a sampled value that is current when it is
 # asked for. The server hands libparam the backing storage directly, so a

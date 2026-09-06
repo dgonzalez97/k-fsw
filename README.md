@@ -47,7 +47,7 @@ a UHF radio, and a small worked example using LEDs and buttons of development bo
 
 ## What KFSW does
 
-- **Settings you can change from the ground.** 100 named values in 16 tables,
+- **Settings you can change from the ground.** 113 named values in 17 tables,
   each owned by the code it describes, which checks a write before it lands. Can be persisted for reboots, and use a system that makes V&V life easier.
 - **CSP.** One router, and a route decides which link a destination takes,
   over [libcsp](https://github.com/libcsp/libcsp).
@@ -58,6 +58,9 @@ a UHF radio, and a small worked example using LEDs and buttons of development bo
 - **Commands, events and health.** A node can be told to do something and
   answer whether it worked, keep a record of what it did while nobody was
   listening, and reset itself when a part of it stops responding.
+- **Housekeeping.** Name a set of values once, and a pass asks for the set
+  rather than its members. Reading 113 parameters one round trip at a time is
+  the difference between knowing how a spacecraft is and guessing.
 - **Ground nodes.** The ground segment lives in this same workspace, built from
   the same sources as the flight side, as if it was one extra node on the satelite.
 ## Using KFSW
@@ -161,9 +164,9 @@ layer is tested mostly on a bench rather than that it is untested.
 
 [Robot Framework](https://robotframework.org/) drives the physical suites,
 because a HIL run is a sequence of operator actions and Robot is honest about
-which ones passed. It works the boards through
-[tmux](https://github.com/tmux/tmux), so the same session a person would drive
-by hand is the one the suite drives.
+which ones passed. It works the boards through @dd here i mention that spend a couple paragraphs on showing the link to tmux-robot-framework which is the one used in testing (its mine so add maybe the CI status too)
+ so the same session a person would drive
+by hand is the one the suite drives, easy to edit for V&V
 
 | Suite | Needs | Covers |
 | --- | --- | --- |

@@ -91,6 +91,7 @@ expect ' 27  service  event'
 expect ' 28  service  command'
 expect ' 29  service  ftp'
 expect ' 32  service  boot'
+expect ' 33  service  hk'
 
 printf '\n=== Addressing ===\n'
 # One offset repeating across tables is the point of the scheme, so each of
@@ -101,6 +102,7 @@ expect 'telemetry   0x00  uptime_s'
 expect 'csp         0x00  tx_packets'
 expect 'storage     0x00  total_kb'
 expect 'log         0x00  log_level'
+expect 'hk          0x00  hk_reports'
 
 printf '\n=== Strings ===\n'
 # A string is the one type whose length is part of the value, so it is checked
