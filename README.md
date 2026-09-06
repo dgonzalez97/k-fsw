@@ -1,4 +1,4 @@
-# K-FSW — flight software for NewSpace
+# K-FSW - Flight Software for Next Space
 
 [![Software CI](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml)
 [![Documentation](https://img.shields.io/badge/docs-K--FSW-28a96b)](https://dgonzalez97.github.io/k-fsw/)
@@ -10,70 +10,60 @@ mission-specific: a console, a link to the ground, settings you can read and
 change over that link, files, events, commands, a watchdog, and a way to
 replace the running image.
 
-It is written for on-board computers, but nothing in it assumes one. Because it
-is composed rather than forked, the same framework runs on a radio, an EPS or
-any other board with a processor: you enable what that board needs and leave
+It is written for on-board computers, but can be used for anything in a spacecraft. Because it
+is composed rather than hardcoded, the same framework runs on a radio, an EPS or
+any other board with a processor: you enable what that subsystem needs and leave
 the rest out.
 
 [Read the documentation](https://dgonzalez97.github.io/k-fsw/) for setup,
-architecture, operations, testing, and the C API.
+architecture, operations, testing, and the API.
 
-## Layout
+## Layout of K-FSW
 
-Five repositories. `k-fsw` composes the application and owns the targets,
-tools, integration tests and documentation; the other four hold everything
-reusable, pinned by [`west.yml`](west.yml).
 
-![How the repositories fit together](docs/media/layout.svg)
+![How the repositories fit together](docs/media/layout.svg) @dd the layout make the titles in bold, in modules add gnss, sensors.
 
 | Repository | Owns |
 | --- | --- |
-| [`k-fsw`](https://github.com/dgonzalez97/k-fsw) | Composition, targets, tools, integration tests, docs |
-| [`kfsw-modules`](https://github.com/dgonzalez97/kfsw-modules) | Device and subsystem modules: `radio-uhf`, `hw_test` |
+| [`k-fsw`](https://github.com/dgonzalez97/k-fsw) | Composition, targets, tools, integration tests, docs, its the main app |
+| [`kfsw-modules`](https://github.com/dgonzalez97/kfsw-modules) | Device and subsystem modules |
 | [`kfsw-services`](https://github.com/dgonzalez97/kfsw-services) | Logging, parameters, persistence, files, events, commands, health, firmware update |
-| [`kfsw-comms`](https://github.com/dgonzalez97/kfsw-comms) | CSP lifecycle, routing, UART/KISS and CAN transports |
-| [`kfsw-platform`](https://github.com/dgonzalez97/kfsw-platform) | Zephyr-facing mechanisms: time, storage, reset cause, watchdog |
+| [`kfsw-comms`](https://github.com/dgonzalez97/kfsw-comms) | CSP, routing, UART/KISS and CAN transports |
+| [`kfsw-platform`](https://github.com/dgonzalez97/kfsw-platform) | Zephyr-facing mechanisms: time, storage, reset cause, watchdog, I/O |
 
-CI runs in `k-fsw`, and covers all five: a commit in a dependency means nothing
-until a composition pins it, so what gets built and tested is the exact set of
-revisions that make one working system.
+
 
 ## Modules
 
-The framework is meant to be composed, not forked. A **module** is the code
-that knows about one piece of hardware — a radio, a sensor, a subsystem. It
-owns its own interface, its settings, its shell command and its tests.
+A **module** is the code that knows about one piece of hardware — a radio, a sensor, a subsystem. It
+owns its own interface, its parameters, its shell command and its tests.
 
 Adding one touches nothing shared. A module claims its own block of settings
 and hands them to the composition, so no existing file changes and the module
-never has to learn that a network exists.
+never has to learn about the services.
 
-Two ship today in [`kfsw-modules`](https://github.com/dgonzalez97/kfsw-modules):
-a UHF radio, and a small worked example of the whole boundary.
+Examples in  [`kfsw-modules`](https://github.com/dgonzalez97/kfsw-modules):
+a UHF radio, and a small worked example using LEDs and buttons of development boards.
 
-## What it does
+## What KFSW does
 
-- **Settings you can change from the ground.** 103 named values in 16 tables,
-  each owned by the code it describes, which checks a write before it lands.
-- **CSP over a radio or over CAN.** One router, and a route decides which link
-  a destination takes.
+- **Settings you can change from the ground.** 100 named values in 16 tables,
+  each owned by the code it describes, which checks a write before it lands. Can be persisted for reboots, and use a system that makes V&V life easier.
+- **CSP** One router, and a route decides which link a destination takes.
 - **Files** in either direction, checksummed before anything is committed.
-- **Firmware update** over the air, with rollback if the new image never
-  confirms itself.  
-- **Commands, events and health.** Typed calls with typed results, a bounded
+- **Firmware update over the air**, with rollback if the new image never
+  confirms itself, a lite version and one based in FTP. 
+- **Commands, events, FTP, health and more** Typed calls with typed results, a bounded
   record of what the node did, and a watchdog fed by a policy rather than a
   timer.
 - **Ground nodes.** The ground segment lives in this same workspace, built from
-  the same sources as the flight side. One CSP, one parameter model, one file
-  protocol, one set of pinned versions — so a change to the wire cannot land on
-  one side and not the other.
-
+  the same sources as the flight side, as if it was one extra node on the satelite.
 ## Hardware
 
 The board in use today is an **STM32 Nucleo (L496ZG)**, and several more will
 join it before the first release. Parameter tables, file transfer, commands,
 events, CAN and a firmware update have all been exercised on it from a ground
-node over a real radio link — not only in simulation.
+node over a real radio link, but also in simulation.
 
 Firmware update is the one worth showing, because it is the whole chain in one
 go: send, flash, reboot, confirm.
@@ -90,7 +80,12 @@ What has and has not been proven on hardware is tracked in the
 
 ## Try it
 
-From a configured west workspace root:
+Three commands build a node and give you its shell. Two more start the other
+end of a link, so you can talk between nodes without any hardware at all —
+every node here is a Linux process, and they reach each other over
+pseudo-terminals exactly as they would over a radio.
+
+![Building a node and bringing up a link](docs/media/getting-started.gif)
 
 ```bash
 west manifest --validate
@@ -98,22 +93,23 @@ west manifest --validate
 ./k-fsw/tools/kfsw-linux run
 ```
 
-That gives you a shell. To bring up the other end of a link, in two more
-terminals:
+Then, in two more terminals:
 
 ```bash
-./k-fsw/tools/k-ground init
-./k-fsw/tools/k-ground run kfsw-gnd-uhf
+./k-fsw/tools/k-ground init                  # once, to create the station
+./k-fsw/tools/k-ground run kfsw-gnd-uhf      # node 16
 ```
 
 ```bash
-./k-fsw/tools/k-ground run kfsw-ops
+./k-fsw/tools/k-ground run kfsw-ops          # node 19
 ```
 
-The [ground guide](docs/ground/index.md) covers the configuration model.
+`csp ping 16` from the operator node crosses the link and comes back. The
+[ground guide](docs/ground/index.md) covers the configuration model and the
+other roles.
 
-The recordings below share one bench: a ground node on the left, the STM32
-Nucleo top right, and a second K-FSW node running as a Linux process below it.
+Everything below runs on real hardware instead: a ground node on the left, an
+STM32 Nucleo top right, and a second K-FSW node as a Linux process beneath it.
 
 ### Settings, across a link
 
