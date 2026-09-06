@@ -194,6 +194,35 @@ platform watchdog and reset diagnostics needed by later health policy
 ([kfsw-platform issue #3](https://github.com/dgonzalez97/kfsw-platform/issues/3)).
 Transporting a candidate image is separate from bootloader recovery mechanics.
 
+### Let a node carry out a plan, and report itself in one pass
+
+Two services, both now unblocked by work that has landed.
+
+**File based operations**
+([kfsw-services issue #34](https://github.com/dgonzalez97/kfsw-services/issues/34))
+runs a sequence from a file: upload it, the node carries it out line by line
+and records each outcome. Not a language — every line is a command the command
+service already validates, so nothing can be written into a file that could not
+be sent over the link, and a sequence that cannot loop cannot hang the node.
+Guards for the cases that matter: stop or continue on error, wait, and skip
+unless an event was recorded.
+
+Embedding an interpreter was weighed and set aside. MicroPython costs 100 KB
+and a garbage collector; Berry costs 40 KB and a smaller one. Nothing here
+allocates dynamically today, and a collector that pauses for an unbounded time
+in the image that feeds the watchdog is a larger change to how this software
+behaves than the expressiveness would repay.
+
+**Housekeeping**
+([kfsw-services issue #8](https://github.com/dgonzalez97/kfsw-services/issues/8))
+names a set of values once so a pass can ask for the set rather than its
+members. Reading 103 parameters one round trip at a time is the difference
+between knowing how a spacecraft is and guessing. Sampling them together also
+makes the set agree with itself, which reading them separately does not.
+
+Both waited on the same two things, and both are now in: parameters addressed
+by table and offset, and a clock so a report can say when it was taken.
+
 ### Improve measurement and fault evidence
 
 Add hosted coverage reporting
