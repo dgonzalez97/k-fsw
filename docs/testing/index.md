@@ -163,6 +163,31 @@ Native ztests still use Zephyr. They do not substitute a host-only mock for the
 kernel, which helps exercise module CMake/Kconfig integration as well as the C
 logic.
 
+### Coverage
+
+`tools/ci/coverage.sh` runs the unit suites instrumented and reports line
+coverage **per repository**, published with this manual under `/coverage/`.
+
+One number for the whole workspace would say almost nothing. The layers are
+owned separately and tested separately, so a well-covered service would hide a
+thin one behind it in an average.
+
+```bash
+./.venv/bin/pip install gcovr
+./k-fsw/tools/ci/coverage.sh
+```
+
+It measures the **unit** suites only. The integration scripts and the HIL
+suites exercise a great deal more, but they drive a built image rather than
+instrumented objects: counting them would claim a coverage the numbers do not
+describe. A low figure means a layer is tested mostly on a bench, which is true
+of `kfsw-comms`, where CSP is proven over a radio and a CAN bus rather than in
+ztest.
+
+Vendored code under `third_party` is excluded. libcsp and libparam are pinned
+upstream projects with their own tests, and including them would move the
+number without saying anything about K-FSW.
+
 ### `boton_test` evidence boundary
 
 The focused module suite has a GPIO-disabled state/PARAM configuration and an
