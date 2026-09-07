@@ -185,6 +185,13 @@ the transport is faked, which is what reaches a replayed offset, a chunk from
 another request, a link that stops answering halfway, and the rule that every
 received frame is released exactly once.
 
+`tests/unit/services_ftp_client` fakes the same header to script the peer
+itself. Over a real link the far side is another node running the server, so it
+answers correctly or not at all; the answers the client is written to refuse --
+a reply to a different request, a reply of the wrong kind, a status carrying a
+refusal, a stat that is neither file nor directory -- take a peer that
+misbehaves on request.
+
 ### Coverage
 
 `tools/ci/coverage.sh` reports **line, function and branch** coverage of the
