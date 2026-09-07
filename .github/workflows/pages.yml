@@ -52,13 +52,7 @@ jobs:
         run: ./k-fsw/tools/ci/coverage.sh
 
       - name: Add coverage to the documentation
-        run: |
-          mkdir -p build/docs/html/coverage
-          cp -r build/coverage/index.html build/docs/html/coverage/
-          for repository in k-fsw kfsw-platform kfsw-services kfsw-comms kfsw-modules; do
-            [ -d "build/coverage/$repository" ] || continue
-            cp -r "build/coverage/$repository" build/docs/html/coverage/
-          done
+        run: cp -r build/coverage/html build/docs/html/coverage
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
