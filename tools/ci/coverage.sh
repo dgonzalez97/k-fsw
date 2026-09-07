@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Line coverage of the unit suites, reported per repository.
+# Line, function and branch coverage of the unit suites.
 #
-# One number for the whole workspace would say almost nothing: the layers are
-# owned separately and tested separately, and a well-covered service would hide
-# a thin one behind it. So the report is split the way the code is.
+# Twister builds the suites instrumented, runs them and composes the gcovr
+# report. Nothing here re-renders its output.
 #
 # Only the unit suites are measured. The integration and HIL runs exercise far
 # more, but they drive a built image rather than instrumented objects, and
@@ -25,6 +24,7 @@ command -v gcovr >/dev/null || {
 
 out_dir="${KFSW_COVERAGE_OUT_DIR:-$KFSW_ROOT/build/coverage}"
 twister_out_dir="$out_dir/twister"
+html_dir="$out_dir/html"
 
 rm -rf "$out_dir"
 mkdir -p "$out_dir"
@@ -38,6 +38,11 @@ gcov_tool="${KFSW_GCOV_TOOL:-$(command -v gcov)}"
 	exit 1
 }
 
+# Twister has no option for gcovr's filters, but gcovr reads gcovr.cfg from its
+# root, which Twister sets from --coverage-basedir. Without it the report covers
+# all of Zephyr and picolibc: 1208 files rather than 46.
+install -m 644 "$KFSW_REPO_DIR/config/gcovr.cfg" "$KFSW_ROOT/gcovr.cfg"
+
 echo "COVERAGE: running the unit suites instrumented, gcov $gcov_tool"
 KFSW_TWISTER_OUT_DIR="$twister_out_dir" \
 	ZEPHYR_TOOLCHAIN_VARIANT="${ZEPHYR_TOOLCHAIN_VARIANT:-zephyr}" \
@@ -45,75 +50,34 @@ KFSW_TWISTER_OUT_DIR="$twister_out_dir" \
 	--coverage \
 	--coverage-basedir "$KFSW_ROOT" \
 	--coverage-tool gcovr \
+	--coverage-formats html,xml,txt \
 	--gcov-tool "$gcov_tool" \
 	>"$out_dir/twister.log" 2>&1 || {
-	echo "COVERAGE RESULT: FAIL - the suites did not pass; see $out_dir/twister.log"
+	echo "COVERAGE RESULT: FAIL - see $out_dir/twister.log"
 	exit 1
 }
 
-# Each repository reported on its own. gcovr is pointed at the whole tree and
-# filtered per repository rather than run four times, so every report comes from
-# one set of measurements and the numbers can be compared with each other.
-declare -A repositories=(
-	[k-fsw]="$KFSW_REPO_DIR/app"
-	[kfsw-platform]="$KFSW_ROOT/kfsw-platform/src"
-	[kfsw-services]="$KFSW_ROOT/kfsw-services/src"
-	[kfsw-comms]="$KFSW_ROOT/kfsw-comms/src"
-	[kfsw-modules]="$KFSW_ROOT/kfsw-modules"
-)
+mv "$twister_out_dir/coverage" "$html_dir"
 
-summary="$out_dir/summary.txt"
-: >"$summary"
+# gcovr writes an index and exits 0 even when it measured nothing, so a written
+# report is not evidence of a measured one.
+summary="$twister_out_dir/coverage_summary.json"
+measured="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["line_total"])' \
+	"$summary" 2>/dev/null || echo 0)"
+if [[ "$measured" -eq 0 ]]; then
+	echo "COVERAGE RESULT: FAIL - nothing was measured; see $out_dir/twister.log"
+	exit 1
+fi
 
-for repository in k-fsw kfsw-platform kfsw-services kfsw-comms kfsw-modules; do
-	source_dir="${repositories[$repository]}"
-	[[ -d "$source_dir" ]] || continue
-
-	report_dir="$out_dir/$repository"
-	mkdir -p "$report_dir"
-
-	# third_party holds vendored libcsp and libparam. They are pinned
-	# upstream code with their own tests; counting them would move the
-	# number without saying anything about K-FSW.
-	gcovr \
-		--root "$KFSW_ROOT" \
-		--filter "$source_dir" \
-		--exclude '.*/third_party/.*' \
-		--exclude '.*/tests/.*' \
-		--gcov-ignore-parse-errors \
-		--html-details "$report_dir/index.html" \
-		--json-summary "$report_dir/summary.json" \
-		--print-summary \
-		"$twister_out_dir" >"$report_dir/gcovr.log" 2>&1 || true
-
-	if [[ -s "$report_dir/summary.json" ]]; then
-		python3 - "$repository" "$report_dir/summary.json" >>"$summary" <<'PY'
-import json
-import sys
-
-repository, path = sys.argv[1], sys.argv[2]
-with open(path) as handle:
-    data = json.load(handle)
-print("%-16s %6.1f%%  %5d / %-5d lines" % (
-    repository,
-    data.get("line_percent", 0.0),
-    data.get("line_covered", 0),
-    data.get("line_total", 0),
-))
-PY
-	else
-		printf '%-16s %s\n' "$repository" "no measurements" >>"$summary"
-	fi
-done
-
-# A landing page, so the five reports are one link rather than five. Written
-# here rather than in the workflow, so what is published is what a developer
-# sees locally.
-python3 "$KFSW_TOOLS_DIR/docs/coverage_index.py" "$out_dir" >"$out_dir/index.html"
+python3 -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+for key, label in (("line", "lines"), ("function", "functions"), ("branch", "branches")):
+    print("%-10s %5.1f%%  %6d / %d" % (
+        label, d[key + "_percent"], d[key + "_covered"], d[key + "_total"]))
+' "$summary"
 
 echo
-echo "COVERAGE: line coverage of the unit suites"
-cat "$summary"
-echo
-echo "COVERAGE: $out_dir/index.html"
+echo "COVERAGE: $html_dir/index.html"
+echo "COVERAGE: serve it with $KFSW_REPO_DIR/tools/coverage/serve.sh"
 echo "COVERAGE RESULT: PASS"
