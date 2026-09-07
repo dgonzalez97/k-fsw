@@ -174,6 +174,40 @@ jobs:
           path: build/valgrind/*.log
           if-no-files-found: ignore
 
+  ubsan:
+    name: UNDEFINED / UBSan
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out K-FSW
+        uses: actions/checkout@v4
+        with:
+          path: k-fsw
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up the west workspace and Zephyr SDK
+        uses: zephyrproject-rtos/action-zephyr-setup@v1
+        with:
+          app-path: k-fsw
+          toolchains: arm-zephyr-eabi
+
+      - name: Run the suites under UBSan
+        run: ./k-fsw/tools/ci/ubsan.sh
+
+      - name: Upload UBSan diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubsan-diagnostics
+          path: |
+            build/ubsan/twister.log
+            build/ubsan/**/handler.log
+          if-no-files-found: ignore
+
   robot:
     name: ROBOT / dry-run + software
     runs-on: ubuntu-24.04
