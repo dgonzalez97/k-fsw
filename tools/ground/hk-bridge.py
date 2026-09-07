@@ -23,6 +23,7 @@ or at the radio for the bench:
 """
 
 import argparse
+import collections
 import socket
 import struct
 import sys
@@ -249,7 +250,10 @@ def main():
         sink = (socket.socket(socket.AF_INET, socket.SOCK_DGRAM), (host, int(port)))
 
     reader = KissReader()
-    seen = set()
+    # Bounded on purpose. A set would grow for as long as the bridge runs, and
+    # sequence numbers wrap at 65536 anyway, so remembering the recent ones is
+    # both cheaper and more correct than remembering all of them.
+    seen = collections.deque(maxlen=1024)
     with serial.Serial(args.device, args.baud, timeout=0.1) as link:
         while True:
             samples = pull(link, reader, args, args.sport, 0, args.count)
@@ -259,7 +263,7 @@ def main():
                 sequence = struct.unpack_from(">H", sample, 2)[0]
                 if sequence in seen:
                     continue
-                seen.add(sequence)
+                seen.append(sequence)
                 print(describe(sample))
                 if sink:
                     sink[0].sendto(envelope(sample, int(time.time() * 1000)), sink[1])

@@ -90,6 +90,20 @@ define_command="$("$python" "$KFSW_REPO_DIR/tools/ground/hk-report.py" "$definit
 printf '%s\n' "$define_command" 'hk collect 0' 'hk get 0' >&3
 sleep 2
 
+# A report naming a table the image does not carry is refused at define time,
+# which is the service working correctly and the test being pointed at the
+# wrong build. Say which, because the failure that follows otherwise is just
+# an empty sample.
+if grep -q 'define report 0: -2' "$work_dir/node.log"; then
+	printf 'this image does not carry every table the report names.\n' >&2
+	printf 'build it with the profile:\n' >&2
+	printf '  KFSW_EXTRA_CONF_FILE="%s;%s" \\\n' \
+		"$KFSW_REPO_DIR/tests/config/param-fixtures.conf" \
+		"$KFSW_REPO_DIR/config/profiles/linux-temperature.conf" >&2
+	printf '      ./k-fsw/tools/ci/build.sh linux\n' >&2
+	exit 2
+fi
+
 # The shell terminates its lines with CR.
 shell_payload="$(tr -d '\r' <"$work_dir/node.log" |
 	sed -n 's/^  \([0-9a-f]\{2,\}\)$/\1/p' | tail -1)"
