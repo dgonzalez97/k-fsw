@@ -165,16 +165,24 @@ logic.
 
 ### Coverage
 
-`tools/ci/coverage.sh` runs the unit suites instrumented and reports line
-coverage **per repository**, published with this manual under `/coverage/`.
+`tools/ci/coverage.sh` reports **line, function and branch** coverage of the
+unit suites, published with this manual under `/coverage/`.
 
-One number for the whole workspace would say almost nothing. The layers are
-owned separately and tested separately, so a well-covered service would hide a
-thin one behind it in an average.
+Twister does the whole job: it builds the suites instrumented, runs them and
+composes the gcovr report. Every file opens into its own source, where a line
+carries the number of times it ran, and a separate list of functions gives each
+one its call count, so a function that is never called is named rather than
+averaged away.
+
+Twister has no option for gcovr's filters, so the scope lives in
+`config/gcovr.cfg`, which gcovr reads from the directory given as
+`--coverage-basedir`. Without it the report covers all of Zephyr and picolibc:
+1208 files rather than 46.
 
 ```bash
 ./.venv/bin/pip install gcovr
 ./k-fsw/tools/ci/coverage.sh
+./k-fsw/tools/coverage/serve.sh   # http://127.0.0.1:8001/
 ```
 
 It measures the **unit** suites only. The integration scripts and the HIL

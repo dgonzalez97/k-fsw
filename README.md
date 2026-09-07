@@ -155,10 +155,12 @@ The unit suites cover each layer on its own; the integration scripts go the
 other way, booting a real image and talking to it through a ground node the way
 an operator would.
 
-[Coverage is reported per repository](https://dgonzalez97.github.io/k-fsw/coverage/),
-because one number for the whole workspace would hide a thin layer behind a
-well covered one. It measures the unit suites only, so a low figure means a
-layer is tested mostly on a bench rather than that it is untested.
+[Coverage is reported by Twister](https://dgonzalez97.github.io/k-fsw/coverage/),
+which builds the suites instrumented, runs them and composes the report. Lines,
+functions and branches are each reported per file, down to the source itself,
+and every function is listed with the number of times it ran. It measures the
+unit suites only, so a low figure means a layer is tested mostly on a bench
+rather than that it is untested.
 
 ### Hardware in the loop
 
