@@ -1,5 +1,7 @@
 # CSP and Communications {#communications}
 
+[TOC]
+
 ## CSP before K-FSW
 
 [Cubesat Space Protocol (CSP)](https://github.com/libcsp/libcsp) is a compact

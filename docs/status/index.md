@@ -1,5 +1,7 @@
 # Project Status and Roadmap {#project_status}
 
+[TOC]
+
 ## Status baseline
 
 This status was updated on 31 August 2026 for the `boton_test` reference module
