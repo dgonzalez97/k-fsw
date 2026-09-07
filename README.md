@@ -145,7 +145,7 @@ Nine jobs run on every push, and all must pass before anything merges:
 | --- | --- |
 | `BUILD / linux`, `BUILD / nucleo_l496zg` | Both full targets build, plus a CSP-disabled composition |
 | `QUALITY` | clang-format and cppcheck over the sources |
-| `UNIT / Twister` | **206 cases** across 21 suites |
+| `UNIT / Twister` | **215 cases** across 22 suites |
 | `INTEGRATION / software` | 18 end-to-end smoke scripts driving a real image |
 | `MEMORY / Valgrind` | The hosted image under Valgrind |
 | `UNDEFINED / UBSan` | The same suites, watching the arithmetic rather than the memory |

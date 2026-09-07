@@ -1,0 +1,11 @@
+/ {
+	chosen {
+		kfsw,fwu-partition = &slot1_partition;
+		kfsw,storage-partition = &storage_partition;
+	};
+};
+
+&storage_partition {
+	label = "kfsw-ftp-transfer-test";
+	reg = <0x000fc000 0x00010000>;
+};

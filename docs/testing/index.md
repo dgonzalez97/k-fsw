@@ -179,6 +179,12 @@ asked for. Those two reads are redirected with `-Wl,--wrap` in the suite's
 `CMakeLists.txt`, declared through `zephyr_link_libraries()` so the wrap
 reaches the final link rather than the `app` library.
 
+`tests/unit/services_ftp_transfer` does the same to `ftp_link.h`, which the
+send and receive loops are already written against. Storage stays real; only
+the transport is faked, which is what reaches a replayed offset, a chunk from
+another request, a link that stops answering halfway, and the rule that every
+received frame is released exactly once.
+
 ### Coverage
 
 `tools/ci/coverage.sh` reports **line, function and branch** coverage of the
