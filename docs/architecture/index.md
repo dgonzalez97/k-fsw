@@ -1,5 +1,7 @@
 # Architecture {#architecture}
 
+[TOC]
+
 ## Architectural intent
 
 K-FSW separates reusable behavior from product composition. A service should

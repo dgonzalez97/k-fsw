@@ -1,5 +1,7 @@
 # Development Workflow {#development}
 
+[TOC]
+
 ## One change, one reviewed story
 
 K-FSW development starts with a concrete issue and ends when the integrated

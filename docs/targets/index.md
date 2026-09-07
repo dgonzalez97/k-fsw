@@ -1,5 +1,7 @@
 # Boards and Targets {#targets}
 
+[TOC]
+
 ## Board and target are different concepts
 
 Zephyr defines boards such as `nucleo_l496zg` and

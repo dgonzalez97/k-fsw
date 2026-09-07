@@ -1,5 +1,7 @@
 # Ground Composition {#ground}
 
+[TOC]
+
 K-FSW can be composed as lightweight Linux ground nodes without creating a
 second framework. `k-ground` uses the same Zephyr `native_sim` application,
 shell commands, libcsp router, KISS interface, services, and build machinery as

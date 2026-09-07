@@ -1,5 +1,7 @@
 # Getting Started {#getting_started}
 
+[TOC]
+
 ## Workspace model
 
 K-FSW is developed as a west workspace. The `k-fsw` repository is the

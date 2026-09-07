@@ -1,5 +1,7 @@
 # Shell and Command Reference {#commands}
 
+[TOC]
+
 ## The Zephyr shell in K-FSW
 
 Development profiles enable Zephyr's serial shell with history, tab

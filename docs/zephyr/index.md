@@ -1,5 +1,7 @@
 # Zephyr Integration {#zephyr_integration}
 
+[TOC]
+
 ## What Zephyr provides
 
 [Zephyr](https://docs.zephyrproject.org/4.4.0/) is a real-time operating system

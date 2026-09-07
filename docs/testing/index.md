@@ -1,5 +1,7 @@
 # Testing, HIL, and CI {#testing}
 
+[TOC]
+
 ## Evidence is layered
 
 No single K-FSW test proves every property. A build can catch configuration and

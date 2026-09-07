@@ -1,5 +1,7 @@
 # Services and Storage {#services}
 
+[TOC]
+
 ## Service ownership
 
 `kfsw-services` contains reusable application behavior. It depends on
