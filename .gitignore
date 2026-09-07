@@ -3,3 +3,7 @@
 # repository. tests/hil/radio-uhf/holybro/bench.env.example is the template.
 bench.env
 *-bench.env
+
+# Python bytecode from the ground tools
+__pycache__/
+*.pyc

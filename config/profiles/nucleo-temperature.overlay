@@ -1,0 +1,22 @@
+/*
+ * The die temperature sits on ADC1 channel 17 and both nodes ship disabled, so
+ * the composition turns them on. The clock source and prescaler are required by
+ * the ADC binding and absent from the L4 SoC files; these match nucleo_l4r5zi,
+ * the closest board in tree that enables the same peripheral.
+ */
+
+&adc1 {
+	st,adc-clock-source = "SYNC";
+	st,adc-prescaler = <4>;
+	status = "okay";
+};
+
+&die_temp {
+	status = "okay";
+};
+
+/ {
+	chosen {
+		kfsw,die-temp = &die_temp;
+	};
+};

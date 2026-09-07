@@ -60,7 +60,9 @@ a UHF radio, and a small worked example using LEDs and buttons of development bo
   listening, and reset itself when a part of it stops responding.
 - **Housekeeping.** Name a set of values once, and a pass asks for the set
   rather than its members. Reading 113 parameters one round trip at a time is
-  the difference between knowing how a spacecraft is and guessing.
+  the difference between knowing how a spacecraft is and guessing. What comes
+  down goes into [Yamcs](https://yamcs.org/), so a pass can still be read after
+  it ends.
 - **Ground nodes.** The ground segment lives in this same workspace, built from
   the same sources as the flight side, as if it was one extra node on the satelite.
 ## Using KFSW

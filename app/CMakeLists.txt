@@ -168,3 +168,11 @@ if(CONFIG_KFSW_BOTON_TEST)
     endif()
     target_link_libraries(app PRIVATE kfsw::boton_test)
 endif()
+
+if(CONFIG_KFSW_TEMPERATURE_SENSOR_EXAMPLE)
+    if(NOT TARGET kfsw_temperature_sensor_example)
+        message(FATAL_ERROR
+            "the temperature example was enabled but kfsw-modules did not provide its target")
+    endif()
+    target_link_libraries(app PRIVATE kfsw::temperature_sensor_example)
+endif()

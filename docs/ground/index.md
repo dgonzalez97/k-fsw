@@ -203,9 +203,10 @@ form verifies both identities, prompts, and ping directions:
 ```
 
 `kfsw-rotctl` and `kfsw-beacon` use the same build/run path and reserve their
-roles without adding unused production protocols. There is no central
-orchestration, master election, GUI, database, web service, or new command
-framework.
+roles without adding unused production protocols. The launcher itself stays a
+launcher: no central orchestration, no master election, and no new command
+framework. Telemetry storage and a GUI do now exist, but as a separate thing
+that talks CSP from outside — see below.
 
 ## Moving a file between ground nodes
 
@@ -249,6 +250,80 @@ FTP list: PASS entries=1
 node 16, including the missing-file negative path, and is part of the software
 integration suite. Transfers to and from a flight node over the radio are a
 separate physical path; see the Holybro fixture under `tests/hil/radio-uhf/`.
+
+## Keeping what a pass brings down
+
+Everything above reads a node from a console, which is enough to fly a bench
+and not enough to fly a mission: the moment the terminal scrolls, the pass is
+gone. Housekeeping already collects a set of values in one exchange; what was
+missing was somewhere on the ground to put them.
+
+That is [Yamcs](https://yamcs.org/), the open source mission control system,
+running from `ground-station/yamcs` — a fork of `yamcs/quickstart` kept small
+on purpose. The same approach [scsat1-mcs](https://github.com/spacecubics/scsat1-mcs)
+takes for a flown 3U: a UDP telemetry link, a generated mission database, and
+the archive doing the keeping.
+
+```bash
+cd k-fsw/ground-station/yamcs && ./mvnw yamcs:run    # then http://localhost:8090
+```
+
+Nothing arrives on its own. Housekeeping answers when asked and never speaks
+first, so a bridge does the asking:
+
+```bash
+./k-fsw/tools/ground/hk-bridge.py --device /dev/pts/7 --node 1 --report 0
+```
+
+It speaks CSP over KISS on the host, pulls samples, and forwards each one to
+Yamcs on UDP 10015. Point it at a hosted node's `uart_1` pseudo-terminal, or
+straight at the Holybro's serial device for a flight node over the radio; it is
+the same client either way.
+
+### One decoder, not two
+
+A housekeeping frame carries **no names** — values back to back in the order
+the report was defined, and nothing in the packet says what they are. That is
+the right trade for a radio and it means the two ends have to agree out of
+band, which is exactly where a ground segment usually forks from its
+spacecraft.
+
+So the bridge decodes nothing. It forwards frames byte for byte and the mission
+database does the decoding, and that database is generated from the same file
+that tells the node what to collect:
+
+```bash
+report=k-fsw/ground-station/reports/nucleo-temperature.yaml
+./k-fsw/tools/ground/hk-report.py "$report" define
+# hk define 0 51:0x00 51:0x10 51:0x08 3:0x00 3:0x0c
+
+./k-fsw/tools/ground/hk-report.py "$report" xtce \
+    -o k-fsw/ground-station/yamcs/src/main/yamcs/mdb/kfsw-hk.xml
+```
+
+`hk-report.py check` compares the file against a node's own `param list`, so a
+parameter that moves offset is caught rather than silently shifting every value
+after it.
+
+### The bridge's envelope
+
+Each datagram is twelve bytes the bridge adds, then the frame the node sent:
+
+```text
+ 0  u64  Unix milliseconds   the node's clock, or the host's when it is unset
+ 8  u32  sequence
+12  ...  the housekeeping frame, header and all
+```
+
+Yamcs reads an 8-byte time and a 4-byte count at fixed offsets; the frame
+carries 4 and 2. Without the envelope a pull of sixteen samples would land at
+one reception instant and the history the node kept would collapse into a
+single moment in the archive.
+
+`tests/hk-yamcs-smoke.sh` asserts the thing that matters: the bytes the bridge
+pulls off the link are the bytes the node's own shell prints for the same
+sample. It is also the only test of housekeeping's CSP server, which the unit
+suites do not reach.
 
 ## Physical-interface ownership
 
