@@ -139,15 +139,16 @@ flight targets, and build without CSP, parameters, storage or files, to test Zep
 
 ## Testing
 
-Eight jobs run on every push, and all must pass before anything merges:
+Nine jobs run on every push, and all must pass before anything merges:
 
 | Job | What it checks |
 | --- | --- |
 | `BUILD / linux`, `BUILD / nucleo_l496zg` | Both full targets build, plus a CSP-disabled composition |
 | `QUALITY` | clang-format and cppcheck over the sources |
-| `UNIT / Twister` | **193 cases** across 17 suites |
+| `UNIT / Twister` | **206 cases** across 21 suites |
 | `INTEGRATION / software` | 18 end-to-end smoke scripts driving a real image |
 | `MEMORY / Valgrind` | The hosted image under Valgrind |
+| `UNDEFINED / UBSan` | The same suites, watching the arithmetic rather than the memory |
 | `ROBOT / dry-run + software` | Every suite parses; the software-tagged cases run |
 | `DOCS / Doxygen` | The documentation builds and the API is documented |
 

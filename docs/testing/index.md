@@ -72,6 +72,7 @@ physical board.
 | `UNIT / Twister` | `tools/ci/unit.sh` | Application/repository ztest suites, including west-managed reusable modules, on `native_sim/native/64` |
 | `INTEGRATION / software` | `tools/ci/integration.sh` | Full native shell, storage, PARAM, CSP/KISS, RDP, and FTP interactions |
 | `MEMORY / Valgrind` | `tools/ci/valgrind.sh` | Normal and corrupt-snapshot boot paths under Memcheck |
+| `UNDEFINED / UBSan` | `tools/ci/ubsan.sh` | The unit suites again, watching the arithmetic rather than the memory |
 | `ROBOT / dry-run + software` | `tools/ci/robot.sh` | All Robot suite syntax plus operator-level nonphysical scenarios |
 | `DOCS / Doxygen` | `tools/ci/docs.sh` | Warning-free HTML manual and public C API generation |
 
@@ -162,6 +163,21 @@ Set `KFSW_TWISTER_OUT_DIR` when parallel work needs isolated output.
 Native ztests still use Zephyr. They do not substitute a host-only mock for the
 kernel, which helps exercise module CMake/Kconfig integration as well as the C
 logic.
+
+### Faking a dependency
+
+Zephyr carries [FFF](https://github.com/meekrosoft/fff) at `zephyr/fff.h`, so a
+suite that needs a fake declares one with `FAKE_VALUE_FUNC` and reads back its
+call count and arguments. Nothing is generated and no build step is added.
+
+It is for seams a test cannot otherwise reach, not for the kernel: a fake that
+stood in for `k_mutex_lock` would only prove the fake works.
+`tests/unit/services_hk_remote` is the case that earns it -- housekeeping
+collects from another node over CSP, and the answers worth asserting are the
+awkward ones, a node that never replies or lists fewer values than it was
+asked for. Those two reads are redirected with `-Wl,--wrap` in the suite's
+`CMakeLists.txt`, declared through `zephyr_link_libraries()` so the wrap
+reaches the final link rather than the `app` library.
 
 ### Coverage
 
@@ -551,6 +567,23 @@ under `build/valgrind/`.
 Valgrind covers code executed by these native boots. It cannot analyze code
 compiled only for the MCU, prove all allocation paths, detect every concurrency
 error, or measure embedded stack margins.
+
+## UBSan
+
+`tools/ci/ubsan.sh` runs the unit suites again with
+`CONFIG_UBSAN`, through Twister's `--enable-ubsan`.
+
+Valgrind watches memory. UBSan watches the arithmetic: signed overflow,
+oversized shifts, misaligned loads. None of those are memory errors, so
+Memcheck never sees them, and the compiler rejects only the ones it can prove
+from constants -- a shift by 40 is refused at build time by
+`-Werror=shift-count-overflow`, while the same shift by a value read at runtime
+is not. That runtime half is what this job covers, and it matters most in the
+protocol code, where bytes off the wire are shifted and packed.
+
+A violation ends the run, so the case that provoked it fails and names its own
+file and line. The reports are also collected from the logs, because a
+sanitizer that reported and continued would leave the gate green.
 
 ## Robot Framework
 
