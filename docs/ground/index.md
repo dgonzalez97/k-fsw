@@ -359,6 +359,33 @@ datagrams, which would mean frames are arriving but not decoding. The bridge
 and Yamcs talk over UDP on localhost, so that hop rarely fails silently — the
 link is almost always the radio or the report definition.
 
+### Yamcs reads; K-FSW commands
+
+Yamcs holds telemetry and does not send anything. There is no telecommand link
+in the instance, and the fork's example command classes were deleted with the
+rest of the quickstart scaffolding.
+
+That is a decision rather than an omission. Housekeeping is configured through
+K-FSW's own command service — `hk_define`, `hk_period` and `hk_clear`, which
+reach a node over KISS or CAN because the command service rides on CSP:
+
+```text
+kfsw-ops# cmd 2 hk_define 0 "51:0x00 51:0x10 3:0x00"
+hk_define node=2: OK report 0 defines 3 values
+```
+
+Adding the same thing to Yamcs would mean an XTCE command definition, a
+telecommand link, and something turning a Yamcs command into a CSP command
+packet — roughly doubling a mission control system whose whole appeal is being
+small enough to read. It would also give commanding two paths and two audit
+trails, which is worse than one.
+
+The argument for doing it later is real: Yamcs would keep a command history
+beside the telemetry, which is worth having when more than one person operates
+a spacecraft. So this is deferred rather than refused, and the thing that
+should decide it is having flown the read-only version for a while and finding
+out whether anybody misses it.
+
 ### One decoder, not two
 
 A housekeeping frame carries **no names** — values back to back in the order
