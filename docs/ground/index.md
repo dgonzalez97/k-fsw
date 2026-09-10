@@ -28,8 +28,6 @@ convention:
 | Role | CSP address | Current scope |
 | --- | --- | --- |
 | `kfsw-gnd-uhf` | 16 | Own the physical UHF interface and expose it to ground CSP |
-| `kfsw-rotctl` | 17 | Reserved configuration for a future antenna-control bridge |
-| `kfsw-beacon` | 18 | Reserved configuration for future beacon handling |
 | `kfsw-ops` | 19 | Operator-facing shell; does not open the radio |
 
 These names and addresses are configurable deployment choices, not CSP
@@ -131,8 +129,6 @@ ground-station/
 ├── station.env
 └── nodes/
     ├── kfsw-gnd-uhf.env
-    ├── kfsw-rotctl.env
-    ├── kfsw-beacon.env
     └── kfsw-ops.env
 ```
 
@@ -154,7 +150,7 @@ image retains `0/0 -> KISS direct`. The launcher configures routes but still
 only auto-connects the direct two-peer PTY link described below; it is not a
 general network orchestrator.
 
-Only `kfsw-gnd-uhf` selects `KFSW_RADIO_UHF`; ops, beacon, and rotator roles do
+Only `kfsw-gnd-uhf` selects `KFSW_RADIO_UHF`; the ops role does
 not own the physical radio. The launcher maps `holybro` to the reusable module's
 compile-time Kconfig choice rather than calling implementation-specific C APIs.
 
@@ -202,8 +198,9 @@ form verifies both identities, prompts, and ping directions:
 ./k-fsw/tools/k-ground test
 ```
 
-`kfsw-rotctl` and `kfsw-beacon` use the same build/run path and reserve their
-roles without adding unused production protocols. The launcher itself stays a
+Addresses 17 and 18 are held for a future antenna bridge and for beacon
+handling. Neither has a node file, because an address reservation is a line in
+a table rather than a node somebody can start. The launcher itself stays a
 launcher: no central orchestration, no master election, and no new command
 framework. Telemetry storage and a GUI do now exist, but as a separate thing
 that talks CSP from outside — see below.
@@ -329,7 +326,7 @@ suites do not reach.
 
 One process should own one physical interface. In the prototype,
 `kfsw-gnd-uhf` alone opens the Holybro serial device. `kfsw-ops`, the future
-rotator bridge, and the future beacon handler communicate through CSP and
+future rotator bridge, and a future beacon handler would communicate through CSP and
 remain independent of the radio implementation. A later
 `kfsw-gnd-sband` could follow the same pattern without changing those roles.
 

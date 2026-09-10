@@ -9,8 +9,6 @@ The assigned prototype roles are:
 | Role | CSP node | Current scope |
 | --- | --- | --- |
 | `kfsw-gnd-uhf` | 16 | Own the Holybro UHF interface |
-| `kfsw-rotctl` | 17 | Reserved: an antenna bridge driven from Gpredict ([#79](https://github.com/dgonzalez97/k-fsw/issues/79)) |
-| `kfsw-beacon` | 18 | Reserved: keep housekeeping samples so a pass can be read after it ends ([#80](https://github.com/dgonzalez97/k-fsw/issues/80)) |
 | `kfsw-ops` | 19 | Operator-facing shell node |
 
 ## yamcs
@@ -34,6 +32,12 @@ them from one file is what stops them drifting.
 
 This is the pull half of [#80](https://github.com/dgonzalez97/k-fsw/issues/80).
 The `kfsw-beacon` role above is the other half, and waits on beacons.
+
+Addresses 17 and 18 are held for an antenna bridge
+([#79](https://github.com/dgonzalez97/k-fsw/issues/79)) and for keeping
+housekeeping samples ([#80](https://github.com/dgonzalez97/k-fsw/issues/80)).
+Neither exists yet, so neither has a node file: an address reservation is a
+sentence in a table, not a configuration you can start.
 
 Run `tools/k-ground init` from a mission workspace to copy this configuration
 into a local `ground-station/` directory. `KGROUND_STATION_DIR` can select a
