@@ -239,10 +239,26 @@ be worse than the round trips it replaced.
   stamp every sample with one reception instant and the history the node kept
   would collapse into a moment.
 
-The bandwidth claim measured on the same link: one exchange returned one
-sample or eight in the same **0.28 s**, so forty values cost what five cost.
-A round trip on this radio is about 250 ms, which is what each value would
-otherwise have cost on its own.
+The bandwidth claim, measured on the same link against reading the same five
+parameters one at a time from a ground node. A round trip on this radio is
+220 to 250 ms.
+
+| | Time | For |
+| --- | --- | --- |
+| Individually, first read of a pass | 9.21 s | 5 values |
+| Individually, descriptor list already cached | 1.17 s | 5 values |
+| One housekeeping exchange | **0.28 s** | 5 values — or 40 |
+
+Two separate savings, and the second is the larger one. Like for like on a warm
+cache the set is four times faster, but one exchange returned eight samples in
+the same 0.28 s as one, so forty values cost what five cost; read individually
+they would cost about nine seconds. And the 9.21 s first read is a cost
+housekeeping never pays at all: names do not go on the wire, so there is no
+descriptor list to fetch before the first value arrives.
+
+An earlier attempt at this comparison failed and was reported as a possible
+timeout defect. That was wrong: orphaned host processes were holding the radio,
+and the measurement above is from a clean bench.
 
 What it collects now reaches the ground and stays there. `hk-bridge.py` speaks
 CSP over KISS on the host, pulls samples from a node, and forwards each to a
