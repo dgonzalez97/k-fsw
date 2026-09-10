@@ -99,14 +99,23 @@ west zephyr-export
 west manifest --validate
 ```
 
-Initialize the test-only Robot terminal runner submodule:
+Initialize the submodules:
 
 ```bash
 git -C k-fsw submodule update --init --recursive
 ```
 
-That submodule is not flight code and is not managed by `west.yml`; both steps
-are therefore required for a complete development/test workspace.
+There are two, and neither is flight code or managed by `west.yml`, so this
+step is required for a complete development workspace on top of `west update`:
+
+- `tests/platform/robot-terminal-runner`, which drives the hardware suites
+  through tmux. `tests/hil/run.sh` refuses to run without it.
+- `ground-station/yamcs`, the mission control system. Nothing builds or tests
+  needs it; it is where telemetry goes once a node is talking.
+
+Neither is needed to build or to run the software tests, so a workspace that
+skipped this step still compiles — it just cannot run the hardware suites or
+start Yamcs.
 
 ## Update an existing workspace
 

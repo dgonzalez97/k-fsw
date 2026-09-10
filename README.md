@@ -59,8 +59,9 @@ a UHF radio, and a small worked example using LEDs and buttons of development bo
   answer whether it worked, keep a record of what it did while nobody was
   listening, and reset itself when a part of it stops responding.
 - **Housekeeping.** Name a set of values once, and a pass asks for the set
-  rather than its members. Reading 113 parameters one round trip at a time is
-  the difference between knowing how a spacecraft is and guessing. What comes
+  rather than its members. Over a real radio one exchange returned forty values
+  in the time a single round trip takes, which is the difference between
+  knowing how a spacecraft is and guessing. What comes
   down goes into [Yamcs](https://yamcs.org/), so a pass can still be read after
   it ends.
 - **Ground nodes.** The ground segment lives in this same workspace, built from
