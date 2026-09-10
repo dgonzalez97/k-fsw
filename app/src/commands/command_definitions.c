@@ -24,6 +24,12 @@
 #if CONFIG_KFSW_STORAGE
 #include <kfsw/platform/storage.h>
 #endif
+#if CONFIG_KFSW_HK
+#include <kfsw/services/hk.h>
+
+#include "../hk_entries.h"
+#endif
+
 #if CONFIG_KFSW_EVENT
 #include <kfsw/services/event.h>
 #endif
@@ -43,6 +49,9 @@
 #define KFSW_COMMAND_ID_REBOOT 3U
 #define KFSW_COMMAND_ID_EVENT_STATS 4U
 #define KFSW_COMMAND_ID_EVENT_TAIL 5U
+#define KFSW_COMMAND_ID_HK_DEFINE 6U
+#define KFSW_COMMAND_ID_HK_PERIOD 7U
+#define KFSW_COMMAND_ID_HK_CLEAR 8U
 
 /* Give the reply time to leave before the reset takes the link down. */
 #define KFSW_COMMAND_REBOOT_DELAY_MS 500U
@@ -213,6 +222,124 @@ static int command_event_tail(const struct kfsw_command_arg *args, size_t arg_co
 static const enum kfsw_command_type event_tail_args[] = {KFSW_COMMAND_TYPE_U32};
 #endif /* CONFIG_KFSW_EVENT */
 
+#if CONFIG_KFSW_HK
+/*
+ * Housekeeping from the ground.
+ *
+ * Everything here existed only on a console before, so a node could serve
+ * samples over the link but could not be told what to collect without somebody
+ * standing next to it. The command service already rides on CSP, so this works
+ * over whatever the node is on without a line of transport code.
+ *
+ * The entry list travels as one text argument in the syntax the shell already
+ * takes, because a command carries at most four arguments and a report names
+ * up to sixteen values.
+ */
+static int command_hk_define(const struct kfsw_command_arg *args, size_t arg_count,
+			     const struct kfsw_command_source *source,
+			     struct kfsw_command_result *result)
+{
+	struct kfsw_hk_entry entries[CONFIG_KFSW_HK_ENTRIES];
+	size_t count = 0U;
+	int outcome;
+
+	ARG_UNUSED(arg_count);
+	ARG_UNUSED(source);
+
+	if (args[0].value.u32 > UINT8_MAX) {
+		result->status = KFSW_COMMAND_INVALID_ARGUMENT;
+		return -EINVAL;
+	}
+
+	outcome =
+		kfsw_app_hk_parse_entries(args[1].value.text, entries, ARRAY_SIZE(entries), &count);
+	if (outcome != 0) {
+		result->status = KFSW_COMMAND_INVALID_ARGUMENT;
+		if (outcome == -E2BIG) {
+			(void)snprintf(result->detail, sizeof(result->detail),
+				       "more than %u entries", (unsigned int)ARRAY_SIZE(entries));
+		} else {
+			/* A text argument is capped at 64 bytes, so a list too
+			 * long to travel arrives truncated and fails here as a
+			 * malformed entry. Quoting it back is what tells the
+			 * two apart from the ground.
+			 */
+			(void)snprintf(result->detail, sizeof(result->detail),
+				       "cannot read '%s' as [node:]table:offset",
+				       args[1].value.text);
+		}
+		return outcome;
+	}
+
+	outcome = kfsw_hk_define((uint8_t)args[0].value.u32, entries, count);
+	if (outcome != 0) {
+		result->status = KFSW_COMMAND_FAILED;
+		(void)snprintf(result->detail, sizeof(result->detail), "define report %u: %d",
+			       args[0].value.u32, outcome);
+		return outcome;
+	}
+	(void)snprintf(result->detail, sizeof(result->detail), "report %u defines %u values",
+		       args[0].value.u32, (unsigned int)count);
+	return 0;
+}
+
+static int command_hk_period(const struct kfsw_command_arg *args, size_t arg_count,
+			     const struct kfsw_command_source *source,
+			     struct kfsw_command_result *result)
+{
+	int outcome;
+
+	ARG_UNUSED(arg_count);
+	ARG_UNUSED(source);
+
+	if (args[0].value.u32 > UINT8_MAX) {
+		result->status = KFSW_COMMAND_INVALID_ARGUMENT;
+		return -EINVAL;
+	}
+	outcome = kfsw_hk_set_period((uint8_t)args[0].value.u32, args[1].value.u32);
+	if (outcome != 0) {
+		result->status = KFSW_COMMAND_FAILED;
+		(void)snprintf(result->detail, sizeof(result->detail), "period for report %u: %d",
+			       args[0].value.u32, outcome);
+		return outcome;
+	}
+	(void)snprintf(result->detail, sizeof(result->detail), "report %u every %u ms",
+		       args[0].value.u32, args[1].value.u32);
+	return 0;
+}
+
+static int command_hk_clear(const struct kfsw_command_arg *args, size_t arg_count,
+			    const struct kfsw_command_source *source,
+			    struct kfsw_command_result *result)
+{
+	int outcome;
+
+	ARG_UNUSED(arg_count);
+	ARG_UNUSED(source);
+
+	if (args[0].value.u32 > UINT8_MAX) {
+		result->status = KFSW_COMMAND_INVALID_ARGUMENT;
+		return -EINVAL;
+	}
+	outcome = kfsw_hk_clear((uint8_t)args[0].value.u32);
+	if (outcome != 0) {
+		result->status = KFSW_COMMAND_FAILED;
+		(void)snprintf(result->detail, sizeof(result->detail), "clear report %u: %d",
+			       args[0].value.u32, outcome);
+		return outcome;
+	}
+	(void)snprintf(result->detail, sizeof(result->detail), "report %u cleared",
+		       args[0].value.u32);
+	return 0;
+}
+
+static const enum kfsw_command_type hk_define_args[] = {KFSW_COMMAND_TYPE_U32,
+							KFSW_COMMAND_TYPE_TEXT};
+static const enum kfsw_command_type hk_period_args[] = {KFSW_COMMAND_TYPE_U32,
+							KFSW_COMMAND_TYPE_U32};
+static const enum kfsw_command_type hk_clear_args[] = {KFSW_COMMAND_TYPE_U32};
+#endif /* CONFIG_KFSW_HK */
+
 static const struct kfsw_command_definition app_commands[] = {
 	{
 		.id = KFSW_COMMAND_ID_NOOP,
@@ -240,6 +367,32 @@ static const struct kfsw_command_definition app_commands[] = {
 		.arg_count = 1U,
 		.arg_types = event_tail_args,
 		.handler = command_event_tail,
+	},
+#endif
+#if CONFIG_KFSW_HK
+	{
+		.id = KFSW_COMMAND_ID_HK_DEFINE,
+		.name = "hk_define",
+		.help = "Name what a report collects: <report> \"[node:]table:offset ...\".",
+		.arg_count = 2U,
+		.arg_types = hk_define_args,
+		.handler = command_hk_define,
+	},
+	{
+		.id = KFSW_COMMAND_ID_HK_PERIOD,
+		.name = "hk_period",
+		.help = "Collect repeatedly: hk_period <report> <ms>, 0 to stop.",
+		.arg_count = 2U,
+		.arg_types = hk_period_args,
+		.handler = command_hk_period,
+	},
+	{
+		.id = KFSW_COMMAND_ID_HK_CLEAR,
+		.name = "hk_clear",
+		.help = "Forget a report: hk_clear <report>.",
+		.arg_count = 1U,
+		.arg_types = hk_clear_args,
+		.handler = command_hk_clear,
 	},
 #endif
 #if CONFIG_REBOOT

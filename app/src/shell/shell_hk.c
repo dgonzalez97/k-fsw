@@ -10,6 +10,8 @@
 #include <kfsw/services/hk.h>
 #include <kfsw/services/parameter.h>
 
+#include "hk_entries.h"
+
 /* Thin, like every adapter here: parse, call the service, print. */
 
 static int parse_u32(const struct shell *sh, const char *text, uint32_t *out, const char *what)
@@ -25,43 +27,14 @@ static int parse_u32(const struct shell *sh, const char *text, uint32_t *out, co
 	return 0;
 }
 
-/* An entry is written node:table:offset, or table:offset for this node. The
- * identifier a report stores is (table << 8) | offset, which is what the wire
- * uses, but nobody wants to type it in hexadecimal.
+/* The parse lives in hk_entries.c because the command service needs the same
+ * one; only the complaint is the shell's.
  */
 static int parse_entry(const struct shell *sh, const char *text, struct kfsw_hk_entry *entry)
 {
-	unsigned long parts[3];
-	size_t count = 0U;
-	const char *cursor = text;
-
-	while ((count < ARRAY_SIZE(parts)) && (*cursor != '\0')) {
-		char *end;
-
-		parts[count] = strtoul(cursor, &end, 0);
-		if (end == cursor) {
-			break;
-		}
-		count++;
-		cursor = end;
-		if (*cursor == ':') {
-			cursor++;
-		} else {
-			break;
-		}
-	}
-
-	if ((*cursor != '\0') || (count < 2U)) {
+	if (kfsw_app_hk_parse_entry(text, entry) != 0) {
 		shell_error(sh, "Invalid entry '%s': use [node:]table:offset", text);
 		return -EINVAL;
-	}
-
-	if (count == 2U) {
-		entry->node = KFSW_HK_NODE_LOCAL;
-		entry->param_id = KFSW_PARAM_ID(parts[0], parts[1]);
-	} else {
-		entry->node = (uint16_t)parts[0];
-		entry->param_id = KFSW_PARAM_ID(parts[1], parts[2]);
 	}
 	return 0;
 }
