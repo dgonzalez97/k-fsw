@@ -149,6 +149,44 @@ and rejected writes, plus physical LED shell/PARAM control, remains pending
 until it is performed with a user on the named NUCLEO bench. The logical
 `hw_test` table is registered under ID 67, in the module band.
 
+### Opt-in wall clock
+
+A node keeps a wall clock so an event can say *when*, and housekeeping stamps
+every sample with it. `csp clock set <seconds>` works on the default image, and
+that is the trap: it works the same way whether or not the hardware clock is
+composed, and the two behave differently the moment the node restarts.
+
+**Verified on 10 September 2026**, on a NUCLEO-L496ZG built without the profile
+below: the clock was set, the node was rebooted from the ground, and it came
+back reporting `clock: not set (reads 946652410)` — the 2000-01-01 hardware
+epoch. Without the RTC, the wall clock lives in RAM and a reset loses it. Every
+sample collected after that reset carries a zero timestamp.
+
+`config/profiles/nucleo-clock.conf` adds the real-time clock, and
+`config/profiles/nucleo-clock.overlay` enables the `rtc` node. It runs from the
+low-speed oscillator rather than the system clock, so it keeps counting across
+a reset and across the low-power states; with VBAT wired it survives losing the
+main supply too.
+
+```bash
+KFSW_EXTRA_CONF_FILE="$PWD/k-fsw/config/profiles/nucleo-clock.conf" \
+KFSW_EXTRA_DTC_OVERLAY_FILE="$PWD/k-fsw/config/profiles/nucleo-clock.overlay" \
+  ./k-fsw/tools/build.sh nucleo_l496zg
+```
+
+Composing it is what makes a timestamp mean anything after the first reset.
+Leaving it out is a legitimate choice for a bench image; believing the clock
+survives when it does not is what this section exists to prevent.
+
+### Opt-in last words
+
+`config/profiles/nucleo-lastwords.conf` keeps a short note across a restart and
+watches the supply for a dip, so a node that came back can say why it left.
+
+The supply watch is **armed but has never been observed firing** — that needs a
+bench supply that can be brought down under control, and until somebody has
+watched it, the path is code we believe works rather than a verified one.
+
 ### Opt-in MCUboot
 
 The bootloader is not in the default NUCLEO image. Three composition files

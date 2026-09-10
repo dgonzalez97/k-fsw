@@ -30,7 +30,7 @@ work_dir="$(mktemp -d)"
 debug_stty=""
 capture_pid=""
 do_flash=1
-record_s="${KFSW_BOTON_RECORD_S:-120}"
+record_s=120
 
 # How long to sit still at the start, proving the input invents nothing.
 readonly BASELINE_S=10
@@ -237,7 +237,7 @@ grep -a "press_count = \|last_press_s = " \
 	"$work_dir/nucleo.log" | tail -2
 printf 'module status press_count: %s\n' "$final_count"
 
-transcript="${KFSW_BOTON_LOG:-$KFSW_ROOT/build/hil/boton/acceptance.log}"
+transcript="$KFSW_ROOT/build/hil/boton/acceptance.log"
 mkdir -p "$(dirname "$transcript")"
 cp "$work_dir/nucleo.log" "$transcript"
 

@@ -22,7 +22,7 @@ KFSW_ROOT="$(dirname "$KFSW_REPO_DIR")"
 
 executable="$KFSW_ROOT/build/linux/zephyr/zephyr.exe"
 definition="$KFSW_REPO_DIR/ground-station/reports/nucleo-temperature.yaml"
-python="${KFSW_PYTHON:-$KFSW_ROOT/.venv/bin/python}"
+python="$KFSW_ROOT/.venv/bin/python"
 work_dir="$(mktemp -d /tmp/kfsw-hk-yamcs.XXXXXX)"
 node_pid=""
 failures=0

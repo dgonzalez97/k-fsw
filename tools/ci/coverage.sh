@@ -22,7 +22,7 @@ command -v gcovr >/dev/null || {
 	exit 1
 }
 
-out_dir="${KFSW_COVERAGE_OUT_DIR:-$KFSW_ROOT/build/coverage}"
+out_dir="$KFSW_ROOT/build/coverage"
 twister_out_dir="$out_dir/twister"
 html_dir="$out_dir/html"
 

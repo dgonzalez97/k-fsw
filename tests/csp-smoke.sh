@@ -16,7 +16,7 @@ if [[ $# -ne 0 ]]; then
 fi
 
 node1_executable="$KFSW_BUILD_DIR/zephyr/zephyr.exe"
-node2_build_dir="${KFSW_NODE2_BUILD_DIR:-$KFSW_ROOT/build/tests/linux-node2}"
+node2_build_dir="$KFSW_ROOT/build/tests/linux-node2"
 node2_executable="$node2_build_dir/zephyr/zephyr.exe"
 work_dir="$(mktemp -d /tmp/kfsw-csp-smoke.XXXXXX)"
 node1_pid=""

@@ -12,7 +12,7 @@ KFSW_TOOLS_DIR="$(dirname "$KFSW_UBSAN_TOOL")/.."
 
 source "$KFSW_TOOLS_DIR/_common.sh" linux
 
-out_dir="${KFSW_UBSAN_OUT_DIR:-$KFSW_ROOT/build/ubsan}"
+out_dir="$KFSW_ROOT/build/ubsan"
 
 echo "UBSAN: Twister output: $out_dir"
 set +e
