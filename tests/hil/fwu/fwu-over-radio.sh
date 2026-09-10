@@ -60,7 +60,7 @@ cleanup()
 	# A failed run is the one whose logs are worth having. Removing them on
 	# the way out leaves nothing to diagnose from.
 	if [[ "$status" -ne 0 ]]; then
-		local kept="${KFSW_HIL_LOG_DIR:-$KFSW_ROOT/build/hil/fwu/failed}"
+		local kept="$KFSW_ROOT/build/hil/fwu/failed"
 
 		mkdir -p "$kept" 2>/dev/null || true
 		cp "$work_dir"/*.log "$kept/" 2>/dev/null || true

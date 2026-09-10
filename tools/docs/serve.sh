@@ -7,7 +7,7 @@ KFSW_TOOLS_DIR="$(dirname "$KFSW_DOCS_TOOLS_DIR")"
 KFSW_REPO_DIR="$(dirname "$KFSW_TOOLS_DIR")"
 KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
 KFSW_DOCS_HTML="$KFSW_WORKSPACE_ROOT/build/docs/html"
-port="${KFSW_DOCS_PORT:-8000}"
+port="${1:-8000}"
 
 if [[ ! -s "$KFSW_DOCS_HTML/index.html" ]]; then
 	echo "ERROR: generated documentation is missing."

@@ -7,7 +7,7 @@ KFSW_TOOLS_DIR="$(dirname "$KFSW_COVERAGE_TOOLS_DIR")"
 KFSW_REPO_DIR="$(dirname "$KFSW_TOOLS_DIR")"
 KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
 KFSW_COVERAGE_HTML="$KFSW_WORKSPACE_ROOT/build/coverage/html"
-port="${KFSW_COVERAGE_PORT:-8001}"
+port="${1:-8001}"
 
 if [[ ! -s "$KFSW_COVERAGE_HTML/index.html" ]]; then
 	echo "ERROR: the coverage report is missing."

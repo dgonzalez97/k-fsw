@@ -8,9 +8,9 @@ KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
 
 radio_device="${KGROUND_HOLYBRO_DEVICE:-}"
 radio_baud="${KGROUND_HOLYBRO_BAUD:-57600}"
-sequence="${KGROUND_HOLYBRO_SEQUENCE:-0001}"
+sequence=0001
 exchange_count="${KGROUND_HOLYBRO_COUNT:-1}"
-test_timeout="${KGROUND_HOLYBRO_TIMEOUT:-10}"
+test_timeout=10
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in

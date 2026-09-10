@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 repo_dir="$(readlink -f "$(dirname "$0")/..")"
-build_root="${KFSW_MULTI_KISS_BUILD_ROOT:-$(dirname "$repo_dir")/build/tests/multi-kiss}"
+build_root="$(dirname "$repo_dir")/build/tests/multi-kiss"
 
 echo "MULTI-KISS BUILD: router"
 KFSW_BUILD_DIR="$build_root/router" \
