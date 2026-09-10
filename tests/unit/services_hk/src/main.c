@@ -285,3 +285,34 @@ ZTEST(kfsw_hk, test_a_sample_without_a_clock_says_so)
 	zassert_equal(sample.data[9] & KFSW_HK_FLAG_CLOCK_UNSET, KFSW_HK_FLAG_CLOCK_UNSET,
 		      "and the flag must reach the wire, not just the struct");
 }
+
+ZTEST(kfsw_hk, test_disabling_stops_the_schedule_and_keeps_the_history)
+{
+	struct kfsw_hk_stats stats;
+	uint16_t depth = 0U;
+	const struct kfsw_hk_entry entries[] = {
+		{.node = KFSW_HK_NODE_LOCAL, .param_id = KFSW_PARAM_ID(TEST_TABLE, 0x00U)},
+	};
+
+	zassert_ok(kfsw_hk_define(0U, entries, ARRAY_SIZE(entries)));
+	zassert_ok(kfsw_hk_collect(0U));
+
+	kfsw_hk_set_enabled(false);
+	zassert_false(kfsw_hk_enabled());
+	kfsw_hk_get_stats(&stats);
+	zassert_false(stats.enabled, "the switch has to be visible in the table");
+
+	/* Disabling is a decision about the schedule, not a lock on the
+	 * service: an operator who asks for a sample by hand has asked.
+	 */
+	zassert_ok(kfsw_hk_collect(0U));
+
+	/* And nothing already collected is thrown away, so turning it off
+	 * during a firmware upload does not cost the pass its history.
+	 */
+	zassert_ok(kfsw_hk_depth(0U, &depth));
+	zassert_equal(depth, 2U, "samples must survive being switched off");
+
+	kfsw_hk_set_enabled(true);
+	zassert_true(kfsw_hk_enabled());
+}
