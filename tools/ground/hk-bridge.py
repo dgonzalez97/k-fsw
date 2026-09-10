@@ -163,14 +163,22 @@ def build_request(source, destination, sport, report, count, first_age):
     return kiss_encode(csp_header(destination, source, HK_PORT, sport, CSP_FCRC32) + body)
 
 
-def decode_reply(frame, source, sport):
-    """Strip the header and both CRC32s, or say why the frame was not ours."""
+def decode_hk_frame(frame, node):
+    """Pull a housekeeping sample out of a CSP frame, whoever it was sent to.
+
+    Every frame on the link passes through here, so the filter is what the
+    frame *is* rather than who asked for it: anything a housekeeping server
+    sent carries the server's port as its source. That covers the reply to our
+    own request and, equally, one somebody else asked for — a second operator
+    on the same pass, or a node that starts speaking on its own once beacons
+    exist. Recording those costs nothing and asking twice costs a round trip.
+    """
     if len(frame) < CSP_HEADER_BYTES + 4:
         return None, "short frame"
 
     header = parse_csp_header(frame)
-    if header["destination"] != source or header["dport"] != sport:
-        # Someone else's traffic on a shared link. Not a fault, not ours.
+    if header["sport"] != HK_PORT or header["source"] != node:
+        # Not housekeeping, or not the node being watched. Not a fault.
         return None, None
 
     body = frame[CSP_HEADER_BYTES:]
@@ -207,19 +215,31 @@ def envelope(sample, host_time_ms):
     return ENVELOPE.pack(when, sequence) + sample
 
 
-def pull(link, reader, args, sport, first_age, count):
-    link.reset_input_buffer()
-    link.write(build_request(args.source, args.node, sport, args.report, count, first_age))
-    link.flush()
+def collect(link, reader, args, sport, count, ask):
+    """Read housekeeping off the link for a while, having asked for it or not.
+
+    Asking is optional because the decoding is not: a frame is recognised by
+    being housekeeping, so the same loop serves a poller and a listener. A
+    listener adds nothing to the link, which is the whole reason to prefer one
+    when something else is already asking.
+    """
+    if ask:
+        link.reset_input_buffer()
+        link.write(build_request(args.source, args.node, sport, args.report, count, 0))
+        link.flush()
 
     samples = []
     deadline = time.monotonic() + args.timeout
-    while len(samples) < count and time.monotonic() < deadline:
+    while time.monotonic() < deadline:
+        # A poller stops as soon as it has what it asked for. A listener has
+        # asked for nothing, so it reads until its window closes.
+        if ask and len(samples) >= count:
+            break
         data = link.read(link.in_waiting or 1)
         if not data:
             continue
         for frame in reader.feed(data):
-            sample, problem = decode_reply(frame, args.source, sport)
+            sample, problem = decode_hk_frame(frame, args.node)
             if problem:
                 print(f"dropped a frame: {problem}", file=sys.stderr)
             elif sample:
@@ -240,6 +260,8 @@ def main():
     parser.add_argument("--interval", type=float, default=5.0, help="seconds between requests")
     parser.add_argument("--timeout", type=float, default=2.0, help="seconds to wait for replies")
     parser.add_argument("--once", action="store_true", help="one request, then stop")
+    parser.add_argument("--listen", action="store_true",
+                        help="never ask; record the housekeeping that already crosses the link")
     parser.add_argument("--yamcs", default="127.0.0.1:10015",
                         help="host:port of the Yamcs UDP link, or 'none' to only print")
     args = parser.parse_args()
@@ -256,8 +278,8 @@ def main():
     seen = collections.deque(maxlen=1024)
     with serial.Serial(args.device, args.baud, timeout=0.1) as link:
         while True:
-            samples = pull(link, reader, args, args.sport, 0, args.count)
-            if not samples:
+            samples = collect(link, reader, args, args.sport, args.count, not args.listen)
+            if not samples and not args.listen:
                 print("no reply", file=sys.stderr)
             for sample in samples:
                 sequence = struct.unpack_from(">H", sample, 2)[0]
