@@ -280,6 +280,88 @@ Yamcs on UDP 10015. Point it at a hosted node's `uart_1` pseudo-terminal, or
 straight at the Holybro's serial device for a flight node over the radio; it is
 the same client either way.
 
+### Bringing it up and checking it
+
+Yamcs needs Java 17 and nothing else; Maven downloads itself through `./mvnw`.
+
+```bash
+cd k-fsw/ground-station/yamcs
+./mvnw yamcs:run
+```
+
+It prints `Yamcs started` after a few seconds and serves <http://localhost:8090>.
+The instance is `kfsw`. Leave it running in its own terminal — it holds the
+archive, so stopping it stops the recording.
+
+**First check, before any hardware.** A database that loads is not a database
+that decodes, so there is a recorded frame to prove it:
+
+```bash
+./scripts/check-mdb.sh
+```
+
+That pushes a housekeeping frame captured off a real node into the running
+instance and reads the values back out. It is what CI runs on every push, and
+it is the fastest way to tell whether a change to a report definition broke the
+decoding. Expect `MDB CHECK RESULT: PASS`.
+
+**Then bring in a node.** Define the report on the node and let it collect:
+
+```text
+kfsw:~$ hk define 0 51:0x00 51:0x10 51:0x08 3:0x00 3:0x0c
+kfsw:~$ csp clock set 1789066008
+kfsw:~$ hk period 0 2000
+kfsw:~$ hk show
+```
+
+`hk show` is the node's own account of itself: how many collections, how many
+failed, how many values were absent, and how many samples the ring is holding.
+Set the clock first or every sample carries a zero timestamp and the bridge
+falls back to host time.
+
+Then start the bridge against the node's link:
+
+```bash
+./k-fsw/tools/ground/hk-bridge.py --device "$KGROUND_HOLYBRO_DEVICE" \
+    --baud 57600 --node 2 --report 0 --count 8 --interval 10
+```
+
+It prints a line per sample as it forwards, so a silent bridge means the node
+is not answering rather than that nothing is happening. `--yamcs none` prints
+the frames as hex instead of forwarding, which is the right first step when
+something is wrong: it separates "the node is not replying" from "Yamcs is not
+accepting".
+
+**What to look at in the web interface.**
+
+| Where | What it tells you |
+| --- | --- |
+| Links | `hk-udp` should show `OK, receiving on 10015`, with valid datagrams climbing and invalid at zero |
+| Telemetry, Packets | one packet per sample, in the `nucleo_temperature` container |
+| Telemetry, Parameters | `/kfsw/nucleo_temperature_temp_mcu` in degrees, with `ACQUIRED` beside it |
+| Archive | the history — this is the part a console cannot give you |
+
+A parameter marked `INVALID` rather than `ACQUIRED` is the mission database
+doing its job: the temperature carries a valid range, so a node reporting the
+reserved value shows as absent instead of plotting at minus two million
+degrees. Check `temp_valid` and `temp_failures` beside it.
+
+The same answers are available without the browser, which is what a script
+should use:
+
+```bash
+curl -s localhost:8090/api/links/kfsw/hk-udp | python3 -m json.tool
+curl -s localhost:8090/api/processors/kfsw/realtime/parameters/kfsw/nucleo_temperature_temp_mcu
+curl -s 'localhost:8090/api/archive/kfsw/parameters/kfsw/nucleo_temperature_temp_mcu?limit=50&order=asc'
+```
+
+**If nothing arrives.** Work outward rather than guessing: run the bridge with
+`--yamcs none` and see whether frames come back at all; check `hk show` on the
+node for a collection count that is advancing; check the Links page for invalid
+datagrams, which would mean frames are arriving but not decoding. The bridge
+and Yamcs talk over UDP on localhost, so that hop rarely fails silently — the
+link is almost always the radio or the report definition.
+
 ### One decoder, not two
 
 A housekeeping frame carries **no names** — values back to back in the order
