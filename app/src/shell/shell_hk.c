@@ -204,8 +204,14 @@ static int cmd_hk_get(const struct shell *sh, size_t argc, char **argv)
 			break;
 		}
 
-		shell_print(sh, "seq %u  at %u  %u values%s  %u bytes", sample.sequence,
-			    sample.seconds, sample.entry_count,
+		/* Both flags are named rather than left in a hex byte: a reader
+		 * who has to decode 0x02 to find out the timestamp is missing
+		 * will read the zero as a date instead.
+		 */
+		shell_print(sh, "seq %u  at %u%s  %u values%s  %u bytes", sample.sequence,
+			    sample.seconds,
+			    ((sample.flags & KFSW_HK_FLAG_CLOCK_UNSET) != 0U) ? " (no clock)" : "",
+			    sample.entry_count,
 			    ((sample.flags & KFSW_HK_FLAG_INCOMPLETE) != 0U) ? " (incomplete)" : "",
 			    sample.length);
 

@@ -262,3 +262,26 @@ ZTEST(kfsw_hk, test_an_undefined_report_collects_nothing)
 	zassert_equal(kfsw_hk_define(CONFIG_KFSW_HK_REPORTS, NULL, 0U), -EINVAL,
 		      "a report past the last one was addressable");
 }
+
+ZTEST(kfsw_hk, test_a_sample_without_a_clock_says_so)
+{
+	struct kfsw_hk_sample sample;
+	const struct kfsw_hk_entry entries[] = {
+		{.node = KFSW_HK_NODE_LOCAL, .param_id = KFSW_PARAM_ID(TEST_TABLE, 0x00U)},
+	};
+
+	zassert_ok(kfsw_hk_define(0U, entries, ARRAY_SIZE(entries)));
+	zassert_ok(kfsw_hk_collect(0U));
+	zassert_ok(kfsw_hk_get(0U, 0U, &sample));
+
+	/* This composition has no CSP, so there is nowhere for a wall clock to
+	 * come from and every sample is collected without one. The timestamp
+	 * being zero is not enough on its own: zero is a real instant, and a
+	 * reader that took it at face value would place the sample in 1970.
+	 */
+	zassert_equal(sample.seconds, 0U, "a node with no clock cannot time a sample");
+	zassert_not_equal(sample.flags & KFSW_HK_FLAG_CLOCK_UNSET, 0U,
+			  "the sample must say the clock was unset");
+	zassert_equal(sample.data[9] & KFSW_HK_FLAG_CLOCK_UNSET, KFSW_HK_FLAG_CLOCK_UNSET,
+		      "and the flag must reach the wire, not just the struct");
+}
