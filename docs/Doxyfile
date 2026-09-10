@@ -48,6 +48,7 @@ INPUT                  = docs \
                          ../kfsw-services/include/kfsw \
                          ../kfsw-comms/include/kfsw \
                          ../kfsw-modules/radio-uhf/include/kfsw \
+                         ../kfsw-modules/temperature-sensor-example/include/kfsw \
                          ../kfsw-modules/boton-test/include/kfsw
 INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = *.h *.md *.dox

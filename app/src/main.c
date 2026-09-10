@@ -21,6 +21,9 @@
 #if CONFIG_KFSW_BOTON_TEST
 #include <kfsw/modules/boton_test.h>
 #endif
+#if CONFIG_KFSW_TEMPERATURE_SENSOR_EXAMPLE
+#include <kfsw/modules/temperature_sensor_example.h>
+#endif
 #if CONFIG_KFSW_LASTWORDS
 #include <kfsw/platform/lastwords.h>
 #endif
@@ -112,7 +115,7 @@ int main(void)
 	 * direction whatever the composition is.
 	 */
 	const struct kfsw_param_definition_set *const parameter_sets[] = {
-		&kfsw_board_param_definitions,      &kfsw_system_param_definitions,
+		&kfsw_board_param_definitions,        &kfsw_system_param_definitions,
 		&kfsw_telemetry_param_definitions,
 #if CONFIG_KFSW_CSP
 		&kfsw_csp_param_definitions,
@@ -126,7 +129,7 @@ int main(void)
 #if CONFIG_KFSW_PARAM_TEST_DEFINITIONS
 		&kfsw_test_param_definitions,
 #endif
-		&kfsw_log_param_definitions,        &kfsw_param_param_definitions,
+		&kfsw_log_param_definitions,          &kfsw_param_param_definitions,
 		&kfsw_boot_param_definitions,
 #if CONFIG_KFSW_EVENT
 		&kfsw_event_param_definitions,
@@ -151,6 +154,9 @@ int main(void)
 #endif
 #if CONFIG_KFSW_BOTON_TEST
 		&kfsw_boton_test_param_definitions,
+#endif
+#if CONFIG_KFSW_TEMPERATURE_SENSOR_EXAMPLE
+		&kfsw_temp_example_param_definitions,
 #endif
 	};
 
@@ -194,6 +200,15 @@ int main(void)
 		kfsw_log_error("Failed to initialize boton_test: %d", result);
 	} else {
 		kfsw_log_info("boton_test initialized");
+	}
+#endif
+
+#if CONFIG_KFSW_TEMPERATURE_SENSOR_EXAMPLE
+	result = kfsw_temp_example_init();
+	if (result != 0) {
+		kfsw_log_error("Failed to initialize the temperature example: %d", result);
+	} else {
+		kfsw_log_info("Temperature example initialized");
 	}
 #endif
 

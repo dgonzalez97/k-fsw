@@ -1,0 +1,63 @@
+# What report 0 collects on the NUCLEO, and how the ground decodes it.
+#
+# One file, two outputs. `hk-report.py define` prints the command that tells the
+# node what to collect; `hk-report.py xtce` writes the mission database Yamcs
+# decodes it with. Housekeeping deliberately keeps names off the wire, so this
+# is the only place the two sides agree, and generating both from it is what
+# stops them drifting apart. `hk-report.py check` proves it against a node.
+#
+# Order matters: values are packed in the order written here, with no padding.
+
+report: 0
+node: 2
+name: nucleo_temperature
+description: >-
+  Die temperature with the evidence needed to trust it, plus enough of the node
+  to say whether the reading arrived from a healthy board.
+
+entries:
+  - table: 51
+    offset: 0x00
+    parameter: temp_mcu_mc
+    type: i32
+    # The wire carries thousandths so the board never formats a float. Yamcs
+    # scales it back for display, which is what a calibrator is for.
+    as: temp_mcu
+    unit: degC
+    calibration:
+      slope: 0.001
+    # Wider than the part's rating, so a real excursion still reads. Its job is
+    # to keep the reserved value from setting the scale on every plot.
+    valid_range:
+      min: -60.0
+      max: 150.0
+    description: MCU die temperature. The die, not the board and not the air.
+
+  - table: 51
+    offset: 0x10
+    parameter: temp_valid
+    type: u8
+    description: >-
+      Whether temp_mcu came from a sensor. Zero means the reading is the
+      reserved value, not a cold spacecraft.
+
+  - table: 51
+    offset: 0x08
+    parameter: temp_failures
+    type: u32
+    description: Sensor reads that returned an error since boot.
+
+  - table: 3
+    offset: 0x00
+    parameter: uptime_s
+    type: u32
+    unit: s
+    description: Seconds since boot. A reset shows here before anywhere else.
+
+  - table: 3
+    offset: 0x0c
+    parameter: csp_buf_free
+    type: u16
+    description: >-
+      Free CSP buffers. Housekeeping skips a sample when this reaches zero, so
+      it explains a gap in the sequence numbers.

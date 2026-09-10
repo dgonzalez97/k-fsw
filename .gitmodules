@@ -1,3 +1,6 @@
 [submodule "tests/platform/robot-terminal-runner"]
 	path = tests/platform/robot-terminal-runner
 	url = https://github.com/dgonzalez97/robot-terminal-runner.git
+[submodule "ground-station/yamcs"]
+	path = ground-station/yamcs
+	url = https://github.com/dgonzalez97/kfsw-yamcs.git

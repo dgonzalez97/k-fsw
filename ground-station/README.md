@@ -13,6 +13,28 @@ The assigned prototype roles are:
 | `kfsw-beacon` | 18 | Reserved: keep housekeeping samples so a pass can be read after it ends ([#80](https://github.com/dgonzalez97/k-fsw/issues/80)) |
 | `kfsw-ops` | 19 | Operator-facing shell node |
 
+## yamcs
+
+`yamcs/` is a submodule holding
+[the mission control system](https://github.com/dgonzalez97/kfsw-yamcs), a fork
+of `yamcs/quickstart` that keeps what housekeeping brings down. Run it with
+`./mvnw yamcs:run` from that directory and open <http://localhost:8090>.
+
+Nothing arrives on its own, because housekeeping answers when asked and never
+speaks first. `tools/ground/hk-bridge.py` does the asking: it speaks CSP over
+KISS on the host, pulls samples from a node, and forwards each one to Yamcs
+over UDP. It decodes nothing — the frames go on byte for byte, and what a value
+means lives in the mission database.
+
+That database is generated, not written. `reports/` holds what a report
+collects; `tools/ground/hk-report.py` turns one of those files into both the
+`hk define` command a node is given and the XTCE Yamcs decodes with. A
+housekeeping frame carries no names, so those two have to agree, and generating
+them from one file is what stops them drifting.
+
+This is the pull half of [#80](https://github.com/dgonzalez97/k-fsw/issues/80).
+The `kfsw-beacon` role above is the other half, and waits on beacons.
+
 Run `tools/k-ground init` from a mission workspace to copy this configuration
 into a local `ground-station/` directory. `KGROUND_STATION_DIR` can select a
 different deployment explicitly.
