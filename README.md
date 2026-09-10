@@ -139,6 +139,30 @@ flight targets, and build without CSP, parameters, storage or files, to test Zep
 | `frdm_k64f` | `frdm_k64f/mk64f12` | OpenSDA UART shell |
 | `rpi_pico_w` | `rpi_pico/rp2040/w` | USB CDC ACM shell |
 
+## Mission control
+
+A console is enough to fly a bench and not enough to fly a mission: the moment
+it scrolls, the pass is gone. So what housekeeping brings down goes into
+[Yamcs](https://yamcs.org/), the open source mission control system, kept in a
+small fork at
+[kfsw-yamcs](https://github.com/dgonzalez97/kfsw-yamcs) and pulled in as a
+submodule under `ground-station/yamcs`.
+
+```bash
+cd ground-station/yamcs && ./mvnw yamcs:run && ./scripts/setup.sh
+```
+
+A bridge on the host speaks CSP over the link, pulls housekeeping and forwards
+it; the mission database is generated from the same file that tells the node
+what to collect, so a frame that carries no names still decodes into the right
+ones. Yamcs reads and does not command — housekeeping is configured through
+K-FSW's own command service, which reaches a node over KISS or CAN.
+
+The [ground guide](docs/ground/index.md) has the walkthrough, including how to
+check it before any hardware is involved.
+
+<!-- A screenshot of the archive belongs here. -->
+
 ## Testing
 
 Nine jobs run on every push, and all must pass before anything merges:
