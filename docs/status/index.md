@@ -21,7 +21,7 @@ or a release qualification record.
 | --- | --- | --- | --- | --- |
 | Platform/time | Monotonic ms/us and reset-cause API implemented over Zephyr | Time ztest; used by native boot/shell tests | Reset/boot path exercised on NUCLEO; no separate clock-accuracy qualification | No UTC/TAI/GNSS or clock correlation |
 | Logging | Fixed-buffer DEBUG/INFO/WARNING/ERROR with compile/runtime filters | Shell and integration diagnostics | Console logging observed in board HIL | Not a structured/persistent event service; no rate limiting |
-| CSP over CAN | libcsp CFP over a CAN controller, selected by a chosen node so the same driver serves a board and a host USB adapter; bitrate published and settable from the ground | A composed NUCLEO profile and a ground node build; the route table selects CAN or the serial link per destination | **PHYSICALLY VERIFIED** on 5 September 2026: a NUCLEO-L496ZG on CAN1 and a PCAN-USB adapter on one bus at 500 kbit/s. Ping, identity and remote parameters all crossed it, the adapter's counters showed the frames, and both nodes stayed error-active | No transceiver on the NUCLEO, so wiring and termination are the operator's; changing the bitrate cuts the link that carried the change until the other end follows |
+| CSP over CAN | libcsp CFP over a CAN controller, selected by a chosen node so the same driver serves a board and a host USB adapter; bitrate published and settable from the ground | A composed NUCLEO profile and a ground node build; the route table selects CAN or the serial link per destination | **PHYSICALLY VERIFIED** on 5 September 2026: a NUCLEO-L496ZG on CAN1 and a PCAN-USB adapter on one bus at 500 kbit/s. Ping, identity and remote parameters all crossed it, the adapter's counters showed the frames, and both nodes stayed error-active. Re-verified on 10 September 2026 against `54ac87f`: `CAN SMOKE RESULT: PASS ... rtt_ms=50 ident=yes params=yes packets=rx:1258/tx:84 berr=tx0/rx0` | No transceiver on the NUCLEO, so wiring and termination are the operator's; changing the bitrate cuts the link that carried the change until the other end follows. The housekeeping bridge speaks KISS over a serial device, so it does not reach a node over CAN |
 | CSP core | Optional libcsp identity, loopback, validated native static routes with destination/prefix/interface/VIA, ping, one router | Route validation/precedence ztest; two-node and three-node native integration | Bidirectional CSP ping on NUCLEO/FTDI UART bench | No dynamic route mutation, redundant-link failover policy, or flight routing plan |
 | UART/KISS | Legacy chosen UART or generic independently named devicetree instances with separate state/counters | Two-node PTY tests plus simultaneous `KISS_1`/`KISS_2` direct selection and bidirectional transit | One NUCLEO USART3/FTDI and one Holybro link physically verified | Multiple links are software-verified only; 115200 reference profiles and 57600 Holybro overlays |
 | k-ground | Configured `native_sim` roles using the normal K-FSW shell/services and optional route string | UHF node 16 and ops node 19 report role-specific identity and ping both ways | No physical evidence required for the local profile | Launcher connects one direct peer link and no generic router orchestration; Yamcs holds housekeeping but nothing commands through it |
@@ -33,7 +33,7 @@ or a release qualification record.
 | Health monitoring | Components register with a deadline and report as they run; the watchdog is fed only by a check that finds every one within its deadline. Registration can be undone so a stopped service does not reset a working board | 14 `native_sim` cases covering registration, deadlines, recovery and the refusal to supervise without a watchdog | **PHYSICALLY VERIFIED** on 4 September 2026: healthy for three watchdog timeouts with no reset, then a genuinely overdue component caused a withheld feed, a reset, and `reset_cause=watchdog` on the next boot | Liveness only, no resource or subsystem checks; the application thread is the only component watched so far |
 | Platform watchdog | Chosen-bound device, timeout and keep-alive at a third of it, deliberate starvation, reset-cause decoding with the watchdog preferred among latched causes | Six-case `native_sim` suite covering the interval margin across the configurable range, cause decoding, and the no-hardware `-ENODEV` contract | **PHYSICALLY VERIFIED** on 3 September 2026: armed on a NUCLEO-L496ZG, survived 18 s fed with the feed counter advancing, reset within 13 s of deliberate starvation, and the next boot reported `reset_cause=watchdog` from a mask that also latched the pin bit | Mechanism only, no health policy; one timeout channel; cannot be disarmed once armed on the STM32 independent watchdog |
 | Local parameters | Tables addressed by identifier and offset in owner bands, scalars, strings and byte arrays, exact size checks, read-only flags, validate and change callbacks, sample-on-read, derived write modes | CSP-disabled ztest, a string and array ztest, a core-table ztest, and local/full shell integration | Local tables run in the NUCLEO composition; physical bench checks remote access to them | Most configuration values in the core tables are read-only, because applying them needs the layer below to read a stored value back at start-up and that path does not exist |
-| Parameter tables | Seventeen tables: core 1–6, services 25–33, module 50 and 67, with 113 parameters across them | **SOFTWARE VERIFIED**: a 24-case core-table ztest, a string and array ztest, `param-tables-smoke.sh`, and Robot software scenarios | **PHYSICALLY VERIFIED** on 5 September 2026: `PARAM TABLES RESULT: PASS` read from a NUCLEO-L496ZG over its debug UART, and every table read across a Holybro link including a string value and a setting written from the ground | Housekeeping now collects a named set in one exchange; the temperature example adds table 51 only when its profile is composed, and that table has no physical evidence yet |
+| Parameter tables | Seventeen tables: core 1–6, services 25–33, module 50 and 67, with 113 parameters across them | **SOFTWARE VERIFIED**: a 24-case core-table ztest, a string and array ztest, `param-tables-smoke.sh`, and Robot software scenarios | **PHYSICALLY VERIFIED** on 5 September 2026: `PARAM TABLES RESULT: PASS` read from a NUCLEO-L496ZG over its debug UART, and every table read across a Holybro link including a string value and a setting written from the ground | Housekeeping now collects a named set in one exchange; the temperature example adds table 51 only when its profile is composed, and it was read off a NUCLEO on 10 September 2026 |
 | PARAM CSP adapter | Optional libparam-compatible server/client/cache | Two-node native remote list/get/set plus Robot errors | Holybro RF bench passed production list/get/set and the valid owner callback; the corrected reset-to-default oracle passed physically on 3 September 2026 (`1` to `3`, then invalid `5` restoring the compiled `1`) | Fixed remote descriptor pool; no remote persistence command |
 | Parameter persistence | Explicit bounded versioned CRC snapshot and defaults/load/save/clear | CSP-disabled unit suite, cross-process integration, corrupt snapshot fallback, Valgrind | No dedicated NUCLEO reboot/persistence acceptance | Local only; no migration framework beyond name/type compatibility |
 | Storage | LittleFS lifecycle at `/kfsw`, cautious first-format policy, capacity API | Storage ztest and native cross-process integration | NUCLEO storage info/test passes in UART HIL | Linux/NUCLEO full profiles only; one 64 KiB volume per profile |
@@ -219,6 +219,46 @@ behaves than the expressiveness would repay.
 for the set; the frame is asserted against reading the same parameters
 individually, because a set that is fast and disagrees with its members would
 be worse than the round trips it replaced.
+
+**PHYSICALLY VERIFIED** on 10 September 2026, on a NUCLEO-L496ZG running
+`54ac87f` with a Holybro SiK pair at 433 MHz and Yamcs 5.13.0:
+
+- the STM32L496 die read 23.214 C over the debug UART, `temp_valid` 1, no
+  failed reads, the sample counter advancing on its 1000 ms period. Readings
+  move by roughly 327 mC at a time, which is one ADC count at this
+  calibration, so the value is a measurement rather than a constant;
+- a five-value report collected every 2000 ms across 20 collections with no
+  failed collection and no absent value;
+- five samples pulled over the radio in one exchange, sequences 21 to 25
+  consecutive and two seconds apart. Decoded by hand, sample 25 carried
+  23.214 C, matching what the shell had just printed for the same parameter;
+- 63 datagrams reached Yamcs and none was invalid. The archive holds 56
+  samples spanning 18:47:44 to 18:49:34 UTC with **56 distinct generation
+  times**, from 22.559 C to 27.142 C as the die warmed under transmission.
+  Distinct times are the point: without the bridge's envelope a pull would
+  stamp every sample with one reception instant and the history the node kept
+  would collapse into a moment.
+
+The bandwidth claim, measured on the same link against reading the same five
+parameters one at a time from a ground node. A round trip on this radio is
+220 to 250 ms.
+
+| | Time | For |
+| --- | --- | --- |
+| Individually, first read of a pass | 9.21 s | 5 values |
+| Individually, descriptor list already cached | 1.17 s | 5 values |
+| One housekeeping exchange | **0.28 s** | 5 values — or 40 |
+
+Two separate savings, and the second is the larger one. Like for like on a warm
+cache the set is four times faster, but one exchange returned eight samples in
+the same 0.28 s as one, so forty values cost what five cost; read individually
+they would cost about nine seconds. And the 9.21 s first read is a cost
+housekeeping never pays at all: names do not go on the wire, so there is no
+descriptor list to fetch before the first value arrives.
+
+An earlier attempt at this comparison failed and was reported as a possible
+timeout defect. That was wrong: orphaned host processes were holding the radio,
+and the measurement above is from a clean bench.
 
 What it collects now reaches the ground and stays there. `hk-bridge.py` speaks
 CSP over KISS on the host, pulls samples from a node, and forwards each to a
