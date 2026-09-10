@@ -33,7 +33,7 @@ or a release qualification record.
 | Health monitoring | Components register with a deadline and report as they run; the watchdog is fed only by a check that finds every one within its deadline. Registration can be undone so a stopped service does not reset a working board | 14 `native_sim` cases covering registration, deadlines, recovery and the refusal to supervise without a watchdog | **PHYSICALLY VERIFIED** on 4 September 2026: healthy for three watchdog timeouts with no reset, then a genuinely overdue component caused a withheld feed, a reset, and `reset_cause=watchdog` on the next boot | Liveness only, no resource or subsystem checks; the application thread is the only component watched so far |
 | Platform watchdog | Chosen-bound device, timeout and keep-alive at a third of it, deliberate starvation, reset-cause decoding with the watchdog preferred among latched causes | Six-case `native_sim` suite covering the interval margin across the configurable range, cause decoding, and the no-hardware `-ENODEV` contract | **PHYSICALLY VERIFIED** on 3 September 2026: armed on a NUCLEO-L496ZG, survived 18 s fed with the feed counter advancing, reset within 13 s of deliberate starvation, and the next boot reported `reset_cause=watchdog` from a mask that also latched the pin bit | Mechanism only, no health policy; one timeout channel; cannot be disarmed once armed on the STM32 independent watchdog |
 | Local parameters | Tables addressed by identifier and offset in owner bands, scalars, strings and byte arrays, exact size checks, read-only flags, validate and change callbacks, sample-on-read, derived write modes | CSP-disabled ztest, a string and array ztest, a core-table ztest, and local/full shell integration | Local tables run in the NUCLEO composition; physical bench checks remote access to them | Most configuration values in the core tables are read-only, because applying them needs the layer below to read a stored value back at start-up and that path does not exist |
-| Parameter tables | Seventeen tables: core 1–6, services 25–33, module 50 and 67, with 113 parameters across them | **SOFTWARE VERIFIED**: a 24-case core-table ztest, a string and array ztest, `param-tables-smoke.sh`, and Robot software scenarios | **PHYSICALLY VERIFIED** on 5 September 2026: `PARAM TABLES RESULT: PASS` read from a NUCLEO-L496ZG over its debug UART, and every table read across a Holybro link including a string value and a setting written from the ground | Housekeeping now collects a named set in one exchange; the temperature example adds table 51 only when its profile is composed, and that table has no physical evidence yet |
+| Parameter tables | Seventeen tables: core 1–6, services 25–33, module 50 and 67, with 113 parameters across them | **SOFTWARE VERIFIED**: a 24-case core-table ztest, a string and array ztest, `param-tables-smoke.sh`, and Robot software scenarios | **PHYSICALLY VERIFIED** on 5 September 2026: `PARAM TABLES RESULT: PASS` read from a NUCLEO-L496ZG over its debug UART, and every table read across a Holybro link including a string value and a setting written from the ground | Housekeeping now collects a named set in one exchange; the temperature example adds table 51 only when its profile is composed, and it was read off a NUCLEO on 10 September 2026 |
 | PARAM CSP adapter | Optional libparam-compatible server/client/cache | Two-node native remote list/get/set plus Robot errors | Holybro RF bench passed production list/get/set and the valid owner callback; the corrected reset-to-default oracle passed physically on 3 September 2026 (`1` to `3`, then invalid `5` restoring the compiled `1`) | Fixed remote descriptor pool; no remote persistence command |
 | Parameter persistence | Explicit bounded versioned CRC snapshot and defaults/load/save/clear | CSP-disabled unit suite, cross-process integration, corrupt snapshot fallback, Valgrind | No dedicated NUCLEO reboot/persistence acceptance | Local only; no migration framework beyond name/type compatibility |
 | Storage | LittleFS lifecycle at `/kfsw`, cautious first-format policy, capacity API | Storage ztest and native cross-process integration | NUCLEO storage info/test passes in UART HIL | Linux/NUCLEO full profiles only; one 64 KiB volume per profile |
@@ -219,6 +219,30 @@ behaves than the expressiveness would repay.
 for the set; the frame is asserted against reading the same parameters
 individually, because a set that is fast and disagrees with its members would
 be worse than the round trips it replaced.
+
+**PHYSICALLY VERIFIED** on 10 September 2026, on a NUCLEO-L496ZG running
+`54ac87f` with a Holybro SiK pair at 433 MHz and Yamcs 5.13.0:
+
+- the STM32L496 die read 23.214 C over the debug UART, `temp_valid` 1, no
+  failed reads, the sample counter advancing on its 1000 ms period. Readings
+  move by roughly 327 mC at a time, which is one ADC count at this
+  calibration, so the value is a measurement rather than a constant;
+- a five-value report collected every 2000 ms across 20 collections with no
+  failed collection and no absent value;
+- five samples pulled over the radio in one exchange, sequences 21 to 25
+  consecutive and two seconds apart. Decoded by hand, sample 25 carried
+  23.214 C, matching what the shell had just printed for the same parameter;
+- 63 datagrams reached Yamcs and none was invalid. The archive holds 56
+  samples spanning 18:47:44 to 18:49:34 UTC with **56 distinct generation
+  times**, from 22.559 C to 27.142 C as the die warmed under transmission.
+  Distinct times are the point: without the bridge's envelope a pull would
+  stamp every sample with one reception instant and the history the node kept
+  would collapse into a moment.
+
+The bandwidth claim measured on the same link: one exchange returned one
+sample or eight in the same **0.28 s**, so forty values cost what five cost.
+A round trip on this radio is about 250 ms, which is what each value would
+otherwise have cost on its own.
 
 What it collects now reaches the ground and stays there. `hk-bridge.py` speaks
 CSP over KISS on the host, pulls samples from a node, and forwards each to a
