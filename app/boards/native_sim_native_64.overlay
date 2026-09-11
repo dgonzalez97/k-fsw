@@ -19,5 +19,14 @@
 
 &storage_partition {
 	label = "kfsw-storage";
-	reg = <0x000fc000 0x00010000>;
+	/* 256 kB, where the NUCLEO keeps 64. The simulated flash is 2 MB and
+	 * costs nothing, and housekeeping's file store is the first thing that
+	 * wants real room: 64 kB gives about 40 back once LittleFS has taken
+	 * its share, which is minutes of history rather than a pass.
+	 *
+	 * Deliberately not matched on the board. A hosted target is where this
+	 * is demonstrated; what a flight partition should be is a decision
+	 * about that board's flash, not about this one's convenience.
+	 */
+	reg = <0x000fc000 0x00040000>;
 };
