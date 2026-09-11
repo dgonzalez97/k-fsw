@@ -18,10 +18,11 @@ The assigned prototype roles are:
 of `yamcs/quickstart` that keeps what housekeeping brings down. Run it with
 `./mvnw yamcs:run` from that directory and open <http://localhost:8090>.
 
-Nothing arrives on its own, because housekeeping answers when asked and never
-speaks first. `tools/ground/hk-bridge.py` does the asking: it speaks CSP over
-KISS on the host, pulls samples from a node, and forwards each one to Yamcs
-over UDP. It decodes nothing — the frames go on byte for byte, and what a value
+By default nothing arrives on its own, because housekeeping answers when asked.
+`tools/ground/hk-bridge.py` does the asking: it speaks CSP over KISS on the
+host, pulls samples from a node, and forwards each one to Yamcs over UDP. A
+node told to beacon sends the same frame unasked, and `--listen` records those
+without transmitting. It decodes nothing — the frames go on byte for byte, and what a value
 means lives in the mission database.
 
 That database is generated, not written. `reports/` holds what a report
