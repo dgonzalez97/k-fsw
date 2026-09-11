@@ -24,6 +24,9 @@
 #if CONFIG_KFSW_TEMPERATURE_SENSOR_EXAMPLE
 #include <kfsw/modules/temperature_sensor_example.h>
 #endif
+#if CONFIG_KFSW_FBO
+#include <kfsw/services/fbo.h>
+#endif
 #if CONFIG_KFSW_LASTWORDS
 #include <kfsw/platform/lastwords.h>
 #endif
@@ -137,6 +140,9 @@ int main(void)
 #if CONFIG_KFSW_HK
 		&kfsw_hk_param_definitions,
 #endif
+#if CONFIG_KFSW_FBO
+		&kfsw_fbo_param_definitions,
+#endif
 #if CONFIG_KFSW_COMMAND
 		&kfsw_command_param_definitions,
 #endif
@@ -200,6 +206,13 @@ int main(void)
 		kfsw_log_error("Failed to initialize boton_test: %d", result);
 	} else {
 		kfsw_log_info("boton_test initialized");
+	}
+#endif
+
+#if CONFIG_KFSW_FBO
+	result = kfsw_fbo_init();
+	if (result != 0) {
+		kfsw_log_error("Failed to initialize file based operations: %d", result);
 	}
 #endif
 

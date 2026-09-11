@@ -1,0 +1,20 @@
+# Every shape a procedure can take, in one file.
+#
+# Blank lines and comments are ignored and are not counted against the line
+# limit. What follows is eight lines: two guards, three commands, a wait, a
+# condition and the command it guards.
+
+on-error continue
+noop
+info
+
+# Not a command. Under `continue` this fails the line and the run carries on,
+# which is the difference this guard exists to make.
+nonsense_command
+
+on-error stop
+wait 1
+
+# Source 9 id 9 has never been recorded, so this must skip the line after it.
+if-event 9 9 skip
+noop
