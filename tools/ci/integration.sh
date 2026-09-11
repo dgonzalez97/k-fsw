@@ -32,6 +32,9 @@ echo "INTEGRATION: PARAM persistence"
 echo "INTEGRATION: housekeeping collection"
 "$KFSW_REPO_DIR/tests/hk-smoke.sh"
 
+echo "INTEGRATION: housekeeping samples kept in a file"
+"$KFSW_REPO_DIR/tests/hk-store-smoke.sh"
+
 echo "INTEGRATION: the ground bridge agrees with the node about a sample"
 "$KFSW_REPO_DIR/tests/hk-yamcs-smoke.sh"
 

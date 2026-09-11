@@ -228,6 +228,33 @@ static int cmd_hk_period(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
+#if CONFIG_KFSW_HK_STORE
+static int cmd_hk_store(const struct shell *sh, size_t argc, char **argv)
+{
+	uint32_t report;
+	uint32_t interval;
+	int result;
+
+	ARG_UNUSED(argc);
+
+	if ((parse_u32(sh, argv[1], &report, "report") != 0) ||
+	    (parse_u32(sh, argv[2], &interval, "interval") != 0)) {
+		return -EINVAL;
+	}
+	result = kfsw_hk_set_store((uint8_t)report, interval);
+	if (result != 0) {
+		shell_error(sh, "store for report %u: %d", report, result);
+		return result;
+	}
+	if (interval == 0U) {
+		shell_print(sh, "report %u keeps samples in RAM only", report);
+	} else {
+		shell_print(sh, "report %u stores every %u ms", report, interval);
+	}
+	return 0;
+}
+#endif
+
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	hk_commands,
 	SHELL_CMD_ARG(define, NULL, "Name what a report collects: define <report> [node:]table:offset ...",
@@ -238,6 +265,10 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 	SHELL_CMD_ARG(get, NULL, "Read samples back: get <report> [count].", cmd_hk_get, 2, 1),
 	SHELL_CMD_ARG(period, NULL, "Collect repeatedly: period <report> <ms>, 0 to stop.",
 		      cmd_hk_period, 3, 0),
+#if CONFIG_KFSW_HK_STORE
+	SHELL_CMD_ARG(store, NULL, "Keep samples in a file: store <report> <ms>, 0 for RAM only.",
+		      cmd_hk_store, 3, 0),
+#endif
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(hk, &hk_commands, "Housekeeping: collect a set of values in one pass.", NULL);

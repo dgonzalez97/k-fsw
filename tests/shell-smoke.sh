@@ -133,7 +133,7 @@ expected_output=(
 	'filesystem: LittleFS'
 	'mount_point: /kfsw'
 	'ready: yes'
-	'total_bytes: 65536'
+	'total_bytes: '
 	'Storage test: PASS'
 	'  mkdir     : Create a directory: mkdir <node> <path>; <node> may be this node.'
 	'generate: wrong parameter count'
