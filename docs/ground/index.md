@@ -265,8 +265,8 @@ the archive doing the keeping.
 cd k-fsw/ground-station/yamcs && ./mvnw yamcs:run    # then http://localhost:8090
 ```
 
-Nothing arrives on its own. Housekeeping answers when asked and never speaks
-first, so a bridge does the asking:
+By default nothing arrives on its own: housekeeping answers when asked, so a
+bridge does the asking.
 
 ```bash
 ./k-fsw/tools/ground/hk-bridge.py --device /dev/pts/7 --node 1 --report 0
@@ -276,6 +276,44 @@ It speaks CSP over KISS on the host, pulls samples, and forwards each one to
 Yamcs on UDP 10015. Point it at a hosted node's `uart_1` pseudo-terminal, or
 straight at the Holybro's serial device for a flight node over the radio; it is
 the same client either way.
+
+### A node that speaks first
+
+Asking costs a round trip, which is the wrong way to open a pass: the ground
+has to find the node and wait before it knows anything. A report can instead be
+told to put its newest sample on the link on its own.
+
+```text
+hk beacon 0 1 5000      # report 0, to node 1, every five seconds
+hk beacon 0 1 0         # stop
+```
+
+The ground does not change. A beacon is the same frame a request gets, sent
+from the same port, so the bridge recognises it with what it already has — it
+only has to stop asking:
+
+```bash
+./k-fsw/tools/ground/hk-bridge.py --device /dev/pts/7 --node 1 --listen
+```
+
+A node that transmits unprompted can flood a link, so three limits sit under
+this. The interval is refused below `CONFIG_KFSW_HK_BEACON_FLOOR_MS`
+(5000 by default), returning `-ERANGE`. Beacons follow collection and the
+clock, so a report that is not collecting does not beacon and a node that was
+never given a time does not announce itself without one. And a beacon never
+takes the last CSP buffers — below `CONFIG_KFSW_HK_BEACON_BUFFER_RESERVE` free
+it is skipped, because a reply somebody is waiting for outranks a broadcast
+nobody asked for. `hk show` prints both counters, and `hk_beacons_skipped` in
+table 33 is the one to read when a ground station stops hearing a node that is
+still collecting: the link was busy, not broken.
+
+The destination is a port nothing binds, deliberately. Addressing a beacon to
+the serving port would drop it onto another node's request handler, where a
+frame whose first byte is also a version number could be read as a request.
+
+The interval is **not** kept across a reset. A node comes back quiet and is
+told to beacon again, which is the safe default and not necessarily the one a
+mission wants; report definitions and their collection periods do persist.
 
 ### Bringing it up and checking it
 
@@ -434,9 +472,9 @@ suites do not reach.
 ## Physical-interface ownership
 
 One process should own one physical interface. In the prototype,
-`kfsw-gnd-uhf` alone opens the Holybro serial device. `kfsw-ops`, the future
-future rotator bridge, and a future beacon handler would communicate through CSP and
-remain independent of the radio implementation. A later
+`kfsw-gnd-uhf` alone opens the Holybro serial device. `kfsw-ops` and a future
+rotator bridge would communicate through CSP and remain independent of the
+radio implementation. A later
 `kfsw-gnd-sband` could follow the same pattern without changing those roles.
 
 ## UHF and Holybro boundary

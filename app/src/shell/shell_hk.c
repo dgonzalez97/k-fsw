@@ -105,6 +105,10 @@ static int cmd_hk_show(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "absent values: %u", stats.entries_failed);
 	shell_print(sh, "samples overwritten: %u", stats.overwritten);
 	shell_print(sh, "last collection: %u", stats.last_seconds);
+#if CONFIG_KFSW_HK_BEACON
+	shell_print(sh, "beacons sent: %u", stats.beacons_sent);
+	shell_print(sh, "beacons skipped: %u", stats.beacons_skipped);
+#endif
 
 	for (uint8_t report = 0U; report < CONFIG_KFSW_HK_REPORTS; report++) {
 		struct kfsw_hk_entry entries[CONFIG_KFSW_HK_ENTRIES];
@@ -119,6 +123,22 @@ static int cmd_hk_show(const struct shell *sh, size_t argc, char **argv)
 		(void)kfsw_hk_depth(report, &depth);
 		shell_print(sh, "report %u: %u values, period %u ms, %u samples held", report,
 			    (unsigned int)count, period, depth);
+#if CONFIG_KFSW_HK_BEACON
+		/* Printed only when it is on: a node that beacons is a node
+		 * that transmits without being asked, and an operator should
+		 * not have to remember whether they left it that way.
+		 */
+		{
+			uint16_t beacon_node = 0U;
+			uint32_t beacon_ms = 0U;
+
+			if ((kfsw_hk_get_beacon(report, &beacon_node, &beacon_ms) == 0) &&
+			    (beacon_ms != 0U)) {
+				shell_print(sh, "  beacons to node %u every %u ms", beacon_node,
+					    beacon_ms);
+			}
+		}
+#endif
 		for (size_t index = 0U; index < count; index++) {
 			shell_print(sh, "  node %u  table %u  offset 0x%02x", entries[index].node,
 				    (unsigned int)(entries[index].param_id >> 8),
@@ -255,6 +275,35 @@ static int cmd_hk_store(const struct shell *sh, size_t argc, char **argv)
 }
 #endif
 
+#if CONFIG_KFSW_HK_BEACON
+static int cmd_hk_beacon(const struct shell *sh, size_t argc, char **argv)
+{
+	uint32_t report;
+	uint32_t node;
+	uint32_t interval;
+	int result;
+
+	ARG_UNUSED(argc);
+
+	if ((parse_u32(sh, argv[1], &report, "report") != 0) ||
+	    (parse_u32(sh, argv[2], &node, "node") != 0) ||
+	    (parse_u32(sh, argv[3], &interval, "interval") != 0)) {
+		return -EINVAL;
+	}
+	result = kfsw_hk_set_beacon((uint8_t)report, (uint16_t)node, interval);
+	if (result != 0) {
+		shell_error(sh, "beacon for report %u: %d", report, result);
+		return result;
+	}
+	if (interval == 0U) {
+		shell_print(sh, "report %u stops beaconing", report);
+	} else {
+		shell_print(sh, "report %u beacons to node %u every %u ms", report, node, interval);
+	}
+	return 0;
+}
+#endif
+
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	hk_commands,
 	SHELL_CMD_ARG(define, NULL, "Name what a report collects: define <report> [node:]table:offset ...",
@@ -268,6 +317,10 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 #if CONFIG_KFSW_HK_STORE
 	SHELL_CMD_ARG(store, NULL, "Keep samples in a file: store <report> <ms>, 0 for RAM only.",
 		      cmd_hk_store, 3, 0),
+#endif
+#if CONFIG_KFSW_HK_BEACON
+	SHELL_CMD_ARG(beacon, NULL, "Send unprompted: beacon <report> <node> <ms>, 0 to stop.",
+		      cmd_hk_beacon, 4, 0),
 #endif
 	SHELL_SUBCMD_SET_END);
 

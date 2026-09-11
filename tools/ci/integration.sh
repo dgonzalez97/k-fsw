@@ -41,6 +41,9 @@ echo "INTEGRATION: housekeeping samples kept in a file"
 echo "INTEGRATION: the ground bridge agrees with the node about a sample"
 "$KFSW_REPO_DIR/tests/hk-yamcs-smoke.sh"
 
+echo "INTEGRATION: a node beacons and the ground hears it without asking"
+"$KFSW_REPO_DIR/tests/hk-beacon-smoke.sh"
+
 echo "INTEGRATION: CSP, remote PARAM, storage, and FTP"
 "$KFSW_REPO_DIR/tests/csp-smoke.sh"
 

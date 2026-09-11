@@ -227,6 +227,26 @@ The electrical fixture must use the board/radio-compatible logic level, a
 common ground, crossed TX/RX, and no hardware flow control. Confirm the actual
 radio and board pinouts before applying power.
 
+## Beacons third
+
+`beacon-smoke.sh` settles the one housekeeping claim a pseudo-terminal cannot.
+Everywhere else the node answers a request; here it transmits on its own, and
+the ground side is `hk-bridge.py --listen`, which binds no port and sends no
+packet. A frame reaching it can only be one the node sent unprompted.
+
+```bash
+./k-fsw/tests/hil/radio-uhf/holybro/beacon-smoke.sh
+```
+
+It also covers the period floor refusing an interval that would swamp the link,
+the counters agreeing with what the ground heard, and an operator taking the
+beacon away again.
+
+Expect `sent` to run slightly ahead of `heard`: beacons carry no RDP, so a lost
+frame costs one sample and the sequence numbers show the gap. That is the
+design, not a fault — a bad pass should return most of something rather than
+nothing.
+
 ## Evidence classification
 
 ### PHYSICALLY BENCH VERIFIED
