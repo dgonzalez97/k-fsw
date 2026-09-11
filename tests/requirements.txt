@@ -1,0 +1,6 @@
+# What the software integration tests need beyond the west workspace.
+#
+# stage-file.py writes a file into a native_sim node's LittleFS partition
+# before it boots, which is how fbo-smoke.sh puts a procedure on a node
+# without transferring one in.
+littlefs-python==0.19.0
