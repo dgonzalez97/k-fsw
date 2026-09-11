@@ -131,6 +131,9 @@ if(CONFIG_KFSW_DEBUG_SHELL)
     target_sources_ifdef(CONFIG_KFSW_HK app PRIVATE
         src/shell/shell_hk.c
     )
+    target_sources_ifdef(CONFIG_KFSW_FBO app PRIVATE
+        src/shell/shell_fbo.c
+    )
     target_sources_ifdef(CONFIG_KFSW_EVENT app PRIVATE
         src/shell/shell_event.c
     )
