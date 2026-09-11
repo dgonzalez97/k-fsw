@@ -1,0 +1,40 @@
+---
+name: Set up the K-FSW workspace
+description: >
+  Python, the west workspace and the Zephyr SDK, plus whatever else a job needs
+  on top. Every job in the workflow wants the first three and most want one or
+  two packages, so they live here once rather than eight times over.
+
+inputs:
+  packages:
+    description: apt packages this job needs, space separated
+    required: false
+    default: ""
+  requirements:
+    description: pip requirements file this job needs
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Set up the west workspace and Zephyr SDK
+      uses: zephyrproject-rtos/action-zephyr-setup@v1
+      with:
+        app-path: k-fsw
+        toolchains: arm-zephyr-eabi
+
+    - name: Install system packages
+      if: inputs.packages != ''
+      shell: bash
+      run: sudo apt-get install --yes ${{ inputs.packages }}
+
+    - name: Install Python packages
+      if: inputs.requirements != ''
+      shell: bash
+      run: pip install -r ${{ inputs.requirements }}

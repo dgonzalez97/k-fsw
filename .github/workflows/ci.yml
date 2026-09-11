@@ -28,16 +28,8 @@ jobs:
         with:
           path: k-fsw
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Set up the west workspace and Zephyr SDK
-        uses: zephyrproject-rtos/action-zephyr-setup@v1
-        with:
-          app-path: k-fsw
-          toolchains: arm-zephyr-eabi
+      - name: Set up the workspace
+        uses: ./k-fsw/.github/actions/workspace
 
       - name: Validate west manifest
         run: west manifest --validate
@@ -59,19 +51,10 @@ jobs:
         with:
           path: k-fsw
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up the workspace
+        uses: ./k-fsw/.github/actions/workspace
         with:
-          python-version: "3.12"
-
-      - name: Set up the west workspace and Zephyr SDK
-        uses: zephyrproject-rtos/action-zephyr-setup@v1
-        with:
-          app-path: k-fsw
-          toolchains: arm-zephyr-eabi
-
-      - name: Install cppcheck
-        run: sudo apt-get install --yes cppcheck
+          packages: cppcheck
 
       - name: Check source quality
         run: ./k-fsw/tools/ci/quality.sh
@@ -86,16 +69,8 @@ jobs:
         with:
           path: k-fsw
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Set up the west workspace and Zephyr SDK
-        uses: zephyrproject-rtos/action-zephyr-setup@v1
-        with:
-          app-path: k-fsw
-          toolchains: arm-zephyr-eabi
+      - name: Set up the workspace
+        uses: ./k-fsw/.github/actions/workspace
 
       - name: Run unit tests
         run: ./k-fsw/tools/ci/unit.sh
@@ -122,21 +97,11 @@ jobs:
         with:
           path: k-fsw
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up the workspace
+        uses: ./k-fsw/.github/actions/workspace
         with:
-          python-version: "3.12"
-
-      - name: Set up the west workspace and Zephyr SDK
-        uses: zephyrproject-rtos/action-zephyr-setup@v1
-        with:
-          app-path: k-fsw
-          toolchains: arm-zephyr-eabi
-
-      - name: Install integration dependencies
-        run: |
-          sudo apt-get install --yes socat
-          pip install -r k-fsw/tests/requirements.txt
+          packages: socat
+          requirements: k-fsw/tests/requirements.txt
 
       - name: Run shell, CSP, PARAM, storage, and FTP integration tests
         run: ./k-fsw/tools/ci/integration.sh
@@ -151,19 +116,10 @@ jobs:
         with:
           path: k-fsw
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up the workspace
+        uses: ./k-fsw/.github/actions/workspace
         with:
-          python-version: "3.12"
-
-      - name: Set up the west workspace and Zephyr SDK
-        uses: zephyrproject-rtos/action-zephyr-setup@v1
-        with:
-          app-path: k-fsw
-          toolchains: arm-zephyr-eabi
-
-      - name: Install Valgrind
-        run: sudo apt-get install --yes valgrind
+          packages: valgrind
 
       - name: Run Valgrind
         run: ./k-fsw/tools/ci/valgrind.sh
@@ -186,16 +142,8 @@ jobs:
         with:
           path: k-fsw
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Set up the west workspace and Zephyr SDK
-        uses: zephyrproject-rtos/action-zephyr-setup@v1
-        with:
-          app-path: k-fsw
-          toolchains: arm-zephyr-eabi
+      - name: Set up the workspace
+        uses: ./k-fsw/.github/actions/workspace
 
       - name: Run the suites under UBSan
         run: ./k-fsw/tools/ci/ubsan.sh
@@ -221,22 +169,11 @@ jobs:
           path: k-fsw
           submodules: recursive
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up the workspace
+        uses: ./k-fsw/.github/actions/workspace
         with:
-          python-version: "3.12"
-
-      - name: Set up the west workspace and Zephyr SDK
-        uses: zephyrproject-rtos/action-zephyr-setup@v1
-        with:
-          app-path: k-fsw
-          toolchains: arm-zephyr-eabi
-
-      - name: Install software-system test dependencies
-        run: sudo apt-get install --yes socat tmux
-
-      - name: Install Robot Framework
-        run: pip install -r k-fsw/tests/hil/requirements.txt
+          packages: socat tmux
+          requirements: k-fsw/tests/hil/requirements.txt
 
       - name: Validate all Robot suites and run software scenarios
         run: ./k-fsw/tools/ci/robot.sh
@@ -259,19 +196,10 @@ jobs:
         with:
           path: k-fsw
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up the workspace
+        uses: ./k-fsw/.github/actions/workspace
         with:
-          python-version: "3.12"
-
-      - name: Set up the west workspace
-        uses: zephyrproject-rtos/action-zephyr-setup@v1
-        with:
-          app-path: k-fsw
-          toolchains: arm-zephyr-eabi
-
-      - name: Install Doxygen
-        run: sudo apt-get install --yes doxygen
+          packages: doxygen
 
       - name: Build and validate SDK documentation
         run: ./k-fsw/tools/ci/docs.sh
