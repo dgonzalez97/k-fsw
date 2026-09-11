@@ -134,7 +134,9 @@ jobs:
           toolchains: arm-zephyr-eabi
 
       - name: Install integration dependencies
-        run: sudo apt-get install --yes socat
+        run: |
+          sudo apt-get install --yes socat
+          pip install -r k-fsw/tests/requirements.txt
 
       - name: Run shell, CSP, PARAM, storage, and FTP integration tests
         run: ./k-fsw/tools/ci/integration.sh
