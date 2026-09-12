@@ -56,6 +56,7 @@ RECURSIVE              = YES
 EXCLUDE                = docs/theme
 EXCLUDE_PATTERNS       = */third_party/* */build/* */bootloader/*
 EXAMPLE_PATH           = docs
+IMAGE_PATH             = docs/media
 
 REFERENCES_RELATION    = NO
 REFERENCED_BY_RELATION = NO
