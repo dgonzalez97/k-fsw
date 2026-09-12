@@ -1,8 +1,7 @@
 # UHF radio HIL
 
 This directory groups physical tests by radio category. Device-specific
-fixtures live below the category rather than defining the whole communications
-architecture.
+fixtures live in their own subdirectories.
 
 Current structure:
 

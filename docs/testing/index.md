@@ -1,35 +1,19 @@
-# Testing, HIL, and CI {#testing}
+# Testing and HIL {#testing}
 
 [TOC]
 
-## Evidence is layered
+## Test layers
 
-No single K-FSW test proves every property. A build can catch configuration and
-link errors without running behavior. A native integration test can execute
-service interactions without proving physical UART signaling. A board shell
-smoke can prove flash/boot/console without qualifying storage or CSP.
+| Layer | Checks |
+| --- | --- |
+| Build and static checks | Configuration, linking, formatting, diagnostics |
+| ztest / Twister | Individual components, validation, error paths |
+| Native integration | Full images exchanging commands and files |
+| Robot | Shell workflows and expected output |
+| Physical HIL | Board, wiring, and link behaviour on a named bench |
 
-```text
-                         physical HIL
-                 board, programmer, serial/link
-                              ^
-                       Robot scenarios
-                 operator-visible system behavior
-                              ^
-                    native integration tests
-               full images, processes, links, files
-                              ^
-                    ztest / Twister units
-                focused module contracts and faults
-                              ^
-                quality + configuration builds
-             source rules, Kconfig, devicetree, linking
-```
-
-Higher layers use more of the real system but usually cover fewer cases. Lower
-layers are faster and more exhaustive but cannot claim physical verification.
-Project status should name the highest relevant evidence without discarding the
-lower layers that make it diagnosable.
+A successful build does not establish hardware behaviour.
+Record software results and observed physical results separately.
 
 ## Local software sequence
 
@@ -39,28 +23,9 @@ From the workspace root:
 ./k-fsw/tools/ci/all.sh
 ```
 
-This performs, in order:
-
-```text
-west manifest validation
-        |
-clean Linux + NUCLEO builds
-        |
-clang-format + cppcheck
-        |
-Twister unit suites
-        |
-native integration scripts
-        |
-Valgrind native boots
-        |
-Robot dry-run + software scenarios
-        |
-Doxygen HTML/API build
-```
-
-It is a software-only command. It does not discover, flash, reset, or operate a
-physical board.
+Runs manifest validation, Linux and NUCLEO builds, quality, unit tests,
+integration tests, Valgrind, Robot, and Doxygen. It does not operate hardware.
+UBSan and coverage have separate entry points below.
 
 ## Hosted pull-request gates
 
@@ -74,7 +39,7 @@ physical board.
 | `UNIT / Twister` | `tools/ci/unit.sh` | Application/repository ztest suites, including west-managed reusable modules, on `native_sim/native/64` |
 | `INTEGRATION / software` | `tools/ci/integration.sh` | Full native shell, storage, PARAM, CSP/KISS, RDP, and FTP interactions |
 | `MEMORY / Valgrind` | `tools/ci/valgrind.sh` | Normal and corrupt-snapshot boot paths under Memcheck |
-| `UNDEFINED / UBSan` | `tools/ci/ubsan.sh` | The unit suites again, watching the arithmetic rather than the memory |
+| `UNDEFINED / UBSan` | `tools/ci/ubsan.sh` | Unit suites with undefined-behaviour checks |
 | `ROBOT / dry-run + software` | `tools/ci/robot.sh` | All Robot suite syntax plus operator-level nonphysical scenarios |
 | `DOCS / Doxygen` | `tools/ci/docs.sh` | Warning-free HTML manual and public C API generation |
 
@@ -199,16 +164,8 @@ misbehaves on request.
 `tools/ci/coverage.sh` reports **line, function and branch** coverage of the
 unit suites, published with this manual under `/coverage/`.
 
-Twister does the whole job: it builds the suites instrumented, runs them and
-composes the gcovr report. Every file opens into its own source, where a line
-carries the number of times it ran, and a separate list of functions gives each
-one its call count, so a function that is never called is named rather than
-averaged away.
-
-Twister has no option for gcovr's filters, so the scope lives in
-`config/gcovr.cfg`, which gcovr reads from the directory given as
-`--coverage-basedir`. Without it the report covers all of Zephyr and picolibc:
-1208 files rather than 46.
+Twister instruments and runs the unit suites, then generates a gcovr report.
+`config/gcovr.cfg` limits it to project-owned code.
 
 ```bash
 ./.venv/bin/pip install gcovr
@@ -216,18 +173,11 @@ Twister has no option for gcovr's filters, so the scope lives in
 ./k-fsw/tools/coverage/serve.sh   # http://127.0.0.1:8001/
 ```
 
-It measures the **unit** suites only. The integration scripts and the HIL
-suites exercise a great deal more, but they drive a built image rather than
-instrumented objects: counting them would claim a coverage the numbers do not
-describe. A low figure means a layer is tested mostly on a bench, which is true
-of `kfsw-comms`, where CSP is proven over a radio and a CAN bus rather than in
-ztest.
+Coverage measures unit suites only. Integration and HIL runs are not
+instrumented, and vendored dependencies are excluded. A low percentage needs
+review alongside those tests; it does not explain the missing coverage.
 
-Vendored code under `third_party` is excluded. libcsp and libparam are pinned
-upstream projects with their own tests, and including them would move the
-number without saying anything about K-FSW.
-
-### `boton_test` evidence boundary
+### boton_test coverage
 
 The focused module suite has a GPIO-disabled state/PARAM configuration and an
 active-low GPIO-emulator configuration. The latter drives Zephyr GPIO edges,
@@ -236,8 +186,7 @@ release/rearm behavior. Private state hooks cover deterministic time and
 saturation cases; there is no production fake-press command. Both
 configurations remain independent of physical hardware and exercise the same
 owner state exposed through `kfsw_boton_test_get_status()` and the two counter
-parameters at offsets 0x00 and 0x04 of table 67
-through 10.
+parameters at offsets 0x00 and 0x04 of table 67.
 
 ### Firmware upload between two nodes
 
@@ -405,7 +354,7 @@ decoding, which are pure and must hold everywhere, and it pins what a
 composition sees on a board with no watchdog hardware, where every operation
 reports `-ENODEV` rather than appearing to succeed.
 
-### `boton_test` hardware acceptance
+### boton_test hardware acceptance
 
 `tests/hil/boton-test/button-acceptance.sh` is the manual fixture for the three
 claims the automated suites cannot settle: that a physical press increments the

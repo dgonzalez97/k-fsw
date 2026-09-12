@@ -465,6 +465,43 @@ ZTEST(param_persistence, test_the_space_a_snapshot_takes_is_reported)
 	zassert_true(kfsw_param_persist_bytes() > 0U, "a written snapshot reported no size");
 }
 
+/*
+ * What one table contributes to the snapshot.
+ *
+ * The file covers every persistent value at once, so saving is always
+ * whole-file. This answers the question an operator has after changing a
+ * table: is what I just set kept at all, and how much of this table is.
+ */
+ZTEST(param_persistence, test_a_table_reports_what_it_keeps)
+{
+	uint16_t kept = 0U;
+
+	zassert_ok(kfsw_param_persist_table_count(KFSW_PARAM_PARAM_TABLE_ID, &kept),
+		   "the service's own table could not be counted");
+	zassert_true(kept > 0U, "the table that holds param_autosave keeps nothing");
+}
+
+ZTEST(param_persistence, test_a_table_nobody_registered_is_refused)
+{
+	uint16_t kept = 0U;
+
+	zassert_equal(kfsw_param_persist_table_count(99U, &kept), -ENOENT,
+		      "a table that does not exist reported a count");
+	zassert_equal(kfsw_param_persist_table_count(KFSW_PARAM_PARAM_TABLE_ID, NULL), -EINVAL,
+		      "a NULL destination was accepted");
+}
+
+/* A table can exist and keep nothing, which is worth saying rather than
+ * confusing with a table that is not there at all.
+ */
+ZTEST(param_persistence, test_a_table_that_keeps_nothing_still_counts)
+{
+	uint16_t kept = 1U;
+
+	zassert_ok(kfsw_param_persist_table_count(KFSW_LOG_PARAM_TABLE_ID, &kept),
+		   "a registered table could not be counted");
+}
+
 ZTEST(param_persistence, test_the_budget_is_readable)
 {
 	zassert_true(kfsw_param_persist_max_bytes() > 0U, "no budget is reported");

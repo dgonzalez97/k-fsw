@@ -1,23 +1,16 @@
-# CSP and Communications {#communications}
+# CSP and links {#communications}
 
 [TOC]
 
-## CSP before K-FSW
+## CSP in K-FSW
 
-[Cubesat Space Protocol (CSP)](https://github.com/libcsp/libcsp) is a compact
-packet network designed for embedded and space systems. It gives applications
-node addresses, service ports, packets, connections, routing, network
-interfaces, and optional transport features without binding the application
-protocol to one physical link.
+[Cubesat Space Protocol](https://github.com/libcsp/libcsp) provides node
+addresses, service ports, routing, and packet transport. K-FSW uses libcsp;
+`kfsw-comms` owns setup, interfaces, routes, and the router.
 
-K-FSW uses the upstream libcsp implementation. `kfsw-comms` owns how that
-library is initialized and presented to the rest of K-FSW; it does not fork the
-CSP protocol or hide its packet-ownership rules.
-
-CSP is **optional**. `CONFIG_KFSW_CSP=n` builds a composition without libcsp
-initialization, routes, a router thread, or CSP shell commands. Local
-parameters and persistence are explicitly software-tested with CSP disabled.
-Only CSP-backed adapters such as remote parameters and FTP require it.
+CSP is optional. With `CONFIG_KFSW_CSP=n`, local parameters, persistence,
+logging, and the shell still work. Remote parameters, FTP, and other
+CSP services require it.
 
 ## CSP vocabulary
 
@@ -38,12 +31,13 @@ every connected CSP network.
 
 A port identifies a service at a node. The destination pair “node 2, port 9”
 means the FTP service on node 2, not a physical connector or operating-system
-serial port. Current K-FSW service ports are:
+serial port. Common K-FSW service ports are:
 
 | CSP port | Use | Configuration |
 | --- | --- | --- |
 | 9 | K-FSW file transfer | `KFSW_FTP_CSP_PORT` |
 | 10 | libparam value transactions | `KFSW_PARAM_PORT` |
+| 11 | Commands | `KFSW_COMMAND_CSP_PORT` |
 | 12 | libparam parameter-list descriptions | `KFSW_PARAM_LIST_PORT` |
 
 libcsp also defines management/service ports, including the standard ping
@@ -72,8 +66,7 @@ pool; it is not an unbounded host socket abstraction.
 
 An interface adapts CSP packets to a link-layer mechanism such as CAN, KISS,
 I2C, ZMQ, or loopback. It has an address, a transmit function, receive path,
-maximum-transfer constraints, and counters. Current K-FSW exposes libcsp's
-loopback interface and one or more UART/KISS interfaces when selected. Every
+maximum-transfer constraints, and counters. K-FSW provides loopback, UART/KISS, and CAN interfaces when selected. Every
 KISS instance has a distinct UART, name, address/prefix, framing state,
 transport context, and counters.
 
@@ -133,7 +126,7 @@ The receive path reverses the link operations, then the router uses the
 destination port to deliver the complete packet to the registered service.
 K-FSW services never parse UART bytes directly.
 
-## What `kfsw-comms` owns
+## What kfsw-comms owns
 
 `kfsw-comms` is the single owner of the shared libcsp lifecycle:
 

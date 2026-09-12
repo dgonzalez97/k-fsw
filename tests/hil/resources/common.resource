@@ -41,6 +41,26 @@ Run Holybro Raw Smoke
     ...    stderr=STDOUT
     RETURN    ${result}
 
+Run Holybro Beacon Smoke
+    ${result}=    Run Process
+    ...    ${KFSW_REPO_DIR}/tests/hil/radio-uhf/holybro/beacon-smoke.sh
+    ...    --radio
+    ...    ${HOLYBRO_RADIO}
+    ...    --serial
+    ...    ${DEBUG_SERIAL}
+    ...    stdout=PIPE
+    ...    stderr=STDOUT
+    RETURN    ${result}
+
+Run Clock Smoke
+    ${result}=    Run Process
+    ...    ${KFSW_REPO_DIR}/tests/hil/stm32/nucleo-l496zg/clock-smoke.sh
+    ...    --serial
+    ...    ${DEBUG_SERIAL}
+    ...    stdout=PIPE
+    ...    stderr=STDOUT
+    RETURN    ${result}
+
 Run Holybro CSP KISS Smoke
     ${result}=    Run Process
     ...    ${KFSW_REPO_DIR}/tests/hil/radio-uhf/holybro/csp-kiss-smoke.sh

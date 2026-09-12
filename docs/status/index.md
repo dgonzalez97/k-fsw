@@ -1,224 +1,70 @@
-# Project Status and Roadmap {#project_status}
+# Project status {#project_status}
 
 [TOC]
 
-## Status baseline
+## Recorded status
 
-This status was updated on 31 August 2026 for the `boton_test` reference module
-tracked by [kfsw-modules issue 6](https://github.com/dgonzalez97/kfsw-modules/issues/6).
-It also reflects the published multi-KISS dependency, merged UHF and routing
-compositions, exact `west.yml` pins, current Kconfig/target profiles, project
-tests, workflows, issues, and pull requests. Automated software evidence is
-kept separate from pending manual USER-button acceptance. The named Holybro
-bench retains its previously reviewed raw and CSP/KISS evidence boundaries.
+This page records implementation limits and software and bench evidence.
+Dates and image revisions identify the recorded runs; they are not a claim
+that every later revision passed the same tests.
 
-Status here is an engineering summary, not a substitute for the issue tracker
-or a release qualification record.
+Linux and NUCLEO-L496ZG are the reference targets. FRDM-K64F and Pico W
+have shell bring-up evidence. No target is flight-qualified.
 
 ## Capability matrix
 
-| Area | Implementation | Software evidence | Physical evidence | Current limits |
-| --- | --- | --- | --- | --- |
-| Platform/time | Monotonic ms/us and reset-cause API implemented over Zephyr | Time ztest; used by native boot/shell tests | Reset/boot path exercised on NUCLEO; no separate clock-accuracy qualification | No UTC/TAI/GNSS or clock correlation |
-| Logging | Fixed-buffer DEBUG/INFO/WARNING/ERROR with compile/runtime filters | Shell and integration diagnostics | Console logging observed in board HIL | Not a structured/persistent event service; no rate limiting |
-| CSP over CAN | libcsp CFP over a CAN controller, selected by a chosen node so the same driver serves a board and a host USB adapter; bitrate published and settable from the ground | A composed NUCLEO profile and a ground node build; the route table selects CAN or the serial link per destination | **PHYSICALLY VERIFIED** on 5 September 2026: a NUCLEO-L496ZG on CAN1 and a PCAN-USB adapter on one bus at 500 kbit/s. Ping, identity and remote parameters all crossed it, the adapter's counters showed the frames, and both nodes stayed error-active. Re-verified on 10 September 2026 against `54ac87f`: `CAN SMOKE RESULT: PASS ... rtt_ms=50 ident=yes params=yes packets=rx:1258/tx:84 berr=tx0/rx0` | No transceiver on the NUCLEO, so wiring and termination are the operator's; changing the bitrate cuts the link that carried the change until the other end follows. The housekeeping bridge speaks KISS over a serial device, so it does not reach a node over CAN |
-| CSP core | Optional libcsp identity, loopback, validated native static routes with destination/prefix/interface/VIA, ping, one router | Route validation/precedence ztest; two-node and three-node native integration | Bidirectional CSP ping on NUCLEO/FTDI UART bench | No dynamic route mutation, redundant-link failover policy, or flight routing plan |
-| UART/KISS | Legacy chosen UART or generic independently named devicetree instances with separate state/counters | Two-node PTY tests plus simultaneous `KISS_1`/`KISS_2` direct selection and bidirectional transit | One NUCLEO USART3/FTDI and one Holybro link physically verified | Multiple links are software-verified only; 115200 reference profiles and 57600 Holybro overlays |
-| k-ground | Configured `native_sim` roles using the normal K-FSW shell/services and optional route string | UHF node 16 and ops node 19 report role-specific identity and ping both ways | No physical evidence required for the local profile | Launcher connects one direct peer link and no generic router orchestration; Yamcs holds housekeeping but nothing commands through it |
-| radio-uhf module | Compile-time implementation selection, generic identity/expected-configuration API, bounded `uhf status`; Holybro SiK implementation | Dedicated module ztest and node-16/NUCLEO composition builds | Reuses the separately verified Holybro bench | No live modem readback/control, radio parameters, worker, or data-plane API |
-| Holybro UHF fixture | Separate NUCLEO raw-byte peer and CSP/KISS HIL entry points under `radio-uhf/holybro` | Scripts validate module identity, production PARAM, file transfer, negative behavior, interfaces/routes/counters | Raw 100/100 with no invalid/timeout; bidirectional node 16 ↔ 2 CSP ping; remote production PARAM validation/callback; 256-byte file upload, remote stat/list, download and byte comparison; KISS counters with zero errors | Functional bench evidence only; no RF performance/soak campaign or qualification |
-| `boton_test` / `hw_test` reference module | Module-owned 30 ms debounce, coherent five-field typed status, five parameters in table 67, three LED owner controls, chosen-GPIO binding | **SOFTWARE VERIFIED**: focused state/GPIO tests, Linux shell/PARAM smoke, and NUCLEO profile build; final matrix recorded with the feature commit | **PARTIALLY PHYSICALLY VERIFIED** on 3 September 2026: an untouched board held `press_count` at 0 for 10 s, physical presses advanced it to 7, both LED paths were observed lit by the operator and read back through `boton_test status`, and `press_count` agreed with the module status. Per-gesture attribution is not yet isolated | NUCLEO example is opt-in; no dedicated thread/allocation, LED persistence, CSP dependency, or HK collector yet |
-| Firmware update | Streams an image into the secondary slot at the swap offset, verifies a whole-image CRC32, and confirms the bootloader scheduled a swap. Two routes: a reserved file-transfer path, and a direct block protocol with per-block checksums and repeat | 52 unit cases across the update service and the block protocol, on simulated flash; a two-node integration transfer of 20000 bytes over CSP | **PHYSICALLY VERIFIED** on 5 September 2026 against `db64963`: an image was sent from a `native_sim` ground node 16 to a NUCLEO-L496ZG node 2 over a Holybro pair, flashed, and the node rebooted into it. The node reported `revision: fwu-before` before the transfer and `revision: fwu-after` after it, the CSP link recovered on its own, and `mcuboot confirm` left the new image marked `confirmed: 1` | No authenticity beyond the bootloader signature; one transfer at a time; blocks must be sequential and full except the last; ground must hold the image to send it |
-| MCUboot boot and rollback | Bootloader plus two 352 KB slots and a reserved 192 KB golden region, ECDSA P-256 signature check, swap with automatic revert, `mcuboot` shell for confirm and upgrade | Opt-in sysbuild composition builds bootloader and signed application; the signed artefact is checked against the project key and against MCUboot's default | **PHYSICALLY VERIFIED** on 3 September 2026: an unconfirmed test image reverted to its predecessor, a confirmed one persisted across two reboots, an image signed with MCUboot's public default key was refused, and a value written to storage under the first image was still readable after every swap and revert | Update transport is out of scope; golden region reserved but unwritten and not selectable; images must be written one sector into the secondary slot |
-| Health monitoring | Components register with a deadline and report as they run; the watchdog is fed only by a check that finds every one within its deadline. Registration can be undone so a stopped service does not reset a working board | 14 `native_sim` cases covering registration, deadlines, recovery and the refusal to supervise without a watchdog | **PHYSICALLY VERIFIED** on 4 September 2026: healthy for three watchdog timeouts with no reset, then a genuinely overdue component caused a withheld feed, a reset, and `reset_cause=watchdog` on the next boot | Liveness only, no resource or subsystem checks; the application thread is the only component watched so far |
-| Platform watchdog | Chosen-bound device, timeout and keep-alive at a third of it, deliberate starvation, reset-cause decoding with the watchdog preferred among latched causes | Six-case `native_sim` suite covering the interval margin across the configurable range, cause decoding, and the no-hardware `-ENODEV` contract | **PHYSICALLY VERIFIED** on 3 September 2026: armed on a NUCLEO-L496ZG, survived 18 s fed with the feed counter advancing, reset within 13 s of deliberate starvation, and the next boot reported `reset_cause=watchdog` from a mask that also latched the pin bit | Mechanism only, no health policy; one timeout channel; cannot be disarmed once armed on the STM32 independent watchdog |
-| Local parameters | Tables addressed by identifier and offset in owner bands, scalars, strings and byte arrays, exact size checks, read-only flags, validate and change callbacks, sample-on-read, derived write modes | CSP-disabled ztest, a string and array ztest, a core-table ztest, and local/full shell integration | Local tables run in the NUCLEO composition; physical bench checks remote access to them | Most configuration values in the core tables are read-only, because applying them needs the layer below to read a stored value back at start-up and that path does not exist |
-| Parameter tables | Eighteen definition sets across the tree — core 1–6, services 25–33, modules 50, 51 and 67 — with 122 parameters between them, plus a test-only fixture on table 24. No single composition carries them all: the reference NUCLEO image reports 12 tables and 75 parameters | **SOFTWARE VERIFIED**: a 24-case core-table ztest, a string and array ztest, `param-tables-smoke.sh`, and Robot software scenarios | **PHYSICALLY VERIFIED** on 5 September 2026: `PARAM TABLES RESULT: PASS` read from a NUCLEO-L496ZG over its debug UART, and every table read across a Holybro link including a string value and a setting written from the ground | Housekeeping now collects a named set in one exchange; the temperature example adds table 51 only when its profile is composed, and it was read off a NUCLEO on 10 September 2026 |
-| PARAM CSP adapter | Optional libparam-compatible server/client/cache | Two-node native remote list/get/set plus Robot errors | Holybro RF bench passed production list/get/set and the valid owner callback; the corrected reset-to-default oracle passed physically on 3 September 2026 (`1` to `3`, then invalid `5` restoring the compiled `1`) | Fixed remote descriptor pool; no remote persistence command |
-| Parameter persistence | Explicit bounded versioned CRC snapshot and defaults/load/save/clear | CSP-disabled unit suite, cross-process integration, corrupt snapshot fallback, Valgrind | No dedicated NUCLEO reboot/persistence acceptance | Local only; no migration framework beyond name/type compatibility |
-| Storage | LittleFS lifecycle at `/kfsw`, cautious first-format policy, capacity API | Storage ztest and native cross-process integration | NUCLEO storage info/test passes in UART HIL | Linux/NUCLEO full profiles only; one 64 KiB volume per profile |
-| K-FSW FTP | LIST/STAT/MKDIR/PUT/GET, 192-byte chunks, CRC, sandbox, atomic `.part` finalization; operation/transfer/transport layering with one transport backend; own-node LIST/STAT/MKDIR served locally | Protocol ztest, native transfers from 0 bytes through 8 KiB, ground-role round trip, Robot workflow | 4 KiB and 16 KiB round trips on NUCLEO UART bench; one 256-byte round trip over the Holybro RF bench with matching CRC and clean counters | K-FSW protocol, not Internet FTP; one server worker/client workspace; PUT/GET need two nodes; no RF throughput characterisation |
-| Self-addressing | A node reaches its own address through an ordinary interface, so the source address is applied; registered only when no other interface covers the address | Two-node integration asserts ping and a command to the local node | Ground node 16 and NUCLEO node 2 both register the interface; self-addressed ping and command pass on the Holybro bench | Not registered on a node whose own address sits in another interface's subnet, such as the multi-interface router |
-| Command service | Frozen compile-time registry; one definition reached by name from the shell and by numeric identifier over CSP port 11; two-level validation; handlers on a dedicated thread | Registry, duplicate rejection, argument type/count checks, unknown and silent-failure paths in ztest; local and remote invocation in two-node integration | Commands served across the Holybro link from ground node 16 to NUCLEO node 2, including a self-addressed command and an unknown-command rejection | Synchronous only; no accepted-plus-identifier form; no authentication, though the request context reserves the fields; an unknown name is rejected locally before reaching the wire |
-| A note across a restart | One small record in memory start-up does not clear, written on the way down and read on the way back up; magic and CRC, checksum last, consumed on read. An STM32L4 voltage detector writes one when the supply dips | 6 ztest cases covering validation, single reporting, last-note-wins, and a SoC without a detector reporting rather than pretending | **PARTIALLY PHYSICALLY VERIFIED** on 5 September 2026: a commanded reboot on a NUCLEO-L496ZG left `commanded ... after 6675 ms`, read back after the restart and recorded as an event; a power cycle correctly left nothing, so the checksum refuses cleared RAM rather than decoding it; the reason, the faulting address and the previous uptime read back across CAN; a withheld watchdog feed reported as `starved` with how long the component had been silent. The brown-out path is armed but **has not been seen firing** | RAM, so a power loss takes it; surviving a dip is the case it is for. Nothing yet writes one on a fault or a withheld watchdog feed |
-| Event record | Numeric records in a bounded RAM ring with stable identifier, monotonic timestamp, sequence number, severity and opaque payload; identifiers owned by the producing component; boot, command and FTP emit | Ring wrap and overwrite counting, read-by-age, rejection counting, visitor early stop in ztest | The NUCLEO's record read from the ground node over the Holybro link, counters and one decoded record | RAM only, so it does not survive a reset; no persistent journal, rate limiting, coalescing or downlink stream; payloads are opaque and decoded by ground tooling |
-| Shell | Zephyr root commands with history, completion, help, and K-FSW prompt | Native shell/integration/Robot tests | Full NUCLEO shell; FRDM and Pico physical shell bring-up | Debug/operations adapter, not a command authorization service |
-| Linux target | Full reference composition on `native_sim/native/64` | Hosted build, unit, integration, Valgrind, Robot | Physical verification not applicable | Simulation does not prove MCU/electrical/timing properties |
-| NUCLEO-L496ZG | Full reference composition, flash layout, dual serial paths | Hosted clean build and native-equivalent service tests | Boot/readiness, storage, UART/KISS, CSP, remote PARAM, FTP bench | No CAN, radio, MCUboot, watchdog, or full mission qualification |
-| FRDM-K64F | Shell-only target profile | Local build path exists; not in hosted matrix | Prompt, status, version, help physically verified | CSP, PARAM, storage, FTP disabled and unqualified |
-| Raspberry Pi Pico W | USB CDC shell-only target profile | Local build path exists; not in hosted matrix | Prompt, status, version, help physically verified | Wi-Fi and full services disabled and unqualified |
-| Test/CI | Hosted build, quality, Twister, integration, Valgrind, Robot, Doxygen; Pages deploy from main | Latest reviewed main runs successful | Manual checked-in HIL paths | No coverage threshold, self-hosted HIL, resource locking, or hosted PDF gate |
+Software and physical results below are recorded evidence. Optional profiles
+are listed in @ref targets; test procedures are in @ref testing.
 
-## What “supported” means here
+| Area | Software checks | Recorded physical checks | Limits |
+| --- | --- | --- | --- |
+| Time and reset cause | Time ztest; native boot/shell tests | NUCLEO boot/reset readback | Clock accuracy and correlation not qualified |
+| Logging | Filtering and shell diagnostics | NUCLEO console output | Console only; no persistent log or rate limiting |
+| CSP routing | Route validation, precedence, two- and three-node tests | Bidirectional NUCLEO UART and Holybro ping | Static routes; no automatic failover |
+| UART/KISS | Independent interfaces, direct routes, transit | USART3/FTDI and one Holybro link | Multiple links tested in software only |
+| CAN | NUCLEO and ground compositions build | 10 September 2026, `54ac87f`: ping, identity, parameters; RX 1258 / TX 84; zero bus errors | External transceiver and termination required; Yamcs bridge uses KISS |
+| Ground nodes | Nodes 16 and 19 identify and ping | Local profiles need no hardware | One direct peer link per launcher; no central orchestration |
+| UHF module | Identity/status tests; ground and NUCLEO builds | Uses the verified Holybro fixture | No live modem readback or AT control |
+| Holybro fixture | Script validation and negative paths | Raw 100/100; bidirectional CSP; remote PARAM; 256-byte file round trip with matching CRC and clean counters | No RF performance or soak qualification |
+| Button/LED example | Debounce, state, PARAM, GPIO, Linux smoke | 3 September 2026: untouched count stayed zero for 10 s; presses reached 7; LEDs observed through shell and PARAM | Individual press/hold attribution pending; opt-in table 67 |
+| Firmware update | 52 cases across update and block protocol; 20000-byte CSP transfer | 5 September 2026, `db64963`: `fwu-before` changed to `fwu-after` over Holybro; link recovered; image confirmed | One upload; sequential blocks; signature checked by bootloader |
+| MCUboot | Sysbuild and signature checks | 3 September 2026: revert, confirmation across two reboots, wrong-key rejection, stored value preserved | Golden region reserved; recovery-image selection absent |
+| Health | 14 native cases for registration, deadlines, recovery | 4 September 2026: healthy for three watchdog periods; overdue component caused reset | Liveness checks; application thread supervised |
+| Watchdog | Six native cases for intervals, reset decoding, missing device | 3 September 2026: fed for 18 s; deliberate starvation reset within 13 s; watchdog cause read back | One channel; STM32 independent watchdog cannot be disarmed |
+| Parameters | Scalar, string, array, validation, write-mode, and table tests | 5 September 2026: NUCLEO table listing, remote table reads and writes over Holybro | Available tables depend on the composition |
+| Remote PARAM | Native list/get/set and errors | 3 September 2026: valid log level 3; invalid 5 restored compiled default 1 | Fixed descriptor pool; persistence operations are local |
+| Persistence | Unit, cross-process, corrupt-snapshot, Valgrind checks | MCUboot bench preserved stored values across swaps | No complete NUCLEO persistence acceptance matrix or migration framework |
+| Storage | Mount, capacity, cross-process persistence | NUCLEO `storage info` and `storage test` | One 64 KiB volume in reference profiles |
+| Files | Codec, sandbox, native transfers to 8 KiB, ground round trips | 4 KiB and 16 KiB UART transfers; 256-byte Holybro round trip | One server worker/client workspace; PUT/GET need two nodes |
+| Self-addressing | Local ping and command integration | Node 16 and NUCLEO node 2 over the Holybro bench | Interface registered only when no other subnet covers the local address |
+| Commands | Registry, validation, unknown requests, local/remote integration | Holybro dispatch, self-addressed command, unknown-command rejection | Synchronous; no authentication or duplicate suppression |
+| Retained reset note | Six cases for validation and reporting | 5 September 2026: commanded reboot note read back; power cycle cleared it; watchdog starvation reason read remotely | Volatile RAM; voltage-dip trigger not observed |
+| Events | Ring wrap, counters, visitor and error tests | Remote NUCLEO counters and decoded record over Holybro | RAM only; no persistent journal |
+| Housekeeping | Collection, CSP, and Yamcs frame checks | 10 September 2026: temperature samples and archive, detailed below | Results apply to the named report and bench |
+| Linux | Hosted builds, units, integration, memory checks, Robot | Not applicable | Simulation does not establish MCU timing or electrical behaviour |
+| NUCLEO-L496ZG | Hosted reference build | Boot, shell, storage, links, and service runs listed above | Optional profiles need separate acceptance; no flight qualification |
+| FRDM-K64F | Build profile | Prompt, status, version, help | Shell bring-up; services disabled |
+| Pico W | Build profile | USB shell, status, version, help | Shell bring-up; Wi-Fi and services disabled |
 
-Linux and NUCLEO-L496ZG are the full reference targets. Their default Kconfig
-compositions are built by hosted CI, and the NUCLEO has the physical evidence
-listed above.
+## Known limits
 
-FRDM-K64F and Pico W are real K-FSW target descriptors with merged physical
-shell bring-up evidence. They are intentionally not labeled full reference
-targets because their configurations disable the current storage,
-communications, and parameter services.
+- `@READY` marks completed startup. It does not aggregate service health.
+- Routes are static; automatic link failover and dynamic routing are absent.
+- CRC32 detects corruption. Command authentication and encryption are absent.
+- Events are held in RAM and lost on reset.
+- Parameter migration is limited to snapshot compatibility checks.
+- Physical HIL is manually invoked. A new board, radio, or profile needs its
+  own acceptance run.
+- Timing, stack usage, endurance, long-duration soak, and flight qualification
+  remain separate work.
 
-No row means flight-qualified. Physical verification is tied to a named bench
-and acceptance behavior; it does not automatically transfer to a new board,
-radio, cable, routing plan, or Kconfig combination.
+The `boton_test` bench recorded press counts and LED operation on
+3 September 2026. Individual press/hold attribution remains pending.
 
-`boton_test` was **SOFTWARE VERIFIED** on 31 August 2026 by its automated
-state, debounce, saturation, typed API, PARAM, LED owner controls, Linux
-integration, and NUCLEO composition gates. On 3 September 2026 part of it
-became physical: on a NUCLEO-L496ZG running the opt-in profile, an untouched
-board held `press_count` at 0 for ten seconds, a sequence of physical presses
-advanced it to 7, the operator observed the green, blue and red LEDs light
-through both `test led` and `param set hw_test_led_*`, and
-`press_count` read back
-the same count as `boton_test status`.
+## Housekeeping bench
 
-What is still not claimed is per-gesture attribution. The first fixture opened
-a window per gesture and advanced when the counter moved, so it straddled
-gestures whenever the operator worked ahead of it; the recorded total was
-consistent with the sequence asked for, but the individual steps cannot be
-decomposed from it. One count per press, and a held button counting once rather
-than repeating, therefore remain pending user
-interaction on the named bench.
-
-## Known limitations
-
-### Startup health
-
-Startup logs errors and continues through independent stages. `@READY` marks
-completion of the startup sequence but does not aggregate service health. A
-future health/FDIR design will need explicit required/optional service policy.
-
-### Communications topology
-
-One-interface profiles retain a direct `0/0` KISS default suitable for a
-two-node test link. Multi-interface profiles use validated static libcsp routes
-and have software evidence for two different UART/KISS links plus bidirectional
-transit. CSP also runs over CAN, where libcsp fragments a packet across frames
-with its own protocol; the same driver serves a controller on a board and a USB
-adapter on a host, so a ground node needs no second implementation. There is no
-ZMQ, redundant link selection, or dynamic route management. The Holybro module complements the existing serial
-KISS path; it does not replace or wrap that data plane. Only one Holybro/KISS
-link has physical evidence; `KISS_2` has not been physically tested. After the
-bench power/USB arrangement was corrected, raw traffic and bidirectional CSP
-passed without RF parameter changes. The raw HIL peer also required removal
-of blocking polling behavior; the production UART/KISS receive path remains
-interrupt-driven.
-
-CRC32 provides accidental-corruption detection, not authentication. HMAC,
-encryption, keys, command authorization, and operational security policy are
-not implemented.
-
-### Service scope
-
-Parameters are addressed by table and offset, in bands that say who owns a
-table: 1 to 24 core, 25 to 49 services, 50 to 99 modules, with zero reserved so
-an uninitialised field cannot address a real table. Sixteen tables exist: six
-core, eight owned by services, and two by modules.
-
-The core six remain almost entirely read-only observability, for a reason that
-still holds: the platform and comms layers sit below the parameter service and
-cannot read a stored value back at initialization, so publishing one of their
-settings as writable would let an operator change something that nothing
-applies. The service tables are not bound by that, and several of their values
-are settable from the ground while the system runs.
-
-What a table can hold is no longer the limit. Scalars, strings and byte arrays
-all work, over the link as well as locally.
-
-Persistence has one snapshot and basic name/type compatibility rather than
-schema versions and mission migrations. FTP has one static worker and no multi-user or authorization
-model.
-
-The command service is synchronous only: a handler runs to completion and
-there is no accepted-plus-identifier form for a long operation. It carries no
-authentication. The request context reserves a source and an authentication
-result, but the flag is always false.
-
-The event record is a fixed RAM ring. It does not survive a reset, so it
-answers what a node has done rather than what happened before it restarted.
-There is no persistent journal, rate limiting, coalescing, or downlink stream.
-Logging remains console-oriented and separate; events are the record, not a
-replacement for log messages.
-
-There is no current local message bus, flight planner,
-or telemetry serialization. Health policy and the update service both exist and
-are covered above; what is missing around them is a collector that can gather
-what they report into one downlink rather than one value per round trip.
-
-### Qualification and release
-
-There is no current coverage gate, stack-usage qualification, worst-case timing
-campaign, long-duration soak, fault-injection campaign, formal safety process,
-signed release process, or traceable flight qualification baseline. The
-existing test system is a strong development foundation, not evidence that
-those activities are complete.
-
-## Near-term project direction
-
-The basic command service
-([k-fsw issue #4](https://github.com/dgonzalez97/k-fsw/issues/4)) is
-implemented and closed. Root shell commands for a specific service remain
-direct adapters to that service's API; the `cmd` root is the generic registry,
-and its shell front end resolves to the same definition and validation a remote
-caller passes through.
-
-The remaining active area on the public board is a self-hosted physical HIL
-runner ([k-fsw issue #11](https://github.com/dgonzalez97/k-fsw/issues/11)).
-All physical HIL is still manually invoked.
-
-The platform watchdog
-([kfsw-platform issue #3](https://github.com/dgonzalez97/kfsw-platform/issues/3))
-is the next capability. It is the prerequisite for any health policy, and for a
-firmware update that must recover from a candidate image that stops
-responding.
-
-## Broad roadmap
-
-The remaining public backlog groups naturally into a few technical steps.
-There are no promised dates.
-
-### Make physical verification repeatable in CI
-
-Add hardware resource locking and fixtures
-([k-fsw issue #12](https://github.com/dgonzalez97/k-fsw/issues/12)), then connect
-the proven manual HIL behaviors to a controlled self-hosted runner. Preserve
-the distinction between reusable test behavior and bench-specific devices,
-power switching, serial paths, and recovery.
-
-### Establish boot recovery and watchdog mechanisms
-
-Define and physically prove an MCUboot primary/secondary image layout,
-test/confirm/revert behavior
-([k-fsw issue #2](https://github.com/dgonzalez97/k-fsw/issues/2)). Add the
-platform watchdog and reset diagnostics needed by later health policy
-([kfsw-platform issue #3](https://github.com/dgonzalez97/kfsw-platform/issues/3)).
-Transporting a candidate image is separate from bootloader recovery mechanics.
-
-### Let a node carry out a plan, and report itself in one pass
-
-Two services, both now unblocked by work that has landed.
-
-**File based operations**
-([kfsw-services issue #34](https://github.com/dgonzalez97/kfsw-services/issues/34))
-runs a sequence from a file: upload it, the node carries it out line by line
-and records each outcome. Not a language — every line is a command the command
-service already validates, so nothing can be written into a file that could not
-be sent over the link, and a sequence that cannot loop cannot hang the node.
-Guards for the cases that matter: stop or continue on error, wait, and skip
-unless an event was recorded.
-
-Embedding an interpreter was weighed and set aside. MicroPython costs 100 KB
-and a garbage collector; Berry costs 40 KB and a smaller one. Nothing here
-allocates dynamically today, and a collector that pauses for an unbounded time
-in the image that feeds the watchdog is a larger change to how this software
-behaves than the expressiveness would repay.
-
-**Housekeeping** is now in. A report names a set of values once and a pass asks
-for the set; the frame is asserted against reading the same parameters
-individually, because a set that is fast and disagrees with its members would
-be worse than the round trips it replaced.
+Housekeeping collects named reports and can forward samples to Yamcs.
+The following measurements are from the recorded radio bench run.
 
 **PHYSICALLY VERIFIED** on 10 September 2026, on a NUCLEO-L496ZG running
 `54ac87f` with a Holybro SiK pair at 433 MHz and Yamcs 5.13.0:
@@ -249,48 +95,24 @@ parameters one at a time from a ground node. A round trip on this radio is
 | Individually, descriptor list already cached | 1.17 s | 5 values |
 | One housekeeping exchange | **0.28 s** | 5 values — or 40 |
 
-Two separate savings, and the second is the larger one. Like for like on a warm
-cache the set is four times faster, but one exchange returned eight samples in
-the same 0.28 s as one, so forty values cost what five cost; read individually
-they would cost about nine seconds. And the 9.21 s first read is a cost
-housekeeping never pays at all: names do not go on the wire, so there is no
-descriptor list to fetch before the first value arrives.
+With cached descriptors, five individual reads took 1.17 s; one housekeeping
+exchange took 0.28 s. The same exchange could return eight five-value samples.
+These timings describe this bench and report size.
 
-An earlier attempt at this comparison failed and was reported as a possible
-timeout defect. That was wrong: orphaned host processes were holding the radio,
-and the measurement above is from a clean bench.
+`tests/hk-yamcs-smoke.sh` compares the frame received by the bridge with the
+node's shell output. The bridge forwards it to Yamcs using a database
+generated from the report definition.
 
-What it collects now reaches the ground and stays there. `hk-bridge.py` speaks
-CSP over KISS on the host, pulls samples from a node, and forwards each to a
-[Yamcs](https://yamcs.org/) instance under `ground-station/yamcs`; the mission
-database is generated from the same file that tells the node what to collect,
-so a frame that carries no names still decodes into the right ones. The claim
-that matters is asserted in `tests/hk-yamcs-smoke.sh`: the bytes the bridge
-pulls off the link are the bytes the node's own shell prints for that sample.
-It is also the first test of housekeeping's CSP server, which the unit suites
-never reached.
+Beacons are implemented with interval and buffer limits; see @ref ground.
+Their physical results must be recorded independently of this polling run.
 
-Periodic beacons are the part deliberately left out: a node that transmits
-unprompted can flood a link, and that wants its own floor and its own bench
-evidence.
+## Next work
 
-### Improve measurement and fault evidence
+- Automate the existing HIL procedures with hardware locking and recovery.
+- Extend fault injection, stack/timing measurements, and soak tests.
+- Complete outstanding physical acceptance for optional profiles.
 
-Add hosted coverage reporting
-([k-fsw issue #8](https://github.com/dgonzalez97/k-fsw/issues/8)), then grow
-fault injection, stack/timing measurement, and soak testing around implemented
-services. A coverage percentage should support review; it should not replace
-behavioral or physical acceptance criteria.
-
-### Grow flight services deliberately
-
-After the command boundary is established, future services such as structured
-events, health, housekeeping, and scheduling, plus equipment modules beyond
-the narrow `boton_test` reference example, should be introduced one contract at
-a time. Older architecture/reference notes are design input, not an
-already-approved feature list. Each new capability needs an owner, Kconfig
-boundary, target composition, tests, operational semantics, and an honest
-status row.
+Use repository issues for the current work queue.
 
 ## Keeping this page current
 
@@ -302,6 +124,4 @@ When a feature merges:
 4. adjust one status row without turning the manual into an issue mirror; and
 5. keep future work separate from current behavior.
 
-GitHub issues and the project board remain the detailed work queue. This page
-should answer “what can I rely on today?” and “what direction is next?” without
-inventing schedule or qualification claims.
+Keep recorded results tied to their image, configuration, and bench.

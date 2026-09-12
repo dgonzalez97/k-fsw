@@ -1,26 +1,18 @@
-# Services and Storage {#services}
+# Services and storage {#services}
 
 [TOC]
 
-## Service ownership
+## Services
 
-`kfsw-services` contains reusable application behavior. It depends on
-`kfsw-platform` for capabilities such as mounted storage and, only when a
-CSP-backed service is enabled, on `kfsw-comms`. The executable application
-selects services and calls their lifecycle APIs; it does not duplicate their
-algorithms.
+`kfsw-services` provides boot markers, logging, parameters, persistence,
+files, commands, events, health, housekeeping, file based operations, and
+firmware updates. The application selects and starts them.
 
-The current service set is intentionally compact:
+Storage belongs to `kfsw-platform`. Network services use the router and
+interfaces in `kfsw-comms`.
 
-- boot/readiness markers;
-- runtime-filtered logging;
-- a bounded local parameter index assembled from component-owned definitions;
-- optional parameter snapshots;
-- an optional CSP parameter adapter using the libparam wire format; and
-- a K-FSW file-transfer client/server over CSP/RDP.
-
-Storage lifecycle and monotonic time live in `kfsw-platform`, but are covered
-here because parameter persistence and FTP depend directly on storage.
+For housekeeping and Yamcs, see @ref ground. For uploads and boot recovery,
+see @ref firmware_update.
 
 ## Boot and readiness markers
 
@@ -69,7 +61,7 @@ callback. An invalid value is rejected; if an out-of-range value reaches the
 callback through a restored or remote representation, logging falls back to
 the compiled minimum.
 
-## Parameter architecture
+## Parameters
 
 Parameters are named, typed runtime values with descriptions and flags. Each
 semantic component owns its definitions, backing storage, validation, and
@@ -176,67 +168,43 @@ The update table is read-only throughout. If an operator could write it, an
 unverified image could be marked ready, which is what the update service exists
 to prevent.
 
-`health_interval_ms` is the one writable value in these tables that can reset a
-working satellite by being set to a number that looks reasonable: the watchdog
-is fed only by a check that finds every component healthy, so a check slower
-than the feed interval resets a board where nothing is wrong. It is validated
-against the watchdog the system is actually running with, and refused in the
-validator rather than the change callback — by the time a change callback runs
-the value is already stored, and undoing it afterwards still reports success
-for something that was rejected.
+`health_interval_ms` is validated against the active watchdog timing before
+the value is stored. A check interval longer than the feed interval could
+reset a healthy board.
 
-The core tables live in the composition layer rather than in `kfsw-platform`
-and `kfsw-comms`. Those layers sit below the parameter service and never
-include a services header, so a table there would invert an established
-dependency. Each core table reads its values through the public API the layer
-below already exposes, which leaves the state where it belongs.
+Core parameter tables live in the application because platform and comms
+must not depend on the parameter service. They read the lower layers through
+their public APIs.
 
 ### Write modes
 
-A parameter's write behaviour is part of its contract. The mode is derived from
-the definition rather than declared separately, so it cannot drift from what
-the code does:
+Write modes are derived from each definition:
 
 | Mode | Meaning | How it is built |
 | --- | --- | --- |
 | `r` | Read-only | `KFSW_PARAM_FLAG_READ_ONLY` |
 | `w` | Takes effect immediately | a `changed` callback, or `KFSW_PARAM_FLAG_LIVE` where the owner reads the value every cycle |
 | `b` | Stored; the running system keeps its old value until reboot | `KFSW_PARAM_FLAG_PERSISTENT` with neither of the above |
-| `wb` | Both | |
 
-The service always sets `KFSW_PARAM_FLAG_LIVE` for a definition that supplies a
-change callback, so a parameter that applies its value cannot be reported as
-needing a reboot. A `b` parameter says so on write rather than acknowledging
-with a bare `OK`: a stored value the operator believes is live is the failure
-this scheme exists to prevent.
+A change callback implies `KFSW_PARAM_FLAG_LIVE`. A `b` write reports
+that reboot is required; saving remains an explicit operation.
 
 ### Strings
 
-`KFSW_PARAM_STRING` carries text up to `CONFIG_KFSW_PARAM_STRING_MAX` bytes
-including the terminator. A definition declares the storage it owns through
-`capacity`; a write longer than that is refused rather than truncated, because
-a truncated value is a different value and the operator is never told. Strings
-have their own validator and change callback, since neither can be passed
-through the scalar union.
+`KFSW_PARAM_STRING` holds up to `CONFIG_KFSW_PARAM_STRING_MAX` bytes,
+including the terminator. Each definition declares its storage capacity,
+validator, and change callback. Oversized writes are rejected.
 
-Values travel on the caller's stack in a bounded buffer rather than through an
-allocator: a parameter service that allocated would have to fail at the worst
-moment.
+Reads and writes use bounded caller buffers with no dynamic allocation.
 
 ### Counters
 
-FTP and the command service recorded every outcome as an event and counted
-nothing, which answers what happened but not how often. Both now keep lifetime
-totals, incremented where the outcome is already known and outside the event
-guard, so a composition without the event record still has the numbers. They
-saturate and are never reset: a counter that wraps or restarts hides the thing
-it was counting.
+FTP and commands keep saturating lifetime totals, even with events disabled.
+These counters reset at boot.
 
-### What stays compile-time, and why
+### Build-time settings
 
-Not everything a table reports can be changed from the ground, and the tables
-say which is which through the mode column rather than leaving it to be
-discovered.
+Check the mode column before writing a setting.
 
 `ftp_root` is read-only because the path resolver takes the root's length from
 `sizeof()` on a compile-time literal, and changing the sandbox under a running
@@ -245,11 +213,8 @@ the workspace buffer is sized at build time and the protocol codec refuses
 anything larger, so a bigger value would be stored here and rejected at the
 first transfer. `fwu_lite_block_size` is read-only for the same reason.
 
-The radio table is read-only throughout. The module selects an implementation
-at build time and never interrogates the modem, so `uhf_link_state` reports
-`unknown` unless the implementation can actually read it back. Unknown is a
-real value there: reporting a link as up on no evidence is the reading that
-gets acted on wrongly.
+The radio module is selected at build time and does not query the modem.
+Its table is read-only; `uhf_link_state` remains `unknown`.
 
 ### Console echo
 
@@ -551,7 +516,7 @@ authentication. Temporary-file replacement limits the window in which a reset
 can leave no complete snapshot. LittleFS supplies the filesystem-level
 power-loss behavior, while K-FSW supplies the application record validation.
 
-### Operator semantics
+### Save, load, defaults, clear
 
 | Command | RAM after command | Saved snapshot after command |
 | --- | --- | --- |
@@ -642,7 +607,7 @@ services report their own initialization errors.
 
 ## K-FSW FTP
 
-### What it is—and is not
+### Protocol
 
 K-FSW FTP is the project's file-transfer service. It is not compatible with
 Internet FTP, FTPS, SFTP, or TFTP. The name describes its role; the wire
@@ -821,11 +786,8 @@ contracts.
 
 ## Command service
 
-`CONFIG_KFSW_COMMAND` enables one normalized path for invoking a K-FSW
-operation. Before it existed, every remotely reachable operation had to supply
-its own CSP adapter: parameters on port 10, file transfer on port 9, each with
-a separate wire format, validation and error mapping. A third operation would
-have meant a third protocol.
+`CONFIG_KFSW_COMMAND` enables a registry shared by local shell commands
+and remote calls over CSP.
 
 ### One definition, two front ends
 
@@ -886,16 +848,10 @@ split its validation.
 
 ## Event record
 
-`CONFIG_KFSW_EVENT` enables a bounded record of what a node has done.
-
-Logging is a human-readable stream that exists only while someone is watching
-it. Over a radio link, or after an unattended restart, it establishes nothing.
-An event is a numeric record instead: a stable identifier, a monotonic
-timestamp, a sequence number, a severity and a small opaque payload.
-
-Events do not replace logging. A message that only helps a developer reading a
-terminal stays a log call. A fact an operator may need after the moment has
-passed becomes an event.
+`CONFIG_KFSW_EVENT` enables a bounded RAM record. Each event carries an
+identifier, monotonic timestamp, sequence, severity, and opaque payload.
+Use logs for console diagnostics and events for outcomes that need to be
+read later in the same boot.
 
 ### Why numeric
 

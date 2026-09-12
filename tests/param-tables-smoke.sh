@@ -116,8 +116,8 @@ printf '\n=== Modes ===\n'
 # The mode column is derived from the definition rather than written by hand,
 # so a table whose behaviour drifts from its documented contract shows up here.
 expect 'uptime_s                          u32     r'
-expect 'boot_delay_ms                     u16     b'
-expect 'app_report_ms                     u16     wb'
+expect 'boot_delay_ms                     u16     wpb'
+expect 'app_report_ms                     u16     wp'
 # Writable and live, and deliberately not persistent: a route table is the one
 # setting that can put a node out of reach, so a wrong one must not survive a
 # reboot.
@@ -131,7 +131,7 @@ expect 'cmd_invoked                       u32     r'
 expect 'boot_image                        string  r'
 # One level per module, rendered as a list because the elements mean something
 # positionally and a hex blob would hide which module is which.
-expect 'log_levels                        data    wb'
+expect 'log_levels                        data    wp'
 
 printf '\n=== Result ===\n'
 if [[ "$failures" -eq 0 ]]; then
