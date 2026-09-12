@@ -3,6 +3,11 @@
 		zephyr,code-partition = &kfsw_app_partition;
 		kfsw,csp-uart = &usart3;
 		kfsw,storage-partition = &kfsw_storage_partition;
+		/* The board's own RTC. Its counter sits in a backup domain a
+		 * reset does not clear, which is what lets a node come back
+		 * from a watchdog knowing when it is.
+		 */
+		kfsw,rtc = &rtc;
 	};
 };
 
