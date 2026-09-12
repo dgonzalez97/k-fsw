@@ -97,7 +97,13 @@ expect "$work_dir/execution-c.log" 'test_u32 = 42' \
 expect "$work_dir/execution-c.log" 'Parameter snapshot load: no saved snapshot' \
 	"missing snapshot was not reported"
 
+# Autosave off for this one scenario. The fixture below finds the snapshot by
+# searching the raw image for its magic, and a write on every accepted change
+# leaves earlier copies in blocks the filesystem has not erased yet, so there
+# is no longer exactly one to find. What is under test here is a damaged
+# snapshot, not how often one is written.
 run_kfsw "$corruption_flash" "$work_dir/corrupt-write.log" yes \
+	'param set param_autosave 0' \
 	'param set test_u32 1234' \
 	'param save'
 expect "$work_dir/corrupt-write.log" 'Parameter snapshot save: PASS' \

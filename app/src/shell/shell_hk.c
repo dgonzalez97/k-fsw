@@ -267,10 +267,30 @@ static int cmd_hk_store(const struct shell *sh, size_t argc, char **argv)
 		return result;
 	}
 	if (interval == 0U) {
-		shell_print(sh, "report %u keeps samples in RAM only", report);
+		shell_print(sh, "report %u keeps samples in RAM only; the file it wrote stays",
+			    report);
 	} else {
 		shell_print(sh, "report %u stores every %u ms", report, interval);
 	}
+	return 0;
+}
+
+static int cmd_hk_store_clear(const struct shell *sh, size_t argc, char **argv)
+{
+	uint32_t report;
+	int result;
+
+	ARG_UNUSED(argc);
+
+	if (parse_u32(sh, argv[1], &report, "report") != 0) {
+		return -EINVAL;
+	}
+	result = kfsw_hk_clear_store((uint8_t)report);
+	if (result != 0) {
+		shell_error(sh, "store_clear for report %u: %d", report, result);
+		return result;
+	}
+	shell_print(sh, "report %u stops storing and its file is removed", report);
 	return 0;
 }
 #endif
@@ -315,8 +335,10 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 	SHELL_CMD_ARG(period, NULL, "Collect repeatedly: period <report> <ms>, 0 to stop.",
 		      cmd_hk_period, 3, 0),
 #if CONFIG_KFSW_HK_STORE
-	SHELL_CMD_ARG(store, NULL, "Keep samples in a file: store <report> <ms>, 0 for RAM only.",
+	SHELL_CMD_ARG(store, NULL, "Keep samples in a file: store <report> <ms>, 0 to stop.",
 		      cmd_hk_store, 3, 0),
+	SHELL_CMD_ARG(store_clear, NULL, "Stop storing and delete the file: store_clear <report>.",
+		      cmd_hk_store_clear, 2, 0),
 #endif
 #if CONFIG_KFSW_HK_BEACON
 	SHELL_CMD_ARG(beacon, NULL, "Send unprompted: beacon <report> <node> <ms>, 0 to stop.",

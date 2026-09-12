@@ -264,39 +264,57 @@ ZTEST(kfsw_hk_store, test_a_record_lands_in_the_slot_its_sequence_names)
 }
 
 /*
- * Turning the store off removes the file.
+ * Stopping is not discarding.
  *
- * Recorded here because it is not what the command looks like it does. `hk
- * store 0 0` reads as a configuration change — stop writing — and it is also
- * destructive: everything captured so far is unlinked in the same call, so an
- * operator who turns storing off to save flash cannot then download what the
- * node had already collected. There is currently no way to stop writing and
- * keep the file.
- *
- * The test asserts the behaviour as it stands rather than the behaviour one
- * might want, so that changing it is a deliberate decision with a failing test
- * to point at.
+ * Turning a store off used to unlink the file in the same call, so the command
+ * that reads as "stop writing" also destroyed the pass already captured. An
+ * operator who turns storing off to save flash is not necessarily asking to
+ * lose what the node collected, so the two are now separate requests.
  */
-ZTEST(kfsw_hk_store, test_turning_it_off_removes_the_file)
+ZTEST(kfsw_hk_store, test_turning_it_off_keeps_what_was_written)
 {
+	off_t before;
+
 	define_report(0U);
 	zassert_ok(kfsw_hk_set_store(0U, CONFIG_KFSW_HK_STORE_FLOOR_MS), "the store was refused");
 	for (int i = 0; i < 3; i++) {
 		zassert_ok(kfsw_hk_collect(0U), "the report collected nothing");
 	}
-	zassert_true(file_size(STORE_PATH) > (off_t)STORE_HEADER_SIZE, "nothing was written");
+	before = file_size(STORE_PATH);
+	zassert_true(before > (off_t)STORE_HEADER_SIZE, "nothing was written");
 
 	zassert_ok(kfsw_hk_set_store(0U, 0U), "the store could not be turned off");
 
-	zassert_equal(file_size(STORE_PATH), -1,
-		      "turning the store off no longer removes the file; if that was "
-		      "deliberate, the samples it used to discard are now downloadable");
+	zassert_equal(file_size(STORE_PATH), before,
+		      "turning the store off discarded the samples it had captured");
 
-	/* And nothing is written after it is off, file or no file. */
+	/* Stopped means stopped: nothing more is written. */
 	for (int i = 0; i < 3; i++) {
 		zassert_ok(kfsw_hk_collect(0U), "the report collected nothing");
 	}
-	zassert_equal(file_size(STORE_PATH), -1, "a store that was turned off wrote again");
+	zassert_equal(file_size(STORE_PATH), before, "a store that was turned off wrote again");
+}
+
+/* And discarding is available, as its own request. */
+ZTEST(kfsw_hk_store, test_clearing_the_store_removes_the_file)
+{
+	define_report(0U);
+	zassert_ok(kfsw_hk_set_store(0U, CONFIG_KFSW_HK_STORE_FLOOR_MS), "the store was refused");
+	zassert_ok(kfsw_hk_collect(0U), "the report collected nothing");
+	zassert_true(file_size(STORE_PATH) > (off_t)STORE_HEADER_SIZE, "nothing was written");
+
+	zassert_ok(kfsw_hk_clear_store(0U), "the store could not be cleared");
+
+	zassert_equal(file_size(STORE_PATH), -1, "clearing the store left the file behind");
+	zassert_equal(kfsw_hk_clear_store(CONFIG_KFSW_HK_REPORTS), -EINVAL,
+		      "a report that does not exist could be cleared");
+}
+
+/* Clearing a store that was never on is not an error worth refusing. */
+ZTEST(kfsw_hk_store, test_clearing_a_store_that_never_ran_is_harmless)
+{
+	define_report(0U);
+	zassert_ok(kfsw_hk_clear_store(0U), "clearing an unused store failed");
 }
 
 /* The sizing the refusal is built on, checked directly rather than inferred. */
