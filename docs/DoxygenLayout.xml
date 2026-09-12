@@ -16,7 +16,7 @@
       <tab type="user" visible="yes" url="architecture.html" title="Architecture"/>
       <tab type="user" visible="yes" url="zephyr_integration.html" title="Zephyr"/>
       <tab type="user" visible="yes" url="development.html" title="Contributing"/>
-      <tab type="user" visible="yes" url="testing.html" title="Testing and HIL"/>
+      <tab type="user" visible="yes" url="testing.html" title="Testing"/>
       <tab type="user" visible="yes" url="project_status.html" title="Project status"/>
     </tab>
     <tab type="usergroup" visible="yes" url="api_reference.html" title="API Reference">
