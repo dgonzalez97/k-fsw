@@ -47,7 +47,10 @@ The Listing Reports Write Behaviour
     ${result}=    Run Param Tables Smoke
     HIL Command Should Pass    ${result}    PARAM TABLES RESULT: PASS
     Should Contain    ${result.stdout}    uptime_s                          u32     r
-    Should Contain    ${result.stdout}    boot_delay_ms                     u16     b
+    # Kept across a reset and read at the next start, which is two separate
+    # facts: wpb rather than the single letter that used to mean both.
+    Should Contain    ${result.stdout}    boot_delay_ms                     u16     wpb
+    Should Contain    ${result.stdout}    app_report_ms                     u16     wp
 
 NUCLEO Reports Its Tables Over The Debug UART
     [Documentation]    The same listing read from a board rather than a hosted
