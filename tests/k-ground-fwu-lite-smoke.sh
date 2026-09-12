@@ -229,8 +229,8 @@ wait_for_output "$work_dir/node16.log" "expected_crc32: $image_crc" \
 
 # Sending stops at a verified image. Committing it is a separate command, so a
 # node is never left booting something merely because it arrived.
-wait_for_output "$work_dir/node16.log" "state: receiving" "$node16_pid" || \
-	fail "node 16 should still hold the transfer until it is told to flash"
+wait_for_output "$work_dir/node16.log" "state: verified" "$node16_pid" || \
+	fail "node 16 should hold a verified image until it is told to flash"
 
 printf '%s\n' 'fwu flash 16' >&4
 wait_for_output "$work_dir/node19.log" "scheduled a swap" "$node19_pid" || \

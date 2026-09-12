@@ -6,6 +6,40 @@
 
 #include <kfsw/services/command.h>
 
+ZTEST(services_command, test_integer_arguments_check_sign_and_overflow)
+{
+	struct kfsw_command_arg argument;
+	const char *invalid_unsigned[] = {
+		"-1", " \t-1", "-0", "4294967296", "18446744073709551616", "", "1x",
+	};
+	const char *invalid_signed[] = {
+		"2147483648",
+		"-2147483649",
+		"9223372036854775808",
+		"-9223372036854775809",
+	};
+
+	zassert_ok(kfsw_command_parse_arg("4294967295", KFSW_COMMAND_TYPE_U32, &argument));
+	zassert_equal(argument.value.u32, UINT32_MAX);
+	zassert_ok(kfsw_command_parse_arg("-2147483648", KFSW_COMMAND_TYPE_I32, &argument));
+	zassert_equal(argument.value.i32, INT32_MIN);
+	zassert_ok(kfsw_command_parse_arg("2147483647", KFSW_COMMAND_TYPE_I32, &argument));
+	zassert_equal(argument.value.i32, INT32_MAX);
+	for (size_t i = 0; i < ARRAY_SIZE(invalid_unsigned); i++) {
+		zassert_equal(kfsw_command_parse_arg(invalid_unsigned[i], KFSW_COMMAND_TYPE_U32,
+						     &argument),
+			      -EINVAL);
+	}
+	for (size_t i = 0; i < ARRAY_SIZE(invalid_signed); i++) {
+		zassert_equal(
+			kfsw_command_parse_arg(invalid_signed[i], KFSW_COMMAND_TYPE_I32, &argument),
+			-EINVAL);
+	}
+	errno = ERANGE;
+	zassert_ok(kfsw_command_parse_arg("23", KFSW_COMMAND_TYPE_U32, &argument));
+	zassert_equal(argument.value.u32, 23U);
+}
+
 /*
  * Registry behaviour. The wire codec is exercised through the integration
  * tests, where a real CSP peer supplies the bytes; these cases cover the

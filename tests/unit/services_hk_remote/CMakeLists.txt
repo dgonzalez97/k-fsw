@@ -22,6 +22,6 @@ target_link_libraries(app PRIVATE kfsw::services)
 # that is slow, silent or short of values, none of which a real node offers on
 # request.
 zephyr_link_libraries(
-    -Wl,--wrap=kfsw_param_remote_visit
-    -Wl,--wrap=kfsw_param_remote_get_many
+    -Wl,--wrap=kfsw_param_remote_visit_until
+    -Wl,--wrap=kfsw_param_remote_get_many_until
 )

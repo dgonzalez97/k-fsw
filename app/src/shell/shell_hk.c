@@ -14,6 +14,17 @@
 
 /* Thin, like every adapter here: parse, call the service, print. */
 
+static int setting_result(const struct shell *sh, int result)
+{
+	if (result == KFSW_HK_APPLIED_UNSAVED) {
+		struct kfsw_hk_stats stats;
+
+		kfsw_hk_get_stats(&stats);
+		shell_error(sh, "Applied in RAM; save failed: %d", stats.last_save_error);
+	}
+	return result;
+}
+
 static int parse_u32(const struct shell *sh, const char *text, uint32_t *out, const char *what)
 {
 	char *end;
@@ -64,6 +75,9 @@ static int cmd_hk_define(const struct shell *sh, size_t argc, char **argv)
 	}
 
 	result = kfsw_hk_define((uint8_t)report, entries, count);
+	if (setting_result(sh, result) == KFSW_HK_APPLIED_UNSAVED) {
+		return result;
+	}
 	if (result != 0) {
 		shell_error(sh, "define report %u: %d", report, result);
 		return result;
@@ -83,6 +97,9 @@ static int cmd_hk_clear(const struct shell *sh, size_t argc, char **argv)
 		return result;
 	}
 	result = kfsw_hk_clear((uint8_t)report);
+	if (setting_result(sh, result) == KFSW_HK_APPLIED_UNSAVED) {
+		return result;
+	}
 	if (result != 0) {
 		shell_error(sh, "clear report %u: %d", report, result);
 		return result;
@@ -101,6 +118,13 @@ static int cmd_hk_show(const struct shell *sh, size_t argc, char **argv)
 	kfsw_hk_get_stats(&stats);
 	shell_print(sh, "reports defined: %u", stats.reports);
 	shell_print(sh, "collections: %u", stats.collections);
+	shell_print(sh, "scheduled attempts: %u, missed slots: %u", stats.scheduled_attempts,
+		    stats.missed_slots);
+#if CONFIG_KFSW_HK_PERSISTENCE
+	shell_print(sh, "settings: %s, save error: %d, load error: %d",
+		    stats.settings_dirty ? "unsaved" : "saved", stats.last_save_error,
+		    stats.last_load_error);
+#endif
 	shell_print(sh, "failed collections: %u", stats.failures);
 	shell_print(sh, "absent values: %u", stats.entries_failed);
 	shell_print(sh, "samples overwritten: %u", stats.overwritten);
@@ -240,6 +264,9 @@ static int cmd_hk_period(const struct shell *sh, size_t argc, char **argv)
 		return result;
 	}
 	result = kfsw_hk_set_period((uint8_t)report, period);
+	if (setting_result(sh, result) == KFSW_HK_APPLIED_UNSAVED) {
+		return result;
+	}
 	if (result != 0) {
 		shell_error(sh, "period for report %u: %d", report, result);
 		return result;
@@ -262,6 +289,9 @@ static int cmd_hk_store(const struct shell *sh, size_t argc, char **argv)
 		return -EINVAL;
 	}
 	result = kfsw_hk_set_store((uint8_t)report, interval);
+	if (setting_result(sh, result) == KFSW_HK_APPLIED_UNSAVED) {
+		return result;
+	}
 	if (result != 0) {
 		shell_error(sh, "store for report %u: %d", report, result);
 		return result;
@@ -286,6 +316,9 @@ static int cmd_hk_store_clear(const struct shell *sh, size_t argc, char **argv)
 		return -EINVAL;
 	}
 	result = kfsw_hk_clear_store((uint8_t)report);
+	if (setting_result(sh, result) == KFSW_HK_APPLIED_UNSAVED) {
+		return result;
+	}
 	if (result != 0) {
 		shell_error(sh, "store_clear for report %u: %d", report, result);
 		return result;
@@ -311,6 +344,9 @@ static int cmd_hk_beacon(const struct shell *sh, size_t argc, char **argv)
 		return -EINVAL;
 	}
 	result = kfsw_hk_set_beacon((uint8_t)report, (uint16_t)node, interval);
+	if (setting_result(sh, result) == KFSW_HK_APPLIED_UNSAVED) {
+		return result;
+	}
 	if (result != 0) {
 		shell_error(sh, "beacon for report %u: %d", report, result);
 		return result;
@@ -324,8 +360,27 @@ static int cmd_hk_beacon(const struct shell *sh, size_t argc, char **argv)
 }
 #endif
 
+#if CONFIG_KFSW_HK_PERSISTENCE
+static int cmd_hk_save(const struct shell *sh, size_t argc, char **argv)
+{
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+	int result = kfsw_hk_save();
+
+	if (result != 0) {
+		shell_error(sh, "Save failed: %d", result);
+	} else {
+		shell_print(sh, "Settings saved");
+	}
+	return result;
+}
+#endif
+
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	hk_commands,
+#if CONFIG_KFSW_HK_PERSISTENCE
+	SHELL_CMD_ARG(save, NULL, "Save settings; replace a rejected snapshot.", cmd_hk_save, 1, 0),
+#endif
 	SHELL_CMD_ARG(define, NULL, "Name what a report collects: define <report> [node:]table:offset ...",
 		      cmd_hk_define, 3, CONFIG_KFSW_HK_ENTRIES),
 	SHELL_CMD_ARG(clear, NULL, "Forget a report: clear <report>.", cmd_hk_clear, 2, 0),

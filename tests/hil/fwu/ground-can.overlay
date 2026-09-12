@@ -1,0 +1,14 @@
+#include "../../../config/profiles/k-ground-can.overlay"
+
+/* Room for the candidate and slot readbacks, including atomic replacement. */
+&flashcontroller0 {
+	reg = <0x00000000 0x00400000>;
+};
+
+&flash0 {
+	reg = <0x00000000 0x00400000>;
+};
+
+&storage_partition {
+	reg = <0x000fc000 0x00200000>;
+};

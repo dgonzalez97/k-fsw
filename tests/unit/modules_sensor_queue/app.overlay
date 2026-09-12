@@ -1,0 +1,7 @@
+/ {
+	chosen { kfsw,die-temp = &test_temperature; };
+	test_temperature: temperature {
+		compatible = "vnd,kfsw-temperature";
+		status = "okay";
+	};
+};

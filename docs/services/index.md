@@ -22,6 +22,8 @@ time, and prints `@READY`.
 
 ```text
 @BOOT sw=<image version> board=<CONFIG_BOARD_TARGET> reset=<flags> reset_rc=<result>
+@SERVICES ok failures=0
+@SOURCE <release commit or development>
 @READY uptime_ms=<monotonic milliseconds>
 ```
 
@@ -29,10 +31,31 @@ The image version is `git describe` on the composition repository, resolved
 when the build is configured, so the banner names the source it was built
 from. The `version` command reports the same string.
 
-These markers are stable automation points used by software and HIL tests.
-They are not a health report. The current startup path can log a service error
-and still reach `@READY`; a test that needs storage or CSP must also check the
-corresponding service state.
+`@SERVICES degraded failures=N` reports startup errors. `@READY` marks the end
+of startup; health monitoring checks runtime liveness. Release builds set an
+explicit image version and source commit; see @ref development.
+
+## Housekeeping
+
+Reports collect local and remote parameters. Each periodic report keeps its
+original cadence. A slow collection skips elapsed slots instead of starting a
+burst of catch-up work. `hk show` reports attempts and missed slots.
+
+Remote reads share one time budget per collection. Local sample callbacks and
+storage drivers must provide their own bounds; this is not a worst-case latency
+guarantee. Redefining a report invalidates any collection already in progress.
+
+With persistence enabled, changes are saved automatically. If saving fails,
+the shell reports that the change was applied in RAM. Retry with `hk save`.
+A rejected settings file is preserved until an explicit save replaces it.
+Restoring report settings keeps existing sample files and their sequence.
+
+## File based operations
+
+`fbo` runs commands from a file. `fbo stop` interrupts waits and ends the current
+run with cancellation status. `fbo status` includes the last result. File size,
+line length, and scanned bytes are bounded; comments count toward the scan limit.
+An I/O error stops the procedure.
 
 ## Logging
 
@@ -272,24 +295,21 @@ that code, so the defect is invisible to a local test.
 
 ### Transport sizing
 
-Listing a table sends one packet per parameter, which makes it the largest
-burst the composition produces. Three limits have to cover it and each fails
-differently when it does not:
+K-FSW peers exchange one numbered descriptor at a time. The reply carries the
+index, total count, and a CRC of the table. A refresh becomes visible only after
+all descriptors and the final reply match. A failed refresh leaves no partial
+cache. The cache holds one node, bounded by `CONFIG_KFSW_PARAM_REMOTE_POOL_SIZE`.
 
-| Limit | Symptom when too small |
-| --- | --- |
-| `CSP_BUFFER_COUNT` | Every buffer sits on a connection's receive queue, the interface has none left to assemble the next frame, and the transfer stops outright |
-| `CSP_CONN_RXQUEUE_LEN` | Packets past the queue depth are dropped, so the caller gets a list that looks complete and is not |
-| `CSP_QFIFO_LEN` | The same, one layer lower, at the router's input |
-| `CONFIG_KFSW_PARAM_REMOTE_POOL_SIZE` | The download stops part way with `-ENOSPC` |
+Remote clients require the indexed v4 exchange. The server also answers legacy
+v3 lists; `CONFIG_KFSW_PARAM_LIST_RDP` allows their RDP connections.
+`CONFIG_KFSW_PARAM_LIST_TIMEOUT_MS` bounds the whole refresh.
 
-The K-FSW compositions set all of them from
-`CONFIG_KFSW_PARAM_MAX_DEFINITIONS`. libcsp's own defaults of 15 and 16 are
-sized for ping-sized traffic.
+Value replies use the existing v2 format. Every requested value and END must
+arrive before the result is accepted. Invalid widths, missing values, and
+conflicting duplicates fail the read.
 
-`CONFIG_KFSW_PARAM_LIST_RDP` puts the list on reliable delivery, on by
-default. The list has no acknowledgement of its own, so over a radio a lost
-descriptor leaves a hole the caller cannot see.
+Value requests run on a dedicated worker. A full queue drops the request and
+increments `param_requests_dropped`; the sender can retry.
 
 ### Local parameters
 

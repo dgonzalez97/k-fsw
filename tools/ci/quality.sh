@@ -22,6 +22,7 @@ format_roots=("$KFSW_REPO_DIR/app/src")
 	format_roots+=("$KFSW_REPO_DIR/tests/support")
 [[ -d "$KFSW_REPO_DIR/tests/unit" ]] && \
 	format_roots+=("$KFSW_REPO_DIR/tests/unit")
+format_roots+=("$KFSW_REPO_DIR/tests/hil/fwu")
 [[ -d "$KFSW_REPO_DIR/tests/hil/radio-uhf/holybro/raw-peer/src" ]] && \
 	format_roots+=("$KFSW_REPO_DIR/tests/hil/radio-uhf/holybro/raw-peer/src")
 [[ -d "$KFSW_WORKSPACE_ROOT/kfsw-modules" ]] && \
@@ -60,6 +61,8 @@ format_sources+=(
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp/ftp_store.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp/ftp_transfer.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/log.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/libparam_print.h"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/libparam_print.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/parameter.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/parameter_csp.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/parameter_internal.h"

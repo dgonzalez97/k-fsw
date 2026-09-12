@@ -1,0 +1,9 @@
+/ {
+	chosen {
+		kfsw,fwu-partition = &slot1_partition;
+	};
+};
+
+&flash0 {
+	write-block-size = <8>;
+};

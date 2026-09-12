@@ -8,12 +8,12 @@ digraph kfsw {
 	bgcolor="transparent";
 	rankdir=TB;
 	node [shape=box, style="rounded,filled", fontname="Helvetica",
-	      fontsize=11, color="#2f9e68", fillcolor="#e8f5ee", fontcolor="#143122",
+	      fontsize=11, color="#43a0b2", fillcolor="#e8f2f5", fontcolor="#173345",
 	      margin="0.18,0.10"];
-	edge [color="#7a8b83", arrowsize=0.7];
+	edge [color="#78909c", arrowsize=0.7];
 
 	app [label=<<b>k-fsw</b><br/>composition, targets, tools, tests, docs>,
-	     fillcolor="#28a96b", fontcolor="#ffffff", color="#1c7a4d"];
+	     fillcolor="#294c69", fontcolor="#ffffff", color="#294c69"];
 
 	modules  [label=<<b>kfsw-modules</b><br/>radio, GNSS, sensors, I/O>];
 	services [label=<<b>kfsw-services</b><br/>log, param, files, events,<br/>commands, health, update>];
@@ -21,7 +21,7 @@ digraph kfsw {
 	platform [label=<<b>kfsw-platform</b><br/>time, storage, reset cause,<br/>watchdog>];
 
 	zephyr [label=<<b>Zephyr</b><br/>kernel, devices, drivers, build>,
-	        fillcolor="#dfe7e3", color="#8fa39a", fontcolor="#25352e"];
+	        fillcolor="#e0e9ef", color="#91a4b2", fontcolor="#253d4b"];
 
 	app -> {modules services comms platform};
 	{modules services comms platform} -> zephyr;

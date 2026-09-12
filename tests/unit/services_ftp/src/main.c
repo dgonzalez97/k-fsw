@@ -130,6 +130,26 @@ ZTEST(services_ftp, test_protocol_round_trip_and_portable_encoding)
 	zassert_mem_equal(decoded.data, data, sizeof(data));
 }
 
+ZTEST(services_ftp, test_boot_paths_select_the_read_only_slot_mount)
+{
+	char resolved[KFSW_FTP_FULL_PATH_SIZE];
+
+	zassert_ok(
+		kfsw_ftp_resolve_path("/boot/firmware_1.bin", false, resolved, sizeof(resolved)));
+	zassert_str_equal(resolved, "/kfsw/boot/firmware_1.bin");
+	zassert_ok(kfsw_ftp_resolve_path("boot", true, resolved, sizeof(resolved)));
+	zassert_str_equal(resolved, "/kfsw/boot");
+	zassert_equal(
+		kfsw_ftp_resolve_write_path("boot/firmware_2.bin", resolved, sizeof(resolved)),
+		-EROFS);
+	zassert_equal(kfsw_ftp_resolve_path("/boot/../params", false, resolved, sizeof(resolved)),
+		      -EINVAL);
+	zassert_ok(kfsw_ftp_resolve_write_path("bootlog", resolved, sizeof(resolved)));
+	zassert_str_equal(resolved, KFSW_FTP_STORAGE_ROOT "/bootlog");
+	zassert_ok(kfsw_ftp_resolve_path("/hk/0.bin", false, resolved, sizeof(resolved)));
+	zassert_str_equal(resolved, KFSW_FTP_READONLY_ROOT "/0.bin");
+}
+
 ZTEST(services_ftp, test_malformed_protocol_is_rejected)
 {
 	uint8_t encoded[KFSW_FTP_PROTOCOL_HEADER_SIZE + 2U] = {0};

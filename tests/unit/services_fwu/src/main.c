@@ -25,6 +25,14 @@
 #define TEST_IMAGE_SIZE 10000U
 
 static uint8_t test_image[TEST_IMAGE_SIZE];
+static int erase_error;
+
+int __real_flash_area_flatten(const struct flash_area *area, off_t offset, size_t size);
+
+int __wrap_flash_area_flatten(const struct flash_area *area, off_t offset, size_t size)
+{
+	return erase_error != 0 ? erase_error : __real_flash_area_flatten(area, offset, size);
+}
 
 static void fill_test_image(void)
 {
@@ -42,7 +50,34 @@ static void *fwu_setup(void)
 static void fwu_before(void *fixture)
 {
 	ARG_UNUSED(fixture);
+	erase_error = 0;
 	(void)kfsw_fwu_abort();
+}
+
+ZTEST(services_fwu, test_failed_abort_retains_details_until_cleanup_succeeds)
+{
+	struct kfsw_fwu_status before;
+	struct kfsw_fwu_status after;
+
+	zassert_ok(kfsw_fwu_begin(TEST_IMAGE_SIZE, 0x12345678U));
+	zassert_ok(kfsw_fwu_write(0, test_image, 19U));
+	zassert_ok(kfsw_fwu_get_status(&before));
+	erase_error = -EIO;
+	zassert_equal(kfsw_fwu_abort(), -EIO);
+	zassert_ok(kfsw_fwu_get_status(&after));
+	zassert_equal(after.state, KFSW_FWU_FAILED);
+	zassert_equal(after.total_size, before.total_size);
+	zassert_equal(after.received, before.received);
+	zassert_equal(after.expected_crc32, before.expected_crc32);
+	zassert_equal(after.failed, before.failed + 1U);
+	zassert_equal(kfsw_fwu_abort(), -EIO);
+	zassert_ok(kfsw_fwu_get_status(&after));
+	zassert_equal(after.failed, before.failed + 1U);
+	erase_error = 0;
+	zassert_ok(kfsw_fwu_abort());
+	zassert_ok(kfsw_fwu_get_status(&after));
+	zassert_equal(after.state, KFSW_FWU_IDLE);
+	zassert_equal(after.received, 0U);
 }
 
 /* Read what actually reached the flash, at the offset the service claims to
