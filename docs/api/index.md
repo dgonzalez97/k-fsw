@@ -7,9 +7,10 @@ The generated reference covers only K-FSW-owned public headers from:
 - `kfsw-comms/include/kfsw/`
 - `kfsw-modules/radio-uhf/include/kfsw/`
 - `kfsw-modules/boton-test/include/kfsw/`
+- `kfsw-modules/temperature-sensor-example/include/kfsw/`
 
-Browse the **API Groups** tab for the conceptual map and **Public Headers** for
-the complete declarations, structures, macros, arguments, and return contracts.
+Under **API Reference**, use **API Groups** to browse by component or
+**Headers** for declarations, types, arguments, and return values.
 
 ## Platform API
 
@@ -40,11 +41,5 @@ the complete declarations, structures, macros, arguments, and return contracts.
 
 ## Scope
 
-The API build explicitly excludes Zephyr, bootloaders, upstream/imported
-modules, libcsp, libparam, robot-terminal-runner, third-party trees, and
-generated build output. The project-owned `kfsw-modules` public headers listed
-above are intentionally included; internal Holybro descriptors and private
-button state/test interfaces remain excluded.
-
-The generated reference describes interfaces selected in the checked-out
-source tree; it does not create API placeholders for roadmap functionality.
+The reference covers the checked-out public headers. Private implementation,
+upstream libraries, and build output are excluded.

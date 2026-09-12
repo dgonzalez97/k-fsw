@@ -1,18 +1,25 @@
 <doxygenlayout version="1.0">
   <navindex>
     <tab type="mainpage" visible="yes" title="Home"/>
-    <tab type="user" visible="yes" url="getting_started.html" title="Getting Started"/>
-    <tab type="user" visible="yes" url="architecture.html" title="Architecture"/>
-    <tab type="user" visible="yes" url="zephyr_integration.html" title="Zephyr"/>
-    <tab type="user" visible="yes" url="communications.html" title="Communications"/>
-    <tab type="user" visible="yes" url="services.html" title="Services"/>
-    <tab type="user" visible="yes" url="targets.html" title="Targets"/>
-    <tab type="user" visible="yes" url="ground.html" title="Ground"/>
-    <tab type="user" visible="yes" url="commands.html" title="Command Reference"/>
-    <tab type="user" visible="yes" url="testing.html" title="Testing"/>
-    <tab type="user" visible="yes" url="development.html" title="Development"/>
-    <tab type="user" visible="yes" url="project_status.html" title="Status"/>
-    <tab type="user" visible="yes" url="api_reference.html" title="API Reference">
+    <tab type="usergroup" visible="yes" url="getting_started.html" title="Start here">
+      <tab type="user" visible="yes" url="getting_started.html" title="Getting started"/>
+      <tab type="user" visible="yes" url="targets.html" title="Boards and targets"/>
+      <tab type="user" visible="yes" url="ground.html" title="Ground station"/>
+    </tab>
+    <tab type="usergroup" visible="yes" url="commands.html" title="Reference">
+      <tab type="user" visible="yes" url="commands.html" title="Shell commands"/>
+      <tab type="user" visible="yes" url="services.html" title="Services and storage"/>
+      <tab type="user" visible="yes" url="communications.html" title="CSP and links"/>
+      <tab type="user" visible="yes" url="firmware_update.html" title="Firmware update"/>
+    </tab>
+    <tab type="usergroup" visible="yes" url="development.html" title="Development">
+      <tab type="user" visible="yes" url="architecture.html" title="Architecture"/>
+      <tab type="user" visible="yes" url="zephyr_integration.html" title="Zephyr"/>
+      <tab type="user" visible="yes" url="development.html" title="Contributing"/>
+      <tab type="user" visible="yes" url="testing.html" title="Testing"/>
+      <tab type="user" visible="yes" url="project_status.html" title="Project status"/>
+    </tab>
+    <tab type="usergroup" visible="yes" url="api_reference.html" title="API Reference">
       <tab type="modules" visible="yes" title="API Groups"/>
       <tab type="classes" visible="yes" title="Data Types">
         <tab type="classlist" visible="yes" title="Structures"/>

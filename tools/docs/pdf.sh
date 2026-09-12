@@ -44,6 +44,7 @@ manual_sources=(
 	"$KFSW_REPO_DIR/docs/zephyr/index.md"
 	"$KFSW_REPO_DIR/docs/communications/index.md"
 	"$KFSW_REPO_DIR/docs/services/index.md"
+	"$KFSW_REPO_DIR/docs/fwu/README.md"
 	"$KFSW_REPO_DIR/docs/targets/index.md"
 	"$KFSW_REPO_DIR/docs/ground/index.md"
 	"$KFSW_REPO_DIR/docs/commands/index.md"
@@ -75,6 +76,7 @@ pandoc \
 	--file-scope \
 	--standalone \
 	--self-contained \
+	--resource-path="$KFSW_REPO_DIR/docs" \
 	--number-sections \
 	--toc \
 	--toc-depth=2 \

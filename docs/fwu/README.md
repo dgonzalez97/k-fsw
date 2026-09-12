@@ -1,7 +1,9 @@
-# Firmware update
+# Firmware update {#firmware_update}
 
-How to put a new image on a K-FSW node and have the bootloader try it, with a
-way back if it does not work.
+[TOC]
+
+Upload a signed image, verify it, and let MCUboot boot it on trial.
+Confirm it after checking the node; an unconfirmed image reverts on the next reset.
 
 ## What exists today
 
@@ -16,7 +18,7 @@ way back if it does not work.
 An image is uploaded with the ordinary `ftp put` that already carries files,
 addressed to a reserved name. Nothing about the wire protocol changed.
 
-## The shape of an update
+## Update sequence
 
 ```
 ground                          flight
@@ -29,14 +31,13 @@ reboot              ─────────►  bootloader swaps and runs th
   new image does not         →  bootloader puts the old one back
 ```
 
-The last two lines are the safety net, and they are the reason nothing else in
-this design needs to be clever. An image that hangs is reset by the watchdog,
-the reset lands in the bootloader, and the bootloader reverts.
+Revert requires another reset. A configured watchdog and health policy
+provide that reset if the candidate stops responding.
 
 ## Building a node that accepts updates
 
 ```bash
-cd ~/projects/K-FSW
+cd /path/to/k-fsw-workspace
 source .venv/bin/activate
 P="$PWD/k-fsw/config/profiles"
 
@@ -56,23 +57,21 @@ sign an image with.
 
 ## Uploading an image
 
+This example requires the signed image in the sending node's filesystem,
+at `/kfsw/ftp/build/zephyr.signed.bin`. Shell FTP paths are relative to
+`/kfsw/ftp`; a host path under `build/nucleo_l496zg/` is not a node file.
+Use direct block upload below if the image will not fit in ground-node storage.
+
 ```
-kfsw-gnd# ftp put build/nucleo_l496zg/app/zephyr/zephyr.signed.bin firmware.bin 2
+kfsw-gnd# ftp put 2 /build/zephyr.signed.bin /firmware.bin
 ```
 
 `firmware.bin` is reserved. A put to that name is streamed into the firmware
 slot instead of being stored as a file; any other name is an ordinary file
 transfer. The name is `CONFIG_KFSW_FTP_FIRMWARE_PATH`.
 
-This works because an FTP put already sends the image size and its CRC32 in the
-request, which is exactly what the update service needs to begin. The client
-computes both before it connects, every chunk repeats them, and the receiver
-rejects any mismatch — so the update path inherits the checking the file
-transfer already had.
-
-Nothing is stored on the way. The image never becomes a file, which matters
-because it could not: an application image is around 154 KB and the filesystem
-partition is 64 KB.
+FTP supplies the size and CRC32. The receiver streams directly into the
+secondary slot without staging a file in its 64 KiB filesystem.
 
 When the transfer completes the image has been verified and offered to the
 bootloader:
@@ -90,25 +89,29 @@ Then reboot, and confirm or reject as below.
 
 ## Choosing a route
 
-Both routes end at the same update service and can be built together. Whichever
-starts a transfer first holds it; the other is told the node is busy rather
-than quietly resetting the first.
+Both routes end at the same update service and can be built together.
+The first transfer owns the slot; competing uploads receive `busy`.
 
 | | File transfer route | Direct upload (`fwu_lite`) |
 | --- | --- | --- |
 | Where the image is | a file on the sending node | a file on the sending node, or on its host |
 | Reliability | the transport's, connection-oriented | per-block checksum and repeat |
-| A lost packet costs | the connection, and the transfer restarts | one block |
+| Retry scope | RDP retransmits; a failed transfer restarts | one block |
 | Wire protocol | unchanged; an ordinary put | its own, twelve-byte header |
 | Best when | there is somewhere to put a file and the link is good | the link is marginal, or the image is only on the host |
 
-The second matters more than it sounds. The transport carries its own checksum,
-so a damaged packet is discarded before it is ever delivered: what the sender
-sees is not a bad block but **no answer at all**. A design that treats silence
-as fatal ends a transfer on the first disturbance, which is exactly the
-situation the direct route exists to survive.
+Damaged CSP packets may be dropped before reaching the service.
+The direct route retries when a reply times out.
 
-## The other way: block by block
+## Direct block upload
+
+On a Linux ground node with `CONFIG_KFSW_FWU_LITE_HOST_FILES=y`, `fwu send`
+can read a host file. Use an absolute host path outside `/kfsw/`:
+
+```text
+kfsw-ops# fwu send 2 /path/to/k-fsw-workspace/build/nucleo_l496zg/app/zephyr/zephyr.signed.bin
+kfsw-ops# fwu flash 2
+```
 
 The file transfer route needs the image to exist as a file on the sending node
 and runs over a reliable connection. `fwu_lite` sends blocks straight across
@@ -124,24 +127,11 @@ kfsw-ops# fwu flash 2
 Node 2 scheduled a swap; reboot it to try the image
 ```
 
-**Why per-block checking.** A whole-image checksum tells you an eight minute
-upload failed. A per-block one tells you which 192 bytes to send again. A block
-that fails its check is not written and does not advance the transfer, so
-resending it is simply sending it once more — no restart, no seeking.
+A failed checksum rejects the block without advancing the transfer.
+A missing reply causes a retry. If an acknowledgement is lost, the receiver
+reports its next expected block so the sender can continue.
 
-`blocks resent` is worth watching: a rising count is the link degrading well
-before it fails outright.
-
-**Two things are recovered from, and they look different.** A block that
-arrives damaged is rejected by its own checksum and asked for again. A block
-that does not arrive at all produces silence, and the sender resends after a
-timeout. The second is the common case on a radio, because the transport
-discards damaged packets before the update service ever sees them.
-
-There is a third case worth knowing about: the block arrives and is written,
-but its acknowledgement is lost. The sender resends, the node says it has moved
-on and names the block it wants instead, and the sender continues from there
-rather than resending forever.
+Check `blocks resent` when assessing link quality.
 
 **Reliable delivery is off by default** (`CONFIG_KFSW_FWU_LITE_RDP`). Per-block
 checks and repeats already recover losses, and a second retry layer underneath
@@ -152,13 +142,7 @@ where reordering rather than loss is the problem.
 **Sending stops at a verified image.** Committing it is `fwu flash`, a separate
 command, so a node never boots something merely because it arrived.
 
-Both routes feed the same update service, and both can be built in at once.
-Whichever starts a transfer first holds it; the other is told the node is busy
-rather than quietly resetting the first.
-
-Every block but the last must be full. The receiving node works out which block
-it expects from how much it holds, so a short block in the middle would
-desynchronise both ends — it is rejected rather than accepted.
+Every block except the last must be full. A short intermediate block is rejected.
 
 ## Preparing an image on the ground
 
@@ -222,12 +206,8 @@ To reject it, just reboot without confirming.
 
 ## Checking it worked
 
-`swap scheduled: yes` is the line to look for. It is not decoration: an image
-written to the wrong offset leaves the bootloader with nothing to swap, and it
-reports that only by quietly running the old image on the next boot. From the
-ground a silent no-op looks exactly like a successful update, so the service
-asks the bootloader whether a swap was actually scheduled and fails if it was
-not.
+Check `swap scheduled: yes`, reboot, then compare the running image version.
+A completed transfer alone does not prove the new image booted.
 
 ## Loading a slot over ST-LINK
 
@@ -265,6 +245,6 @@ find.
 
 ## Related
 
-- `docs/targets/index.md` — the flash map and the opt-in MCUboot profile
-- `docs/testing/index.md` — the rollback acceptance and what it proves
-- `tests/hil/mcuboot/rollback.sh` — revert, permanent upgrade, wrong-key refusal
+- @ref targets — flash map and MCUboot profile.
+- [MCUboot acceptance](https://github.com/dgonzalez97/k-fsw/blob/main/tests/hil/mcuboot/rollback.sh) — rollback and confirmation checks.
+- `tests/hil/mcuboot/rollback.sh` — revert, confirmation, wrong-key rejection.
