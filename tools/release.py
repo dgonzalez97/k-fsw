@@ -84,20 +84,27 @@ def check_inputs():
     key_path = Path(required("KFSW_MCUBOOT_KEY")).resolve()
     mcuboot = WORKSPACE / "bootloader/mcuboot"
     sys.path.insert(0, str(mcuboot / "scripts"))
-    from imgtool import keys
-    from imgtool.keys.ecdsa import ECDSA256P1
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
 
-    key = keys.load(str(key_path))
-    if not isinstance(key, ECDSA256P1):
+    key = serialization.load_pem_private_key(key_path.read_bytes(), password=None)
+    if not isinstance(key, ec.EllipticCurvePrivateKey) or not isinstance(key.curve, ec.SECP256R1):
         raise ValueError("A readable ECDSA P-256 private signing key is required")
-    public = key.get_public_bytes()
+    def public_bytes(key):
+        return key.public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+
+    public = public_bytes(key.public_key())
     fingerprint = hashlib.sha256(public).hexdigest()
     for relative in run("git", "ls-files", "*.pem", cwd=mcuboot).splitlines():
         try:
-            development_key = keys.load(str(mcuboot / relative))
+            pem = (mcuboot / relative).read_bytes()
+            development_key = serialization.load_pem_private_key(pem, password=None).public_key()
         except (ValueError, TypeError):
-            continue
-        if development_key and development_key.get_public_bytes() == public:
+            try:
+                development_key = serialization.load_pem_public_key(pem)
+            except (ValueError, TypeError):
+                continue
+        if public_bytes(development_key) == public:
             raise ValueError("Signing key matches a development key shipped with MCUboot")
     return {
         "version": version,
