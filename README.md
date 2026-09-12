@@ -211,3 +211,8 @@ ownership, dependency pins, and PRs. Build the HTML and PDF from the workspace:
 ./k-fsw/tools/docs/build.sh
 ./k-fsw/tools/docs/pdf.sh
 ```
+
+## License
+
+Licensed under [Apache 2.0](LICENSE). Third-party dependencies retain their
+own licences.
