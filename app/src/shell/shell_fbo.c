@@ -53,6 +53,7 @@ static int cmd_fbo_status(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "procedure: %s", (status.name[0] != '\0') ? status.name : "none");
 	shell_print(sh, "running: %s", status.running ? "yes" : "no");
 	shell_print(sh, "line: %u", status.line);
+	shell_print(sh, "last result: %d", status.last_result);
 	shell_print(sh, "runs: %u", status.runs);
 	shell_print(sh, "lines run: %u", status.lines_run);
 	shell_print(sh, "lines failed: %u", status.lines_failed);
