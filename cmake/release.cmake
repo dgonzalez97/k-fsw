@@ -13,8 +13,12 @@ if(KFSW_RELEASE_BUILD)
     if(NOT kfsw_release_result EQUAL 0)
         message(FATAL_ERROR "Release input check failed")
     endif()
-    set(CONFIG_MCUBOOT_IMGTOOL_SIGN_VERSION "$ENV{KFSW_IMAGE_VERSION}" CACHE STRING "" FORCE)
+    # Sysbuild reads CONFIG_* overrides from its own cache, not this image's.
+    # Zephyr merges configuration fragments in the image build directory last.
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/kfsw-release.conf"
+        "CONFIG_MCUBOOT_IMGTOOL_SIGN_VERSION=\"$ENV{KFSW_IMAGE_VERSION}\"\n")
     set(CSP_REPRODUCIBLE_BUILDS ON CACHE BOOL "" FORCE)
 else()
+    file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/kfsw-release.conf")
     set(CSP_REPRODUCIBLE_BUILDS OFF CACHE BOOL "" FORCE)
 endif()
