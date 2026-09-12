@@ -2,34 +2,17 @@
 
 [TOC]
 
-## The Zephyr shell in K-FSW
+## Shell basics
 
-Development profiles enable Zephyr's serial shell with history, tab
-completion, metakeys, and command help. K-FSW registers project commands at
-the shell root and lets Zephyr supply line editing, dispatch, usage validation,
-and built-in commands.
-
-The prompt is configured as:
-
-```text
-kfsw:~$
-```
-
-This text identifies the console. It is not a command namespace. Type:
+Type commands at the Zephyr shell prompt, without a `kfsw` prefix:
 
 ```text
 kfsw:~$ status
 ```
 
-not:
-
-```text
-kfsw:~$ kfsw status
-```
-
-Documentation examples include the prompt to distinguish commands from
-output. Copy only the text after `$` when using a terminal adapter that does
-not strip prompts.
+Wait for `@READY` before using services. Use `help` to list commands and
+`<command> -h` for syntax. History and Tab completion are available.
+Only commands enabled by the target's Kconfig appear.
 
 ## Editing, history, and discovery
 

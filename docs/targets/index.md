@@ -2,30 +2,14 @@
 
 [TOC]
 
-## Board and target are different concepts
+## Boards and targets
 
-Zephyr defines boards such as `nucleo_l496zg` and
-`rpi_pico/rp2040/w`. A Zephyr board selects the SoC, CPU, devicetree, default
-peripherals, and build/flash runners.
+A Zephyr board selects the SoC, devices, and build/flash runners.
+A K-FSW target adds application configuration and tool defaults under
+`config/targets/`. For example, `rpi_pico_w` maps to
+`rpi_pico/rp2040/w`.
 
-K-FSW defines target names such as `linux` and `rpi_pico_w`. A target descriptor
-under `config/targets/` maps that convenient name to a Zephyr board and records
-local tool defaults: serial device, baud rate, USB identity, expected prompt,
-flash runner, and debugger endpoint where applicable.
-
-```text
-./k-fsw/tools/build.sh rpi_pico_w
-                         |
-       config/targets/rpi_pico_w.env
-                         |
-       ZEPHYR_BOARD=rpi_pico/rp2040/w
-                         |
-     Zephyr board + K-FSW board config/overlay
-```
-
-A target's default composition is part of its identity. Successfully building
-some other Kconfig combination for the same Zephyr board does not silently add
-that combination to the supported matrix.
+Supported features depend on the target configuration and selected profiles.
 
 ## Status language
 
@@ -42,7 +26,7 @@ These scopes make no release or flight-qualification claim.
 
 ## Target matrix
 
-| K-FSW target | Zephyr board | Default composition | Current qualification |
+| K-FSW target | Zephyr board | Default composition | Recorded verification |
 | --- | --- | --- | --- |
 | `linux` | `native_sim/native/64` | Shell, storage, local PARAM, persistence, CSP UART/KISS, PARAM CSP adapter, FTP | Software-tested reference target |
 | `nucleo_l496zg` | `nucleo_l496zg` | Same service set as Linux; shell on ST-LINK and CSP on USART3 | Hosted build plus physical boot, storage, UART/KISS, CSP, remote PARAM, and FTP bench verification |
@@ -151,10 +135,8 @@ until it is performed with a user on the named NUCLEO bench. The logical
 
 ### Opt-in wall clock
 
-A node keeps a wall clock so an event can say *when*, and housekeeping stamps
-every sample with it. `csp clock set <seconds>` works on the default image, and
-that is the trap: it works the same way whether or not the hardware clock is
-composed, and the two behave differently the moment the node restarts.
+`csp clock set <seconds>` sets wall time. Persistence across reset depends
+on whether a hardware RTC is selected.
 
 **Verified on 10 September 2026**, on a NUCLEO-L496ZG built without the profile
 below: the clock was set, the node was rebooted from the ground, and it came
@@ -174,18 +156,15 @@ KFSW_EXTRA_DTC_OVERLAY_FILE="$PWD/k-fsw/config/profiles/nucleo-clock.overlay" \
   ./k-fsw/tools/build.sh nucleo_l496zg
 ```
 
-Composing it is what makes a timestamp mean anything after the first reset.
-Leaving it out is a legitimate choice for a bench image; believing the clock
-survives when it does not is what this section exists to prevent.
+Check clock readback after reset on the selected hardware.
 
 ### Opt-in last words
 
 `config/profiles/nucleo-lastwords.conf` keeps a short note across a restart and
 watches the supply for a dip, so a node that came back can say why it left.
 
-The supply watch is **armed but has never been observed firing** — that needs a
-bench supply that can be brought down under control, and until somebody has
-watched it, the path is code we believe works rather than a verified one.
+Supply monitoring is implemented, but a controlled voltage dip has not
+yet been observed triggering it on the bench.
 
 ### Opt-in MCUboot
 

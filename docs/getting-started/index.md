@@ -105,17 +105,9 @@ Initialize the submodules:
 git -C k-fsw submodule update --init --recursive
 ```
 
-There are two, and neither is flight code or managed by `west.yml`, so this
-step is required for a complete development workspace on top of `west update`:
-
-- `tests/platform/robot-terminal-runner`, which drives the hardware suites
-  through tmux. `tests/hil/run.sh` refuses to run without it.
-- `ground-station/yamcs`, the mission control system. Nothing builds or tests
-  needs it; it is where telemetry goes once a node is talking.
-
-Neither is needed to build or to run the software tests, so a workspace that
-skipped this step still compiles — it just cannot run the hardware suites or
-start Yamcs.
+The submodules provide the Robot terminal runner and Yamcs.
+They are needed for terminal-driven Robot tests and mission control,
+respectively. The application build does not need them.
 
 ## Update an existing workspace
 

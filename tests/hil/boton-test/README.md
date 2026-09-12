@@ -19,9 +19,7 @@ export KFSW_DEBUG_SERIAL=/dev/serial/by-id/usb-STMicroelectronics_STM32_STLink_<
 ./k-fsw/tests/hil/boton-test/button-acceptance.sh
 ```
 
-Add `--no-flash` to use the image already on the board, which is worth doing
-when an operator needs to be told to start pressing at a known moment instead
-of guessing when the build and flash have finished.
+Use `--no-flash` to test the image already on the board.
 
 ## What it records
 
@@ -31,7 +29,7 @@ own `last_press_s`. The gestures are read back out of that timeline rather than
 the fixture trying to keep step with the operator.
 
 Both LED paths are then exercised in turn and read back through
-`boton_test status`, and PARAM IDs 6 and 7 are compared against the module's
+`boton_test status`, and the button parameters are compared against the module's
 own status so the parameter exposure is checked against the same hardware.
 
 ## Reading the timeline

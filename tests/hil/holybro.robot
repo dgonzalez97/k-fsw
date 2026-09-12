@@ -25,3 +25,13 @@ Firmware Update Over The Radio Changes The Running Image
     HIL Command Should Pass    ${result}    FWU RADIO RESULT: PASS
     Should Contain    ${result.stdout}    before=fwu-before
     Should Contain    ${result.stdout}    after=fwu-after
+
+A Node Beacons Over The Radio Without Being Asked
+    [Documentation]    The one housekeeping claim a pseudo-terminal cannot
+    ...    settle. The ground side binds no port and sends no packet, so a
+    ...    frame reaching it can only be one the node sent unprompted.
+    [Tags]    physical    holybro    radio    hk    beacon
+    Skip If    not $HOLYBRO_RADIO    KGROUND_HOLYBRO_DEVICE is not configured
+    ${result}=    Run Holybro Beacon Smoke
+    HIL Command Should Pass    ${result}    HOLYBRO BEACON RESULT: PASS
+    Should Contain    ${result.stdout}    skipped=0

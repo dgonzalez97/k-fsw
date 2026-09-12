@@ -12,7 +12,7 @@
 }
 
 html {
-  color: #202522;
+  color: #243746;
   font-family: Lato, Arial, sans-serif;
   font-size: 10pt;
   line-height: 1.45;
@@ -34,7 +34,7 @@ body {
 
 #title-block-header h1.title {
   border: 0;
-  color: #1d2521;
+  color: #294c69;
   font-size: 28pt;
   letter-spacing: -0.02em;
   margin: 0 0 6mm;
@@ -45,8 +45,8 @@ body {
 }
 
 #title-block-header .subtitle {
-  border-top: 2px solid #2a9d63;
-  color: #2a9d63;
+  border-top: 2px solid #43a0b2;
+  color: #43a0b2;
   font-size: 16pt;
   font-weight: 600;
   margin: 0 0 35mm;
@@ -63,7 +63,7 @@ body {
 }
 
 #TOC::before {
-  color: #1d2521;
+  color: #294c69;
   content: "Contents";
   display: block;
   font-size: 22pt;
@@ -98,8 +98,8 @@ body {
 }
 
 h1 {
-  border-bottom: 2px solid #2a9d63;
-  color: #1d2521;
+  border-bottom: 2px solid #43a0b2;
+  color: #294c69;
   font-size: 23pt;
   margin: 0 0 8mm;
   padding-bottom: 3mm;
@@ -113,7 +113,7 @@ h1 {
 }
 
 h2 {
-  border-bottom: 1px solid #d4d9d6;
+  border-bottom: 1px solid #d4dfe6;
   color: #253029;
   font-size: 15pt;
   margin: 9mm 0 4mm;
@@ -135,7 +135,7 @@ p {
 }
 
 a {
-  color: #1d6f46;
+  color: #25677a;
 }
 
 code {
@@ -148,8 +148,8 @@ code {
 
 pre {
   background: #f4f6f5;
-  border: 1px solid #d4d9d6;
-  border-left: 3px solid #2a9d63;
+  border: 1px solid #d4dfe6;
+  border-left: 3px solid #43a0b2;
   border-radius: 2px;
   break-inside: avoid;
   font-family: "DejaVu Sans Mono", monospace;
@@ -190,7 +190,7 @@ td {
 }
 
 th {
-  background: #edf3ef;
+  background: #eaf1f5;
   color: #253029;
   font-weight: 600;
 }
@@ -206,8 +206,13 @@ li {
 }
 
 blockquote {
-  background: #edf7f1;
-  border-left: 3px solid #2a9d63;
+  background: #f3f7f9;
+  border-left: 3px solid #43a0b2;
   margin: 4mm 0;
   padding: 3mm 4mm;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
 }

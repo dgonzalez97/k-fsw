@@ -2,23 +2,9 @@
 
 [TOC]
 
-K-FSW can be composed as lightweight Linux ground nodes without creating a
-second framework. `k-ground` uses the same Zephyr `native_sim` application,
-shell commands, libcsp router, KISS interface, services, and build machinery as
-KFSW-Linux. Configuration changes node identity and address; it does not fork
-service implementations.
-
-```text
-                        reusable K-FSW components
-                                  |
-                     +------------+------------+
-                     |                         |
-              flight profiles          ground roles
-                                               |
-                                         local CSP
-                                               |
-                                      other K-FSW nodes
-```
+`k-ground` runs Linux ground nodes from the same application and services
+as KFSW-Linux. Node files set each role's name, address, peer, and build
+configuration.
 
 ## Identity and node convention
 
@@ -198,12 +184,9 @@ form verifies both identities, prompts, and ping directions:
 ./k-fsw/tools/k-ground test
 ```
 
-Addresses 17 and 18 are held for a future antenna bridge and for beacon
-handling. Neither has a node file, because an address reservation is a line in
-a table rather than a node somebody can start. The launcher itself stays a
-launcher: no central orchestration, no master election, and no new command
-framework. Telemetry storage and a GUI do now exist, but as a separate thing
-that talks CSP from outside — see below.
+Addresses 17 and 18 are reserved for future ground roles. They have no
+node configuration. The launcher starts configured nodes; the housekeeping
+bridge connects them to Yamcs.
 
 ## Moving a file between ground nodes
 
@@ -248,18 +231,11 @@ node 16, including the missing-file negative path, and is part of the software
 integration suite. Transfers to and from a flight node over the radio are a
 separate physical path; see the Holybro fixture under `tests/hil/radio-uhf/`.
 
-## Keeping what a pass brings down
+## Telemetry in Yamcs
 
-Everything above reads a node from a console, which is enough to fly a bench
-and not enough to fly a mission: the moment the terminal scrolls, the pass is
-gone. Housekeeping already collects a set of values in one exchange; what was
-missing was somewhere on the ground to put them.
-
-That is [Yamcs](https://yamcs.org/), the open source mission control system,
-running from `ground-station/yamcs` — a fork of `yamcs/quickstart` kept small
-on purpose. The same approach [scsat1-mcs](https://github.com/spacecubics/scsat1-mcs)
-takes for a flown 3U: a UDP telemetry link, a generated mission database, and
-the archive doing the keeping.
+[Yamcs](https://yamcs.org/) records housekeeping samples and provides the
+telemetry browser and archive. The project configuration lives in the
+`ground-station/yamcs` submodule.
 
 ```bash
 cd k-fsw/ground-station/yamcs && ./mvnw yamcs:run    # then http://localhost:8090
@@ -277,11 +253,9 @@ Yamcs on UDP 10015. Point it at a hosted node's `uart_1` pseudo-terminal, or
 straight at the Holybro's serial device for a flight node over the radio; it is
 the same client either way.
 
-### A node that speaks first
+### Beacons
 
-Asking costs a round trip, which is the wrong way to open a pass: the ground
-has to find the node and wait before it knows anything. A report can instead be
-told to put its newest sample on the link on its own.
+A report can send its latest sample periodically without a ground request:
 
 ```text
 hk beacon 0 1 5000      # report 0, to node 1, every five seconds
@@ -296,24 +270,16 @@ only has to stop asking:
 ./k-fsw/tools/ground/hk-bridge.py --device /dev/pts/7 --node 1 --listen
 ```
 
-A node that transmits unprompted can flood a link, so three limits sit under
-this. The interval is refused below `CONFIG_KFSW_HK_BEACON_FLOOR_MS`
-(5000 by default), returning `-ERANGE`. Beacons follow collection and the
-clock, so a report that is not collecting does not beacon and a node that was
-never given a time does not announce itself without one. And a beacon never
-takes the last CSP buffers — below `CONFIG_KFSW_HK_BEACON_BUFFER_RESERVE` free
-it is skipped, because a reply somebody is waiting for outranks a broadcast
-nobody asked for. `hk show` prints both counters, and `hk_beacons_skipped` in
-table 33 is the one to read when a ground station stops hearing a node that is
-still collecting: the link was busy, not broken.
+Beacon limits:
 
-The destination is a port nothing binds, deliberately. Addressing a beacon to
-the serving port would drop it onto another node's request handler, where a
-frame whose first byte is also a version number could be read as a request.
+- Intervals below `CONFIG_KFSW_HK_BEACON_FLOOR_MS` (5000 ms by default)
+  return `-ERANGE`.
+- A report must be collecting and the node's clock must be set.
+- A send is skipped below `CONFIG_KFSW_HK_BEACON_BUFFER_RESERVE` free
+  CSP buffers. Check `hk show` and `hk_beacons_skipped` in table 33.
 
-The interval is **not** kept across a reset. A node comes back quiet and is
-told to beacon again, which is the safe default and not necessarily the one a
-mission wants; report definitions and their collection periods do persist.
+Beacons use a separate destination port to avoid service request handlers.
+Beacon intervals reset at boot; report definitions and collection periods persist.
 
 ### Bringing it up and checking it
 
@@ -328,8 +294,8 @@ It prints `Yamcs started` after a few seconds and serves <http://localhost:8090>
 The instance is `kfsw`. Leave it running in its own terminal — it holds the
 archive, so stopping it stops the recording.
 
-**First check, before any hardware.** A database that loads is not a database
-that decodes, so there is a recorded frame to prove it:
+**Check the mission database before connecting hardware.** In another
+terminal, from `k-fsw/ground-station/yamcs`:
 
 ```bash
 ./scripts/check-mdb.sh
@@ -361,11 +327,8 @@ Then start the bridge against the node's link:
     --baud 57600 --node 2 --report 0 --count 8 --interval 10
 ```
 
-It prints a line per sample as it forwards, so a silent bridge means the node
-is not answering rather than that nothing is happening. `--yamcs none` prints
-the frames as hex instead of forwarding, which is the right first step when
-something is wrong: it separates "the node is not replying" from "Yamcs is not
-accepting".
+The bridge prints each forwarded sample. Use `--yamcs none` to inspect
+received frames as hex before checking Yamcs.
 
 **What to look at in the web interface.**
 
@@ -390,51 +353,27 @@ curl -s localhost:8090/api/processors/kfsw/realtime/parameters/kfsw/nucleo_tempe
 curl -s 'localhost:8090/api/archive/kfsw/parameters/kfsw/nucleo_temperature_temp_mcu?limit=50&order=asc'
 ```
 
-**If nothing arrives.** Work outward rather than guessing: run the bridge with
-`--yamcs none` and see whether frames come back at all; check `hk show` on the
-node for a collection count that is advancing; check the Links page for invalid
-datagrams, which would mean frames are arriving but not decoding. The bridge
-and Yamcs talk over UDP on localhost, so that hop rarely fails silently — the
-link is almost always the radio or the report definition.
+**If nothing arrives:** check frames with `--yamcs none`, check that
+`hk show` reports increasing collections, then check Yamcs Links for invalid
+datagrams. Verify the serial path, report definition, and UDP link settings.
 
 ### Yamcs reads; K-FSW commands
 
-Yamcs holds telemetry and does not send anything. There is no telecommand link
-in the instance, and the fork's example command classes were deleted with the
-rest of the quickstart scaffolding.
-
-That is a decision rather than an omission. Housekeeping is configured through
-K-FSW's own command service — `hk_define`, `hk_period` and `hk_clear`, which
-reach a node over KISS or CAN because the command service rides on CSP:
+Yamcs records telemetry. Configure housekeeping through K-FSW commands:
+`hk_define`, `hk_period`, and `hk_clear` reach nodes over CSP/KISS or CAN.
 
 ```text
 kfsw-ops# cmd 2 hk_define 0 "51:0x00 51:0x10 3:0x00"
 hk_define node=2: OK report 0 defines 3 values
 ```
 
-Adding the same thing to Yamcs would mean an XTCE command definition, a
-telecommand link, and something turning a Yamcs command into a CSP command
-packet — roughly doubling a mission control system whose whole appeal is being
-small enough to read. It would also give commanding two paths and two audit
-trails, which is worse than one.
+Yamcs telecommand integration is not implemented.
 
-The argument for doing it later is real: Yamcs would keep a command history
-beside the telemetry, which is worth having when more than one person operates
-a spacecraft. So this is deferred rather than refused, and the thing that
-should decide it is having flown the read-only version for a while and finding
-out whether anybody misses it.
+### Report definitions
 
-### One decoder, not two
-
-A housekeeping frame carries **no names** — values back to back in the order
-the report was defined, and nothing in the packet says what they are. That is
-the right trade for a radio and it means the two ends have to agree out of
-band, which is exactly where a ground segment usually forks from its
-spacecraft.
-
-So the bridge decodes nothing. It forwards frames byte for byte and the mission
-database does the decoding, and that database is generated from the same file
-that tells the node what to collect:
+Housekeeping frames carry values in report order, without names.
+`hk-report.py` generates the node definition and Yamcs XTCE database from
+one YAML file. The bridge forwards the frame unchanged.
 
 ```bash
 report=k-fsw/ground-station/reports/nucleo-temperature.yaml
@@ -459,10 +398,8 @@ Each datagram is twelve bytes the bridge adds, then the frame the node sent:
 12  ...  the housekeeping frame, header and all
 ```
 
-Yamcs reads an 8-byte time and a 4-byte count at fixed offsets; the frame
-carries 4 and 2. Without the envelope a pull of sixteen samples would land at
-one reception instant and the history the node kept would collapse into a
-single moment in the archive.
+The envelope adapts the node's timestamp and sequence to Yamcs field sizes,
+preserving each sample's generation time during batch retrieval.
 
 `tests/hk-yamcs-smoke.sh` asserts the thing that matters: the bytes the bridge
 pulls off the link are the bytes the node's own shell prints for the same
@@ -477,7 +414,7 @@ rotator bridge would communicate through CSP and remain independent of the
 radio implementation. A later
 `kfsw-gnd-sband` could follow the same pattern without changing those roles.
 
-## UHF and Holybro boundary
+## UHF and Holybro setup
 
 The HIL tree models the radio category separately from its implementation:
 
