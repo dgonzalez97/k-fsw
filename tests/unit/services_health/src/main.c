@@ -17,6 +17,13 @@
 
 #define SHORT_DEADLINE_MS 60U
 
+static uint32_t configured_timeout;
+
+uint32_t __wrap_kfsw_platform_watchdog_configured_timeout_ms(void)
+{
+	return configured_timeout;
+}
+
 static void *health_setup(void)
 {
 	return NULL;
@@ -29,6 +36,8 @@ static void *health_setup(void)
 static void health_before(void *fixture)
 {
 	ARG_UNUSED(fixture);
+	configured_timeout = 0U;
+	zassert_ok(kfsw_health_set_interval_ms(CONFIG_KFSW_HEALTH_INTERVAL_MS));
 
 	for (uint8_t index = 0U; index < KFSW_HEALTH_MAX_COMPONENTS; index++) {
 		(void)kfsw_health_unregister(index);
@@ -48,6 +57,15 @@ ZTEST(services_health, test_registration_rejects_nonsense)
 	/* A deadline of zero would be missed the instant it was set, so a
 	 * component registered that way would reset the board immediately. */
 	zassert_equal(kfsw_health_register("zero", 0U, &handle), -EINVAL);
+}
+
+ZTEST(services_health, test_interval_is_bounded_before_watchdog_initialization)
+{
+	configured_timeout = 8000U;
+	zassert_ok(kfsw_health_set_interval_ms(2666U));
+	zassert_equal(kfsw_health_set_interval_ms(2667U), -ERANGE);
+	zassert_equal(kfsw_health_get_interval_ms(), 2666U);
+	zassert_equal(kfsw_health_check_interval_ms(0U), -EINVAL);
 }
 
 ZTEST(services_health, test_a_name_is_registered_once)
