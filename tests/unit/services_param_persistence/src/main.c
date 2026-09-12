@@ -465,17 +465,15 @@ ZTEST(param_persistence, test_the_space_a_snapshot_takes_is_reported)
 	zassert_true(kfsw_param_persist_bytes() > 0U, "a written snapshot reported no size");
 }
 
-ZTEST(param_persistence, test_the_budget_is_readable_and_bounds_the_staging_buffer)
+ZTEST(param_persistence, test_the_budget_is_readable)
 {
 	zassert_true(kfsw_param_persist_max_bytes() > 0U, "no budget is reported");
-	zassert_true(kfsw_param_persist_stage_bytes() > 0U, "no staging size is reported");
 
-	/* A snapshot is built in RAM before it is written, so it can never
-	 * exceed the staging buffer however large the budget is. Stating it
-	 * here keeps the two from being raised apart.
+	/* The budget is also the size of the buffer a snapshot is built in, so
+	 * it has to leave room for the header before any value can fit.
 	 */
-	zassert_true(kfsw_param_persist_stage_bytes() <= kfsw_param_persist_max_bytes(),
-		     "a snapshot staged larger than its budget could never be written");
+	zassert_true(kfsw_param_persist_max_bytes() > SNAPSHOT_HEADER_SIZE,
+		     "the budget cannot hold even an empty snapshot");
 }
 
 ZTEST(param_persistence, test_a_snapshot_fits_inside_what_it_is_allowed)
@@ -483,10 +481,8 @@ ZTEST(param_persistence, test_a_snapshot_fits_inside_what_it_is_allowed)
 	set_u8("log_level", 2U);
 	zassert_ok(kfsw_param_persist_save(), "save failed");
 
-	zassert_true(kfsw_param_persist_bytes() <= kfsw_param_persist_stage_bytes(),
-		     "a snapshot outgrew the buffer it is built in");
 	zassert_true(kfsw_param_persist_bytes() <= kfsw_param_persist_max_bytes(),
-		     "a snapshot outgrew its budget");
+		     "a snapshot outgrew the budget that is also its buffer");
 }
 
 /*
