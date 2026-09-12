@@ -84,7 +84,7 @@ parameter persistence, storage, and FTP, while excluding physical HIL:
 Run the smoke-tagged physical suite with explicit device paths:
 
 ```bash
-KFSW_DEBUG_SERIAL=/dev/ttyACM0 \
+KFSW_DEBUG_SERIAL=/dev/serial/by-id/usb-STLINK_DEVICE-if02 \
 KFSW_FTDI_DEVICE=/dev/serial/by-id/usb-FTDI_DEVICE-if00-port0 \
 ./k-fsw/tests/hil/run.sh --include smoke
 ```
