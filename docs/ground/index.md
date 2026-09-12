@@ -449,7 +449,7 @@ The two physical tests answer different questions:
   proves KISS framing and CSP routing in addition to the link.
 
 The recorded USB-side RFD SiK 2.0 settings, exact commands, and latest bench
-result are in `tests/hil/radio-uhf/holybro/README.md`. On 30 August 2026, the
-corrected bench passed both raw and CSP/KISS acceptance without changing radio
+result are in `tests/hil/radio-uhf/holybro/README.md`. The
+recorded bench passed both raw and CSP/KISS acceptance without changing radio
 parameters. This is physical functional evidence for that named bench, not RF
 or flight qualification.

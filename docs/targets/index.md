@@ -138,8 +138,8 @@ until it is performed with a user on the named NUCLEO bench. The logical
 `csp clock set <seconds>` sets wall time. Persistence across reset depends
 on whether a hardware RTC is selected.
 
-**Verified on 10 September 2026**, on a NUCLEO-L496ZG built without the profile
-below: the clock was set, the node was rebooted from the ground, and it came
+On the recorded NUCLEO-L496ZG bench without the RTC profile, the clock was
+set, the node was rebooted from the ground, and it came
 back reporting `clock: not set (reads 946652410)` — the 2000-01-01 hardware
 epoch. Without the RTC, the wall clock lives in RAM and a reset loses it. Every
 sample collected after that reset carries a zero timestamp.

@@ -196,12 +196,11 @@ distinct `/14` interface addresses are significant: the pinned libcsp
 split-horizon logic must see these as different links before it forwards a
 transit packet.
 
-There is currently no CAN/CFP interface, automatic route discovery, runtime
-route mutation, redundant-link failover policy, ZMQ interface, or production
-radio driver in the K-FSW composition. The k-ground Holybro HIL entry point
+Automatic route discovery, redundant-link failover, ZMQ, and modem control
+are not implemented. The k-ground Holybro HIL entry point
 continues to reuse the direct serial KISS route. Its named one-link bench
 passed 100/100 raw exchanges and bidirectional node 16 ↔ node 2 CSP ping with
-clean KISS counters on 30 August 2026. No physical `KISS_2` bench is claimed.
+clean KISS counters. No physical `KISS_2` bench is claimed.
 
 ## Route-table configuration
 

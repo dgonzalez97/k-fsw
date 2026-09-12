@@ -42,7 +42,7 @@ a UHF radio, and a small worked example using LEDs and buttons of development bo
 ## Services
 
 - **Parameters:** named values with owner validation, remote access, and
-  explicit save/load.
+  saving on change.
 - **CSP:** one router, with routes selecting UART/KISS or CAN links.
 - **Files:** upload and download with CRC32 and atomic commit.
 - **Firmware update:** direct block upload or FTP, with MCUboot test,

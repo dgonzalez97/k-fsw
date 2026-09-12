@@ -72,9 +72,6 @@ Run checks appropriate to the change; @ref testing lists the entry points.
 Docs changes need Doxygen, PDF, link checks, and visual inspection.
 Record physical tests only when they were observed on the bench.
 
-Required CI checks must pass before merge. PRs build the docs; Pages deploys
-from `main`.
-
 ## Change a west dependency
 
 Each reusable repository has its own branch and PR. The composition PR pins
