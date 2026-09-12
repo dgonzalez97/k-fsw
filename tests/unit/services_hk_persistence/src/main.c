@@ -91,6 +91,8 @@ static void persist_before(void *fixture)
 {
 	ARG_UNUSED(fixture);
 	for (uint8_t report = 0U; report < CONFIG_KFSW_HK_REPORTS; report++) {
+		(void)kfsw_hk_set_beacon(report, 1U, 0U);
+		(void)kfsw_hk_clear_store(report);
 		(void)kfsw_hk_clear(report);
 	}
 	(void)fs_unlink(REPORTS_PATH);
@@ -331,10 +333,11 @@ ZTEST(kfsw_hk_persistence, test_a_report_naming_what_is_gone_does_not_come_back)
 	 * re-checksum so the file is honestly formed and only its content is
 	 * stale — which is exactly what a firmware update leaves behind.
 	 *
-	 * 12 bytes of file header, then 6 naming the report and its period,
-	 * then entries of node and identifier: the first identifier is at 20.
+	 * 12 bytes of file header, then 16 naming the report, its period and
+	 * the policy around it, then entries of node and identifier: the first
+	 * identifier is at 30.
 	 */
-	sys_put_be16(KFSW_PARAM_ID(TEST_TABLE, 0x7F), &blob[20]);
+	sys_put_be16(KFSW_PARAM_ID(TEST_TABLE, 0x7F), &blob[30]);
 	sys_put_be32(0U, &blob[crc_offset]);
 	crc = crc32_ieee(blob, size);
 	sys_put_be32(crc, &blob[crc_offset]);
@@ -344,4 +347,134 @@ ZTEST(kfsw_hk_persistence, test_a_report_naming_what_is_gone_does_not_come_back)
 
 	zassert_not_equal(kfsw_hk_get_definition(0U, read_back, &count), 0,
 			  "a report naming a parameter that no longer exists came back defined");
+}
+
+/*
+ * Version 2 of the snapshot, and why it exists.
+ *
+ * A definition that comes back without the policy built around it is the half
+ * that does not help: the node collects again, but its store is off and it
+ * says nothing on its own, which is exactly the state an operator cannot fix
+ * if the reset happened between passes.
+ */
+ZTEST(kfsw_hk_persistence, test_a_store_interval_comes_back)
+{
+	uint8_t saved[256];
+	size_t size;
+	uint32_t interval = 0U;
+
+	define_report(0U);
+	zassert_ok(kfsw_hk_set_period(0U, 2000U), "the period was refused");
+	zassert_ok(kfsw_hk_set_store(0U, CONFIG_KFSW_HK_STORE_FLOOR_MS), "the store was refused");
+	zassert_ok(kfsw_hk_persist_save(), "the definitions were not saved");
+	size = read_file(saved, sizeof(saved));
+
+	restart_with(saved, size);
+	zassert_ok(kfsw_hk_persist_load(), "the definitions were not loaded");
+
+	zassert_ok(kfsw_hk_get_store(0U, &interval), "the store could not be read");
+	zassert_equal(interval, CONFIG_KFSW_HK_STORE_FLOOR_MS,
+		      "a report came back collecting with its store off");
+}
+
+ZTEST(kfsw_hk_persistence, test_a_beacon_comes_back)
+{
+	uint8_t saved[256];
+	size_t size;
+	uint16_t node = 0U;
+	uint32_t interval = 0U;
+
+	define_report(0U);
+	zassert_ok(kfsw_hk_set_period(0U, 2000U), "the period was refused");
+	zassert_ok(kfsw_hk_set_beacon(0U, 16U, CONFIG_KFSW_HK_BEACON_FLOOR_MS),
+		   "the beacon was refused");
+	zassert_ok(kfsw_hk_persist_save(), "the definitions were not saved");
+	size = read_file(saved, sizeof(saved));
+
+	restart_with(saved, size);
+	zassert_ok(kfsw_hk_persist_load(), "the definitions were not loaded");
+
+	zassert_ok(kfsw_hk_get_beacon(0U, &node, &interval), "the beacon could not be read");
+	zassert_equal(interval, CONFIG_KFSW_HK_BEACON_FLOOR_MS,
+		      "a node came back quiet after a reset it did not choose");
+	zassert_equal(node, 16U, "the beacon came back pointed at a different node");
+}
+
+/* A report that was not beaconing must not start on its own. */
+ZTEST(kfsw_hk_persistence, test_a_report_that_was_silent_stays_silent)
+{
+	uint8_t saved[256];
+	size_t size;
+	uint16_t node = 0U;
+	uint32_t interval = 1U;
+
+	define_report(0U);
+	zassert_ok(kfsw_hk_persist_save(), "the definitions were not saved");
+	size = read_file(saved, sizeof(saved));
+
+	restart_with(saved, size);
+	zassert_ok(kfsw_hk_persist_load(), "the definitions were not loaded");
+
+	zassert_ok(kfsw_hk_get_beacon(0U, &node, &interval), "the beacon could not be read");
+	zassert_equal(interval, 0U, "a node that was never told to beacon started on its own");
+}
+
+/*
+ * A board updated in place has a version 1 file on it. Refusing that would
+ * cost the reports it holds for no reason: the fields version 2 added are
+ * simply absent, which is the same as not configured.
+ */
+ZTEST(kfsw_hk_persistence, test_a_version_one_file_is_still_read)
+{
+	struct kfsw_hk_entry read_back[CONFIG_KFSW_HK_ENTRIES];
+	size_t count = ARRAY_SIZE(read_back);
+	uint8_t blob[256];
+	uint8_t v1[256];
+	size_t size;
+	size_t v1_size;
+	uint32_t period;
+	uint32_t crc;
+
+	define_report(0U);
+	zassert_ok(kfsw_hk_set_period(0U, 4000U), "the period was refused");
+	zassert_ok(kfsw_hk_persist_save(), "the definitions were not saved");
+	size = read_file(blob, sizeof(blob));
+
+	/* Rewrite it as version 1: the same header and entries, without the ten
+	 * bytes of policy version 2 added between them.
+	 */
+	memcpy(v1, blob, 12U);
+	v1[4] = 1U;
+	memcpy(&v1[12], &blob[12], 6U);
+	memcpy(&v1[18], &blob[28], size - 28U);
+	v1_size = 18U + (size - 28U);
+	sys_put_be32(0U, &v1[8]);
+	crc = crc32_ieee(v1, v1_size);
+	sys_put_be32(crc, &v1[8]);
+
+	restart_with(v1, v1_size);
+	zassert_ok(kfsw_hk_persist_load(), "a version 1 file was refused");
+
+	zassert_ok(kfsw_hk_get_definition(0U, read_back, &count),
+		   "the report in a version 1 file was lost");
+	zassert_equal(count, 2U, "the report came back a different shape");
+	zassert_ok(kfsw_hk_get_period(0U, &period), "the period could not be read");
+	zassert_equal(period, 4000U, "the period in a version 1 file was lost");
+}
+
+/* A version this reader does not know is still refused rather than guessed. */
+ZTEST(kfsw_hk_persistence, test_a_version_three_file_is_refused)
+{
+	uint8_t blob[256];
+	size_t size;
+
+	define_report(0U);
+	zassert_ok(kfsw_hk_persist_save(), "the definitions were not saved");
+	size = read_file(blob, sizeof(blob));
+
+	blob[4] = 3U;
+	restart_with(blob, size);
+
+	zassert_equal(kfsw_hk_persist_load(), -EPROTONOSUPPORT,
+		      "a layout from the future was decoded anyway");
 }

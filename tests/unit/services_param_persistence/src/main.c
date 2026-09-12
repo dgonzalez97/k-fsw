@@ -168,6 +168,12 @@ static void *persistence_setup(void)
 	const struct kfsw_param_definition_set *const parameter_sets[] = {
 		&kfsw_log_param_definitions,
 		&kfsw_test_param_definitions,
+		/* The service's own table, because param_autosave lives in it:
+		 * whether a persistent value reaches flash on its own is a
+		 * compiled default, and a fixture that leaves the table out
+		 * would never see it applied.
+		 */
+		&kfsw_param_param_definitions,
 	};
 
 	erase_storage_partition();
@@ -262,6 +268,12 @@ static size_t expected_snapshot_size(void)
 
 ZTEST(param_persistence, test_save_modify_load_and_repeated_operations)
 {
+	/* Explicitly the manual flow: with autosave on, the second set below
+	 * would write a snapshot of its own and there would be nothing to
+	 * restore from.
+	 */
+	set_u8("param_autosave", 0U);
+
 	set_u32("test_u32", 1234U);
 	set_i32("test_i32", -1234);
 	zassert_ok(kfsw_param_persist_save(), "first save failed");
@@ -431,6 +443,71 @@ ZTEST(param_persistence, test_unavailable_storage_and_save_failure_are_reported)
 	zassert_true(kfsw_param_persist_save() < 0, "save failure was not reported");
 	zassert_ok(fs_unlink(SNAPSHOT_DIRECTORY), "blocking file removal failed");
 	zassert_ok(fs_mkdir(SNAPSHOT_DIRECTORY), "snapshot directory recovery failed");
+}
+
+/*
+ * How much room a snapshot is allowed, and how much it is using.
+ *
+ * "How much space do the parameters take" is a question asked about a
+ * spacecraft, not about a source tree, so the answer has to be readable from
+ * the node rather than worked out from three constants.
+ */
+ZTEST(param_persistence, test_the_space_a_snapshot_takes_is_reported)
+{
+	size_t size;
+
+	set_u8("log_level", 2U);
+	zassert_ok(kfsw_param_persist_save(), "save failed");
+	size = read_snapshot();
+
+	zassert_equal(kfsw_param_persist_bytes(), (uint32_t)size,
+		      "the reported size is not the size of the file");
+	zassert_true(kfsw_param_persist_bytes() > 0U, "a written snapshot reported no size");
+}
+
+ZTEST(param_persistence, test_the_budget_is_readable)
+{
+	zassert_true(kfsw_param_persist_max_bytes() > 0U, "no budget is reported");
+
+	/* The budget is also the size of the buffer a snapshot is built in, so
+	 * it has to leave room for the header before any value can fit.
+	 */
+	zassert_true(kfsw_param_persist_max_bytes() > SNAPSHOT_HEADER_SIZE,
+		     "the budget cannot hold even an empty snapshot");
+}
+
+ZTEST(param_persistence, test_a_snapshot_fits_inside_what_it_is_allowed)
+{
+	set_u8("log_level", 2U);
+	zassert_ok(kfsw_param_persist_save(), "save failed");
+
+	zassert_true(kfsw_param_persist_bytes() <= kfsw_param_persist_max_bytes(),
+		     "a snapshot outgrew the budget that is also its buffer");
+}
+
+/*
+ * The flag has to mean what it says. A value marked persistent used to reach
+ * flash only if an operator remembered to save, which made the flag a
+ * statement of intent rather than of behaviour.
+ */
+ZTEST(param_persistence, test_a_persistent_value_is_written_without_being_asked)
+{
+	struct kfsw_param_value value;
+
+	zassert_true(kfsw_param_autosave_enabled(),
+		     "a value marked persistent no longer reaches flash on its own");
+
+	/* Set once and never saved by hand. Defaults are then put back in RAM
+	 * only, so what the load restores can only have come from the file the
+	 * change itself wrote.
+	 */
+	set_u8("log_level", 4U);
+	zassert_ok(kfsw_param_restore_defaults(), "defaults could not be put back");
+
+	zassert_ok(kfsw_param_persist_load(), "nothing was written when a value changed");
+	zassert_ok(kfsw_param_get("log_level", &value));
+	zassert_equal(value.scalar.u8, 4U,
+		      "a value marked persistent did not reach flash on its own");
 }
 
 ZTEST_SUITE(param_persistence, NULL, persistence_setup, persistence_before, NULL, NULL);
