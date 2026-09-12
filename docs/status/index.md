@@ -36,7 +36,7 @@ are listed in @ref targets; test procedures are in @ref testing.
 | Persistence | Unit, cross-process, corrupt-snapshot, Valgrind checks | MCUboot bench preserved stored values across swaps | No complete NUCLEO persistence acceptance matrix or migration framework |
 | Storage | Mount, capacity, cross-process persistence | NUCLEO `storage info` and `storage test` | One 64 KiB volume in reference profiles |
 | Files | Codec, sandbox, native transfers to 8 KiB, ground round trips | 4 KiB and 16 KiB UART transfers; 256-byte Holybro round trip | One server worker/client workspace; PUT/GET need two nodes |
-| Self-addressing | Local ping and command integration | Node 16 and NUCLEO node 2 over the Holybro bench | Uses the node address on the libcsp loopback interface |
+| Self-addressing | Local ping and command integration | Node 16 and NUCLEO node 2 over the Holybro bench | Interface registered only when no other subnet covers the local address |
 | Commands | Registry, validation, unknown requests, local/remote integration | Holybro dispatch, self-addressed command, unknown-command rejection | Synchronous; no authentication or duplicate suppression |
 | Retained reset note | Six cases for validation and reporting | commanded reboot note read back; power cycle cleared it; watchdog starvation reason read remotely | Volatile RAM; voltage-dip trigger not observed |
 | Events | Ring wrap, counters, visitor and error tests | Remote NUCLEO counters and decoded record over Holybro | RAM only; no persistent journal |

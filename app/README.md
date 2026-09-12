@@ -1,12 +1,11 @@
 # K-FSW Application
 
-Where the image is put together. This layer stays small on purpose: behaviour
-belongs to the repository that owns it, not to `main.c`.
+This directory selects features, binds hardware, and starts services.
+Reusable behaviour belongs in the owning repository.
 
-What lives here is the part that cannot live anywhere else — the core parameter
-tables, because `kfsw-platform` and `kfsw-comms` sit below the parameter
-service and must not depend on it, and the shell adapters, which parse
-arguments, call a service API, and print.
+Core parameter tables live here because platform and comms must not depend
+on the parameter service. Shell adapters parse arguments, call a service,
+and print the result.
 
 ## Communications
 

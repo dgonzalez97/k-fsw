@@ -144,10 +144,24 @@ static bool print_param_info(const struct kfsw_param_info *info, void *context)
 static bool print_table_info(const struct kfsw_param_table_info *info, void *context)
 {
 	const struct param_list_context *list_context = context;
+#if CONFIG_KFSW_PARAM_PERSISTENCE
+	uint16_t kept = 0U;
 
+	/* How many of the table's values survive a reset. Not every table needs
+	 * any: telemetry counters are rebuilt at every boot and keeping them
+	 * would spend flash on numbers that are wrong by the time they are
+	 * read. Showing the count is what makes that a visible choice rather
+	 * than something an operator discovers after a reset.
+	 */
+	(void)kfsw_param_persist_table_count(info->id, &kept);
+	shell_print(list_context->shell, "%3" PRIu8 "  %-7s  %-*s  %6" PRIu16 "  %6" PRIu16,
+		    info->id, kfsw_param_band_name(info->id), KFSW_PARAM_TABLE_COLUMN, info->name,
+		    info->count, kept);
+#else
 	shell_print(list_context->shell, "%3" PRIu8 "  %-7s  %-*s  %6" PRIu16, info->id,
 		    kfsw_param_band_name(info->id), KFSW_PARAM_TABLE_COLUMN, info->name,
 		    info->count);
+#endif
 	return true;
 }
 
@@ -733,10 +747,18 @@ static int cmd_param_tables(const struct shell *sh, size_t argc, char **argv)
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 
+#if CONFIG_KFSW_PARAM_PERSISTENCE
+	shell_print(sh, "%3s  %-7s  %-*s  %6s  %6s", " id", "band", KFSW_PARAM_TABLE_COLUMN, "name",
+		    "params", "kept");
+	shell_print(sh, "%.3s  %.7s  %.*s  %.6s  %.6s", "---------", "---------",
+		    KFSW_PARAM_TABLE_COLUMN, "--------------------------------", "---------",
+		    "---------");
+#else
 	shell_print(sh, "%3s  %-7s  %-*s  %6s", " id", "band", KFSW_PARAM_TABLE_COLUMN, "name",
 		    "params");
 	shell_print(sh, "%.3s  %.7s  %.*s  %.6s", "---------", "---------", KFSW_PARAM_TABLE_COLUMN,
 		    "--------------------------------", "---------");
+#endif
 
 	result = kfsw_param_visit_tables(print_table_info, &context);
 	if (result != 0) {
@@ -759,6 +781,56 @@ static int cmd_param_save(const struct shell *sh, size_t argc, char **argv)
 		return result;
 	}
 	shell_print(sh, "Parameter snapshot save: PASS");
+	return 0;
+}
+
+/*
+ * Write the snapshot, and say what one table contributed to it.
+ *
+ * The snapshot is a single file covering every persistent value, so the write
+ * is whole-file however this is asked for. What the table buys is the answer
+ * an operator actually wants after changing a few values: did what I just set
+ * reach flash, and how much of this table is kept at all.
+ *
+ * It is also the deliberate alternative to autosave. With param_autosave off,
+ * nothing reaches flash until this is asked for, which is how a campaign that
+ * sets parameters repeatedly stops spending an erase cycle on each one.
+ */
+static int cmd_param_persist(const struct shell *sh, size_t argc, char **argv)
+{
+	uint16_t kept = 0U;
+	uint8_t table;
+	int result;
+
+	ARG_UNUSED(argc);
+
+	result = parse_table_id(sh, argv[1], &table);
+	if (result != 0) {
+		return result;
+	}
+
+	result = kfsw_param_persist_table_count(table, &kept);
+	if (result == -ENOENT) {
+		shell_error(sh, "No table %u on this node", table);
+		return result;
+	}
+	if (result != 0) {
+		shell_error(sh, "table %u: %d", table, result);
+		return result;
+	}
+	if (kept == 0U) {
+		shell_warn(sh, "Table %u keeps nothing across a reset", table);
+	}
+
+	result = kfsw_param_persist_save();
+	if (result != 0) {
+		shell_error(sh, "Parameter snapshot save: FAIL (%d)", result);
+		return result;
+	}
+
+	shell_print(sh, "Snapshot written, %u byte%s; table %u contributes %u value%s",
+		    kfsw_param_persist_bytes(), (kfsw_param_persist_bytes() == 1U) ? "" : "s",
+		    table, kept, (kept == 1U) ? "" : "s");
 	return 0;
 }
 
@@ -839,6 +911,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 		      "List local parameters.", cmd_param_list, 1, 0),
 #endif
 #if CONFIG_KFSW_PARAM_PERSISTENCE
+	SHELL_CMD_ARG(persist, NULL,
+		      "Write the snapshot and report one table's share: persist <table>.",
+		      cmd_param_persist, 2, 0),
 	SHELL_CMD_ARG(save, NULL, "Atomically save persistent RAM values.", cmd_param_save, 1, 0),
 #endif
 	SHELL_CMD_ARG(set, NULL,

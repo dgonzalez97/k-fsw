@@ -1,139 +1,130 @@
-# K-FSW - Flight Software for Next Space
+# K-FSW - Modular flight software on Zephyr, for small satellites
 
 [![Software CI](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml)
-[![Documentation](https://img.shields.io/badge/docs-K--FSW-28a96b)](https://dgonzalez97.github.io/k-fsw/)
+[![Documentation](https://img.shields.io/badge/docs-K--FSW-294c69)](https://dgonzalez97.github.io/k-fsw/)
 
-Open-source flight software built on Zephyr, for small satellites and Cubesats.
+K-FSW gives spacecraft components the common services a mission needs:
+a console, ground links, parameters, files, logs, events, commands,
+housekeeping, and firmware updates. Select what an OBC, radio, ADCS, EPS,
+or payload needs, then add the mission-specific code.
 
-It gives a spacecraft what every mission needs before it can do anything
-mission-specific: a console, a link to the ground, settings you can read and
-change over that link, files, events, logs, commands, housekeeping, and a firmware update mechanism over the air. 
+Zephyr supplies the RTOS, drivers, board support, and build tools, so the
+application can run on different MCU vendors and in Linux simulation.
+Modules and services can be reused in another RTOS port by adapting the
+Zephyr APIs they use.
 
+[Documentation](https://dgonzalez97.github.io/k-fsw/) ·
+[Getting started](docs/getting-started/index.md) ·
+[Shell commands](docs/commands/index.md) ·
+[Project status](docs/status/index.md)
 
-It is written with on-board computers in mind, but can be used for anything in a spacecraft. Because it
-is composed rather than hardcoded, the same framework runs on a radio, ADCS, an EPS or
-any other board with a processor: you enable what that subsystem needs and leave
-the rest out.
+## Repository layout
 
-[Read the documentation](https://dgonzalez97.github.io/k-fsw/) for setup,
-architecture, operations, testing, and the doxygen for the C API.
-
-## Layout of K-FSW
-
-
-![How the repositories fit together](docs/media/layout.svg)
+![K-FSW repositories](docs/media/layout.svg)
 
 | Repository | Owns |
 | --- | --- |
-| [`k-fsw`](https://github.com/dgonzalez97/k-fsw) | Composition, targets, tools, integration tests, docs, its the main app |
+| [`k-fsw`](https://github.com/dgonzalez97/k-fsw) | Application, targets, tools, integration tests, docs |
 | [`kfsw-modules`](https://github.com/dgonzalez97/kfsw-modules) | Device and subsystem modules |
 | [`kfsw-services`](https://github.com/dgonzalez97/kfsw-services) | Logging, parameters, persistence, files, events, commands, health, firmware update |
 | [`kfsw-comms`](https://github.com/dgonzalez97/kfsw-comms) | CSP, routing, UART/KISS and CAN transports |
 | [`kfsw-platform`](https://github.com/dgonzalez97/kfsw-platform) | Zephyr mechanisms: time, storage, reset cause, watchdog, I/O |
 
-
-
 ## Modules
 
-A **module** only knows about one piece of hardware - a radio, a sensor, a subsystem. It
-owns its own interface, its parameters, its shell command and its tests.
-
-Adding one touches nothing shared. A module claims its own block of settings
-and hands them to the composition, so no existing file changes and the module
-never has to learn about the services.
+A module owns one device or subsystem: its interface, state, parameters,
+and tests. Add its definition set to the application composition; the
+parameter core does not need to change.
 
 Examples in  [`kfsw-modules`](https://github.com/dgonzalez97/kfsw-modules):
 a UHF radio, and a small worked example using LEDs and buttons of development boards.
 
-## What KFSW does
+## Services
 
-- **Settings you can change from the ground.** 113 named values in 17 tables,
-  each owned by the code it describes, which checks a write before it lands. Can be persisted for reboots, and use a system that makes V&V life easier.
-- **CSP.** One router, and a route decides which link a destination takes,
-  over [libcsp](https://github.com/libcsp/libcsp).
-- **Files** in either direction, checksummed before anything is committed.
-- **[Firmware update](#firmware-update) over the air**, with rollback if the
-  new image never confirms itself. Two routes: a light block protocol, and one
-  over file transfer.
-- **Commands, events and health.** A node can be told to do something and
-  answer whether it worked, keep a record of what it did while nobody was
-  listening, and reset itself when a part of it stops responding.
-- **Housekeeping.** Name a set of values once, and a pass asks for the set
-  rather than its members. Over a real radio one exchange returned forty values
-  in the time a single round trip takes, which is the difference between
-  knowing how a spacecraft is and guessing. What comes
-  down goes into [Yamcs](https://yamcs.org/), so a pass can still be read after
-  it ends.
-- **Ground nodes.** The ground segment lives in this same workspace, built from
-  the same sources as the flight side, as if it was one extra node on the satelite.
-## Using KFSW
-The first demo tries to get you to talk between nodes without any hardware at all (
-every node here is a Linux process, and they reach each other over
-pseudo-terminals exactly as they would over a radio, kiss or CAN )
+- **Parameters:** named values with owner validation, remote access, and
+  saving on change.
+- **CSP:** one router, with routes selecting UART/KISS or CAN links.
+- **Files:** upload and download with CRC32 and atomic commit.
+- **Firmware update:** direct block upload or FTP, with MCUboot test,
+  confirm, and rollback.
+- **Commands and events:** typed operations and a bounded record of results.
+- **Health:** component deadlines control watchdog feeding.
+- **Housekeeping:** collect groups of parameters and forward samples to Yamcs.
+- **Ground nodes:** the same application and services built for Linux.
+
+## Try it on Linux
+
+From a configured west workspace, the local demo connects Linux nodes
+through pseudo-terminals using CSP/KISS.
 
 ![Building a node and bringing up a link](docs/media/getting-started.gif)
 
 ```bash
 west manifest --validate
 ./k-fsw/tools/kfsw-linux build
-./k-fsw/tools/k-ground init   
+./k-fsw/tools/k-ground init
 ```
 
-Then, in other terminal:
+Start each role in its own terminal:
 
-```bash              
-./k-fsw/tools/k-ground run kfsw-gnd-uhf 
-./k-fsw/tools/kfsw-linux run     
+```bash
+./k-fsw/tools/k-ground run kfsw-gnd-uhf
 ```
 
+```bash
+./k-fsw/tools/k-ground run kfsw-ops
+```
 
 `csp ping 16` from the operator node crosses the link and comes back. The
-[ground guide](docs/ground/index.md) covers the configuration enviroment and the
+[ground guide](docs/ground/index.md) covers the configuration and the
 other ground roles.
-
 
 ### Settings and configuration, across all nodes
 
-`param tables` lists the table from every node and `param table <id>` prints one.
+`param tables` lists local tables; `param table <id>` prints one.
+Use `param tablelist <node>` to inspect another node.
 
 Reaching them from the ground is a separate, optional piece that speaks
 [Space Inventor's libparam](https://github.com/spaceinventor/libparam).
-
 
 ![Reading and writing parameters across a link](docs/media/param-over-a-link.gif)
 
 ### Files
 
-Up, checked on the node, back down, and compared.The CRC32 of the file is what makes it a round trip. RDP can be activated for loss-less connections, and files that stop while being sent, generate a .map file that can be reused, on links that may loss connection.
+Uploads and downloads check size and CRC32 before committing the file.
+CSP/RDP provides retransmission; an interrupted transfer must be restarted.
 
 ![A file sent and fetched back](docs/media/file-transfer.gif)
 
 ### Firmware update
-send, flash, reboot, confirm. An image that arrives
-intact is not the same as one you want to boot, so receiving and committing are
-separate steps, and MCUboot puts the old image back if the new one never
-confirms itself.
-A recovery image, (with minimal modules, flashed in protected memory) can be configured to be the fallback of the A/B images, in the cathastrophic case that 2 main images are failing.
+
+Send, verify, flash, reboot, confirm. MCUboot reverts an unconfirmed test
+image on the next reset. The direct block protocol separates upload from
+`fwu flash`; the FTP route schedules the swap after verification.
+
+A flash region is reserved for a recovery image. Recovery-image boot
+selection is not implemented. See the [update guide](docs/fwu/README.md).
 
 ![Firmware update over a radio link](docs/media/firmware-update-over-radio.gif)
 
 ## Hardware
 
-The board in use today is an **STM32 Nucleo (L496ZG)**, and several more will
-join it before the first release, if they are supported by the Zephyr Proyect. Parameter tables, file transfer, commands, events, CAN and a firmware update have all been exercised on it from a ground node over a real radio link, but also in simulation.
+NUCLEO-L496ZG is the current MCU reference. Recorded bench runs cover
+parameters, files, commands, events, CAN, housekeeping, and firmware updates.
+Some features require opt-in profiles; see [targets](docs/targets/index.md).
 
-What has and has not been proven on hardware is tracked in the
-[project status](docs/status/index.md).
+[Project status](docs/status/index.md) records the tested configurations
+and remaining hardware checks.
 
 ## Targets
- 
+
 | Target | Board | Links | What runs on it |
 | --- | --- | --- | --- |
-| `linux` | `native_sim/native/64` | KISS over a PTY, CAN via SocketCAN | Everything |
-| `nucleo_l496zg` | STM32 Nucleo L496ZG | KISS on USART3, CAN on PD0/PD1 | Everything |
+| `linux` | `native_sim/native/64` | KISS over a PTY; optional CAN via SocketCAN | Reference services and optional profiles |
+| `nucleo_l496zg` | STM32 Nucleo L496ZG | KISS on USART3; optional CAN on PD0/PD1 | Reference services and optional profiles |
 
-They are bring-up profiles, not
-flight targets, and build without CSP, parameters, storage or files, to test Zephyr. TBD before release to test them as well.
+FRDM and Pico W currently provide shell bring-up profiles. CSP,
+parameters, storage, and file transfer are disabled.
 
 | Target | Board | Verified scope |
 | --- | --- | --- |
@@ -142,40 +133,35 @@ flight targets, and build without CSP, parameters, storage or files, to test Zep
 
 ## Mission control
 
-A console is enough to fly a bench and not enough to fly a mission: the moment
-it scrolls, the pass is gone. So what housekeeping brings down goes into
-[Yamcs](https://yamcs.org/), the open source mission control system, kept in a
-small fork at
-[kfsw-yamcs](https://github.com/dgonzalez97/kfsw-yamcs) and pulled in as a
-submodule under `ground-station/yamcs`.
+[Yamcs](https://yamcs.org/) records housekeeping telemetry. The
+[kfsw-yamcs](https://github.com/dgonzalez97/kfsw-yamcs) configuration is a
+submodule under `ground-station/yamcs`:
 
 ```bash
-cd ground-station/yamcs && ./mvnw yamcs:run && ./scripts/setup.sh
+cd ground-station/yamcs
+./mvnw yamcs:run
 ```
 
-A bridge on the host speaks CSP over the link, pulls housekeeping and forwards
-it; the mission database is generated from the same file that tells the node
-what to collect, so a frame that carries no names still decodes into the right
-ones. Yamcs reads and does not command — housekeeping is configured through
-K-FSW's own command service, which reaches a node over KISS or CAN.
+The host bridge pulls CSP samples and forwards them to Yamcs. Report
+definitions generate both the node configuration and the mission database.
+Configure housekeeping through K-FSW commands; Yamcs currently records
+telemetry only.
 
 The [ground guide](docs/ground/index.md) has the walkthrough, including how to
 check it before any hardware is involved.
 
-<!-- A screenshot of the archive belongs here. -->
-
 ## Testing
 
-Nine jobs run on every push, and all must pass before anything merges:
+The software workflow runs these checks:
 
 | Job | What it checks |
 | --- | --- |
 | `BUILD / linux`, `BUILD / nucleo_l496zg` | Both full targets build, plus a CSP-disabled composition |
 | `QUALITY` | clang-format and cppcheck over the sources |
-| `UNIT / Twister` | **227 cases** across 23 suites |
-| `INTEGRATION / software` | 18 end-to-end smoke scripts driving a real image |
+| `UNIT / Twister` | Component tests on native simulation |
+| `INTEGRATION / software` | Smoke scripts driving full images |
 | `MEMORY / Valgrind` | The hosted image under Valgrind |
-| `UNDEFINED / UBSan` | The same suites, watching the arithmetic rather than the memory |
+| `UNDEFINED / UBSan` | Unit suites with undefined-behaviour checks |
 | `ROBOT / dry-run + software` | Every suite parses; the software-tagged cases run |
 | `DOCS / Doxygen` | The documentation builds and the API is documented |
 
@@ -183,28 +169,15 @@ The unit suites cover each layer on its own; the integration scripts go the
 other way, booting a real image and talking to it through a ground node the way
 an operator would.
 
-[Coverage is reported by Twister](https://dgonzalez97.github.io/k-fsw/coverage/),
-which builds the suites instrumented, runs them and composes the report. Lines,
-functions and branches are each reported per file, down to the source itself,
-and every function is listed with the number of times it ran. It measures the
-unit suites only, so a low figure means a layer is tested mostly on a bench
-rather than that it is untested.
+[Coverage](https://dgonzalez97.github.io/k-fsw/coverage/) reports unit-test
+lines, functions, and branches. Integration and HIL runs are not included.
 
 ### Hardware in the loop
 
-[Robot Framework](https://robotframework.org/) drives the physical suites,
-because a HIL run is a sequence of operator actions and Robot is honest about
-which ones passed.
-
-It reaches the boards through
-[`robot-terminal-runner`](https://github.com/dgonzalez97/robot-terminal-runner)
-[![CI](https://github.com/dgonzalez97/robot-terminal-runner/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgonzalez97/robot-terminal-runner/actions/workflows/ci.yml),
-which attaches Robot to a [tmux](https://github.com/tmux/tmux) session and
-types into it. It is a submodule under `tests/platform`.
-
-So the session a person would drive by hand is the one the suite drives. A case
-is a recording of operator actions rather than a harness that has to resemble
-one, which is what makes it easy to read and edit for V&V.
+[Robot Framework](https://robotframework.org/) drives the physical suites
+through [robot-terminal-runner](https://github.com/dgonzalez97/robot-terminal-runner),
+a submodule under `tests/platform/`. It sends shell commands through tmux
+and records the results.
 
 | Suite | Needs | Covers |
 | --- | --- | --- |
@@ -226,18 +199,15 @@ And the report it leaves behind:
 
 ![Robot report from a physical run](docs/media/hil-robot-report.png)
 
-A physical result is only ever recorded when someone watched it happen. The
-[project status](docs/status/index.md) separates what exists from what has been
-tested in software and what has been read off a board.
+The [status page](docs/status/index.md) records observed physical results
+separately from software tests.
 
 ## Development
 
+The [contribution guide](docs/development/index.md) covers repository
+ownership, dependency pins, and PRs. Build the HTML and PDF from the workspace:
 
-The [documentation site](https://dgonzalez97.github.io/k-fsw/) covers setup,
-architecture, operations and the C API, and the same content builds as a
-printable guide with 
-
-`./k-fsw/tools/docs/pdf.sh`. 
-
-The [development guide](docs/development/index.md) covers contributions and how to add modules or
-changes. 
+```bash
+./k-fsw/tools/docs/build.sh
+./k-fsw/tools/docs/pdf.sh
+```

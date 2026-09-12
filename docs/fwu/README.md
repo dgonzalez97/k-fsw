@@ -246,5 +246,5 @@ find.
 ## Related
 
 - @ref targets — flash map and MCUboot profile.
-- [MCUboot acceptance](https://github.com/dgonzalez97/k-fsw/blob/main/tests/hil/mcuboot/rollback.sh) — rollback and confirmation checks.
+- @ref testing — rollback acceptance.
 - `tests/hil/mcuboot/rollback.sh` — revert, confirmation, wrong-key rejection.

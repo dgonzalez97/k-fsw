@@ -1,6 +1,6 @@
 PROJECT_NAME           = "K-FSW"
 PROJECT_NUMBER         = $(KFSW_DOCS_VERSION)
-PROJECT_BRIEF          = "Flight software for small satellites, on Zephyr"
+PROJECT_BRIEF          = "Modular flight software on Zephyr, for small satellites"
 
 OUTPUT_DIRECTORY       = ../build/docs
 CREATE_SUBDIRS         = NO
@@ -78,13 +78,9 @@ LAYOUT_FILE            = docs/DoxygenLayout.xml
 GENERATE_HTML          = YES
 HTML_OUTPUT            = html
 HTML_FILE_EXTENSION    = .html
-HTML_COLORSTYLE_HUE    = 138
+HTML_COLORSTYLE_HUE    = 205
 HTML_COLORSTYLE_SAT    = 80
 HTML_COLORSTYLE_GAMMA  = 90
-# HTML_TIMESTAMP was removed upstream: Doxygen no longer stamps generated pages
-# with a build time, so the tag has no meaning and newer versions warn that it
-# is obsolete. WARN_AS_ERROR is on, so that warning fails the documentation
-# build on any branch once the runner picks up the newer Doxygen.
 HTML_DYNAMIC_MENUS     = YES
 HTML_DYNAMIC_SECTIONS  = YES
 HTML_INDEX_NUM_ENTRIES = 100
@@ -95,7 +91,7 @@ GENERATE_ECLIPSEHELP   = NO
 DISABLE_INDEX          = NO
 GENERATE_TREEVIEW      = YES
 ENUM_VALUES_PER_LINE   = 4
-TREEVIEW_WIDTH         = 280
+TREEVIEW_WIDTH         = 260
 EXT_LINKS_IN_WINDOW    = NO
 HTML_EXTRA_STYLESHEET  = docs/theme/kfsw.css
 

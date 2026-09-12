@@ -243,9 +243,7 @@ the counters agreeing with what the ground heard, and an operator taking the
 beacon away again.
 
 Expect `sent` to run slightly ahead of `heard`: beacons carry no RDP, so a lost
-frame costs one sample and the sequence numbers show the gap. That is the
-design, not a fault — a bad pass should return most of something rather than
-nothing.
+frame costs one sample and the sequence numbers show the gap. Use the sequence numbers to measure lost samples.
 
 ## Evidence classification
 

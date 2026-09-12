@@ -29,6 +29,7 @@ debug_capture_pid=""
 debug_stty=""
 radio_stty=""
 failures=0
+build_image=yes
 
 # Ports outlive this script if they are not given back, and a held port looks
 # exactly like a broken board on the next run.
@@ -69,11 +70,37 @@ wait_for_output()
 	return 1
 }
 
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+	--radio)
+		radio_device="${2:?--radio requires a device path}"
+		shift 2
+		;;
+	--serial)
+		debug_serial="${2:?--serial requires a device path}"
+		shift 2
+		;;
+	--no-build)
+		build_image=no
+		shift
+		;;
+	-h|--help)
+		echo "Usage: beacon-smoke.sh [--radio PATH] [--serial PATH] [--no-build]"
+		exit 0
+		;;
+	*)
+		echo "ERROR: unknown argument: $1" >&2
+		exit 2
+		;;
+	esac
+done
+
 [[ -n "$radio_device" ]] || { echo "ERROR: set KGROUND_HOLYBRO_DEVICE" >&2; exit 2; }
 [[ -e "$radio_device" ]] || { echo "ERROR: no radio at $radio_device" >&2; exit 2; }
 [[ -e "$debug_serial" ]] || { echo "ERROR: no board at $debug_serial" >&2; exit 2; }
 [[ -x "$python" ]] || python="python3"
 
+if [[ "$build_image" == yes ]]; then
 echo "HOLYBRO BEACON: building NUCLEO node 2 with peer 16"
 KFSW_PRISTINE=always \
 	KFSW_BUILD_DIR="$nucleo_build_dir" \
@@ -81,7 +108,10 @@ KFSW_PRISTINE=always \
 	KFSW_EXTRA_DTC_OVERLAY_FILE="$HOLYBRO_DIR/nucleo_l496zg.overlay" \
 	"$KFSW_REPO_DIR/tools/build.sh" nucleo_l496zg >"$work_dir/build.log" 2>&1 ||
 	{ cat "$work_dir/build.log" >&2; exit 1; }
+fi
 
+[[ -f "$nucleo_build_dir/zephyr/.config" ]] ||
+	{ echo "ERROR: no image at $nucleo_build_dir; run without --no-build" >&2; exit 2; }
 grep -q '^CONFIG_KFSW_HK_BEACON=y$' "$nucleo_build_dir/zephyr/.config" ||
 	{ echo "ERROR: this image does not carry the beacon" >&2; exit 2; }
 
