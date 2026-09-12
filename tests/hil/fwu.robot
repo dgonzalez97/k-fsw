@@ -18,7 +18,7 @@ ${FWU_CAN_OUTPUT}      %{KFSW_FWU_CAN_OUTPUT=/tmp/kfsw-fwu-can}
 CAN Update Keeps Both Images Readable
     [Documentation]    Uploads through FTP and FWU lite, compares slot files,
     ...    reverts a trial, then confirms and reboots the candidate.
-    [Tags]    hardware    nucleo    can    fwu    ftp
+    [Tags]    physical    nucleo    can    fwu    ftp
     Skip If    not $FWU_CAN_GROUND or not $FWU_CAN_IMAGE    Prebuilt CAN images not configured
     ${result}=    Run Process    python3
     ...    ${KFSW_REPO_DIR}/tests/hil/fwu/can-update.py
