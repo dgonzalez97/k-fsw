@@ -3,7 +3,8 @@
 [TOC]
 
 Upload a signed image, reboot into it, then confirm it after checking the node.
-MCUboot restores an unconfirmed image on the next reset. The watchdog provides
+MCUboot restores the previous image if the trial is unconfirmed at the next reset.
+The watchdog provides
 that reset only when it is configured and its health policy stops feeding it.
 
 ## Firmware files
