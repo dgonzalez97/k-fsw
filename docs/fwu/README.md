@@ -113,6 +113,9 @@ KFSW_MCUBOOT_DTC_OVERLAY_FILE="$P/nucleo-mcuboot-flash.overlay" \
 The host adapter and flight node use 500 kbit/s. See
 `tests/hil/fwu/README.md` for upload, readback, revert and confirmation tests.
 The radio uses the same services; match the UART baud rate at each radio end.
+When radio encryption is enabled, establish both sessions with `uhf connect`
+before uploading. See @ref communications for key setup. Firmware signatures
+and radio keys serve separate purposes; keep separate keys for them.
 
 ## Errors
 

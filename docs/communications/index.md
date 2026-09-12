@@ -89,6 +89,39 @@ implicitly choosing the first link.
 Routes are fixed once the router starts. Set them in the composition;
 the `route_table` parameter is read-only.
 
+## Radio encryption
+
+Add `config/profiles/radio-crypto.conf` to both builds. NUCLEO also needs
+`nucleo-radio-crypto.overlay` for its hardware RNG. The radio module protects
+the KISS interface named by `KFSW_RADIO_UHF_CRYPTO_INTERFACE`.
+
+Generate a random 256-bit key (`openssl rand -hex 32`). At each local console:
+
+```text
+param set uhf_key_hex <64 hex digits>
+param get uhf_crypto_error
+uhf connect
+uhf status
+```
+
+Use the same key at both ends and set each node's `KFSW_CSP_UART_PEER_ADDRESS`.
+The key reads back empty. Radio settings are saved outside the FTP directory;
+remote writes to them are refused. Check `uhf_crypto_error` after a change.
+
+`uhf_encrypt_enable` switches protection on or off. `uhf_encrypt_tx` and
+`uhf_encrypt_rx` select the directions. They default to 1 in an encryption
+build. RX enabled rejects plaintext; a missing key or session blocks traffic.
+
+The link uses AES-256-GCM with a 16-byte tag. Fresh authenticated sessions
+and sequence numbers reject replayed frames, including after reset. The CSP
+header is authenticated too. A captured handshake can interrupt a session;
+it cannot restore an old session key. `uhf connect` starts a new handshake.
+
+With the default 256-byte CSP buffer and CRC32 enabled, an encrypted packet
+carries at most 220 application bytes. Oversized packets are refused. This
+protection applies to the selected radio link; other interfaces need their
+own access policy.
+
 ### Transport and framing
 
 Transport features operate above routing and link interfaces. libcsp's RDP can
@@ -199,12 +232,10 @@ distinct `/14` interface addresses are significant: the pinned libcsp
 split-horizon logic must see these as different links before it forwards a
 transit packet.
 
-There is currently no CAN/CFP interface, automatic route discovery, runtime
-route mutation, redundant-link failover policy, ZMQ interface, or production
-radio driver in the K-FSW composition. The k-ground Holybro HIL entry point
-continues to reuse the direct serial KISS route. Its named one-link bench
-passed 100/100 raw exchanges and bidirectional node 16 ↔ node 2 CSP ping with
-clean KISS counters on 30 August 2026. No physical `KISS_2` bench is claimed.
+CAN uses libcsp's CFP interface when selected. There is no automatic route
+discovery, runtime route mutation, redundant-link failover, or ZMQ interface.
+The Holybro module uses the serial KISS route; the bench verified raw exchanges
+and bidirectional CSP ping. See @ref project_status for measured coverage.
 
 ## Route-table configuration
 

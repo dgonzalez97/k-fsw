@@ -12,6 +12,7 @@ under `tests/hil/`; use @ref testing to find the relevant fixture.
 | --- | --- | --- |
 | CAN | `54ac87f`: NUCLEO ping, identity, and parameters | External transceiver and termination required |
 | Holybro | Bidirectional CSP, remote parameters, file round trips | No RF range or endurance qualification |
+| Radio encryption | Native peers: AES-256-GCM, key changes, plaintext refusal, replay rejection | Encrypted Holybro acceptance pending |
 | Firmware update | `db64963`: radio upload, boot, and confirmation | Signature checked by MCUboot; golden-image selection absent |
 | CAN firmware update | `fwu-can-checked`: FTP and FWU lite uploads, both slot readbacks, rollback, confirmation, and PARAM reads | NUCLEO at 500 kbit/s; bench image and configuration recorded by the fixture |
 | Housekeeping | `54ac87f`: collection, radio retrieval, and Yamcs archive | Measurements cover one report and bench |
@@ -25,15 +26,20 @@ under `tests/hil/`; use @ref testing to find the relevant fixture.
 - `@READY` marks completed startup. `@SERVICES` reports startup failures;
   runtime liveness is handled by health monitoring.
 - Routes are fixed once the CSP router starts. There is no automatic failover.
-- Commands have no authentication or duplicate suppression. CRC32 detects
-  corruption; it does not authenticate a sender.
+- Optional radio encryption authenticates packets and rejects wire replays.
+  Other links need their own access policy. Commands have no request deduplication;
+  check the outcome before resubmitting a command whose reply was lost.
 - Events and retained reset notes are held in RAM.
 - HK skips elapsed schedule slots after a slow collection. Remote reads have
   a shared budget; local callbacks and drivers need their own time bounds.
-- The CAN bench image left 2,208 bytes unused on the PARAM worker stack and
-  1,184 on the temperature worker. These are observed high-water marks.
-  Worst-case latency, flash endurance, and long soak runs need measurements
-  for each flight composition.
+- A 120-second loaded CAN run measured a 107.124 ms maximum HK collection
+  and 127 us maximum router wake-to-run delay. PARAM and temperature workers
+  left 2,208 and 1,184 stack bytes unused. These are observed maxima for
+  `fwu-can-probes`, with radio encryption disabled.
+- The longer soak stopped after a console command was misread. The revised
+  fixture keeps console writes outside flash traffic; its full rerun and
+  interrupted-update cases remain pending. Each flight composition needs
+  its own timing and endurance measurements.
 
 Use repository issues for planned work. Keep this page to supported behaviour
 and measured limits.

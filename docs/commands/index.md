@@ -664,6 +664,11 @@ The name reports the one an operator needs first.
 
 ## Automation guidance
 
+Commands are sent without automatic retries. A timeout may mean the reply was
+lost after execution. Check the resulting state before submitting the command
+again. Radio replay protection rejects repeated wire frames; a newly submitted
+command is a new request.
+
 Prefer stable markers and result lines over terminal timing. Wait for
 `@READY`, send one command, assert its command-specific output, and wait for
 the prompt before sending the next command. The project integration and Robot

@@ -26,8 +26,10 @@ running a fixture; some fixtures flash or reboot the target.
 | Check | Procedure |
 | --- | --- |
 | CAN firmware upload, slot readback, rollback, confirmation | `tests/hil/fwu/README.md` |
+| Loaded timing, soak, interrupted erase/write | `tests/hil/fwu/can-acceptance.py` |
 | NUCLEO CAN setup | `tests/hil/stm32/nucleo-l496zg/` |
 | Holybro serial and CSP link | `tests/hil/radio-uhf/holybro/` |
+| Encrypted radio, wrong keys, captured-frame replay | `tests/hil/radio-uhf/holybro/crypto-smoke.py` |
 | Robot scenarios | `tests/hil/` |
 
 Keep the source commits, configuration, device identities, routes, interface
