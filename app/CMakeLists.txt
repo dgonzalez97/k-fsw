@@ -42,6 +42,17 @@ target_sources(app PRIVATE
     src/main.c
 )
 
+if(CONFIG_KFSW_HIL_PROBES)
+    target_sources(app PRIVATE ../tests/hil/fwu/probes.c)
+    zephyr_link_libraries(
+        -Wl,--wrap=kfsw_hk_collect
+        -Wl,--wrap=kfsw_param_get_by_id
+        -Wl,--wrap=kfsw_param_sample_all
+        -Wl,--wrap=flash_area_flatten
+        -Wl,--wrap=stream_flash_buffered_write
+    )
+endif()
+
 # Core parameter tables, identifiers 1 to 24. They live in the composition
 # layer because kfsw-platform and kfsw-comms sit below the parameter service.
 target_sources_ifdef(CONFIG_KFSW_DEBUG_SHELL app PRIVATE

@@ -64,6 +64,31 @@ space for the candidate and readbacks; the board's storage geometry is unchanged
 Use `--reboot-pin` if the board's PIN differs from `0000`. The ground profile
 uses 1,000 clock ticks per second for SocketCAN's transmit-completion polling.
 
+## Timing and interrupted uploads
+
+Add `probes.conf` to the flight build, then install and confirm that image.
+The probes are excluded from normal builds. They measure wake-to-run latency,
+full HK collection time, local PARAM reads, and PARAM sampling.
+
+```bash
+python k-fsw/tests/hil/fwu/can-acceptance.py \
+  --ground "$B/ground/zephyr/zephyr.exe" \
+  --image "$B/after/app/zephyr/zephyr.signed.bin" \
+  --flash "$B/run-1/ground-flash.bin" \
+  --serial "$KFSW_DEBUG_SERIAL" \
+  --seconds 3600 --interruptions --output "$B/acceptance-1"
+```
+
+The load combines local and remote HK at 1 Hz, PARAM requests, file round trips,
+and slot downloads. `timing.txt` records observed maxima, not a WCET proof.
+The fixture rejects a run with no measured HK collections.
+
+The reset cases interrupt FTP and FWU lite after 1 or 80 erased pages, then
+after 512 or 65,536 written bytes. Each case checks that the confirmed image
+still boots and reads back unchanged. Resets happen between flash operations;
+this does not test loss of power during an individual erase/program pulse.
+Golden storage and the primary slot are never selected by the probes.
+
 Add `flight-diagnostics.conf` to the flight configuration and pass `--stack-check`
 to record stack high-water marks after the candidate's PARAM requests.
 
