@@ -11,63 +11,63 @@
 <!-- app -->
 <g id="node1" class="node">
 <title>app</title>
-<path fill="#28a96b" stroke="#1c7a4d" d="M471,-191C471,-191 252,-191 252,-191 246,-191 240,-185 240,-179 240,-179 240,-167 240,-167 240,-161 246,-155 252,-155 252,-155 471,-155 471,-155 477,-155 483,-161 483,-167 483,-167 483,-179 483,-179 483,-185 477,-191 471,-191"/>
+<path fill="#294c69" stroke="#25677a" d="M471,-191C471,-191 252,-191 252,-191 246,-191 240,-185 240,-179 240,-179 240,-167 240,-167 240,-161 246,-155 252,-155 252,-155 471,-155 471,-155 477,-155 483,-161 483,-167 483,-167 483,-179 483,-179 483,-185 477,-191 471,-191"/>
 <text text-anchor="start" x="344.5" y="-176.2" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00" fill="#ffffff">k&#45;fsw</text>
 <text text-anchor="start" x="253" y="-165.2" font-family="Helvetica,sans-Serif" font-size="11.00" fill="#ffffff">composition, targets, tools, tests, docs</text>
 </g>
 <!-- modules -->
 <g id="node2" class="node">
 <title>modules</title>
-<path fill="#e8f5ee" stroke="#2f9e68" d="M153,-113.5C153,-113.5 12,-113.5 12,-113.5 6,-113.5 0,-107.5 0,-101.5 0,-101.5 0,-89.5 0,-89.5 0,-83.5 6,-77.5 12,-77.5 12,-77.5 153,-77.5 153,-77.5 159,-77.5 165,-83.5 165,-89.5 165,-89.5 165,-101.5 165,-101.5 165,-107.5 159,-113.5 153,-113.5"/>
-<text text-anchor="start" x="39.5" y="-98.7" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00" fill="#143122">kfsw&#45;modules</text>
-<text text-anchor="start" x="13" y="-87.7" font-family="Helvetica,sans-Serif" font-size="11.00" fill="#143122">radio, GNSS, sensors, I/O</text>
+<path fill="#eaf1f5" stroke="#43a0b2" d="M153,-113.5C153,-113.5 12,-113.5 12,-113.5 6,-113.5 0,-107.5 0,-101.5 0,-101.5 0,-89.5 0,-89.5 0,-83.5 6,-77.5 12,-77.5 12,-77.5 153,-77.5 153,-77.5 159,-77.5 165,-83.5 165,-89.5 165,-89.5 165,-101.5 165,-101.5 165,-107.5 159,-113.5 153,-113.5"/>
+<text text-anchor="start" x="39.5" y="-98.7" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00" fill="#243746">kfsw&#45;modules</text>
+<text text-anchor="start" x="13" y="-87.7" font-family="Helvetica,sans-Serif" font-size="11.00" fill="#243746">radio, GNSS, sensors, I/O</text>
 </g>
 <!-- app&#45;&gt;modules -->
 <g id="edge1" class="edge">
 <title>app&#45;&gt;modules</title>
-<path fill="none" stroke="#7a8b83" d="M298.54,-154.96C255.12,-143.21 197.38,-127.59 152.52,-115.45"/>
-<polygon fill="#7a8b83" stroke="#7a8b83" points="153.11,-113.07 145.71,-113.61 151.83,-117.8 153.11,-113.07"/>
+<path fill="none" stroke="#7891a2" d="M298.54,-154.96C255.12,-143.21 197.38,-127.59 152.52,-115.45"/>
+<polygon fill="#7891a2" stroke="#7891a2" points="153.11,-113.07 145.71,-113.61 151.83,-117.8 153.11,-113.07"/>
 </g>
 <!-- services -->
 <g id="node3" class="node">
 <title>services</title>
-<path fill="#e8f5ee" stroke="#2f9e68" d="M345.5,-119C345.5,-119 195.5,-119 195.5,-119 189.5,-119 183.5,-113 183.5,-107 183.5,-107 183.5,-84 183.5,-84 183.5,-78 189.5,-72 195.5,-72 195.5,-72 345.5,-72 345.5,-72 351.5,-72 357.5,-78 357.5,-84 357.5,-84 357.5,-107 357.5,-107 357.5,-113 351.5,-119 345.5,-119"/>
-<text text-anchor="start" x="227.5" y="-104.2" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00" fill="#143122">kfsw&#45;services</text>
-<text text-anchor="start" x="201" y="-93.2" font-family="Helvetica,sans-Serif" font-size="11.00" fill="#143122">log, param, files, events,</text>
-<text text-anchor="start" x="196.5" y="-82.2" font-family="Helvetica,sans-Serif" font-size="11.00" fill="#143122">commands, health, update</text>
+<path fill="#eaf1f5" stroke="#43a0b2" d="M345.5,-119C345.5,-119 195.5,-119 195.5,-119 189.5,-119 183.5,-113 183.5,-107 183.5,-107 183.5,-84 183.5,-84 183.5,-78 189.5,-72 195.5,-72 195.5,-72 345.5,-72 345.5,-72 351.5,-72 357.5,-78 357.5,-84 357.5,-84 357.5,-107 357.5,-107 357.5,-113 351.5,-119 345.5,-119"/>
+<text text-anchor="start" x="227.5" y="-104.2" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00" fill="#243746">kfsw&#45;services</text>
+<text text-anchor="start" x="201" y="-93.2" font-family="Helvetica,sans-Serif" font-size="11.00" fill="#243746">log, param, files, events,</text>
+<text text-anchor="start" x="196.5" y="-82.2" font-family="Helvetica,sans-Serif" font-size="11.00" fill="#243746">commands, health, update</text>
 </g>
 <!-- app&#45;&gt;services -->
 <g id="edge2" class="edge">
 <title>app&#45;&gt;services</title>
-<path fill="none" stroke="#7a8b83" d="M340.85,-154.87C329.75,-145.66 315.81,-134.1 303.28,-123.69"/>
-<polygon fill="#7a8b83" stroke="#7a8b83" points="304.58,-121.59 297.63,-119.01 301.45,-125.36 304.58,-121.59"/>
+<path fill="none" stroke="#7891a2" d="M340.85,-154.87C329.75,-145.66 315.81,-134.1 303.28,-123.69"/>
+<polygon fill="#7891a2" stroke="#7891a2" points="304.58,-121.59 297.63,-119.01 301.45,-125.36 304.58,-121.59"/>
 </g>
 <!-- comms -->
 <g id="node4" class="node">
 <title>comms</title>
-<path fill="#e8f5ee" stroke="#2f9e68" d="M519.5,-113.5C519.5,-113.5 387.5,-113.5 387.5,-113.5 381.5,-113.5 375.5,-107.5 375.5,-101.5 375.5,-101.5 375.5,-89.5 375.5,-89.5 375.5,-83.5 381.5,-77.5 387.5,-77.5 387.5,-77.5 519.5,-77.5 519.5,-77.5 525.5,-77.5 531.5,-83.5 531.5,-89.5 531.5,-89.5 531.5,-101.5 531.5,-101.5 531.5,-107.5 525.5,-113.5 519.5,-113.5"/>
-<text text-anchor="start" x="414.5" y="-98.7" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00" fill="#143122">kfsw&#45;comms</text>
-<text text-anchor="start" x="388.5" y="-87.7" font-family="Helvetica,sans-Serif" font-size="11.00" fill="#143122">CSP, routing, KISS, CAN</text>
+<path fill="#eaf1f5" stroke="#43a0b2" d="M519.5,-113.5C519.5,-113.5 387.5,-113.5 387.5,-113.5 381.5,-113.5 375.5,-107.5 375.5,-101.5 375.5,-101.5 375.5,-89.5 375.5,-89.5 375.5,-83.5 381.5,-77.5 387.5,-77.5 387.5,-77.5 519.5,-77.5 519.5,-77.5 525.5,-77.5 531.5,-83.5 531.5,-89.5 531.5,-89.5 531.5,-101.5 531.5,-101.5 531.5,-107.5 525.5,-113.5 519.5,-113.5"/>
+<text text-anchor="start" x="414.5" y="-98.7" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00" fill="#243746">kfsw&#45;comms</text>
+<text text-anchor="start" x="388.5" y="-87.7" font-family="Helvetica,sans-Serif" font-size="11.00" fill="#243746">CSP, routing, KISS, CAN</text>
 </g>
 <!-- app&#45;&gt;comms -->
 <g id="edge3" class="edge">
 <title>app&#45;&gt;comms</title>
-<path fill="none" stroke="#7a8b83" d="M382.38,-154.87C395.67,-143.96 413,-129.74 427.22,-118.06"/>
-<polygon fill="#7a8b83" stroke="#7a8b83" points="428.85,-119.9 432.71,-113.56 425.74,-116.11 428.85,-119.9"/>
+<path fill="none" stroke="#7891a2" d="M382.38,-154.87C395.67,-143.96 413,-129.74 427.22,-118.06"/>
+<polygon fill="#7891a2" stroke="#7891a2" points="428.85,-119.9 432.71,-113.56 425.74,-116.11 428.85,-119.9"/>
 </g>
 <!-- platform -->
 <g id="node5" class="node">
 <title>platform</title>
-<path fill="#e8f5ee" stroke="#2f9e68" d="M715,-119C715,-119 562,-119 562,-119 556,-119 550,-113 550,-107 550,-107 550,-84 550,-84 550,-78 556,-72 562,-72 562,-72 715,-72 715,-72 721,-72 727,-78 727,-84 727,-84 727,-107 727,-107 727,-113 721,-119 715,-119"/>
-<text text-anchor="start" x="595" y="-104.2" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00" fill="#143122">kfsw&#45;platform</text>
-<text text-anchor="start" x="563" y="-93.2" font-family="Helvetica,sans-Serif" font-size="11.00" fill="#143122">time, storage, reset cause,</text>
-<text text-anchor="start" x="611.5" y="-82.2" font-family="Helvetica,sans-Serif" font-size="11.00" fill="#143122">watchdog</text>
+<path fill="#eaf1f5" stroke="#43a0b2" d="M715,-119C715,-119 562,-119 562,-119 556,-119 550,-113 550,-107 550,-107 550,-84 550,-84 550,-78 556,-72 562,-72 562,-72 715,-72 715,-72 721,-72 727,-78 727,-84 727,-84 727,-107 727,-107 727,-113 721,-119 715,-119"/>
+<text text-anchor="start" x="595" y="-104.2" font-family="Helvetica,sans-Serif" font-weight="bold" font-size="11.00" fill="#243746">kfsw&#45;platform</text>
+<text text-anchor="start" x="563" y="-93.2" font-family="Helvetica,sans-Serif" font-size="11.00" fill="#243746">time, storage, reset cause,</text>
+<text text-anchor="start" x="611.5" y="-82.2" font-family="Helvetica,sans-Serif" font-size="11.00" fill="#243746">watchdog</text>
 </g>
 <!-- app&#45;&gt;platform -->
 <g id="edge4" class="edge">
 <title>app&#45;&gt;platform</title>
-<path fill="none" stroke="#7a8b83" d="M424.01,-154.96C460.81,-144.93 507.99,-132.07 548.72,-120.97"/>
-<polygon fill="#7a8b83" stroke="#7a8b83" points="549.61,-123.27 555.72,-119.06 548.32,-118.54 549.61,-123.27"/>
+<path fill="none" stroke="#7891a2" d="M424.01,-154.96C460.81,-144.93 507.99,-132.07 548.72,-120.97"/>
+<polygon fill="#7891a2" stroke="#7891a2" points="549.61,-123.27 555.72,-119.06 548.32,-118.54 549.61,-123.27"/>
 </g>
 <!-- zephyr -->
 <g id="node6" class="node">
@@ -79,26 +79,26 @@
 <!-- modules&#45;&gt;zephyr -->
 <g id="edge5" class="edge">
 <title>modules&#45;&gt;zephyr</title>
-<path fill="none" stroke="#7a8b83" d="M145.46,-77.46C188.88,-65.71 246.62,-50.09 291.48,-37.95"/>
-<polygon fill="#7a8b83" stroke="#7a8b83" points="292.17,-40.3 298.29,-36.11 290.89,-35.57 292.17,-40.3"/>
+<path fill="none" stroke="#7891a2" d="M145.46,-77.46C188.88,-65.71 246.62,-50.09 291.48,-37.95"/>
+<polygon fill="#7891a2" stroke="#7891a2" points="292.17,-40.3 298.29,-36.11 290.89,-35.57 292.17,-40.3"/>
 </g>
 <!-- services&#45;&gt;zephyr -->
 <g id="edge6" class="edge">
 <title>services&#45;&gt;zephyr</title>
-<path fill="none" stroke="#7a8b83" d="M297.8,-71.85C309.68,-61.99 323.54,-50.5 335.29,-40.75"/>
-<polygon fill="#7a8b83" stroke="#7a8b83" points="337.05,-42.47 340.87,-36.11 333.92,-38.7 337.05,-42.47"/>
+<path fill="none" stroke="#7891a2" d="M297.8,-71.85C309.68,-61.99 323.54,-50.5 335.29,-40.75"/>
+<polygon fill="#7891a2" stroke="#7891a2" points="337.05,-42.47 340.87,-36.11 333.92,-38.7 337.05,-42.47"/>
 </g>
 <!-- comms&#45;&gt;zephyr -->
 <g id="edge7" class="edge">
 <title>comms&#45;&gt;zephyr</title>
-<path fill="none" stroke="#7a8b83" d="M432.62,-77.37C419.33,-66.46 402,-52.24 387.78,-40.56"/>
-<polygon fill="#7a8b83" stroke="#7a8b83" points="389.26,-38.61 382.29,-36.06 386.15,-42.4 389.26,-38.61"/>
+<path fill="none" stroke="#7891a2" d="M432.62,-77.37C419.33,-66.46 402,-52.24 387.78,-40.56"/>
+<polygon fill="#7891a2" stroke="#7891a2" points="389.26,-38.61 382.29,-36.06 386.15,-42.4 389.26,-38.61"/>
 </g>
 <!-- platform&#45;&gt;zephyr -->
 <g id="edge8" class="edge">
 <title>platform&#45;&gt;zephyr</title>
-<path fill="none" stroke="#7a8b83" d="M555.77,-71.95C516,-61.11 468.86,-48.26 430.98,-37.94"/>
-<polygon fill="#7a8b83" stroke="#7a8b83" points="431.41,-35.52 424.02,-36.04 430.13,-40.24 431.41,-35.52"/>
+<path fill="none" stroke="#7891a2" d="M555.77,-71.95C516,-61.11 468.86,-48.26 430.98,-37.94"/>
+<polygon fill="#7891a2" stroke="#7891a2" points="431.41,-35.52 424.02,-36.04 430.13,-40.24 431.41,-35.52"/>
 </g>
 </g>
 </svg>
