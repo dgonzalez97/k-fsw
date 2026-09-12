@@ -28,7 +28,7 @@ manifest:
 
     - name: kfsw-services
       remote: kfsw
-      revision: 44c0a62dbd741002e908c582882cdac470c76b2d
+      revision: cc4f93a4b6cf630e17e4a04c932bfbd886d3edfc
       path: kfsw-services
 
     - name: kfsw-comms
@@ -38,7 +38,7 @@ manifest:
 
     - name: kfsw-modules
       remote: kfsw
-      revision: f7b9593fb89190ce0d09a3cba71714e64ac0de45
+      revision: 2ca996fe3d5afd32aac6c5889cc594c28e7e1204
       path: kfsw-modules
 
     - name: libcsp
