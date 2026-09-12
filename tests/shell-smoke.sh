@@ -39,6 +39,7 @@ fi
 		'param set route_table "9/9 KISS"' \
 		'csp routes' \
 		'param set route_table bad-table' \
+		'param get route_table' \
 		'param list' \
 		'param get test_u32' \
 		'param set test_u32 1234' \
@@ -120,10 +121,10 @@ expected_output=(
     "set: parameter 'node_id' is read-only"
     "get: parameter 'missing' not found"
     'uid = "kfsw-1"'
-    # Applied to the running router, not merely stored.
-    'route_table = "9/9 KISS"'
-    '9/9 -> KISS direct'
-    "set: parameter 'route_table' failed (-22)"
+    # Runtime writes are rejected; the compiled route remains active.
+    "set: parameter 'route_table' is read-only"
+    'route_table = ""'
+    '0/0 -> KISS direct'
 	'Parameter snapshot save: PASS'
 	'Parameter defaults: PASS (saved snapshot unchanged)'
 	'test_u32 = 42'

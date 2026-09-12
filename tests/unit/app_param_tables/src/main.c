@@ -485,18 +485,15 @@ ZTEST(app_param_tables, test_the_route_table_starts_from_the_composed_one)
 	struct kfsw_param_info info;
 	struct kfsw_param_value value;
 
-	/* Writable and live, but deliberately not persistent: a route table is
-	 * the one setting that can put a node out of reach, so a wrong one must
-	 * not survive a reboot. The compiled table comes back and the mistake
-	 * costs a pass rather than the node.
-	 */
 	zassert_ok(kfsw_param_get_info("route_table", &info));
 	zassert_equal(info.table, KFSW_PARAM_TABLE_CSP);
 	zassert_equal(info.type, KFSW_PARAM_STRING);
-	zassert_false(info.read_only);
-	zassert_str_equal(kfsw_param_mode_name(info.flags), "w",
-			  "live so it can be fixed from the ground, not stored so a "
-			  "mistake does not outlive the pass");
+	zassert_true(info.read_only);
+	zassert_str_equal(kfsw_param_mode_name(info.flags), "r");
+	memset(&value, 0, sizeof(value));
+	value.type = KFSW_PARAM_STRING;
+	strcpy(value.text, "0/0 LOOP");
+	zassert_equal(kfsw_param_set("route_table", &value), -EACCES);
 
 	zassert_ok(kfsw_param_get("route_table", &value));
 	zassert_str_equal(value.text, CONFIG_KFSW_CSP_ROUTE_TABLE);
