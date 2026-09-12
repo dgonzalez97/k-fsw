@@ -11,8 +11,9 @@ list(APPEND ZEPHYR_EXTRA_MODULES
 )
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(kfsw_services_hk_store_tests LANGUAGES C)
+project(kfsw_services_hk_schedule_tests LANGUAGES C)
 
 target_sources(app PRIVATE src/main.c)
 target_link_libraries(app PRIVATE kfsw::services)
-zephyr_link_libraries(-Wl,--wrap=fs_write)
+
+target_include_directories(app PRIVATE "${KFSW_WORKSPACE_ROOT}/kfsw-services/src/hk")

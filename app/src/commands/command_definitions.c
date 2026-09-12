@@ -272,6 +272,15 @@ static int command_hk_define(const struct kfsw_command_arg *args, size_t arg_cou
 	}
 
 	outcome = kfsw_hk_define((uint8_t)args[0].value.u32, entries, count);
+	if (outcome == KFSW_HK_APPLIED_UNSAVED) {
+		struct kfsw_hk_stats stats;
+
+		kfsw_hk_get_stats(&stats);
+		result->status = KFSW_COMMAND_FAILED;
+		(void)snprintf(result->detail, sizeof(result->detail),
+			       "applied in RAM; save failed: %d", stats.last_save_error);
+		return outcome;
+	}
 	if (outcome != 0) {
 		result->status = KFSW_COMMAND_FAILED;
 		(void)snprintf(result->detail, sizeof(result->detail), "define report %u: %d",
@@ -297,6 +306,15 @@ static int command_hk_period(const struct kfsw_command_arg *args, size_t arg_cou
 		return -EINVAL;
 	}
 	outcome = kfsw_hk_set_period((uint8_t)args[0].value.u32, args[1].value.u32);
+	if (outcome == KFSW_HK_APPLIED_UNSAVED) {
+		struct kfsw_hk_stats stats;
+
+		kfsw_hk_get_stats(&stats);
+		result->status = KFSW_COMMAND_FAILED;
+		(void)snprintf(result->detail, sizeof(result->detail),
+			       "applied in RAM; save failed: %d", stats.last_save_error);
+		return outcome;
+	}
 	if (outcome != 0) {
 		result->status = KFSW_COMMAND_FAILED;
 		(void)snprintf(result->detail, sizeof(result->detail), "period for report %u: %d",
@@ -322,6 +340,15 @@ static int command_hk_clear(const struct kfsw_command_arg *args, size_t arg_coun
 		return -EINVAL;
 	}
 	outcome = kfsw_hk_clear((uint8_t)args[0].value.u32);
+	if (outcome == KFSW_HK_APPLIED_UNSAVED) {
+		struct kfsw_hk_stats stats;
+
+		kfsw_hk_get_stats(&stats);
+		result->status = KFSW_COMMAND_FAILED;
+		(void)snprintf(result->detail, sizeof(result->detail),
+			       "applied in RAM; save failed: %d", stats.last_save_error);
+		return outcome;
+	}
 	if (outcome != 0) {
 		result->status = KFSW_COMMAND_FAILED;
 		(void)snprintf(result->detail, sizeof(result->detail), "clear report %u: %d",
