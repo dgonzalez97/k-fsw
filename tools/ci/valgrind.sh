@@ -28,7 +28,11 @@ KFSW_EXTRA_CONF_FILE="$KFSW_ROOT/k-fsw/tests/config/param-fixtures.conf" \
 echo "MEMORY: Valgrind log: $valgrind_log"
 echo "MEMORY: Program log: $program_log"
 
-printf '%s\n' 'param set test_u32 1234' 'param save' |
+# Autosave off first. The fixture below finds the snapshot by searching the raw
+# image for its magic, and a write on every accepted change leaves earlier
+# copies in blocks the filesystem has not erased, so there is no longer exactly
+# one to find.
+printf '%s\n' 'param set param_autosave 0' 'param set test_u32 1234' 'param save' |
 	"$executable" --uart_stdinout --stop_at=1.0 --no-color \
 		-flash="$corrupt_flash" -flash_erase \
 		>"$output_dir/corrupt-fixture.log" 2>&1
