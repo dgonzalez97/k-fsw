@@ -86,6 +86,9 @@ destination is sent on that serial link without a separate gateway address.
 Multi-interface compositions must provide explicit libcsp routes instead of
 implicitly choosing the first link.
 
+Routes are fixed once the router starts. Set them in the composition;
+the `route_table` parameter is read-only.
+
 ### Transport and framing
 
 Transport features operate above routing and link interfaces. libcsp's RDP can

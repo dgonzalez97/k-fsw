@@ -185,11 +185,11 @@ and records the results.
 | `param-tables` | Nucleo | Every table present and addressed, with the right write modes |
 | `can` | Nucleo + CAN adapter | CSP over CAN: ping, identity and remote settings |
 | `holybro` | Nucleo + radio pair | CSP, files, commands and events across the link |
-| `fwu` | Nucleo + radio pair | An image sent, flashed and booted |
+| `fwu` | Nucleo + CAN adapter | FTP and FWU lite uploads, slot readbacks, rollback and confirmation |
 
 Cases needing the board are tagged, so the same files run in CI without
 hardware and on the bench with it. The [testing guide](docs/testing/index.md)
-has the full matrix and how to run them.
+links to the fixtures and commands.
 
 The parameter-table suite running against the Nucleo over CAN and RF.
 

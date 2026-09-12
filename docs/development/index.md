@@ -72,9 +72,6 @@ Run checks appropriate to the change; @ref testing lists the entry points.
 Docs changes need Doxygen, PDF, link checks, and visual inspection.
 Record physical tests only when they were observed on the bench.
 
-Required CI checks must pass before merge. PRs build the docs; Pages deploys
-from `main`.
-
 ## Change a west dependency
 
 Each reusable repository has its own branch and PR. The composition PR pins
@@ -176,3 +173,31 @@ git -C k-fsw diff --check
 Check navigation, images, tables, and links in HTML and PDF. Keep generated
 output out of Git. Update @ref project_status from source and recorded
 test results when capabilities change.
+
+## Release builds
+
+`tools/release.py` checks the source and signing inputs, builds twice, and
+compares the unsigned application payloads. It verifies both signatures and
+the bootloader's trust key. It does not create a tag or publish artifacts.
+
+Use the MCUboot profiles in @ref firmware_update, then set:
+
+| Input | Value |
+| --- | --- |
+| `KFSW_IMAGE_VERSION` | MCUboot version, for example `1.0.0+0` |
+| `KFSW_RELEASE_SOURCE` | Full `k-fsw` commit SHA |
+| `KFSW_RELEASE_MANIFEST` | Frozen manifest from `tools/release.py freeze` |
+| `SOURCE_DATE_EPOCH` | Fixed source timestamp, in Unix seconds |
+| `ZEPHYR_SDK_INSTALL_DIR` | SDK directory |
+| `KFSW_RELEASE_COMPILER_SHA256` | SHA256 of the SDK's `arm-zephyr-eabi-gcc` |
+| `KFSW_MCUBOOT_KEY` | Private ECDSA P-256 signing key; development keys are rejected |
+
+From `k-fsw`, with the workspace virtual environment active:
+
+```bash
+python tools/release.py check
+python tools/release.py build --output ../build/release-1.0.0
+```
+
+The output directory must be new. Keep `artifacts/release.json` with the images;
+it records sources, tool versions, public-key fingerprint, and artifact hashes.
