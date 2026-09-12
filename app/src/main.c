@@ -81,6 +81,7 @@
 
 int main(void)
 {
+	uint32_t startup_failures = 0;
 #if CONFIG_KFSW_STORAGE || CONFIG_KFSW_PARAM || CONFIG_KFSW_CSP || CONFIG_KFSW_RADIO_UHF ||        \
 	CONFIG_KFSW_BOTON_TEST || CONFIG_KFSW_COMMAND || CONFIG_KFSW_WATCHDOG
 	int result;
@@ -93,6 +94,7 @@ int main(void)
 
 	result = kfsw_radio_uhf_get_info(&radio_info);
 	if (result != 0) {
+		startup_failures++;
 		kfsw_log_error("Failed to read UHF radio composition: %d", result);
 	} else {
 		kfsw_log_info("UHF radio selected: %s; expected serial %u baud",
@@ -106,6 +108,7 @@ int main(void)
 		result = kfsw_storage_mount();
 	}
 	if (result != 0) {
+		startup_failures++;
 		kfsw_log_error("Failed to mount storage: %d", result);
 	} else {
 		kfsw_log_info("Storage mounted at %s", KFSW_STORAGE_MOUNT_POINT);
@@ -169,6 +172,7 @@ int main(void)
 	result = kfsw_param_init(parameter_sets, ARRAY_SIZE(parameter_sets));
 
 	if (result != 0) {
+		startup_failures++;
 		kfsw_log_error("Failed to initialize parameters: %d", result);
 	} else {
 		kfsw_log_info("Parameter table initialized");
@@ -177,6 +181,7 @@ int main(void)
 		if (result == -ENOENT) {
 			kfsw_log_info("No parameter snapshot; using compiled defaults");
 		} else if (result != 0) {
+			startup_failures++;
 			kfsw_log_error("Parameter snapshot restore failed (%d); using defaults",
 				       result);
 		} else {
@@ -203,6 +208,7 @@ int main(void)
 #if CONFIG_KFSW_BOTON_TEST
 	result = kfsw_boton_test_init();
 	if (result != 0) {
+		startup_failures++;
 		kfsw_log_error("Failed to initialize boton_test: %d", result);
 	} else {
 		kfsw_log_info("boton_test initialized");
@@ -212,6 +218,7 @@ int main(void)
 #if CONFIG_KFSW_FBO
 	result = kfsw_fbo_init();
 	if (result != 0) {
+		startup_failures++;
 		kfsw_log_error("Failed to initialize file based operations: %d", result);
 	}
 #endif
@@ -219,6 +226,7 @@ int main(void)
 #if CONFIG_KFSW_TEMPERATURE_SENSOR_EXAMPLE
 	result = kfsw_temp_example_init();
 	if (result != 0) {
+		startup_failures++;
 		kfsw_log_error("Failed to initialize the temperature example: %d", result);
 	} else {
 		kfsw_log_info("Temperature example initialized");
@@ -232,6 +240,7 @@ int main(void)
 
 	result = kfsw_command_init(command_sets, ARRAY_SIZE(command_sets));
 	if (result != 0) {
+		startup_failures++;
 		kfsw_log_error("Failed to initialize commands: %d", result);
 	} else {
 		kfsw_log_info("Command registry initialized");
@@ -251,6 +260,7 @@ int main(void)
 	result = kfsw_csp_init();
 
 	if (result != 0) {
+		startup_failures++;
 		kfsw_log_error("Failed to initialize CSP: %d", result);
 	} else {
 		kfsw_log_info("CSP initialized as node %d", CONFIG_KFSW_CSP_ADDRESS);
@@ -266,6 +276,7 @@ int main(void)
 #if CONFIG_KFSW_PARAM_CSP
 		result = kfsw_param_server_start();
 		if (result != 0) {
+			startup_failures++;
 			kfsw_log_error("Failed to start parameter server: %d", result);
 		} else {
 			kfsw_log_info("Parameter server started on CSP port %d",
@@ -275,6 +286,7 @@ int main(void)
 
 		result = kfsw_csp_start();
 		if (result != 0) {
+			startup_failures++;
 			kfsw_log_error("Failed to start CSP router: %d", result);
 		} else {
 			csp_started = true;
@@ -285,6 +297,14 @@ int main(void)
 		}
 	}
 
+#if CONFIG_KFSW_FWU_FILES
+	result = kfsw_fwu_files_mount();
+	if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Failed to mount firmware slots: %d", result);
+	}
+#endif
+
 #if CONFIG_KFSW_FTP
 	if (csp_started) {
 		result = kfsw_ftp_init();
@@ -292,6 +312,7 @@ int main(void)
 			result = kfsw_ftp_start();
 		}
 		if (result != 0) {
+			startup_failures++;
 			kfsw_log_error("Failed to start FTP service: %d", result);
 		} else {
 			kfsw_log_info("FTP service started on CSP port %d",
@@ -304,6 +325,7 @@ int main(void)
 	if (csp_started) {
 		result = kfsw_fwu_lite_server_start();
 		if (result != 0) {
+			startup_failures++;
 			kfsw_log_error("Failed to start the firmware upload server: %d", result);
 		} else {
 			kfsw_log_info("Firmware upload server started on CSP port %d",
@@ -316,6 +338,7 @@ int main(void)
 	if (csp_started) {
 		result = kfsw_command_server_start();
 		if (result != 0) {
+			startup_failures++;
 			kfsw_log_error("Failed to start command server: %d", result);
 		} else {
 			kfsw_log_info("Command server started on CSP port %d",
@@ -324,14 +347,6 @@ int main(void)
 	}
 #endif
 
-#if CONFIG_KFSW_HK_CSP
-	if (csp_started) {
-		result = kfsw_hk_server_start();
-		if (result != 0) {
-			kfsw_log_error("Failed to start the housekeeping server: %d", result);
-		}
-	}
-#endif
 #endif
 
 #if CONFIG_KFSW_HK
@@ -341,9 +356,32 @@ int main(void)
 	 */
 	result = kfsw_hk_init();
 	if (result != 0) {
+		startup_failures++;
 		kfsw_log_error("Failed to initialize housekeeping: %d", result);
 	} else {
-		(void)kfsw_hk_start();
+		struct kfsw_hk_stats hk_status;
+
+		kfsw_hk_get_stats(&hk_status);
+		if (hk_status.last_load_error != 0) {
+			startup_failures++;
+			kfsw_log_error("HK restore failed (%d); using defaults",
+				       hk_status.last_load_error);
+		}
+		result = kfsw_hk_start();
+		if (result != 0) {
+			startup_failures++;
+			kfsw_log_error("Failed to start housekeeping: %d", result);
+		}
+#if CONFIG_KFSW_HK_CSP
+		if (csp_started) {
+			result = kfsw_hk_server_start();
+			if (result != 0) {
+				startup_failures++;
+				kfsw_log_error("Failed to start the housekeeping server: %d",
+					       result);
+			}
+		}
+#endif
 	}
 #endif
 
@@ -357,10 +395,12 @@ int main(void)
 	if (result == -ENODEV) {
 		kfsw_log_info("No watchdog device bound; running unguarded");
 	} else if (result != 0) {
+		startup_failures++;
 		kfsw_log_error("Failed to initialize the watchdog: %d", result);
 	} else if (IS_ENABLED(CONFIG_KFSW_WATCHDOG_AUTO_START)) {
 		result = kfsw_platform_watchdog_start();
 		if (result != 0) {
+			startup_failures++;
 			kfsw_log_error("Failed to start the watchdog: %d", result);
 		} else {
 			kfsw_log_info("Watchdog armed with a %d ms timeout",
@@ -380,6 +420,7 @@ int main(void)
 
 	result = kfsw_health_register("app", CONFIG_KFSW_APP_HEALTH_DEADLINE_MS, &health_handle);
 	if (result != 0) {
+		startup_failures++;
 		kfsw_log_error("Failed to register the application for health: %d", result);
 	} else {
 		health_watching = true;
@@ -390,6 +431,7 @@ int main(void)
 	 */
 	result = kfsw_health_start();
 	if (result != 0) {
+		startup_failures++;
 		kfsw_log_error("Failed to start health monitoring: %d", result);
 	}
 #endif
@@ -421,6 +463,8 @@ int main(void)
 	(void)kfsw_clock_from_host();
 #endif
 
+	printk("@SERVICES %s failures=%u\n", startup_failures == 0U ? "ok" : "degraded",
+	       startup_failures);
 	kfsw_boot_service_start();
 
 	for (;;) {
