@@ -117,7 +117,8 @@ ZTEST(services_param_worker, test_blocked_sampling_keeps_router_running_and_queu
 	static const struct kfsw_param_definition definition = {
 		.offset = 0,
 		.type = KFSW_PARAM_U32,
-		.flags = KFSW_PARAM_FLAG_READ_ONLY,
+		.flags = IS_ENABLED(KFSW_TEST_LOCAL_ONLY) ? KFSW_PARAM_FLAG_LOCAL_ONLY
+							  : KFSW_PARAM_FLAG_READ_ONLY,
 		.name = "slow",
 		.value = &backing,
 		.sample = sample,
@@ -163,7 +164,18 @@ ZTEST(services_param_worker, test_blocked_sampling_keeps_router_running_and_queu
 	zassert_ok(kfsw_param_get_stats(&stats));
 	zassert_equal(stats.requests_dropped, 3);
 
-	/* A queued PUSH must still be refused for a read-only value. */
+	if (IS_ENABLED(KFSW_TEST_LOCAL_ONLY)) {
+		struct kfsw_param_value local_value = {
+			.type = KFSW_PARAM_U32,
+			.size = sizeof(uint32_t),
+			.scalar.u32 = 17,
+		};
+		zassert_ok(kfsw_param_set("slow", &local_value));
+		zassert_equal(backing, 17);
+		local_value.scalar.u32 = 42;
+		zassert_ok(kfsw_param_set("slow", &local_value));
+	}
+	/* Remote PUSH must respect read-only and local-only values. */
 	csp_packet_t *push = csp_buffer_get(CSP_BUFFER_SIZE);
 	param_queue_t queue = {0};
 	uint16_t local = 0;

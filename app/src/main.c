@@ -257,6 +257,14 @@ int main(void)
 	 */
 	kfsw_csp_set_revision(kfsw_boot_get_image_version());
 
+#if CONFIG_KFSW_RADIO_UHF_CRYPTO
+	result = kfsw_radio_uhf_crypto_init();
+	if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Radio protection initialization: %d", result);
+	}
+#endif
+
 	result = kfsw_csp_init();
 
 	if (result != 0) {
@@ -291,6 +299,9 @@ int main(void)
 		} else {
 			csp_started = true;
 			kfsw_log_info("CSP router started");
+#if CONFIG_KFSW_RADIO_UHF_CRYPTO
+			(void)kfsw_radio_uhf_crypto_connect();
+#endif
 #if CONFIG_KFSW_CSP_KISS_UART
 			kfsw_log_info("CSP UART interface started");
 #endif

@@ -538,6 +538,10 @@ static int cmd_param_set(const struct shell *sh, size_t argc, char **argv)
 
 	if (node == 0U) {
 		result = kfsw_param_set(name, &value);
+		if (result == 0) {
+			/* Report owner state. Write-only inputs may already be cleared. */
+			result = kfsw_param_get(name, &value);
+		}
 	}
 #if CONFIG_KFSW_PARAM_CSP
 	else {

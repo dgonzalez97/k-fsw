@@ -1,0 +1,8 @@
+/ { chosen { kfsw,csp-uart = &uart1; }; };
+&uart1 {
+    status = "okay";
+    current-speed = <57600>;
+    parity = "none";
+    stop-bits = "1";
+    data-bits = <8>;
+};

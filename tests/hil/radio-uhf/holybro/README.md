@@ -1,5 +1,35 @@
 # Holybro SiK 433 MHz HIL fixture
 
+## Encrypted link
+
+Add `config/profiles/radio-crypto.conf` at both ends. Flight also needs
+`nucleo-radio-crypto.overlay` and `crypto-flight.conf`; ground needs
+`crypto-ground.conf`. This bench uses flight node 2, radio ground 17, and CAN
+ground 16. The UART remains at 57600 baud.
+
+Create a private key file, then run against a confirmed flight image:
+
+```bash
+umask 077
+openssl rand -hex 32 > /tmp/radio-bench.key
+python k-fsw/tests/hil/radio-uhf/holybro/crypto-smoke.py \
+  --ground "$GROUND_BUILD/zephyr/zephyr.exe" \
+  --serial "$KFSW_DEBUG_SERIAL" --radio "$KFSW_RADIO_SERIAL" \
+  --key-file /tmp/radio-bench.key --output "$GROUND_BUILD/crypto-run"
+```
+
+Both serial paths must use `/dev/serial/by-id/`. The test provisions the key,
+checks both directions, rejects remote radio-setting writes, replays captured
+traffic, tries a wrong key and plaintext, then reboots flight. It keeps the
+key configured. Console logs redact key strings; keep the key file private.
+
+For a software-only run, replace `--serial` and `--radio` with `--flight` and
+a native flight executable configured as node 2, peer 17, prompt
+`crypto-flight# `. This exercises framing and protection but measures no RF
+or physical stack behavior.
+
+## Bench settings
+
 This fixture keeps raw-link and CSP/KISS acceptance separate for a Holybro /
 SiK 433 MHz pair. The USB-side radio reports RFD SiK 2.0 on HM-TRP. Its
 observed settings are:
@@ -314,8 +344,6 @@ This is verified functional evidence for this Holybro SiK raw UART/RF and
 CSP/KISS bench. It is not RF qualification, production readiness, flight
 qualification, an RF performance measurement, or a long-duration link test.
 
-`kfsw-modules` now owns the reusable `radio-uhf` interface and its first
-`holybro-sik` implementation. The module owns compile-time identity, expected
-serial configuration, and bounded status. It deliberately does not own UART,
-KISS, CSP, AT control, or any writable radio parameter; those omissions keep
-the verified transparent data path unchanged.
+`kfsw-modules` owns radio identity, expected serial settings, status, and the
+optional encryption controls. `kfsw-comms` owns UART, KISS, and CSP. The module
+does not change the modem's AT settings.
