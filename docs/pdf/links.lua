@@ -1,17 +1,17 @@
 local references = {
   k_fsw_manual = { "Overview", "k_fsw_manual" },
-  getting_started = { "Getting Started", "getting_started" },
+  getting_started = { "Getting started", "getting_started" },
   architecture = { "Architecture", "architecture" },
-  zephyr_integration = { "Zephyr Integration", "zephyr_integration" },
-  communications = { "CSP and Communications", "communications" },
-  services = { "Services and Storage", "services" },
-  targets = { "Boards and Targets", "targets" },
-  ground = { "Ground Composition", "ground" },
-  commands = { "Command Reference", "commands" },
+  zephyr_integration = { "Zephyr integration", "zephyr_integration" },
+  communications = { "CSP and links", "communications" },
+  services = { "Services and storage", "services" },
+  targets = { "Boards and targets", "targets" },
+  ground = { "Ground station", "ground" },
+  commands = { "Shell commands", "commands" },
   development = { "Contributing", "development" },
   firmware_update = { "Firmware update", "firmware_update" },
-  testing = { "Testing", "testing" },
-  project_status = { "Project Status and Roadmap", "project_status" },
+  testing = { "Testing and HIL", "testing" },
+  project_status = { "Project status", "project_status" },
   api_reference = { "generated API reference", nil },
   kfsw_comms = { "generated communications API reference", nil },
   kfsw_services = { "generated services API reference", nil },
@@ -72,12 +72,17 @@ local function replace_doxygen_references(inlines)
       and separator and separator.t == "Space"
       and identifier and identifier.t == "Str" then
       if marker.text == "@ref" then
-        local reference = references[identifier.text]
+        local name, punctuation = identifier.text:match("^(.-)([.,;:]*)$")
+        local reference = references[name]
 
         if reference then
           output:insert(reference_inline(reference[1], reference[2]))
         else
-          output:insert(pandoc.Str(identifier.text))
+          output:insert(pandoc.Str(name))
+        end
+
+        if punctuation ~= "" then
+          output:insert(pandoc.Str(punctuation))
         end
 
         index = index + 3
@@ -107,6 +112,10 @@ local function replace_doxygen_references(inlines)
 end
 
 function Para(element)
+  if pandoc.utils.stringify(element) == "[TOC]" then
+    return {}
+  end
+
   element.content = replace_doxygen_references(element.content)
   return element
 end

@@ -1,4 +1,4 @@
-# CSP and Communications {#communications}
+# CSP and links {#communications}
 
 [TOC]
 
@@ -126,7 +126,7 @@ The receive path reverses the link operations, then the router uses the
 destination port to deliver the complete packet to the registered service.
 K-FSW services never parse UART bytes directly.
 
-## What `kfsw-comms` owns
+## What kfsw-comms owns
 
 `kfsw-comms` is the single owner of the shared libcsp lifecycle:
 

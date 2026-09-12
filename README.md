@@ -97,6 +97,7 @@ CSP/RDP provides retransmission; an interrupted transfer must be restarted.
 ![A file sent and fetched back](docs/media/file-transfer.gif)
 
 ### Firmware update
+
 Send, verify, flash, reboot, confirm. MCUboot reverts an unconfirmed test
 image on the next reset. The direct block protocol separates upload from
 `fwu flash`; the FTP route schedules the swap after verification.

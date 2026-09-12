@@ -1,4 +1,4 @@
-# Services and Storage {#services}
+# Services and storage {#services}
 
 [TOC]
 

@@ -60,7 +60,7 @@ sign an image with.
 This example requires the signed image in the sending node's filesystem,
 at `/kfsw/ftp/build/zephyr.signed.bin`. Shell FTP paths are relative to
 `/kfsw/ftp`; a host path under `build/nucleo_l496zg/` is not a node file.
-Use the host upload tool below if the image will not fit in ground-node storage.
+Use direct block upload below if the image will not fit in ground-node storage.
 
 ```
 kfsw-gnd# ftp put 2 /build/zephyr.signed.bin /firmware.bin
@@ -89,7 +89,8 @@ Then reboot, and confirm or reject as below.
 
 ## Choosing a route
 
-Both routes end at the same update service and can be built together. The first transfer owns the slot; competing uploads receive `busy`.
+Both routes end at the same update service and can be built together.
+The first transfer owns the slot; competing uploads receive `busy`.
 
 | | File transfer route | Direct upload (`fwu_lite`) |
 | --- | --- | --- |
@@ -103,6 +104,14 @@ Damaged CSP packets may be dropped before reaching the service.
 The direct route retries when a reply times out.
 
 ## Direct block upload
+
+On a Linux ground node with `CONFIG_KFSW_FWU_LITE_HOST_FILES=y`, `fwu send`
+can read a host file. Use an absolute host path outside `/kfsw/`:
+
+```text
+kfsw-ops# fwu send 2 /path/to/k-fsw-workspace/build/nucleo_l496zg/app/zephyr/zephyr.signed.bin
+kfsw-ops# fwu flash 2
+```
 
 The file transfer route needs the image to exist as a file on the sending node
 and runs over a reliable connection. `fwu_lite` sends blocks straight across

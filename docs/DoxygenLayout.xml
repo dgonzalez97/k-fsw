@@ -19,7 +19,7 @@
       <tab type="user" visible="yes" url="testing.html" title="Testing and HIL"/>
       <tab type="user" visible="yes" url="project_status.html" title="Project status"/>
     </tab>
-    <tab type="user" visible="yes" url="api_reference.html" title="API Reference">
+    <tab type="usergroup" visible="yes" url="api_reference.html" title="API Reference">
       <tab type="modules" visible="yes" title="API Groups"/>
       <tab type="classes" visible="yes" title="Data Types">
         <tab type="classlist" visible="yes" title="Structures"/>

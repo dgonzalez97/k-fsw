@@ -1,4 +1,4 @@
-# Testing, HIL, and CI {#testing}
+# Testing and HIL {#testing}
 
 [TOC]
 
@@ -177,7 +177,7 @@ Coverage measures unit suites only. Integration and HIL runs are not
 instrumented, and vendored dependencies are excluded. A low percentage needs
 review alongside those tests; it does not explain the missing coverage.
 
-### `boton_test` coverage
+### boton_test coverage
 
 The focused module suite has a GPIO-disabled state/PARAM configuration and an
 active-low GPIO-emulator configuration. The latter drives Zephyr GPIO edges,
@@ -186,8 +186,7 @@ release/rearm behavior. Private state hooks cover deterministic time and
 saturation cases; there is no production fake-press command. Both
 configurations remain independent of physical hardware and exercise the same
 owner state exposed through `kfsw_boton_test_get_status()` and the two counter
-parameters at offsets 0x00 and 0x04 of table 67
-through 10.
+parameters at offsets 0x00 and 0x04 of table 67.
 
 ### Firmware upload between two nodes
 
@@ -355,7 +354,7 @@ decoding, which are pure and must hold everywhere, and it pins what a
 composition sees on a board with no watchdog hardware, where every operation
 reports `-ENODEV` rather than appearing to succeed.
 
-### `boton_test` hardware acceptance
+### boton_test hardware acceptance
 
 `tests/hil/boton-test/button-acceptance.sh` is the manual fixture for the three
 claims the automated suites cannot settle: that a physical press increments the

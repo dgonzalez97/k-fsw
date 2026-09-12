@@ -239,18 +239,34 @@ ZTEST(app_param_tables, test_parameters_are_addressed_by_table_and_offset)
 
 /* --------------------------------------------------------------- the modes */
 
+/*
+ * One letter per property, so each question is answered on its own: can I
+ * write it, does it survive a reset, and does it take effect now or at the
+ * next start. The old encoding named combinations instead, and "b" meant both
+ * kept and deferred, which are different consequences.
+ */
 ZTEST(app_param_tables, test_mode_follows_the_flags)
 {
 	zassert_str_equal(kfsw_param_mode_name(KFSW_PARAM_FLAG_READ_ONLY), "r");
 	zassert_str_equal(kfsw_param_mode_name(KFSW_PARAM_FLAG_LIVE), "w");
-	zassert_str_equal(kfsw_param_mode_name(KFSW_PARAM_FLAG_PERSISTENT), "b");
-	zassert_str_equal(kfsw_param_mode_name(KFSW_PARAM_FLAG_PERSISTENT | KFSW_PARAM_FLAG_LIVE),
-			  "wb");
 
-	/* Read-only wins over everything else: a parameter nobody can write
-	 * has no write behaviour to describe. */
+	/* Kept, and only read when the node next starts. */
+	zassert_str_equal(kfsw_param_mode_name(KFSW_PARAM_FLAG_PERSISTENT), "wpb");
+
+	/* Kept, and applied as soon as it is set. */
+	zassert_str_equal(kfsw_param_mode_name(KFSW_PARAM_FLAG_PERSISTENT | KFSW_PARAM_FLAG_LIVE),
+			  "wp");
+
+	/* Written, applied now, and gone at the next start. */
+	zassert_str_equal(kfsw_param_mode_name(0U), "wb");
+
+	/* A read-only value is never applied, so the deferral letter would say
+	 * nothing; that it is kept still matters to whoever reads it back.
+	 */
 	zassert_str_equal(kfsw_param_mode_name(KFSW_PARAM_FLAG_READ_ONLY |
 					       KFSW_PARAM_FLAG_PERSISTENT | KFSW_PARAM_FLAG_LIVE),
+			  "rp");
+	zassert_str_equal(kfsw_param_mode_name(KFSW_PARAM_FLAG_READ_ONLY | KFSW_PARAM_FLAG_LIVE),
 			  "r");
 }
 
@@ -371,7 +387,7 @@ ZTEST(app_param_tables, test_a_stored_parameter_says_it_is_stored)
 
 	zassert_ok(kfsw_param_get_info("boot_delay_ms", &info));
 	zassert_equal(info.table, KFSW_PARAM_TABLE_SYSTEM);
-	zassert_str_equal(kfsw_param_mode_name(info.flags), "b",
+	zassert_str_equal(kfsw_param_mode_name(info.flags), "wpb",
 			  "the boot it delays has already happened by the time it could apply");
 
 	zassert_ok(kfsw_param_get("boot_delay_ms", &value));
@@ -388,7 +404,7 @@ ZTEST(app_param_tables, test_a_report_period_that_would_reset_the_board_is_refus
 
 	zassert_ok(kfsw_param_get_info("app_report_ms", &info));
 	zassert_equal(info.table, KFSW_PARAM_TABLE_SYSTEM);
-	zassert_str_equal(kfsw_param_mode_name(info.flags), "wb",
+	zassert_str_equal(kfsw_param_mode_name(info.flags), "wp",
 			  "the loop reads it every cycle and the value survives a reboot");
 
 	/* A period at or beyond half the health deadline leaves no room for an

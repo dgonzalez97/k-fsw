@@ -1,4 +1,4 @@
-# Boards and Targets {#targets}
+# Boards and targets {#targets}
 
 [TOC]
 

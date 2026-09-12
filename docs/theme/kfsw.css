@@ -24,6 +24,7 @@ html, body, #doc-content, .contents {
 }
 
 #titlearea {
+  box-sizing: border-box;
   background: transparent;
   border: 0;
   color: #fff;
@@ -60,6 +61,10 @@ html, body, #doc-content, .contents {
   color: #fff;
 }
 
+.sm-dox a span.sub-arrow {
+  border-top-color: #bfd3e0;
+}
+
 #side-nav, #nav-tree {
   background: var(--kfsw-surface);
 }
@@ -69,7 +74,7 @@ html, body, #doc-content, .contents {
 }
 
 #nav-tree .item {
-  padding: 3px 0;
+  padding: 0;
 }
 
 #nav-tree a, #nav-tree .label {
@@ -95,7 +100,7 @@ html, body, #doc-content, .contents {
 
 .contents {
   line-height: 1.6;
-  margin: 24px 32px;
+  margin: 24px 32px !important;
   max-width: 1000px;
 }
 
@@ -235,11 +240,18 @@ dl.note, dl.warning, dl.attention {
   #projectbrief { white-space: normal; }
   #side-nav, #splitbar { display: none; }
   #doc-content { margin-left: 0 !important; }
-  .contents { margin: 18px 14px; }
+  .contents { margin: 18px 14px !important; }
   div.header { padding: 12px 6px; }
   .title { font-size: 22px; }
   table.markdownTable, table.fieldtable {
     display: block;
     overflow-x: auto;
   }
+  .sm-dox a span.sub-arrow {
+    background: transparent;
+    border-color: #bfd3e0;
+    color: #fff;
+  }
+  .sm-dox a span.sub-arrow::before { content: "+"; }
+  .sm-dox a.highlighted span.sub-arrow::before { content: "−"; }
 }

@@ -1,4 +1,4 @@
-# Ground Composition {#ground}
+# Ground station {#ground}
 
 [TOC]
 
@@ -69,9 +69,8 @@ command -v socat
 must complete without an error. `socat` is required for local CSP/KISS links.
 On Ubuntu, install it with `sudo apt install socat` if the final command prints
 nothing.
-The complete one-time workspace and host-package procedure is in @ref
-getting_started; do not run `west init` again inside an already initialized
-workspace.
+See @ref getting_started for workspace and host setup.
+Do not run `west init` again inside an initialized workspace.
 
 There is no generic project `.env` that must be executed. Activating `.venv`
 configures the development tools; the role files configure K-FSW instances.

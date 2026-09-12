@@ -1,4 +1,4 @@
-# Shell and Command Reference {#commands}
+# Shell commands {#commands}
 
 [TOC]
 
@@ -149,7 +149,7 @@ The command does not enter SiK command mode or read the modem. Expected values
 must be compared with `uart info`; actual interface traffic and errors remain
 under `csp interfaces` and `uart info`.
 
-## `boton_test` diagnostic
+## boton_test diagnostic
 
 The module-owned diagnostic exists only when `CONFIG_KFSW_BOTON_TEST_SHELL=y`:
 

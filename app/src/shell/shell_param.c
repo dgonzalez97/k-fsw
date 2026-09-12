@@ -144,10 +144,24 @@ static bool print_param_info(const struct kfsw_param_info *info, void *context)
 static bool print_table_info(const struct kfsw_param_table_info *info, void *context)
 {
 	const struct param_list_context *list_context = context;
+#if CONFIG_KFSW_PARAM_PERSISTENCE
+	uint16_t kept = 0U;
 
+	/* How many of the table's values survive a reset. Not every table needs
+	 * any: telemetry counters are rebuilt at every boot and keeping them
+	 * would spend flash on numbers that are wrong by the time they are
+	 * read. Showing the count is what makes that a visible choice rather
+	 * than something an operator discovers after a reset.
+	 */
+	(void)kfsw_param_persist_table_count(info->id, &kept);
+	shell_print(list_context->shell, "%3" PRIu8 "  %-7s  %-*s  %6" PRIu16 "  %6" PRIu16,
+		    info->id, kfsw_param_band_name(info->id), KFSW_PARAM_TABLE_COLUMN, info->name,
+		    info->count, kept);
+#else
 	shell_print(list_context->shell, "%3" PRIu8 "  %-7s  %-*s  %6" PRIu16, info->id,
 		    kfsw_param_band_name(info->id), KFSW_PARAM_TABLE_COLUMN, info->name,
 		    info->count);
+#endif
 	return true;
 }
 
@@ -733,10 +747,18 @@ static int cmd_param_tables(const struct shell *sh, size_t argc, char **argv)
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 
+#if CONFIG_KFSW_PARAM_PERSISTENCE
+	shell_print(sh, "%3s  %-7s  %-*s  %6s  %6s", " id", "band", KFSW_PARAM_TABLE_COLUMN, "name",
+		    "params", "kept");
+	shell_print(sh, "%.3s  %.7s  %.*s  %.6s  %.6s", "---------", "---------",
+		    KFSW_PARAM_TABLE_COLUMN, "--------------------------------", "---------",
+		    "---------");
+#else
 	shell_print(sh, "%3s  %-7s  %-*s  %6s", " id", "band", KFSW_PARAM_TABLE_COLUMN, "name",
 		    "params");
 	shell_print(sh, "%.3s  %.7s  %.*s  %.6s", "---------", "---------", KFSW_PARAM_TABLE_COLUMN,
 		    "--------------------------------", "---------");
+#endif
 
 	result = kfsw_param_visit_tables(print_table_info, &context);
 	if (result != 0) {

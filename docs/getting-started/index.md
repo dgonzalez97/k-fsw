@@ -1,4 +1,4 @@
-# Getting Started {#getting_started}
+# Getting started {#getting_started}
 
 [TOC]
 
@@ -364,7 +364,7 @@ only the engineering manual.
 
 ## Common failures
 
-### `west` is not available
+### west is not available
 
 Activate the workspace environment:
 
