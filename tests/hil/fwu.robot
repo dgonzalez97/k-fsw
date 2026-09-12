@@ -8,7 +8,28 @@ Documentation    Firmware update, both routes.
 ...              first.
 Resource         resources/common.resource
 
+*** Variables ***
+${FWU_CAN_GROUND}      %{KFSW_FWU_CAN_GROUND=}
+${FWU_CAN_IMAGE}       %{KFSW_FWU_CAN_IMAGE=}
+${FWU_CAN_REVISION}    %{KFSW_FWU_CAN_REVISION=fwu-can-after}
+${FWU_CAN_OUTPUT}      %{KFSW_FWU_CAN_OUTPUT=/tmp/kfsw-fwu-can}
+
 *** Test Cases ***
+CAN Update Keeps Both Images Readable
+    [Documentation]    Uploads through FTP and FWU lite, compares slot files,
+    ...    reverts a trial, then confirms and reboots the candidate.
+    [Tags]    hardware    nucleo    can    fwu    ftp
+    Skip If    not $FWU_CAN_GROUND or not $FWU_CAN_IMAGE    Prebuilt CAN images not configured
+    ${result}=    Run Process    python3
+    ...    ${KFSW_REPO_DIR}/tests/hil/fwu/can-update.py
+    ...    --ground    ${FWU_CAN_GROUND}
+    ...    --image    ${FWU_CAN_IMAGE}
+    ...    --revision    ${FWU_CAN_REVISION}
+    ...    --serial    ${DEBUG_SERIAL}
+    ...    --output    ${FWU_CAN_OUTPUT}
+    ...    stdout=PIPE    stderr=STDOUT    timeout=1800
+    HIL Command Should Pass    ${result}    CAN FWU RESULT: PASS
+
 Direct Upload Carries An Image Between Two Nodes
     [Documentation]    Sends an image over CSP block by block and checks the
     ...    receiving node holds exactly what was sent: the byte count and the

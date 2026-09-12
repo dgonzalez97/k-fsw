@@ -7,12 +7,15 @@ get_filename_component(KFSW_WORKSPACE_ROOT
 
 list(APPEND ZEPHYR_EXTRA_MODULES
     "${KFSW_WORKSPACE_ROOT}/kfsw-platform"
+    "${KFSW_WORKSPACE_ROOT}/kfsw-comms/third_party/libcsp"
+    "${KFSW_WORKSPACE_ROOT}/kfsw-comms"
     "${KFSW_WORKSPACE_ROOT}/kfsw-services"
 )
 
+set(CSP_USE_RDP ON CACHE BOOL "" FORCE)
+set(CSP_REPRODUCIBLE_BUILDS ON CACHE BOOL "" FORCE)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(kfsw_services_fwu_tests LANGUAGES C)
+project(kfsw_services_fwu_lite_start_tests LANGUAGES C)
 
 target_sources(app PRIVATE src/main.c)
-target_link_libraries(app PRIVATE kfsw::services)
-zephyr_link_libraries(-Wl,--wrap=flash_area_flatten)
+target_link_libraries(app PRIVATE kfsw::services kfsw::comms)

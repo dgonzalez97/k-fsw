@@ -106,10 +106,16 @@ static int cmd_fwu_finish(const struct shell *sh, size_t argc, char **argv)
 
 static int cmd_fwu_abort(const struct shell *sh, size_t argc, char **argv)
 {
+	int result;
+
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 
-	(void)kfsw_fwu_abort();
+	result = kfsw_fwu_abort();
+	if (result != 0) {
+		shell_error(sh, "Firmware update cleanup failed (%d)", result);
+		return result;
+	}
 	shell_print(sh, "Firmware update aborted; the slot is erased");
 	return 0;
 }
