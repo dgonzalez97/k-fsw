@@ -146,10 +146,15 @@ The CSP model reports the board rather than a constant, so a remote
 out, which is what a link failure actually poses: did it leave, did it arrive,
 and where was it addressed.
 
-![A ground node reaching two boards over one CAN bus](docs/media/multi-board-can.gif)
+![A ground node reaching three boards over CAN and a UHF radio](docs/media/multi-board-can.gif)
 
-The two boards above are a bench composition rather than the shipped `frdm_k64f`
-target, which stays shell-only.
+Three boards answering the same commands: an STM32L496 and a Kinetis K64F on
+one CAN bus, and an RP2040 behind a UHF link, with the round trips telling the
+two carriers apart. Reading a named parameter costs one exchange to find it and
+one to read it, whatever else the node holds.
+
+The FRDM and Pico compositions there are bench profiles rather than the shipped
+`frdm_k64f` and `rpi_pico_w` targets, which stay shell-only.
 
 ## Mission control
 
