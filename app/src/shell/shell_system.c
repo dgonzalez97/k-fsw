@@ -20,6 +20,7 @@ static int cmd_status(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "CSP node: %d", CONFIG_KFSW_CSP_ADDRESS);
 #endif
 	shell_print(sh, "board: %s", CONFIG_BOARD_TARGET);
+	shell_print(sh, "unit: %s", kfsw_boot_get_hardware_id());
 	shell_print(sh, "uptime_ms: %llu", (unsigned long long)kfsw_time_monotonic_ms());
 
 	return 0;
@@ -44,6 +45,8 @@ static int cmd_version(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "K-FSW: %s", kfsw_boot_get_image_version());
 	shell_print(sh, "Zephyr: %s", KERNEL_VERSION_STRING);
 	shell_print(sh, "Board: %s", CONFIG_BOARD_TARGET);
+	shell_print(sh, "SoC: %s", CONFIG_SOC);
+	shell_print(sh, "Unit: %s", kfsw_boot_get_hardware_id());
 
 	return 0;
 }
