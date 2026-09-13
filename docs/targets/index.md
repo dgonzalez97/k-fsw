@@ -49,10 +49,11 @@ Width follows the SoC: 96 bits on the STM32L496, 128 on the Kinetis K64, 64 on
 the RP2040. The CSP model reports the board target rather than a constant, so a
 remote `csp ident` names the hardware as well.
 
-![A ground node reaching two boards over one CAN bus](../media/multi-board-can.gif)
+![A ground node reaching three boards over CAN and a UHF radio](../media/multi-board-can.gif)
 
-The recording is a bench composition: the FRDM is configured there as a CSP node
-on CAN, which the shipped `frdm_k64f` target above does not do.
+The recording is a bench composition: the FRDM and the Pico are configured there
+as CSP nodes, on CAN and behind a UHF radio respectively, which the shipped
+`frdm_k64f` and `rpi_pico_w` targets above do not do.
 
 ## KFSW-Linux
 
