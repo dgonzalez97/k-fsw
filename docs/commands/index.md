@@ -185,6 +185,7 @@ These commands exist only with `CONFIG_KFSW_CSP=y`.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
+| `csp debug` | `[on\|off]` | Trace every packet in and out; with no argument, report whether tracing is on |
 | `csp info` | none | Show local address, identity, build date and free packet buffers |
 | `csp interfaces` | none | List registered interfaces with addresses and packet/error/drop counters |
 | `csp routes` | none | List address prefixes, selected interface, and optional next hop |
@@ -198,6 +199,23 @@ kfsw:~$ csp routes
 kfsw:~$ csp ping 2
 CSP ping 2: success, rtt_ms=...
 ```
+
+Tracing answers the question a link failure actually poses, which no counter
+can: did the packet leave, did it arrive, and where was it addressed. It prints
+both nodes, both ports, the priority, the flags and the interface carrying it.
+
+```text
+kfsw:~$ csp debug on
+CSP packet trace: on
+kfsw:~$ csp ping 2
+[DEBUG] OUT: S 33, D 2, Dp 1, Sp 17, Pr 2, Fl 0x01, Sz 10 VIA: CAN (2), Tms 51060
+[DEBUG] INP: S 2, D 33, Dp 17, Sp 1, Pr 2, Fl 0x01, Sz 14 VIA: CAN, Tms 51120
+CSP ping 2: success, rtt_ms=60
+```
+
+It is off by default and per node: a busy link would push the line an operator
+is reading off the screen, and a hop that drops traffic is found by turning it
+on at each end and seeing which one stops reporting.
 
 A multi-interface composition exposes the names and next hop without collapsing
 them to a generic transport:

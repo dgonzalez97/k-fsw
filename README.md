@@ -131,6 +131,26 @@ parameters, storage, and file transfer are disabled.
 | `frdm_k64f` | `frdm_k64f/mk64f12` | OpenSDA UART shell |
 | `rpi_pico_w` | `rpi_pico/rp2040/w` | USB CDC ACM shell |
 
+### Telling one board from another
+
+A node names the silicon it is running on, so a console log, a downlink and a
+screenshot all say which unit produced them. It is on the boot marker, in
+`status` and `version`, and readable from the ground as `board.hw_id`:
+
+```text
+@BOOT sw=v1.0.0 board=nucleo_l496zg/stm32l496xx unit=203037324d46500c0010001f ...
+```
+
+The CSP model reports the board rather than a constant, so a remote
+`csp ident` names the hardware too. `csp debug on` traces every packet in and
+out, which is what a link failure actually poses: did it leave, did it arrive,
+and where was it addressed.
+
+![A ground node reaching two boards over one CAN bus](docs/media/multi-board-can.gif)
+
+The two boards above are a bench composition rather than the shipped `frdm_k64f`
+target, which stays shell-only.
+
 ## Mission control
 
 [Yamcs](https://yamcs.org/) records housekeeping telemetry. The

@@ -37,6 +37,23 @@ Only Linux and NUCLEO-L496ZG are in the hosted `BUILD` matrix. FRDM and Pico
 were accepted with the reusable manual physical shell runner; they are not
 hosted service-qualification gates.
 
+## Identifying a unit
+
+Every target reports the identifier its silicon was manufactured with, on the
+boot marker as `unit=`, from the shell through `status` and `version`, and to
+the ground as the `board.hw_id` parameter. It is the only field that differs
+between two boards running the same image, so it is what attributes a console
+log or a downlink to a unit.
+
+Width follows the SoC: 96 bits on the STM32L496, 128 on the Kinetis K64, 64 on
+the RP2040. The CSP model reports the board target rather than a constant, so a
+remote `csp ident` names the hardware as well.
+
+![A ground node reaching two boards over one CAN bus](../media/multi-board-can.gif)
+
+The recording is a bench composition: the FRDM is configured there as a CSP node
+on CAN, which the shipped `frdm_k64f` target above does not do.
+
 ## KFSW-Linux
 
 ### Purpose

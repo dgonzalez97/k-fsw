@@ -2,6 +2,7 @@
 #include <time.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <zephyr/shell/shell.h>
 #include <zephyr/shell/shell_string_conv.h>
@@ -147,6 +148,32 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 	}
 
 	shell_print(sh, "CSP ping %lu: success, rtt_ms=%u", node, round_trip_ms);
+	return 0;
+}
+
+/* Thin, like every adapter here: the trace itself lives in kfsw-comms, because
+ * it is libcsp's router and this node's send path that produce the lines.
+ */
+static int cmd_csp_debug(const struct shell *sh, size_t argc, char **argv)
+{
+	bool enabled;
+
+	if (argc < 2U) {
+		shell_print(sh, "CSP packet trace: %s", kfsw_csp_get_packet_trace() ? "on" : "off");
+		return 0;
+	}
+
+	if (strcmp(argv[1], "on") == 0) {
+		enabled = true;
+	} else if (strcmp(argv[1], "off") == 0) {
+		enabled = false;
+	} else {
+		shell_error(sh, "Invalid state: %s (expected on or off)", argv[1]);
+		return -EINVAL;
+	}
+
+	kfsw_csp_set_packet_trace(enabled);
+	shell_print(sh, "CSP packet trace: %s", enabled ? "on" : "off");
 	return 0;
 }
 
@@ -332,6 +359,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(csp_commands,
 	SHELL_CMD_ARG(clock, NULL,
 		      "Time: clock, clock set <utc>, clock <node>, clock <node> sync.",
 		      cmd_csp_clock, 1, 2),
+	SHELL_CMD_ARG(debug, NULL, "Trace packets in and out: debug [on|off].", cmd_csp_debug, 1,
+		      1),
 	SHELL_CMD_ARG(ident, NULL, "Identify a node, or this one when no node is given.",
 		      cmd_csp_ident, 1, 1),
 	SHELL_CMD_ARG(info, NULL, "Show local CSP identity and router state.", cmd_csp_info, 1, 0),
