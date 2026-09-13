@@ -4,6 +4,7 @@
 
 #include <zephyr/sys/util.h>
 
+#include <kfsw/platform/hardware.h>
 #include <kfsw/platform/reset.h>
 #include <kfsw/services/boot.h>
 #include <kfsw/services/parameter.h>
@@ -38,6 +39,7 @@
 #define KFSW_BOARD_REVISION_SIZE 40U
 
 static char board_uid[KFSW_BOARD_UID_SIZE];
+static char board_hardware_id[KFSW_HARDWARE_ID_TEXT_SIZE];
 static char board_model[KFSW_BOARD_MODEL_SIZE];
 static char board_revision[KFSW_BOARD_REVISION_SIZE];
 static uint16_t board_node_id = KFSW_BOARD_NODE_ID_DEFAULT;
@@ -76,6 +78,18 @@ static void sample_uid(void *value)
 #else
 	ARG_UNUSED(value);
 #endif
+}
+
+/* The only field on this table that differs between two boards flashed with
+ * the same image. Everything else here is a build option, so a bench of
+ * identical nodes reports identical values until this one is read.
+ *
+ * Taken from the boot service rather than the platform, for the reason the
+ * reset cause below is: one latched reading, several readers.
+ */
+static void sample_hardware_id(void *value)
+{
+	sample_identity(value, KFSW_HARDWARE_ID_TEXT_SIZE, kfsw_boot_get_hardware_id());
 }
 
 static void sample_model(void *value)
@@ -176,6 +190,16 @@ static const struct kfsw_param_definition board_param_definitions[] = {
 		.description = "Unit identity, as reported by csp ident",
 		.value = board_uid,
 		.sample = sample_uid,
+	},
+	{
+		.offset = 0x40U,
+		.type = KFSW_PARAM_STRING,
+		.capacity = KFSW_HARDWARE_ID_TEXT_SIZE,
+		.flags = KFSW_PARAM_FLAG_READ_ONLY | KFSW_PARAM_FLAG_SYSTEM_INFO,
+		.name = "hw_id",
+		.description = "Identifier this unit's silicon was manufactured with",
+		.value = board_hardware_id,
+		.sample = sample_hardware_id,
 	},
 	{
 		.offset = 0x20U,
