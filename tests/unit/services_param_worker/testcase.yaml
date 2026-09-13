@@ -1,0 +1,10 @@
+tests:
+  kfsw.services.param_worker:
+    tags: [unit, services, param, csp]
+    platform_allow: [native_sim/native/64]
+    integration_platforms: [native_sim/native/64]
+  kfsw.services.param_worker.local_only:
+    tags: [unit, services, param, csp]
+    platform_allow: [native_sim/native/64]
+    integration_platforms: [native_sim/native/64]
+    extra_args: EXTRA_CFLAGS=-DKFSW_TEST_LOCAL_ONLY=1

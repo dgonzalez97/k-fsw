@@ -41,6 +41,17 @@ config KFSW_PARAM_TEST_DEFINITIONS
 	  software and physical test configurations; normal application
 	  compositions contain no test parameters.
 
+config KFSW_HIL_PROBES
+	bool "Bench timing and interrupted-update probes"
+	depends on KFSW_DEBUG_SHELL && KFSW_HK && KFSW_PARAM && KFSW_FWU
+	depends on TIMER_HAS_64BIT_CYCLE_COUNTER && !SMP
+	depends on TRACING_USER && INIT_STACKS && THREAD_STACK_INFO
+	depends on THREAD_NAME && THREAD_MONITOR
+	help
+	  Record wake-to-run latency and service durations. The local hil command
+	  can arm a reset between secondary-slot erase pages or write blocks.
+	  Only enable this in bench images.
+
 endmenu
 
 config SHELL_PROMPT_UART

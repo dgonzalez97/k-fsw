@@ -118,10 +118,8 @@ printf '\n=== Modes ===\n'
 expect 'uptime_s                          u32     r'
 expect 'boot_delay_ms                     u16     wpb'
 expect 'app_report_ms                     u16     wp'
-# Writable and live, and deliberately not persistent: a route table is the one
-# setting that can put a node out of reach, so a wrong one must not survive a
-# reboot.
-expect 'route_table                       string  w'
+# Routes are selected by the build before the router starts.
+expect 'route_table                       string  r'
 # Off by default: the shell repeats every input byte, so a scripted session
 # would show each command twice.
 expect 'echo_enabled                      u8      w     0'

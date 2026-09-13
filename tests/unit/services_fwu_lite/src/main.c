@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include <zephyr/sys/crc.h>
+#include <zephyr/storage/flash_map.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/ztest.h>
 
@@ -21,6 +22,14 @@
 #define IMAGE_SIZE ((BLOCK * IMAGE_BLOCKS) + IMAGE_TAIL)
 
 static uint8_t image[IMAGE_SIZE];
+static int erase_error;
+
+int __real_flash_area_flatten(const struct flash_area *area, off_t offset, size_t size);
+
+int __wrap_flash_area_flatten(const struct flash_area *area, off_t offset, size_t size)
+{
+	return erase_error != 0 ? erase_error : __real_flash_area_flatten(area, offset, size);
+}
 
 static void *lite_setup(void)
 {
@@ -33,6 +42,7 @@ static void *lite_setup(void)
 static void lite_before(void *fixture)
 {
 	ARG_UNUSED(fixture);
+	erase_error = 0;
 	(void)kfsw_fwu_abort();
 }
 
@@ -302,6 +312,9 @@ ZTEST(services_fwu_lite, test_verify_reports_a_wrong_whole_image_checksum)
 ZTEST(services_fwu_lite, test_a_whole_image_arrives_and_verifies)
 {
 	struct kfsw_fwu_lite_message reply;
+	struct kfsw_fwu_status status;
+	const struct flash_area *area;
+	uint8_t tail[IMAGE_TAIL];
 
 	begin_transfer(&reply);
 	for (uint16_t index = 0U; index <= IMAGE_BLOCKS; index++) {
@@ -312,6 +325,41 @@ ZTEST(services_fwu_lite, test_a_whole_image_arrives_and_verifies)
 	zassert_equal(reply.extra, IMAGE_SIZE);
 	zassert_equal(reply.argument, crc32_ieee(image, IMAGE_SIZE));
 	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_VERIFY, 0U, 0U, 0U, NULL, 0U),
+		      KFSW_FWU_LITE_STATUS_OK);
+	zassert_ok(kfsw_fwu_get_status(&status));
+	zassert_equal(status.state, KFSW_FWU_VERIFIED);
+	zassert_false(status.swap_scheduled);
+	zassert_ok(flash_area_open(DT_FIXED_PARTITION_ID(DT_CHOSEN(kfsw_fwu_partition)), &area));
+	zassert_ok(flash_area_read(area, kfsw_fwu_slot_write_offset() + IMAGE_SIZE - IMAGE_TAIL,
+				   tail, sizeof(tail)));
+	flash_area_close(area);
+	zassert_mem_equal(tail, &image[IMAGE_SIZE - IMAGE_TAIL], sizeof(tail));
+	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_VERIFY, 0U, 0U, 0U, NULL, 0U),
+		      KFSW_FWU_LITE_STATUS_OK);
+	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_START_FLASHING, 0U, 0U, 0U, NULL, 0U),
+		      KFSW_FWU_LITE_STATUS_OK);
+}
+
+ZTEST(services_fwu_lite, test_idle_verify_is_rejected)
+{
+	struct kfsw_fwu_lite_message reply;
+
+	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_VERIFY, 0U, 0U, 0U, NULL, 0U),
+		      KFSW_FWU_LITE_STATUS_INVALID);
+}
+
+ZTEST(services_fwu_lite, test_abort_reports_erase_failure)
+{
+	struct kfsw_fwu_lite_message reply;
+
+	begin_transfer(&reply);
+	zassert_equal(send_block(&reply, 0U), KFSW_FWU_LITE_STATUS_OK);
+	erase_error = -EIO;
+	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_ABORT, 0U, 0U, 0U, NULL, 0U),
+		      KFSW_FWU_LITE_STATUS_FAILED);
+	zassert_equal(reply.extra, BLOCK);
+	erase_error = 0;
+	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_ABORT, 0U, 0U, 0U, NULL, 0U),
 		      KFSW_FWU_LITE_STATUS_OK);
 }
 

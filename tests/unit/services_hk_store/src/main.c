@@ -324,3 +324,55 @@ ZTEST(kfsw_hk_store, test_the_sizing_is_header_plus_every_slot)
 		      (int)(STORE_HEADER_SIZE + (16U * CONFIG_KFSW_HK_STORE_CAPACITY)),
 		      "the sizing arithmetic changed");
 }
+
+static K_SEM_DEFINE(write_entered, 0, 1);
+static K_SEM_DEFINE(write_release, 0, 1);
+static K_THREAD_STACK_DEFINE(writer_stack, 3072);
+static struct k_thread writer_thread;
+static bool delay_write;
+static int collect_result;
+
+ssize_t __real_fs_write(struct fs_file_t *file, const void *data, size_t size);
+
+ssize_t __wrap_fs_write(struct fs_file_t *file, const void *data, size_t size)
+{
+	if (delay_write) {
+		delay_write = false;
+		k_sem_give(&write_entered);
+		if (k_sem_take(&write_release, K_SECONDS(2)) != 0) {
+			return -ETIMEDOUT;
+		}
+	}
+	return __real_fs_write(file, data, size);
+}
+
+static void collect_to_store(void *a, void *b, void *c)
+{
+	ARG_UNUSED(a);
+	ARG_UNUSED(b);
+	ARG_UNUSED(c);
+	collect_result = kfsw_hk_collect(0);
+}
+
+ZTEST(kfsw_hk_store, test_ring_can_be_read_while_storage_write_waits)
+{
+	struct kfsw_hk_sample sample;
+	struct kfsw_hk_stats stats;
+
+	define_report(0);
+	zassert_ok(kfsw_hk_set_store(0, CONFIG_KFSW_HK_STORE_FLOOR_MS));
+	k_sem_reset(&write_entered);
+	k_sem_reset(&write_release);
+	delay_write = true;
+	k_thread_create(&writer_thread, writer_stack, K_THREAD_STACK_SIZEOF(writer_stack),
+			collect_to_store, NULL, NULL, NULL, 3, 0, K_NO_WAIT);
+	zassert_ok(k_sem_take(&write_entered, K_SECONDS(1)));
+	int64_t started = k_uptime_get();
+	zassert_ok(kfsw_hk_get(0, 0, &sample));
+	kfsw_hk_get_stats(&stats);
+	zassert_true(k_uptime_get() - started < 100);
+	zassert_equal(sample.entry_count, 2);
+	k_sem_give(&write_release);
+	zassert_ok(k_thread_join(&writer_thread, K_SECONDS(1)));
+	zassert_ok(collect_result);
+}

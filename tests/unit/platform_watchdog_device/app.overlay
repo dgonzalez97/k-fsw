@@ -1,0 +1,10 @@
+/ {
+	chosen {
+		kfsw,watchdog = &test_watchdog;
+	};
+
+	test_watchdog: watchdog {
+		compatible = "vnd,kfsw-watchdog";
+		status = "okay";
+	};
+};

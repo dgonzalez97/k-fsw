@@ -7,9 +7,11 @@ CREATE_SUBDIRS         = NO
 ALLOW_UNICODE_NAMES    = NO
 OUTPUT_LANGUAGE        = English
 
-BRIEF_MEMBER_DESC      = YES
+# Keep descriptions beside their declarations in the detailed API section.
+# Doxygen 1.9.1 emits broken anonymous-union links in brief member summaries.
+BRIEF_MEMBER_DESC      = NO
 REPEAT_BRIEF           = YES
-ALWAYS_DETAILED_SEC    = NO
+ALWAYS_DETAILED_SEC    = YES
 INLINE_INHERITED_MEMB  = NO
 FULL_PATH_NAMES        = NO
 STRIP_FROM_PATH        = ../
@@ -111,7 +113,10 @@ PREDEFINED             = __DOXYGEN__=1 \
                          CONFIG_KFSW_LOG_MIN_LEVEL=0 \
                          CONFIG_KFSW_PARAM=1 \
                          CONFIG_KFSW_PARAM_CSP=1 \
-                         CONFIG_KFSW_PARAM_PERSISTENCE=1
+                         CONFIG_KFSW_PARAM_PERSISTENCE=1 \
+                         CONFIG_KFSW_HK_PERSISTENCE=1 \
+                         CONFIG_KFSW_HK_CSP=1 \
+                         CONFIG_KFSW_FWU_FILES=1
 
 SKIP_FUNCTION_MACROS   = YES
 HAVE_DOT               = NO

@@ -90,6 +90,7 @@ static void *persist_setup(void)
 static void persist_before(void *fixture)
 {
 	ARG_UNUSED(fixture);
+	(void)kfsw_hk_save();
 	for (uint8_t report = 0U; report < CONFIG_KFSW_HK_REPORTS; report++) {
 		(void)kfsw_hk_set_beacon(report, 1U, 0U);
 		(void)kfsw_hk_clear_store(report);
@@ -477,4 +478,194 @@ ZTEST(kfsw_hk_persistence, test_a_version_three_file_is_refused)
 
 	zassert_equal(kfsw_hk_persist_load(), -EPROTONOSUPPORT,
 		      "a layout from the future was decoded anyway");
+}
+
+static int write_error;
+static int sync_error;
+static int rename_error;
+static atomic_t block_writes;
+static K_SEM_DEFINE(write_entered, 0, 2);
+static K_SEM_DEFINE(write_release, 0, 2);
+
+ssize_t __real_fs_write(struct fs_file_t *file, const void *data, size_t size);
+int __real_fs_sync(struct fs_file_t *file);
+int __real_fs_rename(const char *from, const char *to);
+
+ssize_t __wrap_fs_write(struct fs_file_t *file, const void *data, size_t size)
+{
+	if (atomic_get(&block_writes) > 0) {
+		atomic_dec(&block_writes);
+		k_sem_give(&write_entered);
+		zassert_ok(k_sem_take(&write_release, K_SECONDS(3)));
+	}
+	return write_error != 0 ? write_error : __real_fs_write(file, data, size);
+}
+
+int __wrap_fs_sync(struct fs_file_t *file)
+{
+	return sync_error != 0 ? sync_error : __real_fs_sync(file);
+}
+
+int __wrap_fs_rename(const char *from, const char *to)
+{
+	return rename_error != 0 ? rename_error : __real_fs_rename(from, to);
+}
+
+ZTEST(kfsw_hk_persistence, test_save_errors_leave_active_settings_dirty_and_retryable)
+{
+	struct kfsw_hk_stats stats;
+	uint32_t period;
+	int *faults[] = {&write_error, &sync_error, &rename_error};
+	int errors[] = {-ENOSPC, -EIO, -EACCES};
+
+	define_report(0);
+	for (size_t i = 0; i < ARRAY_SIZE(faults); i++) {
+		*faults[i] = errors[i];
+		zassert_equal(kfsw_hk_set_period(0, 5000 + i), KFSW_HK_APPLIED_UNSAVED);
+		zassert_ok(kfsw_hk_get_period(0, &period));
+		zassert_equal(period, 5000 + i);
+		kfsw_hk_get_stats(&stats);
+		zassert_true(stats.settings_dirty);
+		zassert_equal(stats.last_save_error, errors[i]);
+		*faults[i] = 0;
+		zassert_ok(kfsw_hk_save());
+		kfsw_hk_get_stats(&stats);
+		zassert_false(stats.settings_dirty);
+		zassert_equal(stats.last_save_error, 0);
+	}
+}
+
+static K_THREAD_STACK_DEFINE(save_stack_a, 3072);
+static K_THREAD_STACK_DEFINE(save_stack_b, 3072);
+static struct k_thread save_thread_a, save_thread_b;
+
+static void set_period_thread(void *period, void *unused_b, void *unused_c)
+{
+	ARG_UNUSED(unused_b);
+	ARG_UNUSED(unused_c);
+	zassert_ok(kfsw_hk_set_period(0, (uint32_t)(uintptr_t)period));
+}
+
+ZTEST(kfsw_hk_persistence, test_older_save_does_not_clear_newer_dirty_settings)
+{
+	struct kfsw_hk_stats stats;
+	uint32_t period = 0;
+
+	define_report(0);
+	atomic_set(&block_writes, 2);
+	k_thread_create(&save_thread_a, save_stack_a, K_THREAD_STACK_SIZEOF(save_stack_a),
+			set_period_thread, (void *)5000, NULL, NULL, 5, 0, K_NO_WAIT);
+	zassert_ok(k_sem_take(&write_entered, K_SECONDS(1)));
+	k_thread_create(&save_thread_b, save_stack_b, K_THREAD_STACK_SIZEOF(save_stack_b),
+			set_period_thread, (void *)6000, NULL, NULL, 5, 0, K_NO_WAIT);
+	for (unsigned int i = 0; i < 100; i++) {
+		zassert_ok(kfsw_hk_get_period(0, &period));
+		if (period == 6000) {
+			break;
+		}
+		k_sleep(K_MSEC(1));
+	}
+	zassert_equal(period, 6000);
+	k_sem_give(&write_release);
+	zassert_ok(k_thread_join(&save_thread_a, K_SECONDS(1)));
+	zassert_ok(k_sem_take(&write_entered, K_SECONDS(1)));
+	kfsw_hk_get_stats(&stats);
+	zassert_true(stats.settings_dirty);
+	k_sem_give(&write_release);
+	zassert_ok(k_thread_join(&save_thread_b, K_SECONDS(1)));
+	kfsw_hk_get_stats(&stats);
+	zassert_false(stats.settings_dirty);
+}
+
+ZTEST(kfsw_hk_persistence, test_invalid_late_report_applies_nothing_and_preserves_file)
+{
+	uint8_t saved[1024], after[1024];
+	struct kfsw_hk_entry entries[CONFIG_KFSW_HK_ENTRIES];
+	struct kfsw_hk_stats stats;
+	size_t count = ARRAY_SIZE(entries);
+
+	define_report(0);
+	define_report(1);
+	size_t size = read_file(saved, sizeof(saved));
+
+	/* The second report reuses the first ID; keep the CRC valid. */
+	saved[12 + 16 + 2 * 4] = 0;
+	sys_put_be32(0, &saved[8]);
+	sys_put_be32(crc32_ieee(saved, size), &saved[8]);
+	restart_with(saved, size);
+	zassert_equal(kfsw_hk_persist_load(), -EBADMSG);
+	zassert_equal(kfsw_hk_get_definition(0, entries, &count), -ENOENT);
+	zassert_equal(kfsw_hk_clear(0), KFSW_HK_APPLIED_UNSAVED);
+	zassert_equal(read_file(after, sizeof(after)), size);
+	zassert_mem_equal(after, saved, size);
+	kfsw_hk_get_stats(&stats);
+	zassert_equal(stats.last_load_error, -EBADMSG);
+	zassert_true(stats.settings_dirty);
+	zassert_ok(kfsw_hk_save());
+}
+
+static atomic_t block_reads;
+static K_SEM_DEFINE(read_entered, 0, 1);
+static K_SEM_DEFINE(read_release, 0, 1);
+ssize_t __real_fs_read(struct fs_file_t *file, void *data, size_t size);
+
+ssize_t __wrap_fs_read(struct fs_file_t *file, void *data, size_t size)
+{
+	if (atomic_cas(&block_reads, 1, 0)) {
+		k_sem_give(&read_entered);
+		zassert_ok(k_sem_take(&read_release, K_SECONDS(2)));
+	}
+	return __real_fs_read(file, data, size);
+}
+
+static void restore_thread(void *a, void *b, void *c)
+{
+	ARG_UNUSED(a);
+	ARG_UNUSED(b);
+	ARG_UNUSED(c);
+	zassert_ok(kfsw_hk_persist_load());
+}
+
+ZTEST(kfsw_hk_persistence, test_requests_are_gated_while_restoring)
+{
+	define_report(0);
+	atomic_set(&block_reads, 1);
+	k_thread_create(&save_thread_a, save_stack_a, K_THREAD_STACK_SIZEOF(save_stack_a),
+			restore_thread, NULL, NULL, NULL, 5, 0, K_NO_WAIT);
+	zassert_ok(k_sem_take(&read_entered, K_SECONDS(1)));
+	zassert_false(kfsw_hk_is_ready());
+	zassert_equal(kfsw_hk_set_period(0, 5000), -EACCES);
+	zassert_equal(kfsw_hk_collect(0), -EACCES);
+	zassert_equal(kfsw_hk_start(), -EACCES);
+	k_sem_give(&read_release);
+	zassert_ok(k_thread_join(&save_thread_a, K_SECONDS(1)));
+	zassert_true(kfsw_hk_is_ready());
+}
+
+ZTEST(kfsw_hk_persistence, test_restore_preserves_samples_and_continues_sequence)
+{
+	struct fs_file_t file;
+	uint8_t saved[512], after[512];
+	struct kfsw_hk_sample sample;
+	ssize_t size;
+
+	define_report(0);
+	zassert_ok(kfsw_hk_set_period(0, CONFIG_KFSW_HK_STORE_FLOOR_MS));
+	zassert_ok(kfsw_hk_set_store(0, CONFIG_KFSW_HK_STORE_FLOOR_MS));
+	zassert_ok(kfsw_hk_collect(0));
+	zassert_ok(kfsw_hk_collect(0));
+	fs_file_t_init(&file);
+	zassert_ok(fs_open(&file, KFSW_STORAGE_MOUNT_POINT "/hk/report0.bin", FS_O_READ));
+	size = fs_read(&file, saved, sizeof(saved));
+	zassert_true(size > 12);
+	zassert_ok(fs_close(&file));
+	zassert_ok(kfsw_hk_persist_load());
+	zassert_ok(kfsw_hk_collect(0));
+	zassert_ok(kfsw_hk_get(0, 0, &sample));
+	zassert_equal(sample.sequence, 2);
+	fs_file_t_init(&file);
+	zassert_ok(fs_open(&file, KFSW_STORAGE_MOUNT_POINT "/hk/report0.bin", FS_O_READ));
+	zassert_equal(fs_read(&file, after, size), size);
+	zassert_mem_equal(after, saved, size);
+	zassert_ok(fs_close(&file));
 }

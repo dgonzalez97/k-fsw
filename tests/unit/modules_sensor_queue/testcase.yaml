@@ -1,0 +1,5 @@
+tests:
+  kfsw.modules.sensor_queue:
+    tags: [unit, modules, sensor]
+    platform_allow: [native_sim/native/64]
+    integration_platforms: [native_sim/native/64]

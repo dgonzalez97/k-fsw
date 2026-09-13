@@ -15,3 +15,4 @@ project(kfsw_services_hk_store_tests LANGUAGES C)
 
 target_sources(app PRIVATE src/main.c)
 target_link_libraries(app PRIVATE kfsw::services)
+zephyr_link_libraries(-Wl,--wrap=fs_write)

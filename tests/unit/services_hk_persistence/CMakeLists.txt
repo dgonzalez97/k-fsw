@@ -17,3 +17,5 @@ project(kfsw_services_hk_persistence_tests LANGUAGES C)
 
 target_sources(app PRIVATE src/main.c)
 target_link_libraries(app PRIVATE kfsw::services kfsw::comms)
+
+zephyr_link_libraries(-Wl,--wrap=fs_read -Wl,--wrap=fs_write -Wl,--wrap=fs_sync -Wl,--wrap=fs_rename)

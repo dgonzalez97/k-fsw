@@ -1,0 +1,5 @@
+tests:
+  kfsw.modules.radio_crypto:
+    tags: [unit, modules, radio, crypto]
+    platform_allow: [native_sim/native/64]
+    integration_platforms: [native_sim/native/64]

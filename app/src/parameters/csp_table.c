@@ -32,62 +32,8 @@ static uint32_t csp_dropped;
 static uint8_t csp_interfaces;
 static uint8_t csp_router_running;
 
-/* Live rather than stored. A route table is the one setting that can put a node
- * out of reach, so a wrong one must not survive a reboot: the compiled table
- * comes back on the next boot and the mistake costs a pass, not the node.
- */
+/* Read-only: libcsp's active CIDR table cannot be replaced while routing. */
 static char csp_route_table[KFSW_CSP_ROUTE_TABLE_MAX_LENGTH + 1U] = CONFIG_KFSW_CSP_ROUTE_TABLE;
-
-/* Empty is accepted and means "leave the composed routes alone". A composition
- * with one link derives its route implicitly and has no compiled table, so
- * empty is the honest starting value; refusing it would stop the whole
- * parameter table from registering on exactly the compositions that work. It
- * is also the safe reading of an empty write, which would otherwise be a way
- * to take a node off the network by typing nothing.
- */
-static int validate_route_table(const char *text)
-{
-	size_t entries = 0U;
-	int result;
-
-	if (text[0] == '\0') {
-		return 0;
-	}
-
-	result = kfsw_csp_route_table_check(text, &entries);
-	if (result == -ENETDOWN) {
-		/* Registration happens before CSP starts, so the interfaces a
-		 * compiled table names do not exist yet and nothing here can
-		 * judge it. Accepting is the only option that leaves the table
-		 * registered, and it costs nothing: the same table is checked
-		 * again when CSP applies it, which is where a bad compiled
-		 * value is reported. Any write an operator makes arrives after
-		 * CSP is up and gets the full check.
-		 */
-		return 0;
-	}
-	if (result != 0) {
-		return -EINVAL;
-	}
-	return (entries == 0U) ? -EINVAL : 0;
-}
-
-static void apply_route_table(const char *text)
-{
-	if (text[0] == '\0') {
-		kfsw_log_info("CSP: empty route table ignored; composed routes kept");
-		return;
-	}
-	if (kfsw_csp_route_table_apply(text) != 0) {
-		/* Validation already accepted it, so a failure here means the
-		 * router refused what it had agreed was well formed. The old
-		 * routes are gone either way, and saying so is the only way an
-		 * operator learns why the node went quiet. */
-		kfsw_log_error("CSP: the router refused a validated route table");
-	} else {
-		kfsw_log_info("CSP: route table replaced with '%s'", text);
-	}
-}
 
 static bool accumulate_interface(const struct kfsw_csp_interface_info *info, void *context)
 {
@@ -226,13 +172,11 @@ static const struct kfsw_param_definition csp_param_definitions[] = {
 		.offset = 0x20U,
 		.type = KFSW_PARAM_STRING,
 		.capacity = KFSW_CSP_ROUTE_TABLE_MAX_LENGTH + 1U,
-		.flags = KFSW_PARAM_FLAG_CONFIGURATION,
+		.flags = KFSW_PARAM_FLAG_READ_ONLY,
 		.name = "route_table",
-		.description = "Static routes in libcsp CIDR syntax; applied immediately",
+		.description = "Compiled routes in libcsp CIDR syntax",
 		.value = csp_route_table,
 		.default_text = CONFIG_KFSW_CSP_ROUTE_TABLE,
-		.validate_text = validate_route_table,
-		.changed_text = apply_route_table,
 	},
 	{
 		.offset = 0x15U,
