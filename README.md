@@ -118,43 +118,31 @@ and remaining hardware checks.
 
 ## Targets
 
-| Target | Board | Links | What runs on it |
-| --- | --- | --- | --- |
-| `linux` | `native_sim/native/64` | KISS over a PTY; optional CAN via SocketCAN | Reference services and optional profiles |
-| `nucleo_l496zg` | STM32 Nucleo L496ZG | KISS on USART3; optional CAN on PD0/PD1 | Reference services and optional profiles |
+| Target | Board | Architecture | Links | What runs on it |
+| --- | --- | --- | --- | --- |
+| `linux` | `native_sim/native/64` | x86-64 host | KISS over a PTY; optional CAN via SocketCAN | Reference services and optional profiles |
+| `nucleo_l496zg` | STM32 Nucleo L496ZG | Arm Cortex-M4 | KISS on USART3; optional CAN on PD0/PD1 | Reference services and optional profiles |
+| `frdm_k64f` | NXP FRDM-K64F | Arm Cortex-M4 | OpenSDA UART console | Shell only; CSP, parameters, storage and file transfer are off |
+| `rpi_pico_w` | Raspberry Pi Pico W | Arm Cortex-M0+ | USB CDC ACM console | Shell only; CSP, parameters, storage and file transfer are off |
 
-FRDM and Pico W currently provide shell bring-up profiles. CSP,
-parameters, storage, and file transfer are disabled.
+### Identifying a board
 
-| Target | Board | Verified scope |
-| --- | --- | --- |
-| `frdm_k64f` | `frdm_k64f/mk64f12` | OpenSDA UART shell |
-| `rpi_pico_w` | `rpi_pico/rp2040/w` | USB CDC ACM shell |
-
-### Telling one board from another
-
-A node names the silicon it is running on, so a console log, a downlink and a
-screenshot all say which unit produced them. It is on the boot marker, in
-`status` and `version`, and readable from the ground as `board.hw_id`:
+Every node prints its chip's unique ID when it boots, so identical boards can
+be told apart in a log or a screenshot. The same ID is shown by `status` and
+`version`, and the ground can read it with `param get <node> hw_id`:
 
 ```text
-@BOOT sw=v1.0.0 board=nucleo_l496zg/stm32l496xx unit=203037324d46500c0010001f ...
+@BOOT sw=v1.0.1 board=nucleo_l496zg/stm32l496xx unit=203037324d46500c0010001f ...
 ```
 
-The CSP model reports the board rather than a constant, so a remote
-`csp ident` names the hardware too. `csp debug on` traces every packet in and
-out, which is what a link failure actually poses: did it leave, did it arrive,
-and where was it addressed.
+`csp ident` also reports the board name, and `csp debug on` prints every packet
+a node sends or receives.
 
-![A ground node reaching three boards over CAN and a UHF radio](docs/media/multi-board-can.gif)
+![A ground node talking to three boards over CAN and radio](docs/media/multi-board-can.gif)
 
-Three boards answering the same commands: an STM32L496 and a Kinetis K64F on
-one CAN bus, and an RP2040 behind a UHF link, with the round trips telling the
-two carriers apart. Reading a named parameter costs one exchange to find it and
-one to read it, whatever else the node holds.
-
-The FRDM and Pico compositions there are bench profiles rather than the shipped
-`frdm_k64f` and `rpi_pico_w` targets, which stay shell-only.
+Here a ground node talks to an STM32 and a Kinetis over CAN, and to an RP2040
+over a UHF radio. The FRDM and Pico run bench configurations for this demo; the
+`frdm_k64f` and `rpi_pico_w` targets in the table above are still shell-only.
 
 ## Mission control
 
