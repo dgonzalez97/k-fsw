@@ -150,10 +150,10 @@ components cannot be given the same table by accident:
 | Band | Owner | Meaning |
 | --- | --- | --- |
 | 0 | — | Reserved invalid. A zero table identifier is never valid, so an uninitialised field cannot address a real table. |
-| 1–24 | composition, platform, comms | Core: identity, links and hardware. |
-| 25–49 | `kfsw-services` | One table per service. |
-| 50–99 | `kfsw-modules` | Devices and subsystems. |
-| 100–255 | — | Unallocated; left for mission payloads. |
+| 1-24 | composition, platform, comms | Core: identity, links and hardware. |
+| 25-49 | `kfsw-services` | One table per service. |
+| 50-99 | `kfsw-modules` | Devices and subsystems. |
+| 100-255 | — | Unallocated; left for mission payloads. |
 
 The wire identifier carries the table in its high byte and the offset in its
 low byte. That keeps it unique across the node, which is what the libcsp

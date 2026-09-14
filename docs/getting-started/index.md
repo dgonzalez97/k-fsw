@@ -12,17 +12,17 @@ Commands in this manual assume:
 
 ```text
 k-fsw-workspace/                    workspace root
-├── .venv/                          Python environment, including west
-├── .west/                          west workspace metadata
-├── k-fsw/                          manifest/application repository
-├── kfsw-platform/                  pinned dependency
-├── kfsw-services/                  pinned dependency
-├── kfsw-comms/                     pinned dependency
-│   └── third_party/libcsp/          separate pinned west project
-├── kfsw-modules/                   pinned dependency
-├── zephyr/                         pinned Zephyr tree
-├── modules/                        Zephyr-imported projects
-└── build/                          generated output
+|-- .venv/                          Python environment, including west
+|-- .west/                          west workspace metadata
+|-- k-fsw/                          manifest/application repository
+|-- kfsw-platform/                  pinned dependency
+|-- kfsw-services/                  pinned dependency
+|-- kfsw-comms/                     pinned dependency
+|   `-- third_party/libcsp/          separate pinned west project
+|-- kfsw-modules/                   pinned dependency
+|-- zephyr/                         pinned Zephyr tree
+|-- modules/                        Zephyr-imported projects
+`-- build/                          generated output
 ```
 
 Run project scripts from the workspace root. The scripts resolve their own

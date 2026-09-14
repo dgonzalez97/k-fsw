@@ -338,7 +338,7 @@ CDC ACM console and selects it for the Zephyr console and shell. The shell
 waits for host DTR so output is not discarded before a terminal is attached.
 
 Like FRDM, the target disables CSP, parameters, persistence, FTP, storage, and
-the flash filesystem. Wi-Fi is not configured; “Pico W” identifies the board,
+the flash filesystem. Wi-Fi is not configured; "Pico W" identifies the board,
 not a supported K-FSW wireless transport.
 
 Build and run the reusable physical acceptance path with:

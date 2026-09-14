@@ -110,11 +110,11 @@ driver or orchestration framework:
 
 ```text
 ground-station/
-├── README.md
-├── station.env
-└── nodes/
-    ├── kfsw-gnd-uhf.env
-    └── kfsw-ops.env
+|-- README.md
+|-- station.env
+`-- nodes/
+    |-- kfsw-gnd-uhf.env
+    `-- kfsw-ops.env
 ```
 
 Each node file is a small shell-compatible environment file:
@@ -419,10 +419,10 @@ The HIL tree models the radio category separately from its implementation:
 
 ```text
 tests/hil/radio-uhf/
-└── holybro/
-    ├── raw-peer/
-    ├── raw-nucleo-smoke.sh
-    └── csp-kiss-smoke.sh
+`-- holybro/
+    |-- raw-peer/
+    |-- raw-nucleo-smoke.sh
+    `-- csp-kiss-smoke.sh
 ```
 
 `kfsw-comms` continues to own reusable CSP/KISS/UART behavior. `kfsw-modules`

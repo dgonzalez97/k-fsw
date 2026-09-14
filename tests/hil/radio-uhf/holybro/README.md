@@ -42,7 +42,7 @@ observed settings are:
 | `TXPOWER` | `20` |
 | `ECC` | `0` |
 | `MAVLINK` | `1` |
-| Frequency range | 433050–434790 kHz |
+| Frequency range | 433050-434790 kHz |
 | Channels | `10` |
 | `RTSCTS` | `0` |
 

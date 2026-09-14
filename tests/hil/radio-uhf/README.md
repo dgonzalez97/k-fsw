@@ -7,9 +7,9 @@ Current structure:
 
 ```text
 radio-uhf/
-└── holybro/
-    ├── raw byte-link smoke test
-    └── CSP/KISS link smoke test
+`-- holybro/
+    |-- raw byte-link smoke test
+    `-- CSP/KISS link smoke test
 ```
 
 Reusable CSP and KISS behavior remains owned by `kfsw-comms`. These fixtures

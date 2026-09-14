@@ -29,7 +29,7 @@ every connected CSP network.
 
 ### Port
 
-A port identifies a service at a node. The destination pair “node 2, port 9”
+A port identifies a service at a node. The destination pair "node 2, port 9"
 means the FTP service on node 2, not a physical connector or operating-system
 serial port. Common K-FSW service ports are:
 

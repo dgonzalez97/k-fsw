@@ -61,33 +61,33 @@ printed `@READY`. Wait for that marker, then query service-specific state.
 
 ```text
 root
-├── status, time, version
-├── log
-│   └── test
-├── uhf                       when KFSW_RADIO_UHF_SHELL=y
-│   └── status
-├── csp                       when KFSW_CSP=y
-│   ├── info, interfaces, routes, ping
-├── uart                      when KFSW_CSP_KISS_UART=y
-│   ├── info, test
-├── param                     when KFSW_PARAM=y
-│   ├── list, get, set
-│   └── save, load, defaults, clear
-│       when persistence is enabled
-├── boton_test                when KFSW_BOTON_TEST_SHELL=y
-│   └── status
-├── test                      when KFSW_BOTON_TEST_SHELL=y
-│   └── led <colour> <on|off>
-├── storage                   when KFSW_STORAGE=y
-│   ├── info, test
-├── ftp                       when KFSW_FTP=y
-│   ├── list/ls, stat, mkdir, put, get
-│   └── generate, verify      diagnostic helpers
-├── cmd                       when KFSW_COMMAND=y
-│   ├── list
-│   └── <registered names>    supplied by the registry, not this tree
-└── event                     when KFSW_EVENT=y
-    ├── list, stats, clear
+|-- status, time, version
+|-- log
+|   `-- test
+|-- uhf                       when KFSW_RADIO_UHF_SHELL=y
+|   `-- status
+|-- csp                       when KFSW_CSP=y
+|   |-- info, interfaces, routes, ping
+|-- uart                      when KFSW_CSP_KISS_UART=y
+|   |-- info, test
+|-- param                     when KFSW_PARAM=y
+|   |-- list, get, set
+|   `-- save, load, defaults, clear
+|       when persistence is enabled
+|-- boton_test                when KFSW_BOTON_TEST_SHELL=y
+|   `-- status
+|-- test                      when KFSW_BOTON_TEST_SHELL=y
+|   `-- led <colour> <on|off>
+|-- storage                   when KFSW_STORAGE=y
+|   |-- info, test
+|-- ftp                       when KFSW_FTP=y
+|   |-- list/ls, stat, mkdir, put, get
+|   `-- generate, verify      diagnostic helpers
+|-- cmd                       when KFSW_COMMAND=y
+|   |-- list
+|   `-- <registered names>    supplied by the registry, not this tree
+`-- event                     when KFSW_EVENT=y
+    |-- list, stats, clear
 ```
 
 `cmd` is the only root whose subcommands are not fixed at build time in this
@@ -422,7 +422,7 @@ Remote writes to either value fail as read-only. This visibility does not make
 composition capabilities.
 
 The node argument is decimal. Remote changes are not automatically persisted
-on the destination. The current API has no remote “save” command.
+on the destination. The current API has no remote "save" command.
 
 When the CSP adapter is disabled, optional node arguments are not accepted;
 the same command names remain local-only.

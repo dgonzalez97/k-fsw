@@ -253,5 +253,5 @@ dl.note, dl.warning, dl.attention {
     color: #fff;
   }
   .sm-dox a span.sub-arrow::before { content: "+"; }
-  .sm-dox a.highlighted span.sub-arrow::before { content: "−"; }
+  .sm-dox a.highlighted span.sub-arrow::before { content: "-"; }
 }
