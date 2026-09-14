@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/media/title.svg" alt="K-FSW"></p>
+
 # K-FSW - Modular flight software on Zephyr, for small satellites
 
 [![Software CI](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml)
