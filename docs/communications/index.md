@@ -4,98 +4,70 @@
 
 ## CSP in K-FSW
 
-[Cubesat Space Protocol](https://github.com/libcsp/libcsp) provides node
-addresses, service ports, routing, and packet transport. K-FSW uses libcsp;
-`kfsw-comms` owns setup, interfaces, routes, and the router.
+[CubeSat Space Protocol](https://github.com/libcsp/libcsp) provides node
+addresses, ports, routing and packet transport. `kfsw-comms` sets up libcsp,
+the interfaces, the routes and the router.
 
 CSP is optional. With `CONFIG_KFSW_CSP=n`, local parameters, persistence,
-logging, and the shell still work. Remote parameters, FTP, and other
-CSP services require it.
+logging and the shell still work; remote parameters, FTP and the other network
+services need it.
 
-## CSP vocabulary
+## Terms
 
-### Node and address
+**Node.** One CSP endpoint: a flight computer, a subsystem, a process or a
+ground tool. K-FSW uses CSP version 2, with addresses from 1 to 16383, set by
+`CONFIG_KFSW_CSP_ADDRESS`. KFSW-Linux is node 1 by default and the
+NUCLEO-L496ZG node 2. Every node on a network needs its own address.
 
-A node is one CSP protocol endpoint: an on-board computer, subsystem,
-development process, or ground-side tool. Its CSP address identifies it for
-routing. Current K-FSW configurations use CSP version 2 addresses in the range
-1 through 16383 and assign one address at build time with
-`CONFIG_KFSW_CSP_ADDRESS`.
+**Port.** A service on a node: "node 2, port 9" is the file transfer service on
+node 2.
 
-KFSW-Linux is node 1 by default and NUCLEO-L496ZG is node 2. Those values form
-the current test topology; they are not a universal spacecraft address plan.
-A real product must allocate addresses deliberately and keep them unique on
-every connected CSP network.
-
-### Port
-
-A port identifies a service at a node. The destination pair "node 2, port 9"
-means the FTP service on node 2, not a physical connector or operating-system
-serial port. Common K-FSW service ports are:
-
-| CSP port | Use | Configuration |
+| Port | Service | Option |
 | --- | --- | --- |
-| 9 | K-FSW file transfer | `KFSW_FTP_CSP_PORT` |
-| 10 | libparam value transactions | `KFSW_PARAM_PORT` |
+| 9 | File transfer | `KFSW_FTP_CSP_PORT` |
+| 10 | libparam values | `KFSW_PARAM_PORT` |
 | 11 | Commands | `KFSW_COMMAND_CSP_PORT` |
-| 12 | libparam parameter-list descriptions | `KFSW_PARAM_LIST_PORT` |
+| 12 | libparam descriptors | `KFSW_PARAM_LIST_PORT` |
+| 13 | FWU lite uploads | `KFSW_FWU_LITE_CSP_PORT` |
+| 14 | Housekeeping | `KFSW_HK_CSP_PORT` |
 
-libcsp also defines management/service ports, including the standard ping
-service K-FSW registers. Port allocations are protocol interfaces and should
-not be changed independently at opposite ends.
+Port 0 is libcsp's management service and port 1 its ping. Both ends of a link
+must use the same port numbers.
 
-### Packet
+**Packet.** A CSP header (addresses, ports and flags such as CRC32 or RDP) and
+a payload. Packets come from a fixed buffer pool and stay datagrams, also with
+RDP.
 
-A CSP packet contains a CSP header and an application payload. The header
-carries source/destination addresses and ports plus flags for optional features
-such as CRC32 or RDP. libcsp allocates packets from a fixed buffer pool and
-passes their ownership between application, router, and interface code.
+**Connection.** libcsp state for a request and reply or an RDP exchange,
+taken from a fixed pool.
 
-Packets are datagrams. Their boundaries matter. Even when RDP is enabled, CSP
-does not become a byte stream.
+**Interface.** Carries packets over a link such as CAN, KISS or loopback, with
+an address and counters. Each KISS interface has its own UART, name, address
+and framing state.
 
-### Connection
+**Route.** Maps an address prefix to an interface and, optionally, a next hop.
+The longest matching prefix wins. The router delivers packets for the local
+node and forwards the rest.
 
-A CSP connection is a libcsp context associating local and remote endpoints
-and receive state. Connection-oriented calls make request/reply and RDP flows
-convenient, but application data is still sent and received as complete
-packets. A connection consumes a slot from libcsp's configured connection
-pool; it is not an unbounded host socket abstraction.
+A single-interface composition without a route table gets
+`0/0 -> KISS direct`: every other node is reached over that serial link.
+Compositions with more than one interface need a route table. Routes are fixed
+once the router starts.
 
-### Interface
-
-An interface adapts CSP packets to a link-layer mechanism such as CAN, KISS,
-I2C, ZMQ, or loopback. It has an address, a transmit function, receive path,
-maximum-transfer constraints, and counters. K-FSW provides loopback, UART/KISS, and CAN interfaces when selected. Every
-KISS instance has a distinct UART, name, address/prefix, framing state,
-transport context, and counters.
-
-An interface is not a route. It says how packets can enter or leave; the
-routing table says which interface to use for a destination.
-
-### Route and router
-
-A route maps an address prefix to an interface and, where required, a
-link-layer next hop. More-specific prefixes win over broad ones. The router
-takes complete packets from the incoming queue, delivers packets addressed to
-the local node, or forwards non-local packets through a selected interface.
-
-An existing one-interface composition with no explicit route table still
-installs `0/0 -> KISS direct`. This is a direct default route: every non-local
-destination is sent on that serial link without a separate gateway address.
-Multi-interface compositions must provide explicit libcsp routes instead of
-implicitly choosing the first link.
-
-Routes are fixed once the router starts. Set them in the composition;
-the `route_table` parameter is read-only.
+More detail is in the libcsp
+[basic architecture](https://github.com/libcsp/libcsp/blob/develop/doc/basic.md),
+[protocol stack](https://github.com/libcsp/libcsp/blob/develop/doc/protocolstack.md)
+and [topology](https://github.com/libcsp/libcsp/blob/develop/doc/topology.md)
+documents.
 
 ## Radio encryption
 
-Add `config/profiles/radio-crypto.conf` to both builds. NUCLEO also needs
+Add `config/profiles/radio-crypto.conf` to both builds. The NUCLEO also needs
 `nucleo-radio-crypto.overlay` for its hardware RNG. The radio module protects
 the KISS interface named by `KFSW_RADIO_UHF_CRYPTO_INTERFACE`.
 
-Generate a random 256-bit key (`openssl rand -hex 32`). At each local console:
+Generate a 256-bit key with `openssl rand -hex 32`, then on each node's
+console:
 
 ```text
 param set uhf_key_hex <64 hex digits>
@@ -104,119 +76,69 @@ uhf connect
 uhf status
 ```
 
-Use the same key at both ends and set each node's `KFSW_CSP_UART_PEER_ADDRESS`.
-The key reads back empty. Radio settings are saved outside the FTP directory;
-remote writes to them are refused. Check `uhf_crypto_error` after a change.
+Use the same key on both ends and set `KFSW_CSP_UART_PEER_ADDRESS` on each
+node. The key reads back empty and can't be written from another node. Radio
+settings are saved outside the FTP directory.
 
-`uhf_encrypt_enable` switches protection on or off. `uhf_encrypt_tx` and
-`uhf_encrypt_rx` select the directions. They default to 1 in an encryption
-build. RX enabled rejects plaintext; a missing key or session blocks traffic.
+`uhf_encrypt_enable` turns protection on or off, and `uhf_encrypt_tx` and
+`uhf_encrypt_rx` select the directions; both default to 1. With RX enabled,
+plaintext is rejected, and a missing key or session blocks traffic.
 
-The link uses AES-256-GCM with a 16-byte tag. Fresh authenticated sessions
-and sequence numbers reject replayed frames, including after reset. The CSP
-header is authenticated too. A captured handshake can interrupt a session;
-it cannot restore an old session key. `uhf connect` starts a new handshake.
+The link uses AES-256-GCM with a 16-byte tag, and the CSP header is
+authenticated too. Sessions and sequence numbers reject replayed frames, also
+after a reset. A replayed handshake can interrupt a session but can't restore
+an old key; `uhf connect` starts a new handshake. With the default 256-byte
+buffer and CRC32, an encrypted packet carries up to 220 bytes of data. Other
+interfaces are not encrypted.
 
-With the default 256-byte CSP buffer and CRC32 enabled, an encrypted packet
-carries at most 220 application bytes. Oversized packets are refused. This
-protection applies to the selected radio link; other interfaces need their
-own access policy.
-
-### Transport and framing
-
-Transport features operate above routing and link interfaces. libcsp's RDP can
-add acknowledgements, windowing, ordering, and retransmission to a connection.
-CRC32 can detect packet corruption. A link framing scheme such as KISS performs
-a different job: it finds packet boundaries and escapes control bytes on a
-serial byte stream.
-
-The upstream libcsp [basic architecture](https://github.com/libcsp/libcsp/blob/develop/doc/basic.md),
-[protocol stack](https://github.com/libcsp/libcsp/blob/develop/doc/protocolstack.md),
-and [topology guide](https://github.com/libcsp/libcsp/blob/develop/doc/topology.md)
-provide the protocol-level detail beyond this chapter.
-
-## A packet's path
-
-An application chooses a destination node and port, constructs a service
-payload, and gives the packet to libcsp. Routing and interface selection happen
-below the service.
+## Packet path
 
 ```text
-application operation: get parameter "log_level"
-                         |
-                destination node 2
-                parameter port 10
-                         |
-                      libcsp
-                CSP header + payload
-                         |
-                  routing table
-                  0/0 -> KISS
-                         |
-                  KISS interface
-                         |
-                UART physical link
+get parameter "log_level"
+        |
+destination node 2, port 10
+        |
+libcsp: header and payload
+        |
+route table: 0/0 -> KISS
+        |
+KISS interface
+        |
+UART
 ```
 
-The receive path reverses the link operations, then the router uses the
-destination port to deliver the complete packet to the registered service.
-K-FSW services never parse UART bytes directly.
+On receive, the router hands the packet to the service bound to its port.
+Services never read UART bytes.
 
-## What kfsw-comms owns
+## Startup
 
-`kfsw-comms` is the single owner of the shared libcsp lifecycle:
+`kfsw-comms` sets up libcsp once:
 
-1. Set hostname, model, revision, and local address.
-2. Call `csp_init()` once.
-3. Assign the local address to libcsp loopback.
-4. Create every configured KISS interface, then validate and load static routes.
-5. Bind libcsp's standard ping handler.
-6. Start one K-FSW router thread that repeatedly calls `csp_route_work()`.
+1. Set the hostname, model, revision and address.
+2. Call `csp_init()`.
+3. Give the loopback interface the local address.
+4. Create the KISS and CAN interfaces, then check and load the routes.
+5. Bind the ping handler.
+6. Start the router thread, which calls `csp_route_work()`.
 
-The public API exposes lifecycle state, interface and route snapshots, buffer
-availability, and a bounded ping operation. It keeps application code out of
-libcsp global lists while retaining libcsp's semantics.
+Services bind their ports after `kfsw_csp_init()` and before
+`kfsw_csp_start()`. The API gives the state, interfaces, routes, free buffers
+and ping. `csp interfaces` and `uart info` show the counters since boot.
 
-Services may register endpoints after `kfsw_csp_init()` and before
-`kfsw_csp_start()`. They do not start another router or create an independent
-CSP instance. The shell is a caller of the same API:
+## Test topologies
+
+The two-node software test connects two Linux processes through their
+simulated UARTs:
 
 ```text
-kfsw:~$ csp info
-kfsw:~$ csp interfaces
-kfsw:~$ csp routes
-kfsw:~$ csp ping 2
+node 1                                                  node 2
+router -- KISS -- native PTY -- socat -- native PTY -- KISS -- router
 ```
 
-`csp interfaces` and `uart info` expose packet/error/drop counters. These are
-diagnostic snapshots, not accumulated mission telemetry or persistent fault
-records.
+The second node uses `tests/config/linux-node2.conf`. On the NUCLEO bench,
+node 2 is the board, connected through USART3 and an FTDI cable.
 
-## Routing in the current topology
-
-The native two-node software test creates two application processes and
-connects their simulated UARTs:
-
-```text
-KFSW-Linux node 1                              node 2 test image
------------------                              -----------------
-service ports                                         service ports
-      |                                                     |
-   router                                                router
-      |  default 0/0 -> KISS              default 0/0 -> KISS |
-    KISS ---- native PTY ---- socat ---- native PTY ---- KISS
-```
-
-Both nodes can ping, access parameters, and transfer files in both directions.
-The second node uses `tests/config/linux-node2.conf`; it is an integration
-fixture rather than another supported product target.
-
-The NUCLEO bench replaces node 2's PTY with a physical UART and an FTDI cable.
-The application/service packet path stays the same, which is the point of the
-interface boundary.
-
-The deterministic multi-interface test creates a router with two different
-native PTYs and two leaf processes:
+The multi-interface test runs a router with two links and a node on each:
 
 ```text
 node 10                         router                         node 11
@@ -225,209 +147,113 @@ node 10                         router                         node 11
                          10/14 -> KISS_1   11/14 -> KISS_2 via 11
 ```
 
-It proves router-originated traffic selects each link, both interface counter
-sets advance independently, the VIA field survives configuration/diagnostics,
-and node 10 and node 11 can ping through the router in both directions. The
-distinct `/14` interface addresses are significant: the pinned libcsp
-split-horizon logic must see these as different links before it forwards a
-transit packet.
+The router's two interfaces have different addresses because libcsp doesn't
+forward a packet between interfaces in the same subnet.
 
-CAN uses libcsp's CFP interface when selected. There is no automatic route
-discovery, runtime route mutation, redundant-link failover, or ZMQ interface.
-The Holybro module uses the serial KISS route; the bench verified raw exchanges
-and bidirectional CSP ping. See @ref project_status for measured coverage.
+## Route table
 
-## Route-table configuration
-
-K-FSW reuses the pinned libcsp text parser rather than maintaining a second
-route representation. `CONFIG_KFSW_CSP_ROUTE_TABLE` is a comma-separated list
-in this exact form:
+`CONFIG_KFSW_CSP_ROUTE_TABLE` uses the libcsp parser's syntax:
 
 ```text
 destination[/prefix-length] interface [via], next-entry
 10/14 KISS_1,11/14 KISS_2 11
 ```
 
-CSP v2 node IDs are 14 bits. The mask is the count of most-significant address
-bits in the prefix: `/14` matches one exact node, `/0` matches every node, and
-an omitted mask defaults to `/14`. The longest matching prefix wins. Equal
-destination/prefix entries are treated by this libcsp revision as multiple
-eligible routes and may transmit on each, not as ordered fallbacks.
+Node IDs are 14 bits: `/14` matches one node, `/0` every node, and no prefix
+means `/14`. Two entries with the same destination and prefix are both used,
+not tried in order. `via` is the link-layer next hop; KISS ignores it, but
+`csp routes` still shows it.
 
-The optional `via` is libcsp's link-layer next-hop value. Its absence is stored
-as `CSP_NO_VIA_ADDRESS`; its presence is passed to the selected interface and
-reported by `csp routes`. KISS has no link-layer address, so the pinned KISS
-transmit function intentionally ignores `via`. Other interface types may use
-it; K-FSW does not reinterpret or discard it.
+Ground node files can set the same table with `KFSW_CSP_ROUTES`. At startup
+the table is checked with `csp_rtable_check()`, the interface names, the
+parser's 99-character limit and the table size, and only then loaded. A bad
+table fails initialization.
 
-Embedded profiles set the table through Kconfig. Ground node files may set the
-same value as `KFSW_CSP_ROUTES`, which `tools/k-ground` validates and writes to
-the generated Kconfig fragment. Startup first validates the complete table
-with `csp_rtable_check()`, interface-name resolution, the parser's 99-character
-limit, and route-table capacity, then loads it. Malformed or unknown-interface
-tables fail initialization. Runtime shell loading is intentionally absent:
-the pinned loader mutates incrementally, so a generally safe live replacement
-would require synchronization and rollback semantics outside this issue.
+With several UARTs, each one is a child of a `kfsw,csp-kiss-uarts` devicetree
+node. Interface names are one to nine characters from `[A-Za-z0-9_-]`, which is
+the parser's limit.
 
-Multi-interface devicetree uses enabled children of a
-`kfsw,csp-kiss-uarts` node. Interface names are one through nine
-`[A-Za-z0-9_-]` characters because the pinned route parser reads at most nine;
-`KISS_1` and `KISS_2` are valid, but longer examples must be shortened.
+## KISS
 
-## KISS: packets on a serial stream
+A UART carries bytes, not packets. KISS framing marks where each packet starts
+and ends and escapes reserved bytes, and the decoder passes complete packets
+to the router. KISS doesn't guarantee delivery or ordering; K-FSW uses CSP
+CRC32 to detect corruption and RDP for file transfers.
 
-A UART transports a sequence of bytes. It does not preserve writes as packet
-boundaries: a receiver may read part of one write, several writes together, or
-data split at any position. A receiver therefore needs framing to distinguish
-one complete CSP packet from the next.
+- KFSW-Linux uses libcsp's Zephyr USART driver on a native_sim PTY.
+- The NUCLEO-L496ZG passes USART3 bytes from the interrupt handler to libcsp's
+  KISS decoder, which avoids overruns.
 
-KISS supplies delimiter and escape rules. Frame boundary bytes identify the
-start/end of a frame, and occurrences of reserved bytes inside the packet are
-escaped. On receive, the KISS state machine removes framing and passes a
-complete CSP packet to the router.
+The reference profiles use 115200 8N1 and the Holybro profiles 57600. See the
+[libcsp KISS interface](https://github.com/libcsp/libcsp/blob/develop/include/csp/interfaces/csp_if_kiss.h).
 
-```text
-               transmit                            receive
+## CAN
 
-              CSP packet                         CSP packet
-                  |                                  ^
-           add KISS framing                    remove framing
-                  |                                  ^
-              UART bytes  -------------------->  UART bytes
-                  |                                  ^
-           physical transport  ----------------------+
-```
+CAN uses libcsp's CFP interface on the controller chosen with `kfsw,csp-can`.
+The NUCLEO uses CAN1 on PD0/PD1 with an external transceiver, and a Linux node
+uses a SocketCAN interface. Both ends of the bus need the same bitrate; the
+profiles use 500 kbit/s.
 
-KISS provides framing; it does not itself guarantee delivery, correct ordering
-across lost frames, authentication, or encryption. K-FSW uses CSP CRC32 where
-selected for corruption detection and RDP for reliable FTP delivery.
+## Shell UART and CSP UART
 
-libcsp's maintained KISS interface performs packet framing. K-FSW supplies
-each Zephyr UART device and one of two receive paths:
-
-- KFSW-Linux uses libcsp's Zephyr USART backend over a native-simulator PTY.
-- NUCLEO-L496ZG configures USART3 and feeds interrupt-driven receive bytes to
-  libcsp's KISS decoder to avoid physical polling overruns.
-
-Both use 115200 baud, eight data bits, no parity, and one stop bit in the
-reference profiles. The Holybro HIL overlays select 57600 baud at both ends.
-The legacy chosen devicetree node is the source of those values for a single
-link. Multi-link profiles place a UART phandle and independent interface
-configuration in each `kfsw,csp-kiss-uarts` child.
-The [libcsp KISS interface API](https://github.com/libcsp/libcsp/blob/develop/include/csp/interfaces/csp_if_kiss.h)
-is the upstream reference for framing state and interface hooks.
-
-## Shell UART versus CSP UART
-
-The NUCLEO uses two serial paths:
+The NUCLEO has two serial connections:
 
 ```text
-ST-LINK virtual COM port <----> Zephyr shell and K-FSW logs
-
-USART3 PD8/PD9 <----> FTDI 3.3 V UART <----> CSP KISS packets
+ST-LINK virtual COM port <--> shell and logs
+USART3 PD8/PD9           <--> FTDI 3.3 V UART <--> CSP KISS packets
 ```
 
-They are not multiplexed. Sending shell text to USART3 produces invalid KISS
-input; sending KISS data to the ST-LINK console displays binary noise and does
-not reach CSP. The Linux native simulator likewise uses stdin/stdout for the
-interactive shell and a separately reported PTY for CSP.
+Don't mix them up: shell text on USART3 is invalid KISS, and KISS data on the
+ST-LINK console is binary noise. On Linux the shell uses stdin/stdout and CSP a
+separate PTY.
 
-## Physically verified UART bench
+## UART bench
 
-The merged physical HIL path connects KFSW-Linux node 1 to NUCLEO-L496ZG node
-2 using an FTDI TTL-232R-3V3 adapter:
+The UART hardware test connects KFSW-Linux node 1 to NUCLEO-L496ZG node 2
+through an FTDI TTL-232R-3V3 on USART3, with the ST-LINK console connected
+too. It flashes the board, checks both serial connections, pings both ways,
+runs `uart test`, checks storage, transfers 4 KiB and 16 KiB files, reads a
+remote parameter and checks the KISS counters.
+
+## RDP
+
+RDP is libcsp's reliable datagram transport: connection setup, a window,
+acknowledgements, retransmission, reordering and flow control. Data still moves
+as CSP datagrams; it is not TCP.
 
 ```text
-KFSW-Linux node 1
-      |
-native_sim KISS PTY
-      |
-    socat
-      |
-FTDI 3.3 V UART
-      |
-USART3 PD8/PD9
-      |
-NUCLEO-L496ZG node 2
-
-ST-LINK remains a separate shell/log connection to the NUCLEO.
+FTP client                          FTP server
+connect                       ->
+                              <-    confirm
+PUT metadata, seq=N           ->
+                              <-    ACK N
+file chunk, seq=N+1           ->    (lost)
+file chunk, seq=N+1, resent   ->
+                              <-    ACK N+1
+                              <-    result and file CRC
+close                         ->
 ```
 
-The acceptance runner flashes the NUCLEO, verifies both service and KISS
-serial paths, performs bidirectional CSP ping, runs the permanent UART test,
-checks storage, transfers 4 KiB and 16 KiB files with FTP, accesses a remote
-parameter afterward, and requires nonzero clean KISS counters.
+FTP doesn't retry on top of RDP. It adds the offsets, sizes, file CRC and
+temporary file that RDP can't check. See the
+[libcsp RDP section](https://github.com/libcsp/libcsp/blob/develop/doc/protocolstack.md#rdp).
 
-This is physical UART/KISS qualification for the current NUCLEO/FTDI bench.
-Separately, the Holybro/SiK fixture described in @ref ground now has functional
-raw UART/RF and CSP/KISS bench evidence. That result verifies the named
-hardware path and configuration; it is not RF performance or flight
-qualification.
+## Packet buffers
 
-## RDP: reliable CSP datagrams
+libcsp uses preallocated buffers:
 
-RDP is libcsp's reliable datagram transport. It establishes connection state,
-tracks packets in a bounded window, acknowledges received data, retransmits
-unacknowledged data after timeouts, buffers/reorders data as required, and
-applies flow control.
+- a packet from a receive call has to be freed or passed to a send or reply
+  call;
+- a packet passed to a send call is freed by libcsp, also when sending fails,
+  so don't free or reuse it;
+- an interface passes complete packets to the router queue;
+- when the pool or a queue is full, the allocation fails or the packet is
+  dropped and counted.
 
-RDP is not TCP. It preserves CSP datagrams, uses libcsp's configuration and
-packet pools, and implements a different protocol. Code and operations should
-call it CSP RDP, not a TCP stream.
+To retry, build a new packet.
 
-A simplified successful exchange is:
+## Security
 
-```text
-FTP client                                      FTP server
-    |                                               |
-    |------ RDP connection establishment ---------->|
-    |<---------------- confirmation -----------------|
-    |                                               |
-    |------ CSP packet: PUT metadata, seq=N -------->|
-    |<---------------- ACK through N ----------------|
-    |------ CSP packet: file chunk, seq=N+1 -------->|
-    |          [packet or ACK lost]                  |
-    |------ retransmit after RDP timeout ----------->|
-    |<---------------- ACK through N+1 --------------|
-    |------ remaining ordered datagrams ------------>|
-    |<------ application result + final CRC ---------|
-    |------ close ----------------------------------->|
-```
-
-Acknowledgements and retransmission are libcsp responsibilities. K-FSW FTP
-does not add a second retry protocol. It adds application-level metadata,
-offsets, bounded chunks, expected total size, file CRC, temporary files, and
-final commit rules because reliable packet delivery alone cannot prove that a
-complete file is valid and safely installed.
-
-The upstream [libcsp protocol-stack RDP section](https://github.com/libcsp/libcsp/blob/develop/doc/protocolstack.md#rdp)
-describes its handshake, flow control, reordering, retransmission, and
-windowing.
-
-## Packet ownership and bounded failure
-
-libcsp is designed around preallocated buffers and mostly zero-copy packet
-movement. K-FSW follows these ownership rules:
-
-- a packet returned by a receive API belongs to the receiver until freed or
-  handed to a send/reply API;
-- handing a packet to a send operation transfers ownership, even if a lower
-  interface later reports a transmit failure;
-- a complete interface receive transfers the packet to the router queue; and
-- pool or queue exhaustion is a bounded allocation failure or counted drop,
-  not a reason to create an unbounded retry list.
-
-An application that needs to retry after a send must construct new state at
-the appropriate layer. It must not resend or free a transferred packet.
-
-## Security boundary
-
-The current K-FSW composition does not enable libcsp HMAC or provide link
-encryption, authentication policy, key management, or command authorization.
-CRC32 detects accidental corruption; it is not a cryptographic integrity
-mechanism. A test cable or closed bench network does not establish the security
-properties required for an operational radio or spacecraft network.
-
-Adding a physical link therefore requires more than a driver. It also requires
-an address/routing plan, bandwidth and MTU analysis, failure behavior,
-operational access policy, and security design appropriate to that link.
+Only the encrypted radio link is authenticated. libcsp HMAC is not enabled,
+CRC32 only detects accidental corruption, and commands have no per-node
+authorization.
