@@ -8,23 +8,23 @@
 K-FSW gives spacecraft components the common services a mission needs:
 a console, ground links, parameters, files, logs, events, commands,
 housekeeping, and firmware updates. Select what an OBC, radio, ADCS, EPS,
-or payload needs, then add the mission-specific code.
+or payload needs, then only add the mission-specific code.
 
 Zephyr supplies the RTOS, drivers, board support, and build tools, so the
 application can run on different MCU vendors and in Linux simulation.
 Modules and services can be reused in another RTOS port by adapting the
 Zephyr APIs they use.
 
-[Documentation](https://dgonzalez97.github.io/k-fsw/) ·
-[Getting started](docs/getting-started/index.md) ·
-[Shell commands](docs/commands/index.md) ·
+[Documentation](https://dgonzalez97.github.io/k-fsw/) |
+[Getting started](docs/getting-started/index.md) |
+[Shell commands](docs/commands/index.md) |
 [Project status](docs/status/index.md)
 
 ## Repository layout
 
 ![K-FSW repositories](docs/media/layout.svg)
 
-| Repository | Owns |
+| Repository | Contents |
 | --- | --- |
 | [`k-fsw`](https://github.com/dgonzalez97/k-fsw) | Application, targets, tools, integration tests, docs |
 | [`kfsw-modules`](https://github.com/dgonzalez97/kfsw-modules) | Device and subsystem modules |
@@ -34,30 +34,27 @@ Zephyr APIs they use.
 
 ## Modules
 
-A module owns one device or subsystem: its interface, state, parameters,
-and tests. Add its definition set to the application composition; the
-parameter core does not need to change.
+A module defines one device or subsystem: its interface, state, parameters,
+and tests. The parameter core does not need to change.
 
-Examples in  [`kfsw-modules`](https://github.com/dgonzalez97/kfsw-modules):
+Examples in [`kfsw-modules`](https://github.com/dgonzalez97/kfsw-modules):
 a UHF radio, and a small worked example using LEDs and buttons of development boards.
 
 ## Services
 
-- **Parameters:** named values with owner validation, remote access, and
-  saving on change.
-- **CSP:** one router, with routes selecting UART/KISS or CAN links.
-- **Files:** upload and download with CRC32 and atomic commit.
-- **Firmware update:** direct block upload or FTP, with MCUboot test,
-  confirm, and rollback.
-- **Commands and events:** typed operations and a bounded record of results.
-- **Health:** component deadlines control watchdog feeding.
-- **Housekeeping:** collect groups of parameters and forward samples to Yamcs.
+- **Parameters:** named values with validation, remote access, callbacks and optional persistence.
+- **CSP:** communications router, with routes selecting UART/KISS or CAN links.
+- **Files:** upload and download with CRC32 and RDP and a complete file system creating tool.
+- **Firmware update:** binaries over FTP, with MCUboot test,
+  confirm, and rollback, or a simple direct block upload FWU over a csp line that doesnt need a file system.
+- **Commands and events:** a shell and remote commanding.
+- **Health:** component deadlines, control and watchdog.
+- **Housekeeping:** collect groups of parameters and forward telemetry to Yamcs.
 - **Ground nodes:** the same application and services built for Linux.
 
-## Try it on Linux
+## KFSW on Linux
 
-From a configured west workspace, the local demo connects Linux nodes
-through pseudo-terminals using CSP/KISS.
+The local demo connects Linux nodes using CSP/KISS.
 
 ![Building a node and bringing up a link](docs/media/getting-started.gif)
 
@@ -67,8 +64,6 @@ west manifest --validate
 ./k-fsw/tools/k-ground init
 ```
 
-Start each role in its own terminal:
-
 ```bash
 ./k-fsw/tools/k-ground run kfsw-gnd-uhf
 ```
@@ -77,7 +72,7 @@ Start each role in its own terminal:
 ./k-fsw/tools/k-ground run kfsw-ops
 ```
 
-`csp ping 16` from the operator node crosses the link and comes back. The
+Run `csp ping 16` from the operator node. The
 [ground guide](docs/ground/index.md) covers the configuration and the
 other ground roles.
 
@@ -86,41 +81,37 @@ other ground roles.
 `param tables` lists local tables; `param table <id>` prints one.
 Use `param tablelist <node>` to inspect another node.
 
-Reaching them from the ground is a separate, optional piece that speaks
-[Space Inventor's libparam](https://github.com/spaceinventor/libparam).
+Remote access uses [Space Inventor's libparam](https://github.com/spaceinventor/libparam).
 
 ![Reading and writing parameters across a link](docs/media/param-over-a-link.gif)
 
 ### Files
 
 Uploads and downloads check size and CRC32 before committing the file.
-CSP/RDP provides retransmission; an interrupted transfer must be restarted.
+CSP/RDP has retransmission as an option.
 
 ![A file sent and fetched back](docs/media/file-transfer.gif)
 
 ### Firmware update
 
-Send, verify, flash, reboot, confirm. MCUboot reverts an unconfirmed test
-image on the next reset. The direct block protocol separates upload from
-`fwu flash`; the FTP route schedules the swap after verification.
+Send, verify, flash, reboot, confirm. MCUboot, FTP for binaries to a specific flash directory or FWU lite for direct downloads. The direct block protocol separates upload from
+`fwu flash`.
 
-A flash region is reserved for a recovery image. Recovery-image boot
-selection is not implemented. See the [update guide](docs/fwu/README.md).
+A optional read only recovery image can be set as well. See the [update guide](docs/fwu/README.md).
 
 ![Firmware update over a radio link](docs/media/firmware-update-over-radio.gif)
 
 ## Hardware
 
-NUCLEO-L496ZG is the current MCU reference. Recorded bench runs cover
+NUCLEO-L496ZG is the current MCU reference. Test-bench cover
 parameters, files, commands, events, CAN, housekeeping, and firmware updates.
-Some features require opt-in profiles; see [targets](docs/targets/index.md).
+See [targets](docs/targets/index.md).
 
-[Project status](docs/status/index.md) records the tested configurations
-and remaining hardware checks.
+[Project status](docs/status/index.md) records the tested configurations and the TO Do list.
 
 ## Targets
 
-| Target | Board | Architecture | Links | What runs on it |
+| Target | Board | Architecture | Links | What has been tested |
 | --- | --- | --- | --- | --- |
 | `linux` | `native_sim/native/64` | x86-64 host | KISS over a PTY; optional CAN via SocketCAN | Reference services and optional profiles |
 | `nucleo_l496zg` | STM32 Nucleo L496ZG | Arm Cortex-M4 | KISS on USART3; optional CAN on PD0/PD1 | Reference services and optional profiles |
@@ -129,22 +120,17 @@ and remaining hardware checks.
 
 ### Identifying a board
 
-Every node prints its chip's unique ID when it boots, so identical boards can
-be told apart in a log or a screenshot. The same ID is shown by `status` and
+The ID is shown by `status` and
 `version`, and the ground can read it with `param get <node> hw_id`:
 
 ```text
 @BOOT sw=v1.0.1 board=nucleo_l496zg/stm32l496xx unit=203037324d46500c0010001f ...
 ```
 
-`csp ident` also reports the board name, and `csp debug on` prints every packet
-a node sends or receives.
-
 ![A ground node talking to three boards over CAN and radio](docs/media/multi-board-can.gif)
 
 Here a ground node talks to an STM32 and a Kinetis over CAN, and to an RP2040
-over a UHF radio. The FRDM and Pico run bench configurations for this demo; the
-`frdm_k64f` and `rpi_pico_w` targets in the table above are still shell-only.
+over a UHF radio.
 
 ## Mission control
 
@@ -157,17 +143,15 @@ cd ground-station/yamcs
 ./mvnw yamcs:run
 ```
 
-The host bridge pulls CSP samples and forwards them to Yamcs. Report
+The host bridge pulls CSP parameters and forwards them to Yamcs. Report
 definitions generate both the node configuration and the mission database.
-Configure housekeeping through K-FSW commands; Yamcs currently records
-telemetry only.
+Configure housekeeping through K-FSW commands.
 
-The [ground guide](docs/ground/index.md) has the walkthrough, including how to
-check it before any hardware is involved.
+The [ground guide](docs/ground/index.md) has a working demo.
 
 ## Testing
 
-The software workflow runs these checks:
+The pipeline runs:
 
 | Job | What it checks |
 | --- | --- |
@@ -181,32 +165,27 @@ The software workflow runs these checks:
 | `DOCS / Doxygen` | The documentation builds and the API is documented |
 
 The unit suites cover each layer on its own; the integration scripts go the
-other way, booting a real image and talking to it through a ground node the way
-an operator would.
+other way, booting a real image and talking to it through a ground node like a real satellite DITL.
 
-[Coverage](https://dgonzalez97.github.io/k-fsw/coverage/) reports unit-test
-lines, functions, and branches. Integration and HIL runs are not included.
+[Coverage](https://dgonzalez97.github.io/k-fsw/coverage/)
 
 ### Hardware in the loop
 
 [Robot Framework](https://robotframework.org/) drives the physical suites
 through [robot-terminal-runner](https://github.com/dgonzalez97/robot-terminal-runner),
 a submodule under `tests/platform/`. It sends shell commands through tmux
-and records the results.
+and records the results in html format to easily identify which command failed.
 
 | Suite | Needs | Covers |
 | --- | --- | --- |
-| `boot`, `uart` | Nucleo | Boot markers, reset cause, shell and CSP over the debug UART |
+| `boot`, `uart` | Nucleo | Boot, reset cause, shell and CSP over the debug UART |
 | `param-tables` | Nucleo | Every table present and addressed, with the right write modes |
-| `can` | Nucleo + CAN adapter | CSP over CAN: ping, identity and remote settings |
+| `can` | Nucleo + CAN adapter | CSP over CAN: ping, identity and remote settings and fuzzy testing |
 | `holybro` | Nucleo + radio pair | CSP, files, commands and events across the link |
-| `fwu` | Nucleo + CAN adapter | FTP and FWU lite uploads, slot readbacks, rollback and confirmation |
+| `fwu` | Nucleo + CAN adapter | FTP and FWU lite uploads, slot readbacks, rollback and confirmation, so firmware update is never broken |
 
-Cases needing the board are tagged, so the same files run in CI without
-hardware and on the bench with it. The [testing guide](docs/testing/index.md)
-links to the fixtures and commands.
-
-The parameter-table suite running against the Nucleo over CAN and RF.
+Cases needing hardware are tagged, so the same files run in CI without
+hardware and on the bench with it. See the [testing guide](docs/testing/index.md).
 
 ![Hardware test suite running](docs/media/hardware-test-robot.gif)
 
@@ -214,18 +193,9 @@ And the report it leaves behind:
 
 ![Robot report from a physical run](docs/media/hil-robot-report.png)
 
-The [status page](docs/status/index.md) records observed physical results
-separately from software tests.
-
 ## Development
 
-The [contribution guide](docs/development/index.md) covers repository
-ownership, dependency pins, and PRs. Build the HTML and PDF from the workspace:
-
-```bash
-./k-fsw/tools/docs/build.sh
-./k-fsw/tools/docs/pdf.sh
-```
+Check the [contribution guide](docs/development/index.md).
 
 ## License
 
