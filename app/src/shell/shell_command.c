@@ -9,13 +9,9 @@
 #include <kfsw/services/command.h>
 
 /*
- * Local front end onto the command registry. It parses text, converts it to
- * the argument types the definition declares, and calls the same entry point
- * the remote front end uses. It implements no command itself, so a shell
- * caller cannot bypass the validation a ground caller passes through.
- *
- * Registered command names appear as shell subcommands, so completion and
- * help work on them the way they do for any other command.
+ * Shell front end of the command registry. It converts text arguments and calls
+ * the same entry point as remote requests. Registered commands appear as
+ * subcommands.
  */
 
 struct command_index_search {
@@ -138,11 +134,7 @@ static int run_command(const struct shell *sh, uint16_t node, const char *name, 
 	}
 	outcome = kfsw_command_find(name, &info);
 	if (outcome != 0) {
-		/* Asked anyway when it is meant for this node, so the service
-		 * records the attempt. Refusing here without telling it left
-		 * cmd_unknown counting only the mistakes that arrived over a
-		 * link, which is the smaller half of them.
-		 */
+		/* Pass unknown local names to the service so they are counted too. */
 		if (node == 0U) {
 			(void)kfsw_command_invoke(name, NULL, 0U, &result);
 		}
@@ -221,8 +213,7 @@ static int cmd_command_root(const struct shell *sh, size_t argc, char **argv)
 }
 
 /*
- * Entry 0 is `list`; the rest are the registered command names, so completion
- * and help offer exactly what the registry holds.
+ * Entry 0 is list; the rest are the registered commands.
  */
 static void command_name_get(size_t idx, struct shell_static_entry *entry)
 {

@@ -1,15 +1,9 @@
 #!/usr/bin/env bash
-# Checks that every parameter table a composition declares is actually there.
+# Checks that every parameter table of the composition is registered with its
+# ID and band, and that the listing addresses parameters by table and offset.
 #
-# This is deliberately about existence and not content. A value is only as good
-# as the layer underneath it, and asserting a particular free-space figure here
-# would test LittleFS rather than the table scheme. What has to hold is that
-# every table registers under the identifier its owner was allocated, in the
-# band that owner belongs to, and that the listing addresses each parameter by
-# table and offset.
-#
-# Runs against the hosted image by default. Pass --serial to run it against a
-# board over its debug UART instead, in which case the by-id path is required.
+# Runs against the hosted image by default. Pass --serial to use a board's debug
+# UART instead, with a by-id path.
 
 set -euo pipefail
 
@@ -78,8 +72,7 @@ else
 fi
 
 printf '\n=== Tables ===\n'
-# Identifier, band and name together: a table registered under the wrong
-# number would still print its name, and the number is what the wire uses.
+# ID, band and name together, since the wire uses the ID.
 expect '  1  core     board'
 expect '  2  core     system'
 expect '  3  core     telemetry'
@@ -94,8 +87,7 @@ expect ' 32  service  boot'
 expect ' 33  service  hk'
 
 printf '\n=== Addressing ===\n'
-# One offset repeating across tables is the point of the scheme, so each of
-# these is offset zero in a different table.
+# Offset zero in several tables.
 expect 'board       0x00  node_id'
 expect 'system      0x00  boot_delay_ms'
 expect 'telemetry   0x00  uptime_s'
@@ -105,16 +97,13 @@ expect 'log         0x00  log_level'
 expect 'hk          0x00  hk_reports'
 
 printf '\n=== Strings ===\n'
-# A string is the one type whose length is part of the value, so it is checked
-# where it is rendered: quoted, so a trailing space or an empty value reads as
-# a value rather than a missing one.
+# Strings are quoted, so an empty value is visible.
 expect 'board       0x10  uid                               string'
 expect 'board       0x30  revision                          string'
 expect 'csp         0x20  route_table                       string'
 
 printf '\n=== Modes ===\n'
-# The mode column is derived from the definition rather than written by hand,
-# so a table whose behaviour drifts from its documented contract shows up here.
+# The mode column comes from the definition.
 expect 'uptime_s                          u32     r'
 expect 'boot_delay_ms                     u16     wpb'
 expect 'app_report_ms                     u16     wp'

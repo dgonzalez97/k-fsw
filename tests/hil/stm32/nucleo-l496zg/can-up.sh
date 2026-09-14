@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Bring the PCAN-USB adapter up. Needs root, which is the only reason this is a
-# separate script: everything after it runs as an ordinary user.
+# Bring the PCAN-USB adapter up. Needs root; everything else runs as a normal user.
 set -euo pipefail
 
 bitrate="${1:-500000}"

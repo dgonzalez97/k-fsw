@@ -10,9 +10,8 @@ ${CAN SMOKE}      ${CURDIR}/stm32/nucleo-l496zg/can-smoke.sh
 
 *** Test Cases ***
 CSP Reaches A Node Over CAN
-    [Documentation]    Ping, identity and remote parameters across the bus, and
-    ...                the adapter's own frame counters as evidence the link
-    ...                carried them.
+    [Documentation]    Ping, identity and remote parameters over CAN, and the
+    ...                adapter's frame counters.
     [Tags]    physical    can    nucleo    csp
     ${result}=    Run Process    ${CAN SMOKE}    --no-build
     ...           stdout=${TEMPDIR}/can-smoke.out    stderr=STDOUT    timeout=300s

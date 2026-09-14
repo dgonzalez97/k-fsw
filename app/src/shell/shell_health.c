@@ -66,12 +66,7 @@ static int cmd_health_watch(const struct shell *sh, size_t argc, char **argv)
 	char *end = NULL;
 	int result;
 
-	/* Registering something that nothing reports will take the board down
-	 * within its deadline plus a watchdog timeout. That is the point of it
-	 * -- it is how the recovery chain is exercised with a real fault rather
-	 * than a simulated one -- but it is not something to reach by accident,
-	 * so it is spelled out.
-	 */
+	/* Watching a component that never reports resets the board, so ask for confirm. */
 	if ((argc != 4U) || (strcmp(argv[3], "confirm") != 0)) {
 		shell_error(sh, "This registers a component that nothing reports.");
 		shell_error(sh, "The board will reset once its deadline passes.");

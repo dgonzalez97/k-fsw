@@ -28,7 +28,7 @@
 
 static uint8_t snapshot[SNAPSHOT_MAX_SIZE];
 
-/* KPAR v1 snapshot produced by kfsw-services 32260f8 before ownership moved. */
+/* KPAR v1 snapshot written by kfsw-services 32260f8. */
 static const uint8_t pre_refactor_snapshot[] = {
 	0x4b, 0x50, 0x41, 0x52, 0x00, 0x01, 0x00, 0x14, 0x00, 0x00, 0x00, 0x40, 0x00, 0x04,
 	0x00, 0x00, 0x6d, 0x80, 0x22, 0xc6, 0x09, 0x01, 0x00, 0x01, 0x6c, 0x6f, 0x67, 0x5f,
@@ -168,11 +168,7 @@ static void *persistence_setup(void)
 	const struct kfsw_param_definition_set *const parameter_sets[] = {
 		&kfsw_log_param_definitions,
 		&kfsw_test_param_definitions,
-		/* The service's own table, because param_autosave lives in it:
-		 * whether a persistent value reaches flash on its own is a
-		 * compiled default, and a fixture that leaves the table out
-		 * would never see it applied.
-		 */
+		/* Include the service's own table, which has param_autosave. */
 		&kfsw_param_param_definitions,
 	};
 
@@ -268,21 +264,14 @@ static size_t expected_snapshot_size(void)
 
 ZTEST(param_persistence, test_save_modify_load_and_repeated_operations)
 {
-	/* Explicitly the manual flow: with autosave on, the second set below
-	 * would write a snapshot of its own and there would be nothing to
-	 * restore from.
-	 */
+	/* Manual save: with autosave on, the second set would save its own snapshot. */
 	set_u8("param_autosave", 0U);
 
 	set_u32("test_u32", 1234U);
 	set_i32("test_i32", -1234);
 	zassert_ok(kfsw_param_persist_save(), "first save failed");
 	zassert_ok(kfsw_param_persist_save(), "repeated save failed");
-	/* Derived from the parameters actually registered rather than a literal.
-	 * A byte count written here has to be edited every time any service
-	 * publishes one more persistent value, which makes it a record of the
-	 * last edit rather than a check of the format.
-	 */
+	/* Derived from the registered parameters instead of a literal. */
 	zassert_equal(read_snapshot(), expected_snapshot_size(), "unexpected snapshot size");
 
 	set_u32("test_u32", 9U);
@@ -420,10 +409,10 @@ ZTEST(param_persistence, test_invalid_owner_value_is_ignored)
 	write_snapshot(size);
 
 	set_u8("log_level", 3U);
-	zassert_ok(kfsw_param_persist_load(), "invalid owner value rejected the snapshot");
+	zassert_ok(kfsw_param_persist_load(), "an invalid value rejected the snapshot");
 	zassert_ok(kfsw_param_get("log_level", &value));
-	zassert_equal(value.scalar.u8, 3U, "invalid owner value changed backing storage");
-	zassert_equal(kfsw_log_get_level(), 3U, "invalid owner value changed owner behavior");
+	zassert_equal(value.scalar.u8, 3U, "an invalid value changed the stored value");
+	zassert_equal(kfsw_log_get_level(), 3U, "an invalid value changed the log level");
 }
 
 ZTEST(param_persistence, test_unavailable_storage_and_save_failure_are_reported)
@@ -446,11 +435,7 @@ ZTEST(param_persistence, test_unavailable_storage_and_save_failure_are_reported)
 }
 
 /*
- * How much room a snapshot is allowed, and how much it is using.
- *
- * "How much space do the parameters take" is a question asked about a
- * spacecraft, not about a source tree, so the answer has to be readable from
- * the node rather than worked out from three constants.
+ * Snapshot size and budget.
  */
 ZTEST(param_persistence, test_the_space_a_snapshot_takes_is_reported)
 {
@@ -466,11 +451,7 @@ ZTEST(param_persistence, test_the_space_a_snapshot_takes_is_reported)
 }
 
 /*
- * What one table contributes to the snapshot.
- *
- * The file covers every persistent value at once, so saving is always
- * whole-file. This answers the question an operator has after changing a
- * table: is what I just set kept at all, and how much of this table is.
+ * How much of the snapshot one table uses.
  */
 ZTEST(param_persistence, test_a_table_reports_what_it_keeps)
 {
@@ -491,9 +472,7 @@ ZTEST(param_persistence, test_a_table_nobody_registered_is_refused)
 		      "a NULL destination was accepted");
 }
 
-/* A table can exist and keep nothing, which is worth saying rather than
- * confusing with a table that is not there at all.
- */
+/* A table with no saved values reports zero. */
 ZTEST(param_persistence, test_a_table_that_keeps_nothing_still_counts)
 {
 	uint16_t kept = 1U;
@@ -506,9 +485,7 @@ ZTEST(param_persistence, test_the_budget_is_readable)
 {
 	zassert_true(kfsw_param_persist_max_bytes() > 0U, "no budget is reported");
 
-	/* The budget is also the size of the buffer a snapshot is built in, so
-	 * it has to leave room for the header before any value can fit.
-	 */
+	/* The budget must leave room for the header. */
 	zassert_true(kfsw_param_persist_max_bytes() > SNAPSHOT_HEADER_SIZE,
 		     "the budget cannot hold even an empty snapshot");
 }
@@ -523,9 +500,7 @@ ZTEST(param_persistence, test_a_snapshot_fits_inside_what_it_is_allowed)
 }
 
 /*
- * The flag has to mean what it says. A value marked persistent used to reach
- * flash only if an operator remembered to save, which made the flag a
- * statement of intent rather than of behaviour.
+ * With autosave, a persistent value reaches flash without param save.
  */
 ZTEST(param_persistence, test_a_persistent_value_is_written_without_being_asked)
 {
@@ -534,10 +509,7 @@ ZTEST(param_persistence, test_a_persistent_value_is_written_without_being_asked)
 	zassert_true(kfsw_param_autosave_enabled(),
 		     "a value marked persistent no longer reaches flash on its own");
 
-	/* Set once and never saved by hand. Defaults are then put back in RAM
-	 * only, so what the load restores can only have come from the file the
-	 * change itself wrote.
-	 */
+	/* Set once, then reset RAM to defaults, so load can only restore from the file. */
 	set_u8("log_level", 4U);
 	zassert_ok(kfsw_param_restore_defaults(), "defaults could not be put back");
 

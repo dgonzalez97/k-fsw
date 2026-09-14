@@ -18,9 +18,8 @@ project(kfsw_services_hk_remote_tests LANGUAGES C)
 target_sources(app PRIVATE src/main.c)
 target_link_libraries(app PRIVATE kfsw::services)
 
-# The remote reads are the seam. Wrapping them lets the fakes answer as a node
-# that is slow, silent or short of values, none of which a real node offers on
-# request.
+# The remote reads are wrapped so the fakes can act as a slow, silent or
+# incomplete node.
 zephyr_link_libraries(
     -Wl,--wrap=kfsw_param_remote_visit_until
     -Wl,--wrap=kfsw_param_remote_get_many_until

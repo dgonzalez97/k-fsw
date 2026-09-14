@@ -46,8 +46,7 @@ jobs:
       - name: Build and validate SDK documentation
         run: ./k-fsw/tools/ci/docs.sh
 
-      # Published alongside the manual rather than as its own site, so one link
-      # reaches both and neither can drift to a different commit.
+      # Published with the manual so both come from the same commit.
       - name: Measure coverage
         run: ./k-fsw/tools/ci/coverage.sh
 

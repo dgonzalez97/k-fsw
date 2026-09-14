@@ -9,10 +9,8 @@ Resource         resources/common.resource
 
 *** Test Cases ***
 The Clock Outlives A Commanded Reset
-    [Documentation]    Not merely restored: still counting. A value copied
-    ...    before the reboot would read back exactly as it was set, so the test
-    ...    requires a later time, and requires housekeeping to resume on its
-    ...    own rather than waiting to be told.
+    [Documentation]    The clock must still be counting after the reboot, and
+    ...    housekeeping must resume without setting the clock again.
     [Tags]    physical    nucleo    clock    rtc    hk
     ${result}=    Run Clock Smoke
     HIL Command Should Pass    ${result}    CLOCK SMOKE RESULT: PASS

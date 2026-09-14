@@ -18,8 +18,7 @@ project(kfsw_services_hk_server_tests LANGUAGES C)
 target_sources(app PRIVATE src/main.c)
 target_link_libraries(app PRIVATE kfsw::services kfsw::comms)
 
-# Wrapping the connection is what lets a test ask what a request means without
-# standing up a router: the fakes count the replies and can starve the pool.
+# The connection is wrapped so replies can be counted and the pool emptied.
 zephyr_link_libraries(
     -Wl,--wrap=csp_send
     -Wl,--wrap=csp_buffer_get

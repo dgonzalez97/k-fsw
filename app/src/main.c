@@ -54,7 +54,6 @@
 #if CONFIG_KFSW_HEALTH
 #include <kfsw/services/health.h>
 #endif
-/* Attributes this file's messages, so its level can be raised alone. */
 #define KFSW_LOG_MODULE KFSW_LOG_MODULE_APP
 #include <kfsw/services/log.h>
 #if CONFIG_KFSW_PARAM
@@ -67,11 +66,7 @@
 #include "parameters/tables.h"
 #endif
 
-/* The prompt and the echo belong to the shell, not to the parameter service,
- * so they are included on their own conditions. Nesting them under PARAM left
- * the boards that run a shell without parameters calling an undeclared
- * function.
- */
+/* The prompt and echo only need the shell, not the parameter service. */
 #if CONFIG_KFSW_DEBUG_SHELL
 #include "shell/shell_prompt.h"
 #if CONFIG_KFSW_COMMAND
@@ -116,10 +111,7 @@ int main(void)
 #endif
 
 #if CONFIG_KFSW_PARAM
-	/* Core tables first, then services, then modules: the same order the
-	 * identifier bands are allocated in, so a listing reads in one
-	 * direction whatever the composition is.
-	 */
+	/* Core tables first, then services, then modules, in band order. */
 	const struct kfsw_param_definition_set *const parameter_sets[] = {
 		&kfsw_board_param_definitions,        &kfsw_system_param_definitions,
 		&kfsw_telemetry_param_definitions,
@@ -188,13 +180,10 @@ int main(void)
 			kfsw_log_info("Persistent parameters restored");
 		}
 #endif
-		/* Applied here because this is the first point at which the
-		 * stored value is known: storage is mounted, the snapshot has
-		 * been restored, and nothing that talks to the outside has
-		 * started yet.
+		/* Applied once the snapshot is restored and before anything talks to
+		 * the outside.
 		 */
-		/* After the snapshot, so the count continues from what was
-		 * stored rather than restarting at zero every boot. */
+		/* After the snapshot, so the count continues from the saved value. */
 		kfsw_boot_count_restart();
 
 		if (kfsw_system_boot_delay_ms() != 0U) {
@@ -250,11 +239,7 @@ int main(void)
 #if CONFIG_KFSW_CSP
 	bool csp_started = false;
 
-	/* Name the build before CSP starts, so `csp ident` reports the image
-	 * that is running rather than a fixed string. The composition is where
-	 * this can happen: kfsw-comms sits below the boot service and cannot
-	 * reach up for the version itself.
-	 */
+	/* Set the revision before CSP starts, so csp ident reports this build. */
 	kfsw_csp_set_revision(kfsw_boot_get_image_version());
 
 #if CONFIG_KFSW_RADIO_UHF_CRYPTO
@@ -361,10 +346,7 @@ int main(void)
 #endif
 
 #if CONFIG_KFSW_HK
-	/* After the parameter tables exist, because a saved definition names
-	 * them, and after CSP where there is one, because a definition may name
-	 * another node.
-	 */
+	/* After the parameter tables and CSP, since definitions name both. */
 	result = kfsw_hk_init();
 	if (result != 0) {
 		startup_failures++;
@@ -397,11 +379,7 @@ int main(void)
 #endif
 
 #if CONFIG_KFSW_WATCHDOG
-	/* Armed last, once every service that could stall during start-up has
-	 * finished. A watchdog that can reset the board before the shell comes
-	 * up would make a slow boot indistinguishable from a hang, and would
-	 * take away the console needed to diagnose it.
-	 */
+	/* Armed last, so a slow start-up isn't reset before the shell is up. */
 	result = kfsw_platform_watchdog_init();
 	if (result == -ENODEV) {
 		kfsw_log_info("No watchdog device bound; running unguarded");
@@ -421,10 +399,8 @@ int main(void)
 #endif
 
 #if CONFIG_KFSW_HEALTH
-	/* The application thread watches itself first. It is the thread that
-	 * would stop if the system seized, and watching one real thing is worth
-	 * more than watching several that only look supervised. Services join
-	 * as they gain something meaningful to report.
+	/* The application thread reports to health. Services can join when they
+	 * have something to report.
 	 */
 	uint8_t health_handle = 0U;
 	bool health_watching = false;
@@ -437,9 +413,7 @@ int main(void)
 		health_watching = true;
 	}
 
-	/* Started after the watchdog is armed: this takes the feeding over, and
-	 * there is nothing to take over before then.
-	 */
+	/* Health takes over feeding, so start it after the watchdog is armed. */
 	result = kfsw_health_start();
 	if (result != 0) {
 		startup_failures++;
@@ -455,10 +429,7 @@ int main(void)
 #endif
 
 #if CONFIG_KFSW_LASTWORDS
-	/* Armed before the services start, so a dip during start-up is still
-	 * described. -ENOTSUP means the SoC has no detector, which is not a
-	 * failure: every other reason still reaches the record.
-	 */
+	/* Armed before the services start. -ENOTSUP means the SoC has no detector. */
 	result = kfsw_lastwords_watch_supply();
 	if (result == 0) {
 		kfsw_log_info("Watching the supply");
@@ -468,9 +439,7 @@ int main(void)
 #endif
 
 #if CONFIG_KFSW_CSP && CONFIG_BOARD_NATIVE_SIM
-	/* After every subsystem is up, because the ones that initialise in
-	 * between reset the wall clock and a time set earlier does not survive.
-	 */
+	/* After every subsystem is up, because they reset the wall clock. */
 	(void)kfsw_clock_from_host();
 #endif
 
@@ -483,11 +452,7 @@ int main(void)
 		if (health_watching) {
 			(void)kfsw_health_report(health_handle);
 		}
-		/* Read every cycle so a change takes effect on the next one.
-		 * The parameter is validated to stay well inside the deadline,
-		 * so an ordinary scheduling delay is never mistaken for the
-		 * thread having stopped.
-		 */
+		/* Read every cycle so a change applies on the next one. */
 #if CONFIG_KFSW_PARAM
 		k_sleep(K_MSEC(kfsw_system_app_report_ms()));
 #else

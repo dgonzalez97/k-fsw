@@ -17,11 +17,7 @@
 #define KFSW_MS_PER_S 1000U
 #define KFSW_BYTES_PER_KB 1024U
 
-/* Every value is sampled at the moment it is read rather than refreshed on a
- * timer. A housekeeping value is worth having only if it is current when it was
- * asked for; an uptime refreshed once a second is wrong by up to a second every
- * time somebody reads it.
- */
+/* Every value is sampled when it is read. */
 static uint32_t telemetry_uptime_s;
 static uint16_t telemetry_csp_buf_free;
 static uint32_t telemetry_fs_free_kb;
@@ -38,10 +34,7 @@ static void sample_csp_buf_free(void *value)
 #if CONFIG_KFSW_CSP
 	struct kfsw_csp_info info;
 
-	/* Buffer exhaustion is a real failure mode and is invisible without
-	 * this: a node that has stopped answering because it has no buffers
-	 * left looks exactly like one that has stopped answering.
-	 */
+	/* Free CSP buffers; zero means the node can't answer. */
 	kfsw_csp_get_info(&info);
 	*(uint16_t *)value = (uint16_t)info.free_buffers;
 #else

@@ -1,21 +1,8 @@
 #!/usr/bin/env bash
-# Firmware update over the radio, end to end.
-#
-# The claim being tested is not that bytes crossed the link. It is that a
-# different image is running afterwards, and the node says so itself.
-#
-# Two images are built from the same tree with different CSP revision strings.
-# The node starts on one. Ground uploads the other over UHF, tells the node to
-# flash it, and the node reboots. The proof is that ground asks the node who it
-# is, over the radio, and gets a different answer than before.
-#
-# A revision string is used rather than a checksum of the slot because it is
-# what the running image reports about itself. Reading back the slot would show
-# what was written; asking the node shows what is executing.
-#
-# This takes a long time. An application image is around 154 KB and the link
-# carries a few hundred bytes a second, with a reply after every block, so the
-# upload alone is tens of minutes. It is an acceptance, not a smoke test.
+# Firmware update over the radio. Two images differ only in their CSP revision
+# string: the node starts on one, the ground uploads the other over UHF, the
+# node flashes it and reboots, and csp ident must report the new revision. The
+# upload takes tens of minutes.
 #
 # Required environment:
 #   KGROUND_HOLYBRO_DEVICE  USB side of the radio pair, by-id path only.
@@ -57,8 +44,7 @@ cleanup()
 		[[ -n "$pid" ]] && kill "$pid" 2>/dev/null || true
 	done
 
-	# A failed run is the one whose logs are worth having. Removing them on
-	# the way out leaves nothing to diagnose from.
+	# Keep the logs of a failed run.
 	if [[ "$status" -ne 0 ]]; then
 		local kept="$KFSW_ROOT/build/hil/fwu/failed"
 
@@ -101,9 +87,7 @@ wait_for_output()
 	return 1
 }
 
-# Wait until the flight node answers at all. After a reboot the radio pair and
-# the routing need a moment, and an identity request sent into that gap simply
-# times out -- which looks the same as a node running the wrong image.
+# Wait until the node answers after a reboot; the first request can time out.
 wait_for_link()
 {
 	local marker="$1" attempt
@@ -119,8 +103,7 @@ wait_for_link()
 	return 1
 }
 
-# Ground's identity view of the flight node, read over the radio. Retried,
-# because a single timed-out request is not evidence of anything.
+# Read the node identity over the radio, with retries.
 remote_revision()
 {
 	local marker="$1" attempt revision
@@ -144,9 +127,7 @@ build_image()
 	local revision="$1" build_dir="$2"
 	local revision_conf="$work_dir/revision-$revision.conf"
 
-	# The only difference between the two images. Building both from the
-	# same tree keeps the test about the update rather than about a
-	# difference between two programs.
+	# The only difference between the two images.
 	printf 'CONFIG_KFSW_CSP_REVISION="%s"\n' "$revision" >"$revision_conf"
 
 	KFSW_SYSBUILD=1 \
@@ -206,9 +187,8 @@ debug_capture_pid=$!
 wait_for_output "$work_dir/nucleo.log" "@READY " "$debug_capture_pid" 60 || \
 	fail "the node did not boot the first image"
 
-# The image was written straight to the primary slot, so the bootloader treats
-# it as already confirmed. Confirming explicitly gives the revert a destination
-# if the uploaded image never confirms itself.
+# The image was written to the primary slot, so confirm it explicitly to give a
+# revert somewhere to go.
 printf '%s\r' 'mcuboot confirm' >"$debug_serial"
 sleep 2
 
@@ -269,8 +249,7 @@ banner "Upload the second image over the radio"
 printf 'this is tens of minutes at %s baud\n' "$radio_baud"
 printf '%s\n' "fwu send $FLIGHT_NODE $after_image" >&3
 
-# Waiting for success alone turns any failure into the full timeout, which on a
-# transfer this long is an hour of watching nothing happen.
+# Stop at the first failure instead of waiting for the full timeout.
 upload_done=0
 for _ in $(seq 1 3600); do
 	if grep -aq "Image accepted and verified" "$work_dir/ground.log"; then
@@ -311,8 +290,7 @@ if [[ "$revision_after" != "$REVISION_AFTER" ]]; then
 fi
 printf 'node %s reports revision %s\n' "$FLIGHT_NODE" "$revision_after"
 
-# Keep it. Without this the bootloader restores the previous image on the next
-# reboot, which is the designed behaviour and would undo what was proven.
+# Confirm, or MCUboot restores the previous image at the next reboot.
 printf '%s\r' 'mcuboot confirm' >"$debug_serial"
 sleep 3
 

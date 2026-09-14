@@ -96,7 +96,7 @@ grep -Fq 'CONFIG_KFSW_CSP_ROUTE_TABLE="19/14 KISS"' \
 	fail "node 16 did not compose its configured CSP route table"
 grep -Fq '# CONFIG_KFSW_RADIO_UHF is not set' \
 	"$KGROUND_BUILD_ROOT/node-19/zephyr/.config" || \
-	fail "node 19 unexpectedly owns the UHF radio module"
+	fail "node 19 unexpectedly has the UHF radio module"
 
 mkfifo "$work_dir/node16.in" "$work_dir/node19.in"
 exec 3<>"$work_dir/node16.in"

@@ -31,7 +31,7 @@ or payload needs, then write the mission-specific code.
 The other four repositories hold reusable code. `west.yml` pins the
 revisions used together.
 
-## Why Zephyr?
+## Zephyr
 
 Zephyr provides the RTOS, device drivers, board support, Kconfig, devicetree,
 and build tools. Its native simulator runs the application on Linux, so
@@ -42,8 +42,8 @@ its hardware description and configuration. Modules and services can also
 be reused in another RTOS port, but their Zephyr kernel, driver, and
 filesystem calls need adapting. See @ref zephyr_integration.
 
-CSP is optional. Local parameters, persistence, logging, and the shell can
-run without a network stack.
+CSP is optional. Local parameters, persistence, logging and the shell work
+without it.
 
 ## First run
 
@@ -59,11 +59,10 @@ See @ref getting_started for workspace setup.
 
 ## Development
 
-- @ref architecture — ownership, startup, and configuration.
-- @ref development — branches, dependency changes, and short PRs.
-- @ref testing — software checks and hardware test procedures.
-- @ref project_status — recorded bench results and remaining work.
+- @ref architecture covers repositories, startup and configuration.
+- @ref development covers branches, dependency changes and pull requests.
+- @ref testing covers software checks and hardware tests.
+- @ref project_status lists bench results and known limits.
 
-Linux and NUCLEO-L496ZG are the reference targets. FRDM-K64F and Pico W
-currently run shell bring-up profiles. K-FSW is under development;
-bench results are recorded in the status page and do not imply flight qualification.
+Linux and NUCLEO-L496ZG are the reference targets. FRDM-K64F and Pico W run
+shell-only profiles.

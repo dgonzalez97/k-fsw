@@ -1,13 +1,7 @@
 #!/usr/bin/env bash
-# Checks that housekeeping samples survive in a file, and that the ground can
-# fetch them without being able to change them.
-#
-# A file store is one of the few things that cannot be tested without a
-# filesystem, so this runs against a real image with real LittleFS rather than
-# as a unit case. It asserts four things: an interval that would wear the flash
-# out is refused, an accepted one produces a file, that file can be read but
-# not written through file transfer, and a redefinition takes it away because
-# the same bytes would mean something else under the new layout.
+# Checks the housekeeping sample file store: a too-short interval is refused,
+# an accepted one creates a file, the file can be read but not written over file
+# transfer, and redefining the report removes it.
 
 set -euo pipefail
 

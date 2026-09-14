@@ -101,14 +101,12 @@ expect "$disabled_log" \
 expect "$disabled_log" \
 	"get: parameter 'last_press_s' not found" \
 	"the disabled composition unexpectedly exposed last_press_s"
-# The listing is one row per parameter: table name, offset, then the name. A
-# composition without the module must not carry the table at all.
+# One row per parameter: table, offset, name. Without the module there is no
+# table.
 if grep -Eq '^hw_test +0x[0-9a-f]{2} ' "$disabled_log"; then
 	fail "the disabled parameter list contains the hw_test table"
 fi
-# Anchored to a listing row in the module's own table. The names no longer
-# carry a prefix -- the table already says which component owns them -- so a
-# bare name like led_green is not distinctive enough to search for on its own.
+# Match the row in the module's table; the names have no prefix.
 if grep -Eq '^hw_test +0x[0-9a-f]{2} +(press_count|last_press_s|led_)' "$disabled_log"; then
 	fail "the disabled parameter list contains module definitions"
 fi
@@ -135,9 +133,7 @@ run_image "$enabled_build_dir/zephyr/zephyr.exe" \
 
 expect "$enabled_log" 'boton_test initialized' \
 	"the enabled module did not initialize"
-# Table, offset, name, type and write mode together. The mode is derived from
-# the definition, so a read-only value reported as writable would show up here
-# rather than only when an operator tried to set it.
+# Table, offset, name, type and mode, so a wrong write mode shows up here.
 if ! grep -Eq '^hw_test +0x00 +press_count +u32 +r ' "$enabled_log"; then
 	fail "the enabled parameter list omitted read-only press_count at table 67 offset 0"
 fi
@@ -149,8 +145,7 @@ for led in green blue red; do
 		fail "the enabled parameter list omitted writable ${led} LED state"
 	fi
 done
-# The module band is where a module's table belongs; a core or service number
-# would collide with another node's table of the same number.
+# The module table is in the module band.
 if ! grep -Eq '^ *67 +module +hw_test +' "$enabled_log"; then
 	fail "hw_test was not registered as table 67 in the module band"
 fi
@@ -184,13 +179,13 @@ expect "$enabled_log" "set: parameter 'led_green' failed (-34)" \
 	"an invalid LED boolean was not rejected"
 
 if [[ "$(grep -Fc 'press_count = 0' "$enabled_log")" -lt 2 ]]; then
-	fail "the rejected press_count write changed owner state"
+	fail "the rejected press_count write changed the module state"
 fi
 if [[ "$(grep -Fc 'last_press_s = 0' "$enabled_log")" -lt 2 ]]; then
-	fail "the rejected last_press_s write changed owner state"
+	fail "the rejected last_press_s write changed the module state"
 fi
 if [[ "$(grep -Fc 'led_green = 1' "$enabled_log")" -lt 3 ]]; then
-	fail "the invalid green LED write changed owner state"
+	fail "the invalid green LED write changed the module state"
 fi
 
 cat "$disabled_log"

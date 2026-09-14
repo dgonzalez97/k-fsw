@@ -28,9 +28,7 @@ echo
 west_args=()
 cmake_args=()
 
-# Sysbuild is opt-in and off by default, so every existing caller builds the
-# single application image exactly as before. Only a composition that needs a
-# bootloader alongside the application turns it on.
+# Sysbuild is off by default; only the MCUboot composition turns it on.
 if [[ -n "${KFSW_SYSBUILD:-}" ]]; then
 	west_args+=(--sysbuild)
 fi
@@ -44,10 +42,7 @@ if [[ -n "${KFSW_EXTRA_DTC_OVERLAY_FILE:-}" ]]; then
 
 fi
 
-# Under sysbuild the bootloader is a second Zephyr image with its own
-# devicetree. It is given the shared flash map only: it must agree with the
-# application about the slot addresses, but it has no use for the application's
-# own peripherals or storage partition.
+# The bootloader image only gets the shared flash map overlay.
 if [[ -n "${KFSW_MCUBOOT_DTC_OVERLAY_FILE:-}" ]]; then
 	cmake_args+=("-Dmcuboot_EXTRA_DTC_OVERLAY_FILE=$KFSW_MCUBOOT_DTC_OVERLAY_FILE")
 fi
@@ -56,14 +51,8 @@ if [[ -n "${KFSW_CONF_FILE:-}" ]]; then
 	cmake_args+=("-DCONF_FILE=$KFSW_CONF_FILE")
 fi
 
-# The bootloader is configured through sysbuild, not through a fragment on the
-# image: sysbuild generates a forced .config.sysbuild that overrides anything
-# app/sysbuild/mcuboot.conf sets. Everything else lives in app/sysbuild.conf.
-#
-# Only the signing key is passed here. It is private and machine-local, so its
-# path is supplied at build time rather than committed. Without it the
-# bootloader silently falls back to the key MCUboot ships in its own public
-# tree, which anyone can sign an image with.
+# The bootloader is configured in app/sysbuild.conf. Only the signing key is
+# passed here; without it MCUboot uses its public development key.
 if [[ -n "${KFSW_MCUBOOT_KEY:-}" ]]; then
 	if [[ ! -r "$KFSW_MCUBOOT_KEY" ]]; then
 		echo "ERROR: KFSW_MCUBOOT_KEY is set but not readable: $KFSW_MCUBOOT_KEY"

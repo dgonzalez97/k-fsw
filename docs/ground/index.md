@@ -2,31 +2,25 @@
 
 [TOC]
 
-`k-ground` runs Linux ground nodes from the same application and services
-as KFSW-Linux. Node files set each role's name, address, peer, and build
-configuration.
+`k-ground` runs Linux ground nodes built from the same application and
+services as KFSW-Linux. A node file sets each role's name, address, peer and
+build options.
 
-## Identity and node convention
+## Roles and addresses
 
-K-FSW currently assigns ground-side addresses starting at 16 by project
-convention:
-
-| Role | CSP address | Current scope |
+| Role | CSP address | Use |
 | --- | --- | --- |
-| `kfsw-gnd-uhf` | 16 | Own the physical UHF interface and expose it to ground CSP |
-| `kfsw-ops` | 19 | Operator-facing shell; does not open the radio |
+| `kfsw-gnd-uhf` | 16 | Opens the UHF radio for the ground network |
+| `kfsw-gnd-uhf-bench` | 16 | The same, routed to flight node 2 on the radio bench |
+| `kfsw-gnd-can` | 16 | Reaches a flight node over a SocketCAN interface |
+| `kfsw-ops` | 19 | Operator shell; doesn't open the radio |
 
-These names and addresses are configurable deployment choices, not CSP
-protocol roles. K-FSW uses CSP v2, whose source and destination fields are 14
-bits. The launcher therefore accepts ground nodes in `16..16383`; CSP v1's
-familiar 5-bit `0..31` address range does not apply to this composition. A
-peer may be any different CSP v2 address in `1..16383`, allowing the UHF
-gateway to target a flight-side node such as node 2.
+These are the reference settings. CSP v2 addresses are 14 bits, so the
+launcher accepts ground nodes from 16 to 16383 and peers from 1 to 16383.
 
-Role, name, hostname, prompt, address, direct peer, optional UHF implementation,
-and build directory are generated from configuration rather than hard-coded
-into C. `status` makes the selected instance visible, while `uhf status` is
-present only when the radio module is composed:
+The role, name, prompt, address, peer, radio and build directory come from the
+node file. `status` shows them, and `uhf status` is there when the radio module
+is built in:
 
 ```text
 kfsw-gnd-uhf# status
@@ -35,51 +29,32 @@ Role: kfsw-gnd-uhf
 Name: kfsw-gnd-uhf
 CSP node: 16
 board: native_sim/native/64
-
-kfsw-gnd-uhf# uhf status
-implementation: holybro-sik
-expected serial: 57600 8N1
-RF link: unknown
 ```
 
-Normal Linux images retain the `kfsw:~$` prompt and report `Role: flight`.
+A normal Linux image keeps the `kfsw:~$` prompt and `Role: flight`.
 
-## Engineering environment setup
+## Environment
 
-Use three separate environment layers. Keeping them distinct makes failures
-easier to locate:
-
-| Layer | Purpose | How it is loaded |
+| Layer | Contents | Loaded by |
 | --- | --- | --- |
-| Workspace `.venv` | Python, west, and Zephyr tooling | Activate in the engineer's shell; K-FSW scripts also discover it automatically |
-| `ground-station/nodes/*.env` | Version-controlled role, CSP address, and peer | Loaded automatically by `tools/k-ground` |
-| Holybro bench environment | Host-specific serial paths and measured radio settings | Explicitly sourced before physical HIL |
+| Workspace `.venv` | Python, west and Zephyr tools | Your shell; K-FSW scripts activate it themselves |
+| `ground-station/nodes/*.env` | Role, CSP address, peer and routes | `tools/k-ground` |
+| Holybro bench file | Serial paths and radio settings of one host | Sourced before a hardware test |
 
-From an existing west workspace, prepare a terminal with:
+From the workspace root:
 
 ```bash
-cd /path/to/k-fsw-workspace
 . .venv/bin/activate
 west topdir
 west manifest --validate
 command -v socat
 ```
 
-`west topdir` should print the workspace root, and `west manifest --validate`
-must complete without an error. `socat` is required for local CSP/KISS links.
-On Ubuntu, install it with `sudo apt install socat` if the final command prints
-nothing.
-See @ref getting_started for workspace and host setup.
-Do not run `west init` again inside an initialized workspace.
+`socat` is needed for the local CSP/KISS links (`sudo apt install socat`).
+See @ref getting_started for the workspace setup.
 
-There is no generic project `.env` that must be executed. Activating `.venv`
-configures the development tools; the role files configure K-FSW instances.
-Project wrappers source `.venv/bin/activate` when it exists, but activation is
-still recommended when invoking `west` directly.
-
-The launcher defaults to the reference deployment in `k-fsw/ground-station`
-and generated output in `build/k-ground`. To select a mission deployment and
-an explicit build root for the current terminal:
+The launcher uses `k-fsw/ground-station` and writes to `build/k-ground` by
+default. To use other directories in the current shell:
 
 ```bash
 export KGROUND_STATION_DIR="$PWD/ground-station"
@@ -87,71 +62,49 @@ export KGROUND_BUILD_ROOT="$PWD/build/k-ground"
 ./k-fsw/tools/k-ground build kfsw-gnd-uhf
 ```
 
-These exports affect only the current shell and its children. Do not add them
-globally to `.bashrc` when one host serves more than one mission deployment.
-Use `unset KGROUND_STATION_DIR KGROUND_BUILD_ROOT` to return to launcher
-defaults.
+Keep USB device paths out of the node files and put them in the bench file.
 
-Inspect the active values before a test with:
-
-```bash
-printf 'station=%s\nbuild=%s\n' \
-  "$KGROUND_STATION_DIR" "$KGROUND_BUILD_ROOT"
-```
-
-Do not place USB device paths in reusable node files. They are properties of a
-particular bench host and belong in the separate Holybro bench environment
-described below.
-
-## Ground-station configuration
-
-`ground-station/` is a version-controlled deployment description, not a
-driver or orchestration framework:
+## Configuration
 
 ```text
 ground-station/
-├── README.md
-├── station.env
-└── nodes/
-    ├── kfsw-gnd-uhf.env
-    └── kfsw-ops.env
+|-- README.md
+|-- station.env
+|-- reports/
+`-- nodes/
+    |-- kfsw-gnd-can.env
+    |-- kfsw-gnd-uhf-bench.env
+    |-- kfsw-gnd-uhf.env
+    `-- kfsw-ops.env
 ```
 
-Each node file is a small shell-compatible environment file:
+A node file is a shell environment file:
 
 ```text
 KFSW_ROLE=kfsw-gnd-uhf
 KFSW_CSP_NODE=16
 KFSW_CSP_PEER=19
-KFSW_CSP_ROUTES='19/14 KISS'
 KFSW_RADIO_UHF=holybro
 ```
 
-`KFSW_CSP_ROUTES` is optional. When present, `tools/k-ground` validates its
-bounded characters/length and writes it to `CONFIG_KFSW_CSP_ROUTE_TABLE` for
-that node; the value uses libcsp's comma-separated
-`destination[/prefix] interface [via]` syntax. When absent, the one-interface
-image retains `0/0 -> KISS direct`. The launcher configures routes but still
-only auto-connects the direct two-peer PTY link described below; it is not a
-general network orchestrator.
+`KFSW_CSP_ROUTES` sets a route table, for example `'2/14 KISS'`.
+`tools/k-ground` checks it and writes it to `CONFIG_KFSW_CSP_ROUTE_TABLE`;
+without it the node uses `0/0 -> KISS direct`. `KFSW_EXTRA_KCONFIG` and
+`KFSW_EXTRA_OVERLAY` add Kconfig lines and a devicetree overlay, which is how
+`kfsw-gnd-can` enables CAN. `KFSW_RADIO_UHF=holybro` selects the radio module.
 
-Only `kfsw-gnd-uhf` selects `KFSW_RADIO_UHF`; the ops role does
-not own the physical radio. The launcher maps `holybro` to the reusable module's
-compile-time Kconfig choice rather than calling implementation-specific C APIs.
-
-Create a mission-local copy from the west workspace root with:
+To copy the reference configuration into your workspace:
 
 ```bash
 ./k-fsw/tools/k-ground init
 ```
 
-The launcher selects `./ground-station` when present. Set
-`KGROUND_STATION_DIR` to select another deployment. `init` refuses to replace
-an existing directory; it is a copy operation, not an interactive wizard.
+The launcher uses `./ground-station` when it exists, or `KGROUND_STATION_DIR`.
+`init` doesn't overwrite an existing directory.
 
-## Launching k-ground
+## Running
 
-Start the configured UHF gateway and operator shell in separate terminals:
+Start the UHF gateway and the operator shell in two terminals:
 
 ```bash
 ./k-fsw/tools/k-ground run kfsw-gnd-uhf
@@ -161,13 +114,9 @@ Start the configured UHF gateway and operator shell in separate terminals:
 ./k-fsw/tools/k-ground run kfsw-ops
 ```
 
-For two configured ground peers, `run` connects their native KISS PTYs through
-a local Unix socket. This is deliberately a direct two-node demonstration,
-not a multi-drop ground router. The existing shell syntax then works in
-both directions:
+`run` connects the KISS PTYs of the two peers through a local socket:
 
 ```text
-kfsw-ops# status
 kfsw-ops# csp ping 16
 CSP ping 16: success, rtt_ms=...
 
@@ -175,26 +124,17 @@ kfsw-gnd-uhf# csp ping 19
 CSP ping 19: success, rtt_ms=...
 ```
 
-The optional one-command demo presents the operator shell, while the automated
-form verifies both identities, prompts, and ping directions:
+`k-ground demo` starts both and opens the operator shell. `k-ground test`
+checks both identities, prompts and ping directions:
 
 ```bash
 ./k-fsw/tools/k-ground demo
 ./k-fsw/tools/k-ground test
 ```
 
-Addresses 17 and 18 are reserved for future ground roles. They have no
-node configuration. The launcher starts configured nodes; the housekeeping
-bridge connects them to Yamcs.
-
 ## Moving a file between ground nodes
 
-Ground roles are built from the same `native_sim` composition as KFSW-Linux, so
-they carry the same file-transfer service. Every path is virtual and sandboxed
-below `/kfsw/ftp` on the node that owns it.
-
-From the operator shell, upload a file to the gateway, read its metadata back,
-download it again, and compare the two local copies:
+Ground nodes include the file transfer service. From the operator shell:
 
 ```text
 kfsw-ops# ftp generate /build/test.txt 256
@@ -211,13 +151,8 @@ kfsw-ops# ftp verify /build/test.txt /build/test-returned.txt
 FTP verify first=/build/test.txt second=/build/test-returned.txt: PASS
 ```
 
-`ftp generate` writes a deterministic byte pattern rather than prose; the
-transfer service treats every file as binary. The same CRC appearing on the
-sender, on the receiver's `stat`, and on the returned copy is the end-to-end
-evidence that the round trip was exact.
-
-The gateway can inspect what it received without opening a connection, because
-a request addressed to a node's own CSP address is served from local storage:
+The same CRC on both nodes and on the returned copy means the file came back
+unchanged. The gateway can list its own files without a connection:
 
 ```text
 kfsw-gnd-uhf# ftp 16 ls /uplink
@@ -225,87 +160,76 @@ f        256 test.txt
 FTP list: PASS entries=1
 ```
 
-`tests/k-ground-ftp-smoke.sh` runs exactly this sequence between node 19 and
-node 16, including the missing-file negative path, and is part of the software
-integration suite. Transfers to and from a flight node over the radio are a
-separate physical path; see the Holybro fixture under `tests/hil/radio-uhf/`.
+`tests/k-ground-ftp-smoke.sh` runs this sequence, including a missing file.
 
 ## Telemetry in Yamcs
 
-[Yamcs](https://yamcs.org/) records housekeeping samples and provides the
-telemetry browser and archive. The project configuration lives in the
-`ground-station/yamcs` submodule.
+[Yamcs](https://yamcs.org/) stores housekeeping samples and has a telemetry
+browser and archive. Its configuration is the `ground-station/yamcs`
+submodule.
 
 ```bash
-cd k-fsw/ground-station/yamcs && ./mvnw yamcs:run    # then http://localhost:8090
+cd k-fsw/ground-station/yamcs && ./mvnw yamcs:run    # http://localhost:8090
 ```
 
-By default nothing arrives on its own: housekeeping answers when asked, so a
-bridge does the asking.
+Nodes answer housekeeping requests, so the bridge polls them:
 
 ```bash
 ./k-fsw/tools/ground/hk-bridge.py --device /dev/pts/7 --node 1 --report 0
 ```
 
-It speaks CSP over KISS on the host, pulls samples, and forwards each one to
-Yamcs on UDP 10015. Point it at a hosted node's `uart_1` pseudo-terminal, or
-straight at the Holybro's serial device for a flight node over the radio; it is
-the same client either way.
+The bridge talks CSP over KISS, pulls samples and sends each one to Yamcs on
+UDP port 10015. Point it at a Linux node's `uart_1` PTY, or at the Holybro
+serial device to reach a flight node over the radio.
 
 ### Beacons
 
-A report can send its latest sample periodically without a ground request:
+A report can also send its latest sample periodically:
 
 ```text
 hk beacon 0 1 5000      # report 0, to node 1, every five seconds
 hk beacon 0 1 0         # stop
 ```
 
-The ground does not change. A beacon is the same frame a request gets, sent
-from the same port, so the bridge recognises it with what it already has — it
-only has to stop asking:
+A beacon is the same frame a request gets, sent from the same port, so the
+bridge only has to stop polling:
 
 ```bash
 ./k-fsw/tools/ground/hk-bridge.py --device /dev/pts/7 --node 1 --listen
 ```
 
-Beacon limits:
+- Intervals below `CONFIG_KFSW_HK_BEACON_FLOOR_MS` (5000 ms) return `-ERANGE`.
+- The report has to be collecting and the node's clock has to be set.
+- A beacon is skipped when fewer than `CONFIG_KFSW_HK_BEACON_BUFFER_RESERVE`
+  CSP buffers are free; check `hk show` and `hk_beacons_skipped` in table 33.
 
-- Intervals below `CONFIG_KFSW_HK_BEACON_FLOOR_MS` (5000 ms by default)
-  return `-ERANGE`.
-- A report must be collecting and the node's clock must be set.
-- A send is skipped below `CONFIG_KFSW_HK_BEACON_BUFFER_RESERVE` free
-  CSP buffers. Check `hk show` and `hk_beacons_skipped` in table 33.
+Beacons are sent to their own port (`KFSW_HK_BEACON_PORT`) so they never reach
+a request handler. With persistence enabled, beacon settings are saved with
+the report.
 
-Beacons use a separate destination port to avoid service request handlers.
-Beacon intervals reset at boot; report definitions and collection periods persist.
+### Running Yamcs
 
-### Bringing it up and checking it
-
-Yamcs needs Java 17 and nothing else; Maven downloads itself through `./mvnw`.
+Yamcs needs Java 17; Maven comes through `./mvnw`.
 
 ```bash
 cd k-fsw/ground-station/yamcs
 ./mvnw yamcs:run
 ```
 
-It prints `Yamcs started` after a few seconds and serves <http://localhost:8090>.
-The instance is `kfsw`. Leave it running in its own terminal — it holds the
-archive, so stopping it stops the recording.
+It prints `Yamcs started` and serves <http://localhost:8090>. The instance is
+`kfsw`. Keep it running while recording.
 
-**Check the mission database before connecting hardware.** In another
-terminal, from `k-fsw/ground-station/yamcs`:
+Check the mission database before connecting hardware. In another terminal,
+from `k-fsw/ground-station/yamcs`:
 
 ```bash
 ./scripts/check-mdb.sh
 ```
 
-That pushes a housekeeping frame captured off a real node into the running
-instance and reads the values back out. It is what CI runs on every push, and
-it is the fastest way to tell whether a change to a report definition broke the
-decoding. Expect `MDB CHECK RESULT: PASS`.
+It sends a recorded housekeeping frame to Yamcs and reads the values back; CI
+runs it on every push. Expect `MDB CHECK RESULT: PASS`.
 
-**Then bring in a node.** Define the report on the node and let it collect:
+Then set up a report on the node:
 
 ```text
 kfsw:~$ hk define 0 51:0x00 51:0x10 51:0x08 3:0x00 3:0x0c
@@ -314,37 +238,32 @@ kfsw:~$ hk period 0 2000
 kfsw:~$ hk show
 ```
 
-`hk show` is the node's own account of itself: how many collections, how many
-failed, how many values were absent, and how many samples the ring is holding.
-Set the clock first or every sample carries a zero timestamp and the bridge
-falls back to host time.
+`hk show` prints the collections, failures, missing values and stored
+samples. Set the clock first, otherwise samples have a zero timestamp and the
+bridge uses the host time.
 
-Then start the bridge against the node's link:
+Start the bridge on the node's link:
 
 ```bash
 ./k-fsw/tools/ground/hk-bridge.py --device "$KGROUND_HOLYBRO_DEVICE" \
     --baud 57600 --node 2 --report 0 --count 8 --interval 10
 ```
 
-The bridge prints each forwarded sample. Use `--yamcs none` to inspect
-received frames as hex before checking Yamcs.
+The bridge prints each sample. With `--yamcs none` it prints the frames as hex
+and sends nothing.
 
-**What to look at in the web interface.**
-
-| Where | What it tells you |
+| Yamcs page | What to check |
 | --- | --- |
-| Links | `hk-udp` should show `OK, receiving on 10015`, with valid datagrams climbing and invalid at zero |
-| Telemetry, Packets | one packet per sample, in the `nucleo_temperature` container |
-| Telemetry, Parameters | `/kfsw/nucleo_temperature_temp_mcu` in degrees, with `ACQUIRED` beside it |
-| Archive | the history — this is the part a console cannot give you |
+| Links | `hk-udp` shows `OK, receiving on 10015`; valid datagrams go up, invalid stays at zero |
+| Telemetry, Packets | One packet per sample in the `nucleo_temperature` container |
+| Telemetry, Parameters | `/kfsw/nucleo_temperature_temp_mcu` in degrees, marked `ACQUIRED` |
+| Archive | The stored history |
 
-A parameter marked `INVALID` rather than `ACQUIRED` is the mission database
-doing its job: the temperature carries a valid range, so a node reporting the
-reserved value shows as absent instead of plotting at minus two million
-degrees. Check `temp_valid` and `temp_failures` beside it.
+`INVALID` instead of `ACQUIRED` means the value is outside its valid range, for
+example the reserved value sent when the sensor can't be read. Check
+`temp_valid` and `temp_failures`.
 
-The same answers are available without the browser, which is what a script
-should use:
+The same data is available from the Yamcs API:
 
 ```bash
 curl -s localhost:8090/api/links/kfsw/hk-udp | python3 -m json.tool
@@ -352,27 +271,24 @@ curl -s localhost:8090/api/processors/kfsw/realtime/parameters/kfsw/nucleo_tempe
 curl -s 'localhost:8090/api/archive/kfsw/parameters/kfsw/nucleo_temperature_temp_mcu?limit=50&order=asc'
 ```
 
-**If nothing arrives:** check frames with `--yamcs none`, check that
-`hk show` reports increasing collections, then check Yamcs Links for invalid
-datagrams. Verify the serial path, report definition, and UDP link settings.
+If nothing arrives, look at the frames with `--yamcs none`, check that
+`hk show` counts collections, and then check Links for invalid datagrams.
 
-### Yamcs reads; K-FSW commands
+### Commanding
 
-Yamcs records telemetry. Configure housekeeping through K-FSW commands:
-`hk_define`, `hk_period`, and `hk_clear` reach nodes over CSP/KISS or CAN.
+Yamcs only records telemetry. Housekeeping is configured with K-FSW commands;
+`hk_define`, `hk_period` and `hk_clear` work over CSP/KISS or CAN:
 
 ```text
 kfsw-ops# cmd 2 hk_define 0 "51:0x00 51:0x10 3:0x00"
 hk_define node=2: OK report 0 defines 3 values
 ```
 
-Yamcs telecommand integration is not implemented.
-
 ### Report definitions
 
-Housekeeping frames carry values in report order, without names.
-`hk-report.py` generates the node definition and Yamcs XTCE database from
-one YAML file. The bridge forwards the frame unchanged.
+Housekeeping frames carry the values in report order, without names.
+`hk-report.py` generates the node command and the Yamcs XTCE database from one
+YAML file:
 
 ```bash
 report=k-fsw/ground-station/reports/nucleo-temperature.yaml
@@ -383,73 +299,48 @@ report=k-fsw/ground-station/reports/nucleo-temperature.yaml
     -o k-fsw/ground-station/yamcs/src/main/yamcs/mdb/kfsw-hk.xml
 ```
 
-`hk-report.py check` compares the file against a node's own `param list`, so a
-parameter that moves offset is caught rather than silently shifting every value
-after it.
+`hk-report.py check` compares the file with a node's `param list`, which
+catches a parameter that moved.
 
-### The bridge's envelope
+### Bridge datagrams
 
-Each datagram is twelve bytes the bridge adds, then the frame the node sent:
+Each UDP datagram has a 12-byte header followed by the frame from the node:
 
 ```text
- 0  u64  Unix milliseconds   the node's clock, or the host's when it is unset
+ 0  u64  Unix milliseconds   the node's clock, or the host's when it is not set
  8  u32  sequence
-12  ...  the housekeeping frame, header and all
+12  ...  housekeeping frame
 ```
 
-The envelope adapts the node's timestamp and sequence to Yamcs field sizes,
-preserving each sample's generation time during batch retrieval.
+Yamcs reads the time and sequence with these sizes, so each sample keeps its
+own time when several are pulled at once.
 
-`tests/hk-yamcs-smoke.sh` asserts the thing that matters: the bytes the bridge
-pulls off the link are the bytes the node's own shell prints for the same
-sample. It is also the only test of housekeeping's CSP server, which the unit
-suites do not reach.
+`tests/hk-yamcs-smoke.sh` checks that the bytes the bridge receives match what
+the node's shell prints for the same sample.
 
-## Physical-interface ownership
+## Radio
 
-One process should own one physical interface. In the prototype,
-`kfsw-gnd-uhf` alone opens the Holybro serial device. `kfsw-ops` and a future
-rotator bridge would communicate through CSP and remain independent of the
-radio implementation. A later
-`kfsw-gnd-sband` could follow the same pattern without changing those roles.
-
-## UHF and Holybro setup
-
-The HIL tree models the radio category separately from its implementation:
+Only one process opens each physical interface. `kfsw-gnd-uhf` opens the
+Holybro serial device, and the other ground roles reach it over CSP.
 
 ```text
 tests/hil/radio-uhf/
-└── holybro/
-    ├── raw-peer/
-    ├── raw-nucleo-smoke.sh
-    └── csp-kiss-smoke.sh
+`-- holybro/
+    |-- raw-peer/
+    |-- raw-nucleo-smoke.sh
+    `-- csp-kiss-smoke.sh
 ```
 
-`kfsw-comms` continues to own reusable CSP/KISS/UART behavior. `kfsw-modules`
-owns the compile-time-selected `radio-uhf` interface and the `holybro-sik`
-implementation. That module reports configured identity and expected serial
-facts without adding send/receive operations, another UART driver, KISS
-framing, CSP interface, or background manager.
+`kfsw-comms` has the UART, KISS and CSP code. `kfsw-modules` has the
+`radio-uhf` module and its `holybro-sik` implementation, which reports the
+expected radio settings and adds encryption. Table 50 has the radio identity,
+status and encryption settings. TX power, network ID and air rate are not
+writable because the module doesn't use SiK command mode.
 
-No radio parameter definitions are exported yet. The implementation does not
-enter SiK command mode or safely apply runtime setting changes, so writable
-TX-power, network-ID, or air-rate parameters would accept state without real
-hardware behavior. The generic PARAM mechanism remains ready for a future
-module-owned definition set once an actual safe operation exists.
+- `raw-nucleo-smoke.sh` flashes a raw test peer on the NUCLEO and exchanges
+  numbered messages over the radio.
+- `csp-kiss-smoke.sh` builds ground node 16 and NUCLEO node 2 at 57600 baud,
+  bridges the ground PTY to the USB radio, and checks the interfaces, routes,
+  ping in both directions and the counters.
 
-The two physical tests answer different questions:
-
-- `raw-nucleo-smoke.sh` flashes a temporary NUCLEO raw peer, sends
-  deterministic numbered requests, and requires every matching reply. The
-  accepted bench ran 100/100 exchanges with no invalid payload or timeout. It
-  proves only that bytes traverse the UART/RF link.
-- `csp-kiss-smoke.sh` builds k-ground node 16 and NUCLEO node 2 with 57600-baud
-  UART profiles, bridges the ground KISS PTY to the USB radio, and requires
-  interfaces, direct routes, bidirectional CSP ping, and clean counters. It
-  proves KISS framing and CSP routing in addition to the link.
-
-The recorded USB-side RFD SiK 2.0 settings, exact commands, and latest bench
-result are in `tests/hil/radio-uhf/holybro/README.md`. The
-recorded bench passed both raw and CSP/KISS acceptance without changing radio
-parameters. This is physical functional evidence for that named bench, not RF
-or flight qualification.
+Radio settings and commands are in `tests/hil/radio-uhf/holybro/README.md`.

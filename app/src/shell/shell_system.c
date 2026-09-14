@@ -4,7 +4,6 @@
 
 #include <kfsw/platform/time.h>
 #include <kfsw/services/boot.h>
-/* Attributes this file's messages, so its level can be raised alone. */
 #define KFSW_LOG_MODULE KFSW_LOG_MODULE_APP
 #include <kfsw/services/log.h>
 

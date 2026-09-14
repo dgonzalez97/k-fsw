@@ -1,9 +1,6 @@
-/* Application-side half of the MCUboot composition. Applied only to the
- * application image, on top of nucleo-mcuboot-flash.overlay.
- *
- * The single 960 KB application partition is removed and the application is
- * linked into the primary slot instead. The bootloader image has no such
- * partition to remove, which is why this is separate from the shared map.
+/* Application side of the MCUboot profile, on top of nucleo-mcuboot-flash.overlay.
+ * The application is linked into the primary slot instead of the 960 KB
+ * application partition.
  */
 
 /delete-node/ &kfsw_app_partition;

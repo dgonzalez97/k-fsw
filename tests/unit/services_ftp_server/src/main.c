@@ -18,17 +18,9 @@
 #define TEST_PAYLOAD 64U
 
 /*
- * What the file-transfer server does with a request.
- *
- * The server was already built around a link interface, so a test can stand a
- * fake one in its place and ask a question the real transport cannot: what
- * happens on the frames nobody sends by accident. A request for a file that is
- * not there, a path that climbs out of the sandbox, a write aimed at the
- * read-only root, an opcode from a future version.
- *
- * Every one of those is a refusal that has to reach the peer as a status
- * rather than as silence, because a ground station waiting on a reply that
- * never comes cannot tell a refusal from a dead node.
+ * File transfer server request handling over a fake link: missing files, paths
+ * outside the sandbox, writes to the read-only root and unknown opcodes. Every
+ * refusal must reach the peer as a status.
  */
 
 /* The request the fake link will hand over, and the responses it collects. */
@@ -147,8 +139,7 @@ static void ftp_before(void *fixture)
 ZTEST_SUITE(kfsw_ftp_server, NULL, ftp_setup, ftp_before, NULL, NULL);
 
 /*
- * A link that cannot deliver a request still gets an answer. Silence here is
- * indistinguishable from a dead node to whoever is waiting.
+ * A request that can't be delivered still gets an answer.
  */
 ZTEST(kfsw_ftp_server, test_a_request_that_never_arrived_is_still_answered)
 {
@@ -162,9 +153,7 @@ ZTEST(kfsw_ftp_server, test_a_request_that_never_arrived_is_still_answered)
 		      "a failed receive was not reported as a bad request");
 }
 
-/* A transport that says it cannot carry this says so differently, because the
- * peer's next move is different: stop, rather than resend.
- */
+/* A transport error gets a different status, telling the peer not to resend. */
 ZTEST(kfsw_ftp_server, test_an_unsupported_frame_says_unsupported)
 {
 	memset(&link_fake, 0, sizeof(link_fake));
@@ -191,8 +180,7 @@ ZTEST(kfsw_ftp_server, test_an_unknown_opcode_is_refused)
 }
 
 /*
- * The sandbox. A path that climbs out of the root is the oldest trick there
- * is, and the node's own filesystem is the thing on the other side of it.
+ * Paths outside the root are refused.
  */
 ZTEST(kfsw_ftp_server, test_a_path_climbing_out_of_the_sandbox_is_refused)
 {
@@ -217,8 +205,7 @@ ZTEST(kfsw_ftp_server, test_a_request_with_no_path_is_refused)
 }
 
 /*
- * The read-only root. A node's own record of a pass is not a peer's to change,
- * and the refusal has to happen before anything opens a file.
+ * Writes to the read-only root are refused before a file is opened.
  */
 ZTEST(kfsw_ftp_server, test_writing_into_the_read_only_root_is_refused)
 {
@@ -245,7 +232,7 @@ ZTEST(kfsw_ftp_server, test_uploading_into_the_read_only_root_is_refused)
 			  "a file was accepted into the read-only root");
 }
 
-/* Reading it, on the other hand, is the entire point of having it. */
+/* Reading it is allowed. */
 ZTEST(kfsw_ftp_server, test_the_read_only_root_can_still_be_read)
 {
 	(void)fs_mkdir(KFSW_FTP_READONLY_ROOT);
@@ -295,9 +282,7 @@ ZTEST(kfsw_ftp_server, test_a_file_is_reported_with_its_size)
 	zassert_equal(link_fake.response[0].total_size, 10U, "the size reported is not the size");
 }
 
-/* A listing ends with an explicit end, so a peer knows it has everything
- * rather than guessing from a silence.
- */
+/* A listing ends with an explicit end marker. */
 ZTEST(kfsw_ftp_server, test_a_listing_says_where_it_ends)
 {
 	bool saw_end = false;
@@ -351,9 +336,7 @@ ZTEST(kfsw_ftp_server, test_downloading_what_is_not_there_says_so)
 		      "downloading a missing file was not reported missing");
 }
 
-/* However the request ends, its frame is given back exactly once. A leak per
- * bad frame is a node that stops serving after a noisy pass.
- */
+/* The frame is released once, however the request ends. */
 ZTEST(kfsw_ftp_server, test_a_served_request_is_given_back_once)
 {
 	write_file(KFSW_FTP_STORAGE_ROOT "/released.bin", "z");

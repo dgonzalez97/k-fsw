@@ -11,10 +11,7 @@
 
 #include <kfsw/services/parameter.h>
 
-/* Column widths for the listing. The name column is the widest a name may be,
- * so no value ever pushes the columns out of line; registration refuses a
- * longer name rather than truncating one here.
- */
+/* Column widths. Names longer than the name column are refused at registration. */
 /* Wide enough for the longest table name in any composition. */
 #define KFSW_PARAM_TABLE_COLUMN 10
 #define KFSW_PARAM_NAME_COLUMN ((int)KFSW_PARAM_NAME_MAX)
@@ -25,38 +22,27 @@
 /* Largest table this shell will fetch whole. */
 #define KFSW_PARAM_TABLE_NAMES_MAX 32U
 
-/* Values are fetched a window at a time so one refused packet costs a window
- * rather than the table, and so the buffer stays small enough to hold.
- */
+/* Values are fetched a window at a time. */
 #define KFSW_PARAM_REMOTE_WINDOW 8U
 
 struct param_list_context {
 	const struct shell *shell;
-	/* When set, only this table is printed. A whole listing is one line per
-	 * parameter, which on a slow console is a lot of scrolling to find the
-	 * handful that belong together. */
+	/* When set, only this table is printed. */
 	bool filter_table;
 	uint8_t table;
 	/* Tally for the table summary: how many parameters carry each table. */
 	uint16_t counts[KFSW_PARAM_TABLE_MODULE_LAST + 1U];
-	/* Names collected during a remote table walk. The values are fetched
-	 * afterwards rather than inside the walk, because the walk holds the
-	 * parameter lock and fetching is network I/O: doing both at once is how
-	 * a reader and the server end up waiting on each other. */
+	/* Names from a remote table walk. The values are fetched after the walk,
+	 * because the walk holds the parameter lock.
+	 */
 	const char *names[KFSW_PARAM_TABLE_NAMES_MAX];
 	uint8_t offsets[KFSW_PARAM_TABLE_NAMES_MAX];
 	enum kfsw_param_type types[KFSW_PARAM_TABLE_NAMES_MAX];
 	uint32_t param_flags[KFSW_PARAM_TABLE_NAMES_MAX];
 	size_t name_count;
-	/* The header is printed on the first row rather than before the walk,
-	 * so a listing that turns out to be empty prints nothing at all
-	 * instead of column titles over nothing.
-	 */
+	/* The header is printed with the first row, so an empty listing prints nothing. */
 	bool header_printed;
-	/* False for a remote listing. Values are looked up by name, and a name
-	 * can exist on both nodes, so reading one during a remote listing would
-	 * print this node's value in the other node's table.
-	 */
+	/* False for a remote listing, where a local value by the same name would be wrong. */
 	bool local;
 };
 
@@ -118,10 +104,7 @@ static bool print_param_info(const struct kfsw_param_info *info, void *context)
 		list_context->header_printed = true;
 	}
 
-	/* A remote listing carries the table in the identifier but not its
-	 * name, so the name is printed where it is known and the number where
-	 * it is not.
-	 */
+	/* Remote listings show the table number; the name isn't sent. */
 	if (info->table_name != NULL) {
 		(void)snprintf(table_text, sizeof(table_text), "%s", info->table_name);
 	} else {
@@ -147,12 +130,7 @@ static bool print_table_info(const struct kfsw_param_table_info *info, void *con
 #if CONFIG_KFSW_PARAM_PERSISTENCE
 	uint16_t kept = 0U;
 
-	/* How many of the table's values survive a reset. Not every table needs
-	 * any: telemetry counters are rebuilt at every boot and keeping them
-	 * would spend flash on numbers that are wrong by the time they are
-	 * read. Showing the count is what makes that a visible choice rather
-	 * than something an operator discovers after a reset.
-	 */
+	/* How many of the table's values are saved. */
 	(void)kfsw_param_persist_table_count(info->id, &kept);
 	shell_print(list_context->shell, "%3" PRIu8 "  %-7s  %-*s  %6" PRIu16 "  %6" PRIu16,
 		    info->id, kfsw_param_band_name(info->id), KFSW_PARAM_TABLE_COLUMN, info->name,
@@ -244,14 +222,11 @@ static void format_param_value(char *text, size_t size, const struct kfsw_param_
 		(void)snprintf(text, size, "%.12g", value->scalar.f64);
 		break;
 	case KFSW_PARAM_STRING:
-		/* Quoted so a trailing space or an empty value is visible rather
-		 * than looking like a missing one. */
+		/* Quoted so trailing spaces and empty values are visible. */
 		(void)snprintf(text, size, "\"%s\"", value->text);
 		break;
 	case KFSW_PARAM_DATA: {
-		/* Rendered as a list because the elements of an array mean
-		 * something positionally, and a hex blob hides which one is
-		 * which. */
+		/* Arrays are printed as a list. */
 		size_t used = 0U;
 
 		for (size_t index = 0U; (index < value->size) && (used + 5U < size); index++) {
@@ -335,8 +310,7 @@ static int parse_param_value(const char *text, struct kfsw_param_value *value)
 		return 0;
 	}
 	case KFSW_PARAM_DATA: {
-		/* Comma-separated, and the count has to match what the parameter
-		 * declares: an array is written whole or not at all. */
+		/* Comma-separated, with the declared number of elements. */
 		const char *cursor = text;
 		size_t count = 0U;
 
@@ -451,10 +425,7 @@ static int cmd_param_list(const struct shell *sh, size_t argc, char **argv)
 #endif
 
 	if (result == -ENOSPC) {
-		/* The descriptor cache filled part way through the download, so
-		 * the parameters after that point never arrived. Naming the
-		 * option is the difference between a number and a fix.
-		 */
+		/* The descriptor cache filled up during the download; name the option to raise. */
 		shell_error(sh,
 			    "parameter list failed: the remote cache holds %d descriptors; "
 			    "raise CONFIG_KFSW_PARAM_REMOTE_POOL_SIZE",
@@ -539,7 +510,7 @@ static int cmd_param_set(const struct shell *sh, size_t argc, char **argv)
 	if (node == 0U) {
 		result = kfsw_param_set(name, &value);
 		if (result == 0) {
-			/* Report owner state. Write-only inputs may already be cleared. */
+			/* Print the stored value. Write-only inputs may already be cleared. */
 			result = kfsw_param_get(name, &value);
 		}
 	}
@@ -553,10 +524,7 @@ static int cmd_param_set(const struct shell *sh, size_t argc, char **argv)
 	}
 	print_param_value(sh, node, name, &value);
 
-	/* A stored parameter that lets the operator believe it is live is the
-	 * failure this whole scheme exists to prevent, so the write says which
-	 * one it was rather than a bare acknowledgement.
-	 */
+	/* Say whether the value applies now or at the next boot. */
 	if (node == 0U) {
 		struct kfsw_param_info info;
 
@@ -585,8 +553,7 @@ static int parse_table_id(const struct shell *sh, const char *text, uint8_t *tab
 }
 
 /*
- * One table, local or from a node. A node's descriptors are fetched once and
- * reused, so asking for a second table costs nothing more on the link.
+ * One table, local or remote. A node's descriptors are fetched once.
  */
 static int cmd_param_table(const struct shell *sh, size_t argc, char **argv)
 {
@@ -616,10 +583,7 @@ static int cmd_param_table(const struct shell *sh, size_t argc, char **argv)
 		if (result != 0) {
 			return result;
 		}
-		/* Names first, then one request for the lot. A table is a
-		 * handful of parameters, so this is bounded; the whole listing
-		 * is not, which is why only this command reads values remotely.
-		 */
+		/* Names first, then one request for the values. */
 		result = kfsw_param_remote_visit(node, collect_table_names, &context);
 		if (result != 0) {
 			shell_error(sh, "parameter table failed (%d)", result);
@@ -630,14 +594,8 @@ static int cmd_param_table(const struct shell *sh, size_t argc, char **argv)
 			return 0;
 		}
 
-		/* One exchange per window rather than one per value. Over a
-		 * radio each round trip waits up to a second, so a table that
-		 * took a dozen now takes one or two.
-		 *
-		 * The window is static, not a local: a kfsw_param_value is
-		 * about 120 bytes because of its string field, and the shell
-		 * thread was measured at 2208 bytes of its 3072 doing exactly
-		 * this command. Eight of them on the stack would overflow it.
+		/* One exchange per window. The window is static because each value is
+		 * about 120 bytes and the shell stack is small.
 		 */
 		static struct kfsw_param_value window[KFSW_PARAM_REMOTE_WINDOW];
 
@@ -694,8 +652,7 @@ static int cmd_param_table(const struct shell *sh, size_t argc, char **argv)
 }
 
 /*
- * The tables a node carries, without their contents. A remote node's table
- * names are not on the wire, so the number and its band stand in for them.
+ * The tables a node has, without values. Remote tables show their number and band.
  */
 static int cmd_param_tablelist(const struct shell *sh, size_t argc, char **argv)
 {
@@ -789,16 +746,8 @@ static int cmd_param_save(const struct shell *sh, size_t argc, char **argv)
 }
 
 /*
- * Write the snapshot, and say what one table contributed to it.
- *
- * The snapshot is a single file covering every persistent value, so the write
- * is whole-file however this is asked for. What the table buys is the answer
- * an operator actually wants after changing a few values: did what I just set
- * reach flash, and how much of this table is kept at all.
- *
- * It is also the deliberate alternative to autosave. With param_autosave off,
- * nothing reaches flash until this is asked for, which is how a campaign that
- * sets parameters repeatedly stops spending an erase cycle on each one.
+ * Write the snapshot and report how much of it one table uses. Use it with
+ * param_autosave off to save only when asked.
  */
 static int cmd_param_persist(const struct shell *sh, size_t argc, char **argv)
 {

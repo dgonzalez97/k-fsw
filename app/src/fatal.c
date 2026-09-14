@@ -5,22 +5,15 @@
 #include <kfsw/platform/lastwords.h>
 #include <kfsw/services/boot.h>
 
-/* Where a crash leaves its address.
- *
- * Zephyr's default handler ends the thread or the system and says so on the
- * console, which is no help to a node nobody is watching. This runs first,
- * writes the faulting address into the note, and then hands over: the default
- * behaviour is unchanged, and the next boot can say where the previous run
- * died rather than only that it did.
+/* Fatal error hook: writes the faulting address into the last words note, then
+ * runs Zephyr's default handler.
  */
 void k_sys_fatal_error_handler(unsigned int reason, const struct arch_esf *esf)
 {
 	uint32_t address = 0U;
 
 #if defined(CONFIG_ARM) && !defined(CONFIG_ARM64)
-	/* The program counter at the fault. On this architecture it is in the
-	 * stacked exception frame, which is the only place it survives.
-	 */
+	/* The program counter at the fault, from the stacked exception frame. */
 	if (esf != NULL) {
 		address = (uint32_t)esf->basic.pc;
 	}

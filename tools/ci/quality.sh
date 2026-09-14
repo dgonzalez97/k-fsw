@@ -102,9 +102,8 @@ if [[ -d "$KFSW_WORKSPACE_ROOT/kfsw-modules" ]]; then
 	)
 fi
 
-# Checked here rather than at the top so a missing analyser cannot abort the
-# run before the formatter has reported. A local gate that exits early looks
-# like a pass and hides exactly the failures CI then reports.
+# Checked after the formatter has run, so a missing analyser doesn't hide
+# formatting errors.
 if ! command -v cppcheck >/dev/null 2>&1; then
 	echo "ERROR: cppcheck is required"
 	echo "Debian/Ubuntu: sudo apt-get install cppcheck"

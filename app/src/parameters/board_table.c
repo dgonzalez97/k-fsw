@@ -21,19 +21,10 @@
 #define KFSW_BOARD_NODE_ID_DEFAULT 0U
 #endif
 
-/* Identity is read from the running CSP configuration rather than the build
- * options, so the table reports what the node actually came up as.
- *
- * The switches below are read-only. A writable CSP address or KISS baud rate
- * would have to be read back by kfsw-comms and kfsw-platform, which sit below
- * the parameter service. Publishing them as writable before that path exists
- * would let an operator change a value that nothing applies, which is the one
- * failure this table exists to prevent.
+/* Identity is read from the running CSP configuration. The switches are
+ * read-only because the lower layers can't apply a new value.
  */
-/* Sized so the identities a composition actually uses fit whole. A truncated
- * identity is worse than a missing one: it looks like a different node, and
- * the operator comparing it against a build record has no way to tell.
- */
+/* Sized so the identities in use fit without truncation. */
 #define KFSW_BOARD_UID_SIZE 32U
 #define KFSW_BOARD_MODEL_SIZE 32U
 #define KFSW_BOARD_REVISION_SIZE 40U
@@ -53,10 +44,7 @@ static uint8_t board_can_enabled = IS_ENABLED(CONFIG_KFSW_CSP_CAN);
 static uint32_t board_can_speed = CONFIG_KFSW_CSP_CAN_BITRATE;
 #endif
 
-/* Copied out of the running CSP identity rather than duplicated as build
- * constants: two sources for one fact eventually disagree, and the one an
- * operator can reach would be the wrong one.
- */
+/* Copied from the running CSP identity. */
 static void sample_identity(char *destination, size_t size, const char *source)
 {
 	size_t length = 0U;
@@ -80,13 +68,7 @@ static void sample_uid(void *value)
 #endif
 }
 
-/* The only field on this table that differs between two boards flashed with
- * the same image. Everything else here is a build option, so a bench of
- * identical nodes reports identical values until this one is read.
- *
- * Taken from the boot service rather than the platform, for the reason the
- * reset cause below is: one latched reading, several readers.
- */
+/* The chip ID, from the boot service like the reset cause. */
 static void sample_hardware_id(void *value)
 {
 	sample_identity(value, KFSW_HARDWARE_ID_TEXT_SIZE, kfsw_boot_get_hardware_id());
@@ -121,9 +103,7 @@ static void sample_node_id(void *value)
 #if CONFIG_KFSW_CSP
 	struct kfsw_csp_info info;
 
-	/* Read from the running configuration rather than the build option, so
-	 * this reports the address the node actually came up as.
-	 */
+	/* From the running configuration, not the build option. */
 	kfsw_csp_get_info(&info);
 	*(uint16_t *)value = info.address;
 #else
@@ -133,12 +113,7 @@ static void sample_node_id(void *value)
 
 static void sample_reset_cause(void *value)
 {
-	/* Read from the boot service, not the platform. Reading the platform
-	 * clears the latched hardware flags, and the boot service is the first
-	 * reader: calling it again here returned an empty register, so this
-	 * parameter reported zero on every board while the boot event carried
-	 * the real cause. Two places describing the same reset disagreed.
-	 */
+	/* From the boot service: reading the platform again returns an empty register. */
 	*(uint32_t *)value = kfsw_boot_get_reset_cause();
 }
 
@@ -151,18 +126,16 @@ static void sample_can_speed(void *value)
 	*(uint32_t *)value = info.bitrate;
 }
 
-/* Refused here rather than in the change callback, because a change callback
- * runs after the value has already been stored and cannot put the old one
- * back. A rate the controller would reject has to be stopped before that.
+/* Checked in the validator, because the change callback runs after the value
+ * is stored.
  */
 static int validate_can_speed(const union kfsw_param_scalar *value)
 {
 	return kfsw_can_bitrate_supported(value->u32) ? 0 : -EINVAL;
 }
 
-/* Both ends of a CAN bus have to agree, so a node reconfigured on its own goes
- * quiet until whatever is at the other end follows. Writing this over CAN
- * therefore cuts the link that carried the write.
+/* Every node on the bus needs the same bitrate, so changing it over CAN
+ * cuts the link until the other nodes follow.
  */
 static void changed_can_speed(const union kfsw_param_scalar *value)
 {

@@ -1,23 +1,7 @@
 #!/usr/bin/env bash
-# Hardware acceptance for health monitoring.
-#
-# The claim is not that a service reports numbers. It is that a system which
-# stops working resets itself without anyone asking it to, and says why
-# afterwards.
-#
-# The sequence is:
-#
-#   1. flash a build where health owns the watchdog, and confirm it does;
-#   2. show the board survives well beyond the watchdog timeout while healthy,
-#      which is what rules out a board that resets on its own;
-#   3. register a component that is never reported, so health has something
-#      genuinely overdue rather than a simulated fault;
-#   4. observe health withhold the feed and say which component caused it;
-#   5. observe the reset, and the next boot naming the watchdog.
-#
-# Step 2 is what makes the rest mean anything, and step 3 is deliberately a
-# real component rather than a test hook: a fault that only a test can cause
-# proves only that the test works.
+# Hardware test for health monitoring: the board must stay up past the watchdog
+# timeout while healthy, reset through the watchdog when a registered component
+# stops reporting, and name the watchdog on the next boot.
 #
 # Required environment:
 #   KFSW_DEBUG_SERIAL  NUCLEO ST-LINK virtual COM port, by-id path only.
@@ -130,7 +114,7 @@ for _ in $(seq 1 60); do
 done
 grep -q "@READY " "$work_dir/nucleo.log" || abort "the node did not report readiness"
 
-banner "Health owns the watchdog"
+banner "Health feeds the watchdog"
 mark
 send ""
 send "health status"
@@ -172,9 +156,8 @@ since_mark | grep -aq "app" && pass "the application thread is watched" || \
 banner "A component that stops reporting resets the board"
 printf 'this takes about %s s\n' "$(( (deadline_ms + timeout_ms) / 1000 + 5 ))"
 
-# There is no command to stall the application thread, and adding one would
-# mean shipping a way to hang the flight software. Instead a second component
-# is registered and never reported: health then has something genuinely overdue.
+# There is no command to stall the application thread, so register a second
+# component that never reports.
 mark
 send "health watch stuck 2000 confirm"
 sleep 2

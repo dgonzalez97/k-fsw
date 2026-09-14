@@ -1,9 +1,8 @@
 ---
 name: Set up the K-FSW workspace
 description: >
-  Python, the west workspace and the Zephyr SDK, plus whatever else a job needs
-  on top. Every job in the workflow wants the first three and most want one or
-  two packages, so they live here once rather than eight times over.
+  Python, the west workspace and the Zephyr SDK, plus any apt packages the job
+  needs.
 
 inputs:
   packages:

@@ -309,16 +309,11 @@ ZTEST(services_ftp, test_public_argument_validation_and_lifecycle)
 }
 
 #if CONFIG_KFSW_FWU
-/* The reserved upload path is what makes a firmware image reach the update
- * slot instead of the filesystem, so an accidental match would divert an
- * ordinary file and an accidental miss would silently store an image as data.
- */
+/* Matching of the reserved firmware upload path. */
 ZTEST(services_ftp, test_reserved_firmware_path_matches_exactly)
 {
-	/* The path on the wire carries its own length and is not terminated.
-	 * Comparing it as a string reads whatever follows it in the packet, so
-	 * these cases pass an explicit length and deliberately include a buffer
-	 * with trailing bytes after the name.
+	/* The path on the wire isn't terminated, so these cases pass a length and
+	 * include bytes after the name.
 	 */
 	static const uint8_t reserved[] = "firmware.bin";
 	static const uint8_t with_slash[] = "/firmware.bin";
@@ -330,7 +325,7 @@ ZTEST(services_ftp, test_reserved_firmware_path_matches_exactly)
 	zassert_true(kfsw_ftp_path_is_firmware(with_slash, sizeof(with_slash) - 1U),
 		     "a leading separator names the same file");
 
-	/* The length is what decides, not a terminator that may not be there. */
+	/* The length decides, not a terminator. */
 	zassert_true(kfsw_ftp_path_is_firmware(with_trailing, 12U),
 		     "only the first path_size bytes may be considered");
 	zassert_false(kfsw_ftp_path_is_firmware(with_trailing, sizeof(with_trailing) - 1U));

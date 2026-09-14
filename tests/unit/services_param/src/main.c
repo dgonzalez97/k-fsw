@@ -36,10 +36,7 @@ static bool summarize_parameter(const struct kfsw_param_info *info, void *contex
 ZTEST(services_param, test_kfsw_parameter_lifecycle)
 {
 	static uint8_t duplicate_value;
-	/* Same table and offset as the log service's own parameter: the wire
-	 * identifier is what a remote list is keyed by, so two components
-	 * claiming one must be refused rather than silently shadowing.
-	 */
+	/* Same table and offset as a log service parameter; it must be refused. */
 	static const struct kfsw_param_definition duplicate_definitions[] = {
 		{
 			.offset = 0x00U,
@@ -146,15 +143,13 @@ ZTEST(services_param, test_kfsw_parameter_lifecycle)
 	zassert_equal(kfsw_param_init(invalid_sets, ARRAY_SIZE(invalid_sets)), -EEXIST);
 	zassert_false(kfsw_param_is_initialized());
 
-	/* Registration has to refuse what could not be addressed afterwards.
-	 * These all belong here rather than in cases of their own because the
-	 * service initializes once: after the successful call below, every
-	 * later attempt is a no-op and would prove nothing.
+	/* Registration refusals. They are in this case because the service only
+	 * initializes once.
 	 */
 	zassert_equal(kfsw_param_init(reserved_table_sets, 1U), -EINVAL,
 		      "table zero is reserved so an uninitialised field cannot address a table");
 	zassert_equal(kfsw_param_init(unallocated_table_sets, 1U), -EINVAL,
-		      "a table outside every band has no owner");
+		      "a table outside every band must be refused");
 	zassert_equal(kfsw_param_init(unnamed_table_sets, 1U), -EINVAL);
 	zassert_equal(kfsw_param_init(long_name_sets, 1U), -ENAMETOOLONG,
 		      "a truncated name would be printed but could not be typed");
@@ -170,9 +165,7 @@ ZTEST(services_param, test_kfsw_parameter_lifecycle)
 	zassert_ok(kfsw_param_init(parameter_sets, ARRAY_SIZE(parameter_sets)));
 	zassert_true(kfsw_param_is_initialized());
 	zassert_ok(kfsw_param_visit(summarize_parameter, &table));
-	/* Both sets, whatever each holds: asserting the sum of the two tables
-	 * rather than a literal keeps this from breaking every time a service
-	 * publishes one more value. */
+	/* Sum of both tables, not a literal. */
 	zassert_equal(table.count,
 		      kfsw_log_param_definitions.count + kfsw_test_param_definitions.count);
 	zassert_true(table.saw_read_only);
@@ -181,9 +174,7 @@ ZTEST(services_param, test_kfsw_parameter_lifecycle)
 	zassert_true(table.saw_signed);
 	zassert_true(table.saw_float);
 
-	/* One offset in two tables is the point of the scheme: each table starts
-	 * its own address space at zero, and the wire identifier keeps them
-	 * apart. */
+	/* The same offset in two tables. */
 	zassert_equal(kfsw_param_table_count(), 2U);
 	zassert_ok(kfsw_param_get_info("log_level", &info));
 	zassert_equal(info.table, KFSW_LOG_PARAM_TABLE_ID);

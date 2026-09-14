@@ -16,7 +16,7 @@ under `tests/hil/`; use @ref testing to find the relevant fixture.
 | Firmware update | `db64963`: radio upload, boot, and confirmation | Signature checked by MCUboot; golden-image selection absent |
 | CAN firmware update | `fwu-can-checked`: FTP and FWU lite uploads, both slot readbacks, rollback, confirmation, and PARAM reads | NUCLEO at 500 kbit/s; bench image and configuration recorded by the fixture |
 | Housekeeping | `54ac87f`: collection, radio retrieval, and Yamcs archive | Measurements cover one report and bench |
-| Watchdog and health | Deliberate starvation reset; healthy and overdue-component runs | STM32 watchdog cannot be disarmed once started |
+| Watchdog and health | Reset after starving the watchdog; runs with healthy and overdue components | STM32 watchdog cannot be disarmed once started |
 | Persistence | Parameter snapshots preserved across MCUboot swaps | Configuration migration needs release-specific checks |
 | Button and LEDs | Debounce, press counts, and observed LED operation | Optional profile |
 | FRDM-K64F / Pico W | Boot and shell commands | Services disabled in bring-up profiles |
@@ -38,8 +38,7 @@ under `tests/hil/`; use @ref testing to find the relevant fixture.
   `fwu-can-probes`, with radio encryption disabled.
 - The longer soak stopped after a console command was misread. The revised
   fixture keeps console writes outside flash traffic; its full rerun and
-  interrupted-update cases remain pending. Each flight composition needs
-  its own timing and endurance measurements.
+  interrupted-update cases are still to be run.
 
 Use repository issues for planned work. Keep this page to supported behaviour
 and measured limits.

@@ -4,133 +4,76 @@
 
 ## Boards and targets
 
-A Zephyr board selects the SoC, devices, and build/flash runners.
-A K-FSW target adds application configuration and tool defaults under
-`config/targets/`. For example, `rpi_pico_w` maps to
-`rpi_pico/rp2040/w`.
+A Zephyr board selects the SoC, devices and flash runner. A K-FSW target adds
+the application configuration and tool defaults under `config/targets/`; for
+example `rpi_pico_w` maps to `rpi_pico/rp2040/w`.
 
-Supported features depend on the target configuration and selected profiles.
-
-## Status language
-
-This manual uses these scopes:
-
-- **Implemented**: merged source and configuration exist.
-- **Software-tested**: an automated host/CI test exercises the behavior.
-- **Physically verified**: a defined hardware acceptance path has passed.
-- **Physical shell bring-up verified**: build, flash, prompt, and a small shell
-  set passed; other services remain unqualified.
-- **Planned**: an issue or current roadmap describes work that is not merged.
-
-These scopes make no release or flight-qualification claim.
-
-## Target matrix
-
-| K-FSW target | Zephyr board | Default composition | Recorded verification |
+| Target | Zephyr board | Default composition | Tested |
 | --- | --- | --- | --- |
-| `linux` | `native_sim/native/64` | Shell, storage, local PARAM, persistence, CSP UART/KISS, PARAM CSP adapter, FTP | Software-tested reference target |
-| `nucleo_l496zg` | `nucleo_l496zg` | Same service set as Linux; shell on ST-LINK and CSP on USART3 | Hosted build plus physical boot, storage, UART/KISS, CSP, remote PARAM, and FTP bench verification |
-| `frdm_k64f` | `frdm_k64f/mk64f12` | Shell and basic platform/boot paths; CSP, PARAM, persistence, storage, and FTP disabled | Physical shell bring-up verified |
-| `rpi_pico_w` | `rpi_pico/rp2040/w` | USB CDC ACM shell and basic platform/boot paths; CSP, PARAM, persistence, storage, and FTP disabled | Physical shell bring-up verified |
+| `linux` | `native_sim/native/64` | Shell, storage, parameters, persistence, CSP UART/KISS, remote parameters, FTP | Software tests in CI |
+| `nucleo_l496zg` | `nucleo_l496zg` | Same as Linux; shell on ST-LINK, CSP on USART3 | CI build; boot, storage, UART/KISS, CSP, remote parameters and FTP on the bench |
+| `frdm_k64f` | `frdm_k64f/mk64f12` | Shell only | Boot and shell on the board |
+| `rpi_pico_w` | `rpi_pico/rp2040/w` | USB CDC ACM shell only | Boot and shell on the board |
 
-Only Linux and NUCLEO-L496ZG are in the hosted `BUILD` matrix. FRDM and Pico
-were accepted with the reusable manual physical shell runner; they are not
-hosted service-qualification gates.
+Only Linux and the NUCLEO are built in CI.
 
 ## Identifying a unit
 
-Every target reports the identifier its silicon was manufactured with, on the
-boot marker as `unit=`, from the shell through `status` and `version`, and to
-the ground as the `board.hw_id` parameter. It is the only field that differs
-between two boards running the same image, so it is what attributes a console
-log or a downlink to a unit.
-
-Width follows the SoC: 96 bits on the STM32L496, 128 on the Kinetis K64, 64 on
-the RP2040. The CSP model reports the board target rather than a constant, so a
-remote `csp ident` names the hardware as well.
+Every target reports its chip's unique ID: as `unit=` in the boot marker, in
+`status` and `version`, and as `hw_id` in the board table. It is 96 bits on the
+STM32L496, 128 on the Kinetis K64 and 64 on the RP2040. The CSP model is the
+board target, so `csp ident` names the hardware too.
 
 ![A ground node reaching three boards over CAN and a UHF radio](../media/multi-board-can.gif)
 
-The recording is a bench composition: the FRDM and the Pico are configured there
-as CSP nodes, on CAN and behind a UHF radio respectively, which the shipped
-`frdm_k64f` and `rpi_pico_w` targets above do not do.
+In this recording the FRDM and the Pico run bench configurations with CSP, on
+CAN and behind a UHF radio. The `frdm_k64f` and `rpi_pico_w` targets in the
+table are shell only.
 
 ## KFSW-Linux
 
-### Purpose
-
 KFSW-Linux is the application built for Zephyr's 64-bit native simulator. It
-is not a separate POSIX rewrite. It compiles the same project-owned platform,
-service, communications, startup, and shell sources as the NUCLEO composition,
-with Zephyr's simulated devices underneath them.
-
-This makes it the fastest feedback target and lets tests run real service
-interactions without hardware. It also makes limitations visible: simulated
-execution does not verify MCU timing, electrical interfaces, interrupt load,
-flash endurance, or toolchain-specific MCU behavior.
-
-### Build and run
+compiles the same sources as the NUCLEO build, on simulated devices. It is the
+quickest target to test on, but it says nothing about MCU timing, electrical
+behaviour, interrupt load or flash wear.
 
 ```bash
 ./k-fsw/tools/kfsw-linux build
 ./k-fsw/tools/kfsw-linux run
 ```
 
-The executable is `build/linux/zephyr/zephyr.exe`. By default the runner gives
-it `build/linux/kfsw-storage.bin` as persistent simulated flash. Use test
-runners for isolated flash fixtures rather than sharing this developer image
-between parallel scenarios.
-
-The interactive shell uses stdin/stdout. A line such as:
+The executable is `build/linux/zephyr/zephyr.exe`, and the runner gives it
+`build/linux/kfsw-storage.bin` as flash; tests use their own flash files. The
+shell uses stdin/stdout. A line such as
 
 ```text
 uart_1 connected to pseudotty: /dev/pts/...
 ```
 
-reports the separate simulated CSP UART. It is not the shell console.
+is the CSP UART, not the console.
 
-### What software tests prove
-
-The hosted pipeline builds the target and a CSP-disabled minimal composition.
-Twister tests individual modules on native simulation. Integration and Robot
-tests start one or two full processes for shell, parameters, persistence,
-LittleFS, CSP/KISS, RDP, and FTP. Valgrind checks bounded normal and corrupted
-snapshot boots.
-
-The `linux-node2` configuration under `tests/config/` is a peer fixture. It is
-not another K-FSW product target.
+CI builds the target and a composition without CSP. Twister runs the unit
+tests, the integration and Robot tests start one or two full processes, and
+Valgrind checks a normal boot and one with a corrupted snapshot.
+`tests/config/linux-node2.conf` configures the second test node.
 
 ## NUCLEO-L496ZG
 
-### Default composition
+The NUCLEO build enables storage, local and remote parameters, persistence,
+CSP, UART/KISS and FTP. Flash is split into a 960 KiB application partition
+and a 64 KiB LittleFS partition.
 
-The NUCLEO target is the current embedded reference. Its application profile
-enables storage, local and remote parameters, persistence, CSP, UART/KISS, and
-FTP. Internal flash is split into a 960 KiB application partition and 64 KiB
-LittleFS partition.
-
-The two UARTs have fixed roles:
-
-| Path | Hardware | Use |
+| Connection | Hardware | Use |
 | --- | --- | --- |
-| Debug console | ST-LINK virtual COM / LPUART1 | Zephyr shell, K-FSW logs, boot markers |
-| CSP link | USART3 on PD8 TX and PD9 RX | 115200 8N1 KISS packets |
+| Debug console | ST-LINK virtual COM, LPUART1 | Shell, logs and boot markers |
+| CSP link | USART3, PD8 TX and PD9 RX | 115200 8N1 KISS |
 
-The CSP receive path is interrupt-driven. The current default addresses the
-NUCLEO as node 2 and routes non-local traffic directly to the KISS interface.
+CSP reception is interrupt driven. The NUCLEO is node 2 and sends traffic for
+every other node to the KISS interface.
 
-### Opt-in hardware-test example
+### Button and LED example
 
-`boton_test` is not forced into the default NUCLEO image. The focused example
-uses both of these composition files:
-
-- `config/profiles/nucleo-boton-test.conf` selects the module, button and LED
-  GPIO backends, and diagnostic shell with a 30 ms debounce interval; and
-- `config/profiles/nucleo-boton-test.overlay` maps
-  the button plus green, blue, and red LED chosen properties to existing
-  upstream board nodes.
-
-Build that explicit profile from the workspace root with:
+`boton_test` is not in the default image. Build it with:
 
 ```bash
 KFSW_EXTRA_CONF_FILE="$PWD/k-fsw/config/profiles/nucleo-boton-test.conf" \
@@ -138,35 +81,20 @@ KFSW_EXTRA_DTC_OVERLAY_FILE="$PWD/k-fsw/config/profiles/nucleo-boton-test.overla
   ./k-fsw/tools/build.sh nucleo_l496zg
 ```
 
-Zephyr's NUCLEO-L496ZG definition maps `user_button` with
-`GPIO_ACTIVE_HIGH`, and maps `led0`/LD1 green, `led1`/LD2 blue, and `led2`/LD3
-red as three independent outputs. Board-specific pins and polarity stay in
-Devicetree; reusable module source contains no port, pin, MCU, or board name.
+The overlay maps the USER button and the green, blue and red LEDs (LD1 to LD3)
+to the module's chosen properties, so the pins stay in devicetree. The button
+is debounced for 30 ms on the system workqueue, and its values are in table 67.
+The manual test is in `tests/hil/boton-test/`.
 
-The profile uses a 30 ms debounce interval, the system workqueue, and no
-dedicated thread or dynamic allocation. Its software build and state tests do
-not constitute physical evidence. Manual blue USER-button acceptance,
-including one-count-per-press, hold behavior, timestamps, remote observation,
-and rejected writes, plus physical LED shell/PARAM control, remains pending
-until it is performed with a user on the named NUCLEO bench. The logical
-`hw_test` table is registered under ID 67, in the module band.
+### Wall clock
 
-### Opt-in wall clock
+`csp clock set <seconds>` sets the wall time. Without an RTC the time is kept
+in RAM and lost at reset, and samples collected after the reset have a zero
+timestamp.
 
-`csp clock set <seconds>` sets wall time. Persistence across reset depends
-on whether a hardware RTC is selected.
-
-On the recorded NUCLEO-L496ZG bench without the RTC profile, the clock was
-set, the node was rebooted from the ground, and it came
-back reporting `clock: not set (reads 946652410)` — the 2000-01-01 hardware
-epoch. Without the RTC, the wall clock lives in RAM and a reset loses it. Every
-sample collected after that reset carries a zero timestamp.
-
-`config/profiles/nucleo-clock.conf` adds the real-time clock, and
-`config/profiles/nucleo-clock.overlay` enables the `rtc` node. It runs from the
-low-speed oscillator rather than the system clock, so it keeps counting across
-a reset and across the low-power states; with VBAT wired it survives losing the
-main supply too.
+`config/profiles/nucleo-clock.conf` and `nucleo-clock.overlay` enable the RTC.
+It runs from the low-speed oscillator, keeps counting across resets and
+low-power states, and survives a power loss when VBAT is connected.
 
 ```bash
 KFSW_EXTRA_CONF_FILE="$PWD/k-fsw/config/profiles/nucleo-clock.conf" \
@@ -174,20 +102,14 @@ KFSW_EXTRA_DTC_OVERLAY_FILE="$PWD/k-fsw/config/profiles/nucleo-clock.overlay" \
   ./k-fsw/tools/build.sh nucleo_l496zg
 ```
 
-Check clock readback after reset on the selected hardware.
-
-### Opt-in last words
+### Last words
 
 `config/profiles/nucleo-lastwords.conf` keeps a short note across a restart and
-watches the supply for a dip, so a node that came back can say why it left.
+watches the supply voltage, so a node can report why it went down.
 
-Supply monitoring is implemented, but a controlled voltage dip has not
-yet been observed triggering it on the bench.
+### MCUboot
 
-### Opt-in MCUboot
-
-The bootloader is not in the default NUCLEO image. Three composition files
-select it, and sysbuild is opted into with `KFSW_SYSBUILD`:
+The bootloader is not in the default image. Build it with sysbuild:
 
 ```bash
 KFSW_SYSBUILD=1 \
@@ -203,46 +125,27 @@ KFSW_MCUBOOT_DTC_OVERLAY_FILE="$PWD/k-fsw/config/profiles/nucleo-mcuboot-flash.o
 | `boot_partition` | `0x000000` | 64 KB |
 | `slot0_partition` | `0x010000` | 352 KB |
 | `slot1_partition` | `0x068000` | 352 KB |
-| `kfsw_golden_partition` | `0x0C0000` | 192 KB, reserved and unwritten |
-| `kfsw_storage_partition` | `0x0F0000` | 64 KB, unchanged |
+| `kfsw_golden_partition` | `0x0C0000` | 192 KB, reserved |
+| `kfsw_storage_partition` | `0x0F0000` | 64 KB |
 
-The flash map is one file applied to **both** images. The bootloader and the
-application cannot be allowed to disagree about slot addresses, so it is not
-written twice.
-
-Storage deliberately does not move. Leaving it at `0xf0000` is what lets an
-existing filesystem, with its parameter snapshots and transferred files,
-survive the migration to a bootloader. The rollback acceptance checks the
-weaker but testable form of this: a value written under one image is still
-readable after every swap and revert.
-
-The golden region is reserved and unwritten. A last-resort image has to survive
-when other things are broken, so it is a raw partition rather than a file.
-Reserving it now is what makes it possible later: a bootloader's address map
-cannot be replaced over the air.
+The bootloader and the application use the same flash map overlay. The
+storage partition stays at `0xF0000`, so an existing filesystem survives the
+move to MCUboot; the rollback test checks that a stored value is still there
+after every swap. The golden partition is reserved for a recovery image.
 
 #### Signing
 
-The signing key is private and lives outside the repository. Passing
-`KFSW_MCUBOOT_KEY` writes it into the bootloader as a public key and signs the
-application with the private half. **Omitting it is not an error**: MCUboot
-falls back to the key it ships in its own public tree, which anyone can sign an
-image with. The acceptance checks for exactly that.
+The signing key is private and kept outside the repository. With
+`KFSW_MCUBOOT_KEY` the build puts its public key in the bootloader and signs
+the application. Without it MCUboot uses the development key from its own
+repository, which anyone can sign with; the rollback test checks for this.
 
-Bootloader configuration lives in `app/sysbuild.conf` as `SB_CONFIG_*` symbols.
-Sysbuild generates a forced configuration for the bootloader image from those,
-which overrides any fragment placed on the image itself — a fragment there is
-accepted, applied, and silently discarded.
+Bootloader settings go in `app/sysbuild.conf` as `SB_CONFIG_*` symbols.
+Sysbuild overrides settings placed in a fragment on the bootloader image.
 
-### Opt-in watchdog
+### Watchdog
 
-The watchdog is not forced into the default NUCLEO image. Two composition files
-select it:
-
-- `config/profiles/nucleo-watchdog.conf` enables the mechanism with an 8000 ms
-  timeout and arms it during application start-up; and
-- `config/profiles/nucleo-watchdog.overlay` enables the independent watchdog
-  and binds it to the `kfsw,watchdog` chosen property.
+The watchdog is also not in the default image:
 
 ```bash
 KFSW_EXTRA_CONF_FILE="$PWD/k-fsw/config/profiles/nucleo-watchdog.conf" \
@@ -250,19 +153,16 @@ KFSW_EXTRA_DTC_OVERLAY_FILE="$PWD/k-fsw/config/profiles/nucleo-watchdog.overlay"
   ./k-fsw/tools/build.sh nucleo_l496zg
 ```
 
-The board's own `watchdog0` alias is deliberately not used. On this board it
-selects the window watchdog, which resets when fed too early and whose timeout
-is far shorter than a keep-alive wants. The independent watchdog is clocked
-from the low-speed oscillator, reaches roughly 32 s, and keeps running across
-most low-power states. Board-specific selection stays in Devicetree; reusable
-platform source names no watchdog instance.
+The profile uses an 8000 ms timeout. The overlay binds the independent
+watchdog to `kfsw,watchdog`, because the board's `watchdog0` alias is the window
+watchdog, which resets when it is fed too early and has a much shorter timeout.
+The independent watchdog runs from the low-speed oscillator, goes up to about
+32 s and keeps running in most low-power states.
 
-The watchdog is armed after every service has started, not at driver init. A
-watchdog that can reset the board before the shell is up makes a slow boot
-indistinguishable from a hang, and removes the console needed to tell them
-apart.
+The watchdog is armed after all services have started, so a slow boot isn't
+reset before the shell is up.
 
-### Build, flash, and console
+### Build, flash and console
 
 ```bash
 ./k-fsw/tools/build.sh nucleo_l496zg
@@ -270,78 +170,52 @@ apart.
 ./k-fsw/tools/serial.sh nucleo_l496zg 30
 ```
 
-Use a stable serial path when the default device name is unsuitable:
+Use a stable serial path if the default device is wrong:
 
 ```bash
 KFSW_SERIAL=/dev/serial/by-id/<st-link-device> \
   ./k-fsw/tools/serial.sh nucleo_l496zg 30
 ```
 
-For source debugging, start the server in one terminal and the client in
-another:
+To debug, start the server in one terminal and the client in another:
 
 ```bash
 ./k-fsw/tools/debugserver.sh nucleo_l496zg
 ./k-fsw/tools/debug.sh nucleo_l496zg
 ```
 
-The scripts build automatically when the expected ELF is absent. They use the
-target descriptor and Zephyr's OpenOCD runner; they do not encode service
-behavior.
+The scripts build first when the ELF is missing.
 
-### Physical verification
+### Hardware tests
 
-The physical boot test checks ST-LINK visibility, builds/flashes, captures the
-console before reset, and requires `@BOOT` and `@READY`.
+The boot test checks that the ST-LINK is there, builds, flashes, captures the
+console and waits for `@BOOT` and `@READY`. The UART/KISS test adds an FTDI
+cable and a KFSW-Linux peer, and checks ping, `uart test`, storage, a remote
+parameter, 4 KiB and 16 KiB transfers and the KISS counters; see
+@ref communications. The Holybro profile sets USART3 to 57600 baud for the
+radio.
 
-The UART/KISS bench adds a 3.3 V FTDI cable and KFSW-Linux peer. It requires
-bidirectional ping, UART interface status, mounted storage and its file test,
-remote parameter access, 4 KiB and 16 KiB FTP round trips, and clean nonzero
-KISS statistics. @ref communications describes the topology.
+## FRDM-K64F
 
-This evidence applies to the defined NUCLEO/FTDI bench. The separate Holybro
-UHF profile selects the reusable `radio-uhf` module, changes USART3 to 57600,
-and has physically verified raw and CSP/KISS acceptance. Neither prior bench
-result physically verifies the opt-in `boton_test` profile. CSP over CAN
-remains unimplemented; none of these physical results is flight or RF
-qualification.
-
-## FRDM-K64F shell profile
-
-The `frdm_k64f` target maps to Zephyr's `frdm_k64f/mk64f12` board and uses the
-OpenSDA/DAPLink serial console and OpenOCD flash runner. Its K-FSW board
-configuration explicitly disables CSP, parameters, persistence, FTP, storage,
-flash-map, and filesystem support.
-
-Build it with:
+The `frdm_k64f` target maps to `frdm_k64f/mk64f12` and uses the OpenSDA serial
+console and the OpenOCD runner. CSP, parameters, persistence, FTP, storage and
+the filesystem are disabled.
 
 ```bash
 ./k-fsw/tools/build.sh frdm_k64f
-```
-
-The merged physical shell acceptance path is:
-
-```bash
 KFSW_SERIAL=/dev/serial/by-id/<frdm-console> \
   ./k-fsw/tests/hil/shell-smoke.sh frdm_k64f
 ```
 
-It builds, checks the configured USB flash device, flashes, waits for
-`kfsw:~$`, and exercises `status`, `version`, and `help`. This is physical shell
-bring-up verification only. It does not qualify CSP, a second UART, storage,
-parameters, or FTP on the K64F.
+The test builds, flashes, waits for `kfsw:~$` and runs `status`, `version` and
+`help`.
 
-## Raspberry Pi Pico W shell profile
+## Raspberry Pi Pico W
 
-The `rpi_pico_w` target maps to `rpi_pico/rp2040/w`. Its overlay creates a USB
-CDC ACM console and selects it for the Zephyr console and shell. The shell
-waits for host DTR so output is not discarded before a terminal is attached.
-
-Like FRDM, the target disables CSP, parameters, persistence, FTP, storage, and
-the flash filesystem. Wi-Fi is not configured; “Pico W” identifies the board,
-not a supported K-FSW wireless transport.
-
-Build and run the reusable physical acceptance path with:
+The `rpi_pico_w` target maps to `rpi_pico/rp2040/w`. Its overlay puts the
+console and shell on USB CDC ACM, and the shell waits for DTR so no output is
+lost before a terminal is open. CSP, parameters, persistence, FTP, storage and
+Wi-Fi are not enabled.
 
 ```bash
 ./k-fsw/tools/build.sh rpi_pico_w
@@ -349,9 +223,8 @@ KFSW_SERIAL=/dev/serial/by-id/<pico-console> \
   ./k-fsw/tests/hil/shell-smoke.sh rpi_pico_w
 ```
 
-The target selects Zephyr's UF2 runner. Where host/USB forwarding requires a
-manual UF2 copy and device reattachment, flash first and run the same
-acceptance behavior without another flash:
+The target uses Zephyr's UF2 runner. If the UF2 has to be copied by hand, for
+example through usbipd, flash it first and run the test with `KFSW_FLASH=0`:
 
 ```bash
 KFSW_FLASH=0 \
@@ -359,42 +232,34 @@ KFSW_SERIAL=/dev/serial/by-id/<pico-console> \
   ./k-fsw/tests/hil/shell-smoke.sh rpi_pico_w
 ```
 
-The accepted scope is prompt, `status`, `version`, and `help`. USB CDC shell
-success does not verify the RP2040 flash backend, Wi-Fi hardware, CSP, or any
-full-service composition.
+## Shell test and target files
 
-## Reusable shell behavior versus fixture
-
-`tests/hil/shell-smoke.sh` owns the common acceptance behavior. A target `.env`
-owns the fixture values.
+`tests/hil/shell-smoke.sh` has the test steps, and each target's `.env` file
+has the board details:
 
 ```text
-common behavior                       target fixture
----------------                       --------------
-build                                 Zephyr board
-optional flash          <----------   flash USB ID + runner
-discover/open console   <----------   app USB ID / serial path / baud
-wait for prompt         <----------   expected prompt
-status/version/help
+test step                     target file
+build                         Zephyr board
+flash (optional)        <--   flash USB ID and runner
+open the console        <--   USB ID, serial path and baud
+wait for the prompt     <--   expected prompt
+status, version, help
 ```
 
-This split is what made FRDM and Pico bring-up additive. A future shell target
-should supply a descriptor and only add script branches when the physical
-fixture has genuinely different behavior.
+A new shell target only needs its own `.env` file, unless its hardware behaves
+differently.
 
-## Adding or extending a target
+## Adding a target
 
-A new K-FSW target normally requires:
+A new target needs:
 
-1. an upstream or project-maintained Zephyr board target;
-2. `config/targets/<name>.env` with the board mapping and tool fixture;
-3. a normalized `app/boards/<board>.conf` defining the default composition;
-4. an overlay when K-FSW must choose a UART, storage partition, or console;
+1. a Zephyr board, upstream or in the project;
+2. `config/targets/<name>.env` with the board and tool settings;
+3. `app/boards/<board>.conf` with the default composition;
+4. an overlay if K-FSW has to choose a UART, storage partition or console;
 5. a clean build;
-6. software tests for reusable behavior; and
-7. a physical acceptance test whose claims match the enabled services.
+6. software tests for any new shared code; and
+7. a hardware test for the services it enables.
 
-Enabling the full NUCLEO configuration on another board is not just a Kconfig
-copy. Storage layout, erase behavior, UART electrical connection, interrupt
-behavior, flash runner, console, and service resource sizes all require review
-and physical evidence.
+Moving the NUCLEO configuration to another board also means checking the
+storage layout, UART wiring, flash runner, console and memory sizes.

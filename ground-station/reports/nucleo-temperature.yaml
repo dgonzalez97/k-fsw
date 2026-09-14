@@ -1,12 +1,9 @@
-# What report 0 collects on the NUCLEO, and how the ground decodes it.
+# Report 0 on the NUCLEO and how the ground decodes it.
 #
-# One file, two outputs. `hk-report.py define` prints the command that tells the
-# node what to collect; `hk-report.py xtce` writes the mission database Yamcs
-# decodes it with. Housekeeping deliberately keeps names off the wire, so this
-# is the only place the two sides agree, and generating both from it is what
-# stops them drifting apart. `hk-report.py check` proves it against a node.
+# `hk-report.py define` prints the node command, `hk-report.py xtce` writes the
+# Yamcs database and `hk-report.py check` compares the file with a node.
 #
-# Order matters: values are packed in the order written here, with no padding.
+# Values are packed in the order listed here, without padding.
 
 report: 0
 node: 2
@@ -20,14 +17,12 @@ entries:
     offset: 0x00
     parameter: temp_mcu_mc
     type: i32
-    # The wire carries thousandths so the board never formats a float. Yamcs
-    # scales it back for display, which is what a calibrator is for.
+    # Thousandths of a degree; Yamcs scales it for display.
     as: temp_mcu
     unit: degC
     calibration:
       slope: 0.001
-    # Wider than the part's rating, so a real excursion still reads. Its job is
-    # to keep the reserved value from setting the scale on every plot.
+    # Valid range, wider than the part's rating, so the reserved value stays off the plots.
     valid_range:
       min: -60.0
       max: 150.0

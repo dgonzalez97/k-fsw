@@ -162,11 +162,8 @@ def tests(ground, flight, bridge, key, reboot):
             bridge.ports[1].write(frame)
         time.sleep(0.5)
         flight.run("param get log_level", f"log_level = {match[1]}")
-        # A restarted peer has no outbound session, and the design rebuilds it
-        # on the first thing it tries to send: that packet is spent on the
-        # handshake and the next one crosses. Waiting for sessions to come up
-        # on their own would wait forever, because a node with nothing to send
-        # never triggers it.
+        # A restarted peer rebuilds its session on the first packet it sends, so send
+        # something instead of waiting.
         ground.run("csp ping 2")
         sessions(ground, flight)
         ground.run("csp ping 2", "CSP ping 2: success")

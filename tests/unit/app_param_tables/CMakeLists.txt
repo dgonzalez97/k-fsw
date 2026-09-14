@@ -20,9 +20,7 @@ set(CSP_USE_PROMISC OFF CACHE BOOL "" FORCE)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(kfsw_app_param_tables_tests LANGUAGES C)
 
-# The tables under test are the ones the application composes, not a copy of
-# them: a test against its own definitions would prove only that the test is
-# self-consistent.
+# Tests the application's own tables, not copies.
 target_sources(app PRIVATE
     src/main.c
     ../../../app/src/parameters/board_table.c

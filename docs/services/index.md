@@ -8,909 +8,401 @@
 files, commands, events, health, housekeeping, file based operations, and
 firmware updates. The application selects and starts them.
 
-Storage belongs to `kfsw-platform`. Network services use the router and
-interfaces in `kfsw-comms`.
-
-For housekeeping and Yamcs, see @ref ground. For uploads and boot recovery,
-see @ref firmware_update.
+Storage is in `kfsw-platform`. Network services use the router and interfaces
+in `kfsw-comms`. For housekeeping and Yamcs, see @ref ground. For uploads and
+boot recovery, see @ref firmware_update. The API is in @ref kfsw_services.
 
 ## Boot and readiness markers
 
-The boot service reads and clears Zephyr's hardware reset-cause flags through
-the platform API, prints a structured `@BOOT` line, logs the elapsed startup
-time, and prints `@READY`.
+At startup the boot service reads and clears the reset cause and prints:
 
 ```text
-@BOOT sw=<image version> board=<CONFIG_BOARD_TARGET> reset=<flags> reset_rc=<result>
 @SERVICES ok failures=0
+@BOOT sw=<image version> board=<board target> unit=<hardware id> reset=<flags> reset_rc=<result> reset_cause=<name>
 @SOURCE <release commit or development>
-@READY uptime_ms=<monotonic milliseconds>
+@READY uptime_ms=<milliseconds>
 ```
 
-The image version is `git describe` on the composition repository, resolved
-when the build is configured, so the banner names the source it was built
-from. The `version` command reports the same string.
-
-`@SERVICES degraded failures=N` reports startup errors. `@READY` marks the end
-of startup; health monitoring checks runtime liveness. Release builds set an
-explicit image version and source commit; see @ref development.
+The image version is `git describe` of the `k-fsw` repository when the build
+is configured, and `version` prints the same string. `@SERVICES degraded
+failures=N` means some services failed to start. `@READY` marks the end of
+startup; release builds set the version and source commit explicitly, see
+@ref development.
 
 ## Housekeeping
 
-Reports collect local and remote parameters. Each periodic report keeps its
-original cadence. A slow collection skips elapsed slots instead of starting a
-burst of catch-up work. `hk show` reports attempts and missed slots.
+Reports collect local and remote parameters. A periodic report keeps its
+cadence: a slow collection skips the missed slots instead of catching up.
+`hk show` reports attempts and missed slots.
 
-Remote reads share one time budget per collection. Local sample callbacks and
-storage drivers must provide their own bounds; this is not a worst-case latency
-guarantee. Redefining a report invalidates any collection already in progress.
+Remote reads in one collection share one time budget. Local sample callbacks
+and storage drivers need their own time limits. Redefining a report cancels a
+collection in progress.
 
-With persistence enabled, changes are saved automatically. If saving fails,
-the shell reports that the change was applied in RAM. Retry with `hk save`.
-A rejected settings file is preserved until an explicit save replaces it.
-Restoring report settings keeps existing sample files and their sequence.
+With persistence enabled, report settings are saved on every change. If a save
+fails, the shell says the change is only in RAM; retry with `hk save`. A
+rejected settings file is kept until a save replaces it. Restoring settings
+keeps the existing sample files and their sequence numbers.
 
 ## File based operations
 
-`fbo` runs commands from a file. `fbo stop` interrupts waits and ends the current
-run with cancellation status. `fbo status` includes the last result. File size,
-line length, and scanned bytes are bounded; comments count toward the scan limit.
-An I/O error stops the procedure.
+`fbo run <name>` runs the commands in a procedure file, `fbo stop` ends the
+run, and `fbo status` shows what it did. File size, line length and scanned
+bytes are limited, and comments count toward the scan limit. An I/O error
+stops the procedure.
+
+```text
+on-error continue
+noop
+info
+on-error stop
+wait 1
+if-event 9 9 skip
+noop
+```
+
+`on-error` chooses whether a failed line stops the run, `wait` pauses, and
+`if-event <source> <id> skip` skips the next line unless that event is in the
+event record. There are no loops or jumps.
 
 ## Logging
 
-The logging API has four message severities: DEBUG, INFO, WARNING, and ERROR.
-`CONFIG_KFSW_LOG_MIN_LEVEL` removes calls below a compile-time threshold. A
-runtime atomic threshold can further suppress compiled messages without
-rebuilding.
+Messages have four levels: DEBUG, INFO, WARNING and ERROR.
+`CONFIG_KFSW_LOG_MIN_LEVEL` removes the lower levels from the build. At
+runtime `log_level` sets a global level and `log_levels` one per module; a
+message has to pass both. An invalid level is rejected.
 
-```text
-source log call
-      |
-compiled at CONFIG_KFSW_LOG_MIN_LEVEL?
-      | yes
-runtime severity >= current log_level?
-      | yes
-print one bounded line to the Zephyr console
-```
-
-Messages are formatted into a fixed 192-byte buffer. Embedded newlines and
-carriage returns are replaced with spaces so each event occupies one console
-line. This is a basic console logging service, not yet a structured event
-store, telemetry stream, rate limiter, or persistent log.
-
-The `log_level` parameter drives the runtime threshold through a change
-callback. An invalid value is rejected; if an out-of-range value reaches the
-callback through a restored or remote representation, logging falls back to
-the compiled minimum.
+Each message is printed as one console line, with newlines replaced by
+spaces. Lines are coloured by level: errors red, warnings yellow, info white
+and debug dim. The colour codes wrap the whole line, so `[LEVEL] message`
+stays intact for scripts. `log_color` turns colour off.
 
 ## Parameters
 
-Parameters are named, typed runtime values with descriptions and flags. Each
-semantic component owns its definitions, backing storage, validation, and
-change callbacks. The executable composition passes the enabled definition
-sets to `kfsw_param_init()`; the PARAM core validates them once and builds a
-bounded, ID-sorted index. Applications read and write that index through
-`include/kfsw/services/parameter.h`; the optional persistence and CSP adapters
-consume the same index.
+Parameters are named, typed values grouped in tables. Each service or module
+defines its own table, with the storage, validators and change callbacks. The
+application passes the enabled tables to `kfsw_param_init()`, which checks
+them and builds a sorted index. Persistence and the CSP adapter use the same
+index.
 
 ```text
-application identity   logging service   boton_test module   test support
-  node_id set           log_level set     live status set     fixture set
-       \                     |                  |                 /
-        +---------------- executable composition ---------------+
-                                  |
-                        kfsw_param_init(sets, count)
-                                  |
-                   PARAM core: validate + sorted index
-                           /                    \
-                 KPAR v1 persistence       CSP/libparam adapter
+KFSW_PARAM              local tables and API
+KFSW_PARAM_PERSISTENCE  needs KFSW_PARAM and KFSW_STORAGE
+KFSW_PARAM_CSP          needs KFSW_PARAM and KFSW_CSP
+KFSW_FTP                needs KFSW_STORAGE and KFSW_CSP
 ```
 
-The dependency direction is from an owner to the PARAM declaration API.
-PARAM does not include owner headers or contain owner-specific IDs, ranges, or
-callbacks. Adding an optional component requires adding its definition set to
-the composition; it does not require editing the PARAM core.
-
-The Kconfig split is central to the design:
-
-```text
-                         KFSW_PARAM
-                    local table and API
-                      /             \
-                     /               \
-                    v                 v
-    KFSW_PARAM_PERSISTENCE       KFSW_PARAM_CSP
-       requires KFSW_STORAGE     requires KFSW_CSP
-       local snapshots           remote server/client
-                    \                 /
-                     \               /
-                    may be selected independently
-```
-
-In dependency form:
-
-```text
-KFSW_PARAM_PERSISTENCE -> KFSW_PARAM + KFSW_STORAGE
-KFSW_PARAM_CSP         -> KFSW_PARAM + KFSW_CSP
-KFSW_FTP               -> KFSW_STORAGE + KFSW_CSP
-```
-
-`KFSW_PARAM` does not select or depend on CSP. The local parameter and
-persistence unit suites build with `CONFIG_KFSW_CSP=n`, and
-`tests/param-local-smoke.sh` provides an additional local-only integration
-composition.
+`KFSW_PARAM` does not need CSP; `tests/param-local-smoke.sh` builds a
+local-only composition.
 
 ### Tables
 
-A parameter is addressed by **table and offset**, not by a flat identifier.
-The band a table sits in says who owns it, so two independently developed
-components cannot be given the same table by accident:
+A parameter is addressed by table and offset. Table numbers are split in
+bands:
 
-| Band | Owner | Meaning |
-| --- | --- | --- |
-| 0 | — | Reserved invalid. A zero table identifier is never valid, so an uninitialised field cannot address a real table. |
-| 1–24 | composition, platform, comms | Core: identity, links and hardware. |
-| 25–49 | `kfsw-services` | One table per service. |
-| 50–99 | `kfsw-modules` | Devices and subsystems. |
-| 100–255 | — | Unallocated; left for mission payloads. |
+| Band | Used by |
+| --- | --- |
+| 0 | Reserved, never valid |
+| 1-24 | Application, platform and comms |
+| 25-49 | Services, one table each |
+| 50-99 | Modules |
+| 100-255 | Free for mission payloads |
 
-The wire identifier carries the table in its high byte and the offset in its
-low byte. That keeps it unique across the node, which is what the libcsp
-parameter list requires, while decoding back to the table and offset an
-operator reads. Offsets are unique inside a table; names are unique across the
-node and are at most `KFSW_PARAM_NAME_MAX` (32) characters, refused at
-registration rather than truncated.
+On the wire the table is the high byte and the offset the low byte. Offsets
+are unique inside a table. Names are unique on the node and up to
+`KFSW_PARAM_NAME_MAX` (32) characters; a longer name is refused at
+registration.
 
-A table is a definition set: the two are the same thing because a table is
-owned by exactly one component, the one that can validate and apply its values.
-
-Registered tables in the reference composition:
-
-| ID | Band | Name | Owner |
+| ID | Band | Name | Source |
 | --- | --- | --- | --- |
 | 1 | core | `board` | `k-fsw/app/src/parameters/board_table.c` |
 | 2 | core | `system` | `k-fsw/app/src/parameters/system_table.c` |
 | 3 | core | `telemetry` | `k-fsw/app/src/parameters/telemetry_table.c` |
-| 4 | core | `csp` | `k-fsw/app/src/parameters/csp_table.c`, with CSP |
-| 5 | core | `storage` | `k-fsw/app/src/parameters/storage_table.c`, with storage |
-| 6 | core | `watchdog` | `k-fsw/app/src/parameters/watchdog_table.c`, with the watchdog |
-| 24 | core | `test` | `tests/support/parameter_definitions.c`, opt-in fixtures |
+| 4 | core | `csp` | `k-fsw/app/src/parameters/csp_table.c` |
+| 5 | core | `storage` | `k-fsw/app/src/parameters/storage_table.c` |
+| 6 | core | `watchdog` | `k-fsw/app/src/parameters/watchdog_table.c` |
+| 24 | core | `test` | `k-fsw/tests/support/parameter_definitions.c` |
 | 25 | service | `log` | `kfsw-services/src/log.c` |
-| 27 | service | `event` | `kfsw-services/src/event-parameters/`, with the event record |
-| 30 | service | `fwu` | `kfsw-services/src/fwu-parameters/`, with the update service |
-| 26 | service | `param` | `kfsw-services/src/param-parameters/`, the service describing itself |
-| 28 | service | `command` | `kfsw-services/src/command-parameters/`, with the command service |
-| 29 | service | `ftp` | `kfsw-services/src/ftp-parameters/`, with the file transfer service |
-| 31 | service | `health` | `kfsw-services/src/health-parameters/`, with health monitoring |
-| 32 | service | `boot` | `kfsw-services/src/boot-parameters/`, with the boot service |
-| 50 | module | `radio_uhf` | `kfsw-modules/radio-uhf/parameters/`, with the radio module |
-| 67 | module | `hw_test` | `kfsw-modules/boton-test` |
+| 26 | service | `param` | `kfsw-services/src/param-parameters/` |
+| 27 | service | `event` | `kfsw-services/src/event-parameters/` |
+| 28 | service | `command` | `kfsw-services/src/command-parameters/` |
+| 29 | service | `ftp` | `kfsw-services/src/ftp-parameters/` |
+| 30 | service | `fwu` | `kfsw-services/src/fwu-parameters/` |
+| 31 | service | `health` | `kfsw-services/src/health-parameters/` |
+| 32 | service | `boot` | `kfsw-services/src/boot-parameters/` |
+| 33 | service | `hk` | `kfsw-services/src/hk-parameters/` |
+| 34 | service | `fbo` | `kfsw-services/src/fbo-parameters/` |
+| 50 | module | `radio_uhf` | `kfsw-modules/radio-uhf/parameters/` |
+| 51 | module | `temp_example` | `kfsw-modules/temperature-sensor-example/parameters/` |
+| 67 | module | `hw_test` | `kfsw-modules/boton-test/` |
 
-The update table is read-only throughout. If an operator could write it, an
-unverified image could be marked ready, which is what the update service exists
-to prevent.
-
-`health_interval_ms` is validated against the active watchdog timing before
-the value is stored. A check interval longer than the feed interval could
-reset a healthy board.
-
-Core parameter tables live in the application because platform and comms
-must not depend on the parameter service. They read the lower layers through
-their public APIs.
+A table is only registered when its service or module is enabled. The `fwu`
+table is read-only. `health_interval_ms` is checked against the watchdog
+timing before it is stored. Core tables are in the application because the
+platform and comms layers can't depend on the parameter service.
 
 ### Write modes
 
-Write modes are derived from each definition:
+The `mode` column of `param list` comes from each definition:
 
-| Mode | Meaning | How it is built |
-| --- | --- | --- |
-| `r` | Read-only | `KFSW_PARAM_FLAG_READ_ONLY` |
-| `w` | Takes effect immediately | a `changed` callback, or `KFSW_PARAM_FLAG_LIVE` where the owner reads the value every cycle |
-| `b` | Stored; the running system keeps its old value until reboot | `KFSW_PARAM_FLAG_PERSISTENT` with neither of the above |
+| Letter | Meaning |
+| --- | --- |
+| `r` | Read-only |
+| `w` | Writable |
+| `p` | Saved in the snapshot |
+| `b` | Applied at the next boot |
 
-A change callback implies `KFSW_PARAM_FLAG_LIVE`. A `b` write reports
-that reboot is required; saving remains an explicit operation.
+`wp` is saved and applied now, `wpb` is saved and applied at the next boot,
+and `w` is applied now and lost at reset. A definition with a change callback
+is applied immediately. Writing a `b` parameter prints that a reboot is
+needed.
 
-### Strings
+### Strings and arrays
 
-`KFSW_PARAM_STRING` holds up to `CONFIG_KFSW_PARAM_STRING_MAX` bytes,
-including the terminator. Each definition declares its storage capacity,
-validator, and change callback. Oversized writes are rejected.
-
-Reads and writes use bounded caller buffers with no dynamic allocation.
-
-### Counters
-
-FTP and commands keep saturating lifetime totals, even with events disabled.
-These counters reset at boot.
-
-### Build-time settings
-
-Check the mode column before writing a setting.
-
-`ftp_root` is read-only because the path resolver takes the root's length from
-`sizeof()` on a compile-time literal, and changing the sandbox under a running
-transfer is not a failure worth having. `ftp_chunk_size` can only be shortened:
-the workspace buffer is sized at build time and the protocol codec refuses
-anything larger, so a bigger value would be stored here and rejected at the
-first transfer. `fwu_lite_block_size` is read-only for the same reason.
-
-The radio module is selected at build time and does not query the modem.
-Its table is read-only; `uhf_link_state` remains `unknown`.
-
-### Console echo
-
-`echo_enabled` in table 28 is off by default. The shell prints every input byte
-back, so a session driven by a script shows each command twice — once as the
-sender typed it and once as the shell repeated it. The setting is live rather
-than stored, because it is worth changing while watching a console.
-
-The console belongs to the composition, not to the command service, so the
-service holds the setting and the composition registers what applies it.
-Registering also applies the current value, so the default reaches the shell at
-start-up without waiting for anyone to write the parameter.
-
-A test that needs to see what it typed — checking tab completion, or windowing
-output by the command that produced it — has to ask for echo itself.
-
-### Console colour
-
-Log lines are coloured by severity: errors red, warnings yellow, information
-white, debug dim. The escape sequences bracket the whole line rather than
-sitting inside it, so `[LEVEL] message` remains one contiguous run of text for
-anything matching on it. `CONFIG_KFSW_LOG_COLOR` turns it off for a console
-that does not understand VT100.
-
-The shell prompt is jade, applied at runtime because Kconfig strings cannot
-carry escape sequences. The shell measures the prompt with a plain string
-length to know where the cursor starts, so the composition corrects that count
-to the visible width; without it, every line edit would land in the wrong
-column.
+A `KFSW_PARAM_STRING` holds up to `CONFIG_KFSW_PARAM_STRING_MAX` bytes (104 by
+default) including the terminator, and a longer write is refused. A
+`KFSW_PARAM_DATA` array is always written whole and validated as a whole.
+Reads and writes use caller buffers; nothing is allocated.
 
 ### Sampled values
 
-A definition may supply a `sample` callback, which refreshes the backing store
-immediately before a read. Live housekeeping uses it because a value is worth
-reading only if it is current when it was asked for; an uptime refreshed on a
-timer is wrong by up to one period every time somebody reads it.
+A definition can have a `sample` callback that refreshes the value just before
+it is read. The CSP server calls it before answering a remote read as well.
+Sampling runs under the table lock, so the callback must not call the
+parameter API.
 
-The CSP server hands libparam the backing storage directly rather than going
-through that read path, so it refreshes every sampled parameter before serving
-a request. Without that, a remote read answers with whatever the storage last
-held, which for a value nothing writes locally is its compiled default
-forever: an uptime always zero, an identity always empty.
+A remote write to a sampled parameter is applied from the stored value
+(`kfsw_param_read_stored_entry()`) without sampling again, so the new value is
+not overwritten.
 
-Sampling runs while PARAM serializes access, so a `sample` callback must not
-call back into the parameter API.
+### Console echo and colour
 
-A parameter that is both sampled and writable needs care on one path. A write
-arriving over CSP lands in the backing store and is handed back to be applied;
-sampling at that moment would overwrite the value that just arrived with the
-one the owner still holds, and the change callback would be given the old
-value. The write would report success and change nothing. The change path
-therefore reads the store without refreshing it, which is what
-`kfsw_param_read_stored_entry()` exists for. Only the remote path goes through
-that code, so the defect is invisible to a local test.
+`echo_enabled` in table 28 is off by default, so a scripted session doesn't
+show each command twice. Turn it on to see what the console received, for
+example when checking tab completion. The shell prompt is jade; its colour is
+set at runtime because Kconfig strings can't hold escape sequences.
 
-### Transport sizing
+### Build-time settings
 
-K-FSW peers exchange one numbered descriptor at a time. The reply carries the
-index, total count, and a CRC of the table. A refresh becomes visible only after
-all descriptors and the final reply match. A failed refresh leaves no partial
-cache. The cache holds one node, bounded by `CONFIG_KFSW_PARAM_REMOTE_POOL_SIZE`.
+`ftp_root` is read-only because the path resolver uses a compile-time string.
+`ftp_chunk_size` can only be lowered, since the transfer buffer is sized at
+build time. `fwu_lite_block_size` is read-only for the same reason. The radio
+table reports `uhf_link_state` as `unknown` because the module does not query
+the modem.
 
-Remote clients require the indexed v4 exchange. The server also answers legacy
-v3 lists; `CONFIG_KFSW_PARAM_LIST_RDP` allows their RDP connections.
-`CONFIG_KFSW_PARAM_LIST_TIMEOUT_MS` bounds the whole refresh.
+### Remote parameters
 
-Value replies use the existing v2 format. Every requested value and END must
-arrive before the result is accepted. Invalid widths, missing values, and
-conflicting duplicates fail the read.
-
-Value requests run on a dedicated worker. A full queue drops the request and
-increments `param_requests_dropped`; the sender can retry.
-
-### Local parameters
-
-Software and physical test configurations may enable
-`CONFIG_KFSW_PARAM_TEST_DEFINITIONS`, which contributes table 24 `test`. These
-are not production parameters, but the table identifier stays reserved.
-
-`CONFIG_KFSW_PARAM_MAX_DEFINITIONS` (default 64) bounds parameters across every
-table and `CONFIG_KFSW_PARAM_MAX_TABLES` (default 16) bounds the tables
-themselves. Registration is refused once either is full rather than overrunning
-it.
-
-The two button entries reference the same individually aligned `uint32_t`
-backing fields represented by `kfsw_boton_test_get_status()`; PARAM does not
-maintain a second copy. The typed API uses the module mutex to return a coherent
-pair, while PARAM reads each scalar independently under its own table lock.
-On the tested targets those naturally aligned U32 views are single-copy, but
-the raw-value model does not provide a shared formal C synchronization edge
-with the owner mutex. They are runtime observations rather than configuration,
-so remote or local `set` operations are rejected and the persistent flag is
-absent. `param save`, `param load`, and `param defaults` therefore never change
-or restore them. PARAM now has an owner-read callback -- see **Sampled values**
-above -- so if formal owner synchronization is required for these scalar reads,
-that is where it belongs.
-
-The three LED entries are non-persistent developer controls. Their validators
-accept only `0` or `1` and call the same owner setter used by the shell. A GPIO
-failure rejects the write before PARAM stores the new value, so reported owner
-state remains truthful. The five values form the logical `hw_test` definition
-set, registered as table 67 in the module band. The three LED offsets are
-0x08, 0x09 and 0x0a; the two counters are at 0x00 and 0x04.
-
-The public type enumeration names unsigned, signed, hexadecimal, float,
-double, string, and data categories. The current local core accepts scalar
-integer/hex/float/double sizes; string, data, and arrays are not implemented as
-local values. The production and test definition sets use only the scalar
-types described above.
-
-`kfsw_param_init()` rejects an empty or malformed table, unsupported entry
-type/shape, duplicate ID, or duplicate name. Local reads and writes are
-serialized by a mutex. A write must match the entry's exact type and scalar
-size, pass its current validation, and not target a read-only entry.
-
-### Runtime values and compiled defaults
-
-A compiled default initializes RAM when the image starts. A normal `set`
-changes RAM immediately and invokes the entry callback, but does not change
-the compiled image or saved snapshot.
+`CONFIG_KFSW_PARAM_CSP` adds `parameter_csp.c` and the parts of
+[libparam](https://github.com/spaceinventor/libparam) it needs. The local
+tables are served on CSP port 10 (values) and 12 (descriptors), and the client
+caches the descriptors of one remote node.
 
 ```text
-compiled default --boot--> runtime value --set--> new runtime value
-       ^                         |
-       |                         +-- save --> persistent snapshot
-       |
-  param defaults
-```
-
-`param defaults` restores persistent entries to their compiled values in RAM.
-It deliberately leaves the saved snapshot untouched; a later `param load` can
-reapply it. `param clear` does the inverse: it removes saved state but leaves
-current RAM values untouched.
-
-### Local operations
-
-The direct service API provides composition-aware initialization, state check,
-get, set, and table visitor operations. The shell exposes the same distinction:
-
-```text
-kfsw:~$ param list
-kfsw:~$ param get log_level
-kfsw:~$ param set log_level 2
-```
-
-The shell parses text according to the parameter's actual type. Negative text
-for an unsigned value, integer overflow, an invalid float, a missing name, and
-a read-only write all produce errors rather than implicit conversion.
-
-### Optional remote adapter
-
-`CONFIG_KFSW_PARAM_CSP` adds `parameter_csp.c` and the selected subset of
-[libparam](https://github.com/spaceinventor/libparam). It registers transaction
-and parameter-list endpoints for the local table, and provides a client that
-can download and cache a remote node's descriptions before get/set operations.
-
-```text
-local caller or shell
-       |
-K-FSW remote parameter API
-       |
-preallocated remote descriptor cache
-       |
-libparam request/response codec
-       |
-CSP ports 10 and 12
-       |
-remote adapter -> same remote local table
-```
-
-The default remote pool has 16 descriptors and is selected by
-`KFSW_PARAM_REMOTE_POOL_SIZE`; it does not grow dynamically. Remote operations
-use an explicit node and a bounded timeout. The adapter does not own CSP
-initialization, interfaces, routes, or the router.
-
-Current remote shell forms are:
-
-```text
-kfsw:~$ param list 2
 kfsw:~$ param get 2 log_level
 kfsw:~$ param set 2 log_level 2
+kfsw:~$ param list 2
 ```
 
-When the NUCLEO button example is selected, the same generic adapter makes its
-live owner state observable without adding CSP knowledge to the module:
+A named read asks the node for that one descriptor and then the value. A node
+that doesn't answer the lookup is read by downloading its whole descriptor
+list. The list is downloaded one indexed descriptor at a time and checked with
+a table CRC, so a failed download leaves no partial cache.
+`CONFIG_KFSW_PARAM_LIST_TIMEOUT_MS` (10 s) limits the download; raise it on
+nodes that list parameters over a slow radio.
 
-```text
-kfsw:~$ param get 2 press_count
-kfsw:~$ param get 2 last_press_s
-kfsw:~$ param set 2 led_green 1
-kfsw:~$ param get 2 led_green
-kfsw:~$ param set 2 press_count 100
-set: parameter 'press_count' is read-only or service is not ready
-```
+The cache holds `CONFIG_KFSW_PARAM_REMOTE_POOL_SIZE` descriptors. Value requests
+are handled by a worker thread; when its queue is full the request is dropped
+and `param_requests_dropped` increases.
 
-The rejected write leaves both fields unchanged. Routing and the physical link
-are composition concerns; `boton_test` depends only on the local PARAM
-declaration API and the platform monotonic-time API.
+Each node validates remote writes with its own validators. An invalid remote
+value is rejected and the parameter goes back to its compiled default.
 
-The CSP adapter is protocol compatibility, not shared memory. Each node owns
-its local table and applies its own validation/callbacks when a remote write is
-decoded. An invalid externally supplied value is rejected by the owner
-validator and the parameter is restored to its compiled default; it does not
-retain the last runtime value.
+### Defaults, save and load
+
+At boot every value starts from its compiled default, then the snapshot is
+restored. `param set` changes RAM and runs the change callback. With
+`param_autosave` on (the default), an accepted change to a persistent value
+also writes the snapshot.
+
+| Command | RAM | Saved snapshot |
+| --- | --- | --- |
+| `param set <name> <value>` | Changed | Written for persistent values when autosave is on |
+| `param save` | Unchanged | Replaced with the persistent values |
+| `param persist <table>` | Unchanged | Replaced; prints that table's share |
+| `param load` | Updated from valid entries | Unchanged |
+| `param defaults` | Persistent values back to defaults | Unchanged |
+| `param clear` | Unchanged | Deleted |
 
 ## Parameter persistence
 
-### Lifecycle and intent
+The snapshot is `/kfsw/params/parameters.dat`, written through
+`/kfsw/params/parameters.tmp`. It has a 20-byte header (magic `KPAR`, version
+1, sizes, entry count and CRC32) followed by one entry per persistent value:
+name, type, length and the big-endian value. It is limited to 2048 bytes and
+64 entries; `param_persist_bytes` and `param_persist_max_bytes` in table 26
+show how much is used.
 
-Persistence stores selected local parameters in one versioned snapshot. It is
-explicit so an operator can test a runtime change before deciding that it
-should survive reboot.
+Loading checks the size, structure and CRC before anything is applied. Unknown
+names and entries with a different type are skipped, so another image version
+keeps the values it understands. A bad snapshot is logged, the compiled
+defaults stay, and startup continues. The filesystem is not reformatted.
 
-```text
-                 compiled default
-                        |
-                       boot
-                        |
-              initialize local table
-                        |
-             valid snapshot available?
-                  /             \
-                yes              no/error
-                 |                  |
-         restore saved values   keep defaults
-                  \             /
-                    runtime RAM
-                        |
-                       set
-                        |
-                 changed RAM value
-                        |
-                  explicit save
-                        |
-             atomic snapshot replacement
-                        |
-                    next boot
-```
+A save writes and syncs the temporary file and then renames it over the active
+file. If a step fails, the temporary file is removed and the previous snapshot
+stays. The CRC catches corruption; it is not authentication.
 
-Only entries with the K-FSW persistent flag are saved. The read-only
-`node_id` is excluded. The active file is
-`/kfsw/params/parameters.dat`; an in-progress save uses
-`/kfsw/params/parameters.tmp`.
+## Storage
 
-### Snapshot format and validation
+K-FSW mounts one [LittleFS](https://github.com/littlefs-project/littlefs)
+volume at `/kfsw`. The platform layer handles init, mount, unmount and
+capacity. Once it is mounted, services use the normal Zephyr
+[filesystem API](https://docs.zephyrproject.org/4.4.0/services/file_system/index.html).
 
-The bounded snapshot is at most 256 bytes and contains a 20-byte header plus
-up to 16 typed entries. The header carries:
-
-- magic `KPAR`;
-- format version 1;
-- header and payload sizes;
-- entry count;
-- reserved fields that must be zero; and
-- IEEE CRC32 over the complete snapshot with the CRC field cleared.
-
-Each entry contains a bounded name, K-FSW persistence type, value length, and
-big-endian value bytes. The currently persistent types are `u8`, `u32`, `i32`,
-and 32-bit float.
-
-Load first checks file type and total bounds, reads the complete snapshot,
-validates its structure and CRC, then applies entries. Unknown names and known
-names with incompatible types are ignored so a newer/older image can retain
-the values it understands. A bad magic, unsupported version, malformed length,
-excess count, truncated entry, or CRC mismatch rejects the snapshot before it
-changes the live table.
-
-On boot, rejection is logged and compiled defaults stay active. The filesystem
-is not reformatted and startup continues to `@READY`.
-
-### Atomic replacement
-
-A save follows this sequence:
+The partition is selected with the `kfsw,storage-partition` devicetree
+property. The NUCLEO-L496ZG uses the last 64 KiB of its 1 MiB flash:
 
 ```text
-snapshot RAM
-    |
-write parameters.tmp
-    |
-fs_sync temporary file
-    |
-close successfully
-    |
-LittleFS rename temporary -> parameters.dat
-    |
-new snapshot is active
+0x00000000                     0x000F0000         0x00100000
+|------------------------------|------------------|
+| application, 960 KiB         | LittleFS, 64 KiB |
+|------------------------------|------------------|
 ```
 
-If write, sync, close, or rename fails, K-FSW removes the temporary file and
-returns the error. The previous active snapshot is not deliberately truncated
-as the first step. At load time, an abandoned temporary file is removed before
-the active file is examined.
+`CONFIG_USE_DT_CODE_PARTITION=y` keeps the application out of the storage
+region. native_sim uses a 256 KiB partition backed by a host file,
+`build/linux/kfsw-storage.bin` when started with the runner. The FRDM-K64F and
+Pico W profiles have no storage.
 
-CRC catches accidental corruption and incomplete/malformed content; it is not
-authentication. Temporary-file replacement limits the window in which a reset
-can leave no complete snapshot. LittleFS supplies the filesystem-level
-power-loss behavior, while K-FSW supplies the application record validation.
+### Mount and format
 
-### Save, load, defaults, clear
+The first mount uses `FS_MOUNT_FLAG_NO_FORMAT`. If LittleFS reports the
+partition as corrupt (`EFAULT`), the whole partition is scanned. A fully erased
+partition is formatted and mounted; anything else is reported as an error and
+left as it is. Services that need storage report their own errors when it is
+not mounted.
 
-| Command | RAM after command | Saved snapshot after command |
-| --- | --- | --- |
-| `param set <name> <value>` | Changed | Unchanged |
-| `param save` | Unchanged | Replaced from persistent RAM entries |
-| `param load` | Updated from valid compatible entries | Unchanged |
-| `param defaults` | Persistent entries reset to compiled defaults | Unchanged |
-| `param clear` | Unchanged | Active and temporary files removed |
+## File transfer
 
-Persistence is local. A remote `param set 2 ...` changes node 2's RAM; it does
-not implicitly run `param save` on node 2.
+K-FSW FTP is the project's own protocol and is not compatible with Internet
+FTP, FTPS, SFTP or TFTP. It supports list, stat, mkdir, put and get. The server
+listens on CSP port 9 and requires RDP and CRC32. Each message has a 24-byte
+header with the request ID, offset, total size and file CRC.
 
-## Embedded storage and LittleFS
-
-### Why a filesystem is present
-
-Microcontroller flash has erase-block and write constraints and can lose power
-during an update. [LittleFS](https://github.com/littlefs-project/littlefs) is a
-small embedded filesystem designed for bounded RAM, wear distribution, and
-power-loss resilience. Zephyr integrates it with its flash-map and filesystem
-APIs; K-FSW owns when the selected volume is initialized and mounted.
-
-The complete upstream references are the
-[LittleFS project](https://github.com/littlefs-project/littlefs) and Zephyr's
-[filesystem documentation](https://docs.zephyrproject.org/4.4.0/services/file_system/index.html).
-
-K-FSW mounts one volume at `/kfsw`. The platform layer exposes init, mount,
-unmount, readiness, backend identity, and capacity. Services use normal Zephyr
-filesystem operations after readiness is established.
-
-### Flash layout
-
-The storage backend is selected by the `kfsw,storage-partition` devicetree
-chosen property. Reusable code never contains a board-specific address.
-
-NUCLEO-L496ZG uses the final 64 KiB of its 1 MiB internal flash:
+Paths are virtual and rooted at `/kfsw/ftp` on each node:
 
 ```text
-NUCLEO-L496ZG internal flash
-
-0x00000000                                            0x00100000
-     |-----------------------------------------------------|
-     | K-FSW application partition | LittleFS storage      |
-     | 0x00000000 + 0x000F0000     | 0x000F0000 + 0x10000 |
-     |          960 KiB            |        64 KiB         |
-     |-----------------------------------------------------|
-                                   ^
-                     kfsw,storage-partition
+FTP path              Zephyr path
+/build/sample.bin     /kfsw/ftp/build/sample.bin
+/exchange/result.dat  /kfsw/ftp/exchange/result.dat
 ```
 
-`CONFIG_USE_DT_CODE_PARTITION=y` makes the application linker respect the
-code partition instead of occupying the storage region.
-
-The native simulator selects a separate 64 KiB flash region at offset
-`0x000FC000`. Zephyr backs simulated flash with a host file, normally
-`build/linux/kfsw-storage.bin` through the K-FSW runner. This intentionally
-exercises the same flash-map, LittleFS, and Zephyr filesystem code as the MCU
-composition rather than replacing it with `fopen()`.
-
-FRDM-K64F and Pico W shell profiles disable storage and do not define a K-FSW
-storage partition.
-
-### Mount and format policy
-
-K-FSW first mounts with `FS_MOUNT_FLAG_NO_FORMAT`. If that succeeds, the
-volume becomes ready. If LittleFS reports the specific corrupt/unformatted
-condition, the platform scans the entire fixed partition through the flash-map
-API.
-
-```text
-mount without format
-       |
-       +-- success ------------------------> ready
-       |
-       +-- failure other than EFAULT ------> report error
-       |
-       +-- EFAULT -> scan every flash byte
-                         |
-                         +-- all erased -> allow one format + mount
-                         |
-                         +-- any non-erased byte -> report error
-```
-
-This policy distinguishes factory/first-boot media from non-empty media that
-may contain recoverable data. K-FSW does not silently erase a corrupt,
-non-erased partition. A mount failure leaves storage unready; dependent
-services report their own initialization errors.
-
-## K-FSW FTP
-
-### Protocol
-
-K-FSW FTP is the project's file-transfer service. It is not compatible with
-Internet FTP, FTPS, SFTP, or TFTP. The name describes its role; the wire
-protocol is a compact K-FSW request/data/result protocol carried in CSP
-datagrams.
-
-It has client and server APIs for list, stat, mkdir, upload (PUT), and download
-(GET). The default server listens on CSP port 9 and requires both RDP and CSP
-CRC32. Each protocol message has a 24-byte header, bounded path/data fields,
-request ID, offset, total size, and file CRC where applicable.
+Paths are up to 96 bytes. Relative paths, empty components, `.` and `..`,
+backslashes, control characters and embedded NULs are rejected. The sandbox is
+not access control. `/hk` is a second, read-only root with the housekeeping
+sample files.
 
 ### The local node
 
-`kfsw_ftp_list`, `kfsw_ftp_stat`, and `kfsw_ftp_mkdir` accept this node's own
-CSP address. Those calls run the same filesystem operations the server runs for
-a decoded request, directly against local storage. No connection is opened and
-no route is consulted, so a node can always inspect and prepare its own FTP
-root — including on a node with no configured peer.
+`list`, `stat` and `mkdir` addressed to the node's own CSP address run
+directly on local storage, without a connection or a route. They need storage
+mounted and the service started, otherwise they return `-EACCES`. `put` and
+`get` need two nodes and return `-ENOTSUP` for the local address.
 
-Local requests need storage mounted and the service started; otherwise they
-return `-EACCES`. `kfsw_ftp_put` and `kfsw_ftp_get` move a file between two
-nodes and return `-ENOTSUP` for the local address.
-
-This is a deliberate short circuit in the service, not CSP loopback. Self
-addressing at the CSP layer is not part of the verified routing scope, and
-nothing in K-FSW depends on it.
-
-### Internal layering
-
-The service separates what a transfer means from how its messages travel:
+### Code layout
 
 ```text
-        client and server operations
-   operation state, request/response order,
-        which file each request touches
-                    |
-             transfer engine
-   one send loop, one receive loop, shared by
-    both roles; owns the open file handle
-                    |
-        reliable transport (ftp_link.h)
-   connect, listen, accept, send, receive,
-          release, close, max payload
-                    |
-              CSP with RDP and CRC32
-                    |
-             CSP router, KISS, UART
+ftp_client.c, ftp_server.c   requests and responses
+ftp_transfer.c               the send and receive loops
+ftp_link.h                   transport interface
+ftp_link_csp.c               CSP with RDP and CRC32
+ftp_protocol.c               wire codec and path checks
+ftp_store.c                  file CRC, temporary files and rename
 ```
 
-Only the transport backend includes libcsp. The operation and engine layers
-work in terms of protocol messages and borrowed receive frames, so packet
-ownership is expressed by the interface rather than by convention:
-`kfsw_ftp_link_receive()` hands back a frame whose `path` and `data` point into
-the transport's buffer, and `kfsw_ftp_link_release()` is what ends that borrow.
+Only `ftp_link_csp.c` includes libcsp. A received frame points into the
+transport buffer until `kfsw_ftp_link_release()` is called. RDP handles
+ordering and retransmission, so FTP has no retry layer of its own; the offset
+in each data message is checked so a stray or repeated packet can't advance
+the write.
 
-Two leaf units sit beside those layers and call nothing above them: the wire
-codec with path policy and status mapping, and the storage rules for whole-file
-CRC, the temporary file, and the atomic commit.
+### Transfers
 
-RDP already guarantees ordering and retransmission, so the application does not
-add a second acknowledgement layer. The `offset` field in every data message is
-a consistency assertion that a stray or replayed packet cannot advance the
-write; it is not a reordering mechanism.
-
-The usable payload is bounded by the CSP buffer minus the RDP header, the
-CRC32, and the file-transfer header. `kfsw_ftp_link_max_payload()` reports that
-limit, and a build assertion holds the compiled chunk size below it.
-
-### Virtual paths and sandbox
-
-Every FTP path is virtual and rooted below `/kfsw/ftp` on the node that uses
-it:
+File data is sent in chunks of up to 192 bytes. The sender gives the total size
+and IEEE CRC32, and the receiver checks both before it commits the file.
 
 ```text
-FTP virtual path             Zephyr filesystem path
-----------------             ----------------------
-/build/sample.bin     ->     /kfsw/ftp/build/sample.bin
-/exchange/result.dat  ->     /kfsw/ftp/exchange/result.dat
+client                              server
+PUT (path, size, CRC32)       ->
+                              <-    PUT_READY
+DATA (offset 0)               ->
+DATA (next offset)            ->    writes <path>.part
+                              <-    PUT_RESULT after sync, check and rename
 ```
 
-Virtual paths are limited to 96 bytes. The validator rejects relative paths,
-empty components, `.` and `..` traversal, backslashes, control characters,
-embedded NULs, and overlong names. A client cannot name
-`/kfsw/params/parameters.dat` through the FTP service because mapping always
-adds the FTP root.
+A download is the same in the other direction: GET, GET_INFO, DATA and
+GET_RESULT. The receiving side always writes `<path>.part`, syncs it, checks
+it and renames it. A failed transfer removes the partial file and leaves an
+existing file alone.
 
-The sandbox is a namespace and accidental-traversal boundary. It is not user
-authentication or access control.
-
-### Chunks and integrity
-
-PUT and GET stream file data in chunks of at most 192 bytes. Application-level
-offsets require each chunk to arrive at the expected location. The sender
-provides total file size and an IEEE CRC32; the receiver recomputes both and
-commits only an exact match.
-
-CSP CRC32 and file CRC serve different scopes:
-
-- CSP CRC32 checks one transported CSP packet.
-- the FTP file CRC checks the complete reconstructed file.
-- RDP provides ordered/retransmitted delivery between endpoints.
-- the `.part`/rename rule protects the local final pathname.
-
-None of these provides cryptographic authenticity.
-
-### Upload flow
-
-```text
-client                                      server
-  |                                           |
-  |-- connect CSP/RDP+CRC32 to port 9 -------->|
-  |-- PUT request: path, total size, CRC ----->|
-  |<----------------------------- PUT_READY ---|
-  |-- DATA offset 0, <=192 bytes ------------->|
-  |-- DATA next offset, <=192 bytes ---------->|
-  |                 ...                       |
-  |                                  write path.part
-  |                                  sync + close
-  |                                  verify size + CRC
-  |                                  rename .part -> path
-  |<--- PUT_RESULT: status, size, CRC ----------|
-  |-- close ----------------------------------->|
-```
-
-A failed upload removes the partial file. An existing final file is preserved
-unless a complete, validated temporary file reaches the rename step.
-
-### Download flow
-
-```text
-client                                      server
-  |                                           |
-  |-- connect CSP/RDP+CRC32 to port 9 -------->|
-  |-- GET request: remote path --------------->|
-  |<--- GET_INFO: total size, CRC --------------|
-  |<--- DATA offset 0, <=192 bytes -------------|
-  |<--- DATA next offset, <=192 bytes ----------|
-  |                 ...                       |
-  |<--- GET_RESULT: status, size, CRC -----------|
-  | write local-path.part                     |
-  | sync + close; verify size + CRC           |
-  | rename .part -> local path                |
-```
-
-Both sides therefore use atomic finalization when they are receiving a file.
-
-### Concurrency and limits
-
-The current server has one static acceptor and one static worker. It listens
-with a one-connection backlog and returns busy for an overlapping connection
-rather than allocating unbounded workers. The client uses one static workspace
-guarded by a mutex, so client calls are serialized. Each protocol receive has
-a configured timeout, currently 15 seconds by default.
-
-The shell's `ftp generate` diagnostic is limited to 32768 bytes, but that is a
-test-data limit, not the protocol's general file-size claim. Actual transfers
-remain bounded by 32-bit protocol sizes, filesystem capacity, CSP resources,
-timeouts, and operational link conditions.
-
-### Verification scope
-
-Software tests cover protocol encoding/decoding, path validation, CRC and
-atomic-commit behavior, missing files, traversal rejection, zero-byte through
-8 KiB transfers, byte comparison, and buffer recovery. Two-node ground roles
-round-trip a file through `tests/k-ground-ftp-smoke.sh`. The NUCLEO physical
-UART bench transfers and verifies 4 KiB and 16 KiB files in both directions of
-the client workflow.
-
-A 256-byte file has also been round-tripped over the Holybro SiK 433 MHz bench
-between ground node 16 and NUCLEO node 2, with matching CRC on both nodes and
-clean KISS counters. That is one small file on one named bench; it is not a
-throughput characterisation, and no larger transfer over RF is claimed.
-
-Browse @ref kfsw_services for exact public service declarations and return
-contracts.
+The server has one acceptor and one worker and answers `busy` to a second
+connection. Client calls share one static workspace behind a mutex. Each
+receive waits up to `ftp_timeout_ms` (15 s by default). `ftp generate` is
+limited to 32768 bytes; transfers are limited by the 32-bit size field, free
+space and the link.
 
 ## Command service
 
-`CONFIG_KFSW_COMMAND` enables a registry shared by local shell commands
-and remote calls over CSP.
-
-### One definition, two front ends
-
-A command is defined once by its owning component and carries both a stable
-text name and a stable numeric identifier:
+`CONFIG_KFSW_COMMAND` enables the command registry used by the `cmd` shell
+command and by remote callers on CSP port 11. A command has a name, a numeric
+ID, up to four typed arguments and a result.
 
 ```text
-shell           "cmd info"           resolves by name
-ground station   id 2 on CSP port 11 resolves by identifier
-                         |
-                  the same definition
-                  the same validation
-                  the same handler
+shell    cmd info       found by name
+ground   ID 2, port 11  found by ID
+             |
+   same definition, validation and handler
 ```
 
-The shell adapter implements no command. It converts text into the argument
-types the definition declares and calls the same entry point the remote front
-end uses, so a local operator cannot bypass a check a remote caller passes
-through.
+Commands are registered at build time as sets and the registry is fixed at
+startup. Duplicate IDs or names, missing handlers and too many arguments are
+rejected. Handlers run on the command thread, one at a time, never in a CSP
+receive context.
 
-### Registry
+A message has a 12-byte big-endian header (version, opcode, status, argument
+count, command ID, request ID and payload size) followed by type-length-value
+arguments. Every length is checked before use, and a message always fits one
+CSP packet.
 
-Definitions arrive as compile-time sets from their owning component and the
-registry is frozen at startup, the same shape as parameter definitions.
-Startup rejects duplicate identifiers, duplicate names, missing handlers and
-argument counts above the bound. There is no runtime registration: a command
-that exists after startup existed at build time.
+There is no authentication. The request carries the source node and an
+authentication flag that is always false. See @ref kfsw_services_command.
 
-Handlers run on the command server thread, never on a CSP receive context, and
-one invocation is serialized against another.
-
-### Wire format
-
-Requests use configurable CSP port 11 with CRC32, distinct from file transfer
-and the parameter adapter. Each message has a twelve-byte explicit big-endian
-header carrying version, opcode, status, argument count, command identifier,
-request identifier and payload size. Arguments follow as bounded
-type-length-value entries, and every length is checked against the buffer
-before use. A build assertion holds one message inside one CSP packet.
-
-### Security boundary
-
-There is no authentication. The request context carries the source node and an
-authentication result that is always false. The field exists so that adding
-authentication later does not change the structure's meaning, and so no handler
-encodes an assumption that a particular node is trusted. See
-@ref kfsw_services_command for the public contract.
-
-### Scope
-
-Version 1 is synchronous: a handler runs to completion and returns a status
-with an optional short detail. There is no accepted-plus-identifier form for a
-long operation, no operation tracking and no duplicate suppression.
-
-Remote parameter access deliberately has no command. The parameter service
-already owns that path over CSP, and a second route to the same operation would
-split its validation.
+A handler runs to completion and returns a status and an optional short text.
+Requests are not deduplicated, so check the node state before sending a
+command again after a lost reply. Remote parameters use the parameter service,
+not commands.
 
 ## Event record
 
-`CONFIG_KFSW_EVENT` enables a bounded RAM record. Each event carries an
-identifier, monotonic timestamp, sequence, severity, and opaque payload.
-Use logs for console diagnostics and events for outcomes that need to be
-read later in the same boot.
-
-### Why numeric
+`CONFIG_KFSW_EVENT` keeps events in a RAM ring. Each event has an ID, a
+monotonic timestamp, a sequence number, a severity and a small payload. Logs
+are for the console; events are for results you want to read later.
 
 ```text
 log    "FTP put node=2 destination=/uplink/test.txt: PASS bytes=256 crc32=0ce9d363"
 event  source=ftp id=1 payload={node:2, bytes:256, crc32:0x0ce9d363}
 ```
 
-Three properties follow from the second form: it is small enough to downlink
-over a constrained link, a gap in the sequence is detectable, and rewording a
-message does not break ground tooling because the identifier did not change.
+Events are small enough to downlink, a gap in the sequence shows lost records,
+and rewording a log message doesn't break ground tools.
 
-### Ownership
+IDs and payload layouts are declared in each producer's public header. Boot
+records the reset cause, the command service records every dispatch, and file
+transfer records completed and failed transfers. Payloads are stored as given;
+a producer that sends one over a link writes it big-endian.
 
-Identifiers belong to the producing component and are declared in its own
-public header together with the payload layout, so the event service does not
-know its producers. Boot records the reset cause, the command service records
-every dispatch outcome, and file transfer records completion and failure.
+The ring size is set in Kconfig. When it is full the oldest record is
+overwritten and `events_overwritten` increases. Recording takes a short
+spinlock, so it can be called from any context.
 
-Payload bytes are opaque to the service and stored exactly as given. A producer
-whose payload crosses a link writes it in network byte order.
-
-### Bounds and loss
-
-The record is a fixed RAM ring sized by Kconfig. When it wraps, the oldest
-record is overwritten and an overwritten counter increases, so losing history
-is visible rather than silent.
-
-Emitting takes a short spinlock rather than a mutex, so any context can record
-without sleeping, and the visitor runs outside the lock so a slow reader cannot
-hold off a producer. Nothing in the service touches a link or a filesystem.
-
-### Reading it remotely
-
-A remote node's record is read through the command service, using
-`event_stats` and `event_tail`, rather than through a separate protocol.
-
-### Scope
-
-The ring is RAM and does not survive a reset. It answers what a node has done,
-not what happened before it restarted. There is no persistent journal, rate
-limiting, coalescing or downlink stream. Persisting the record is separate work.
+Read another node's events with `cmd <node> event_stats` and
+`cmd <node> event_tail <age>`. The ring does not survive a reset.

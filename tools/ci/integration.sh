@@ -10,9 +10,8 @@ if ! command -v socat >/dev/null 2>&1; then
 	exit 1
 fi
 
-# The temperature example rides along so the Yamcs bridge has a report worth
-# pulling. native_sim has no die temperature, so it registers table 51 and
-# reports the reserved value, which is the honest hosted answer.
+# Include the temperature example so the Yamcs bridge has a report to pull.
+# native_sim has no sensor, so it reports the reserved value.
 KFSW_EXTRA_CONF_FILE="$KFSW_REPO_DIR/tests/config/param-fixtures.conf;$KFSW_REPO_DIR/config/profiles/linux-temperature.conf" \
 	"$KFSW_CI_DIR/build.sh" linux
 KFSW_PRISTINE=always "$KFSW_REPO_DIR/tests/build-linux-node2.sh"
@@ -20,7 +19,7 @@ KFSW_PRISTINE=always "$KFSW_REPO_DIR/tests/build-linux-node2.sh"
 echo "INTEGRATION: shell and local PARAM"
 "$KFSW_REPO_DIR/tests/shell-smoke.sh"
 
-echo "INTEGRATION: boton_test opt-in PARAM ownership"
+echo "INTEGRATION: boton_test parameters"
 "$KFSW_REPO_DIR/tests/boton-test-smoke.sh"
 
 echo "INTEGRATION: storage"

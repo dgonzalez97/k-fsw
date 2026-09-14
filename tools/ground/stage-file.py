@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
-"""Place a host file into a native_sim node's LittleFS partition.
+"""Write a host file into a native_sim node's LittleFS partition.
 
-The ground station runs as a native_sim process whose flash is a plain host
-file, so a file can be put into its filesystem before it boots rather than
-being transferred in. That matters for a firmware image: it is far larger than
-anything the on-board diagnostic generator can produce, and it has to come from
-the host in the first place.
+A native_sim node's flash is a host file, so a file such as a firmware image can
+be placed in its filesystem before it boots instead of being transferred.
 
-The LittleFS geometry must match the one Zephyr mounts, or the node will see an
-unformatted partition and refuse to mount it rather than silently misread it.
+The LittleFS geometry must match the one Zephyr mounts, or the node won't mount
+the partition.
 """
 
 import argparse

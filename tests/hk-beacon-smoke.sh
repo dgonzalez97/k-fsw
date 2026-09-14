@@ -1,18 +1,9 @@
 #!/usr/bin/env bash
-# Checks that a node beacons on its own and that the ground hears it.
+# Checks that a node sends beacons and the ground receives them. The bridge runs
+# with --listen and sends nothing. Beacons leave from the housekeeping port and
+# go to a port nothing binds.
 #
-# Every other housekeeping test asks for a sample. This one never does: the
-# bridge runs in --listen, which binds nothing and transmits nothing, so the
-# only thing that can put a frame in front of it is the node deciding to speak.
-#
-# That distinction is the whole feature, and it is also where the ports matter.
-# A beacon is sent *from* the serving port, because a listener recognises
-# housekeeping by the port a frame came from; it is sent *to* a port nothing
-# binds, so it can never be mistaken for a request by another node. Get either
-# backwards and this test sees silence.
-#
-# Software only. The node runs hosted and the bridge talks to its uart_1
-# pseudo-terminal.
+# Software only: the node runs hosted and the bridge uses its uart_1 PTY.
 
 set -euo pipefail
 
@@ -89,8 +80,7 @@ echo "HK BEACON SMOKE"
 printf '%s\n' 'hk define 0 1:0 3:0' 'hk period 0 1000' >&3
 sleep 2
 
-# The floor exists so an operator cannot turn a node into a transmitter that
-# swamps its own link. -34 is -ERANGE.
+# Below the floor. -34 is -ERANGE.
 printf '%s\n' 'hk beacon 0 16 250' >&3
 sleep 1
 if tr -d '\r' <"$work_dir/node.log" | grep -q 'beacon for report 0: -34'; then
@@ -103,8 +93,7 @@ fi
 printf '%s\n' 'hk beacon 0 16 5000' >&3
 sleep 1
 
-# Nothing here asks. --listen binds no port and sends no packet; the frames it
-# reports can only be ones the node sent unprompted.
+# --listen binds no port and sends nothing.
 "$python" "$KFSW_REPO_DIR/tools/ground/hk-bridge.py" \
 	--device "$pty" --node 1 --listen --once --timeout 20 --yamcs none \
 	>"$work_dir/bridge.log" 2>&1 || {
@@ -124,8 +113,7 @@ printf '  [ok]   the ground heard a node that was never asked\n'
 check "the beacon carries the protocol version" "${beacon_frame:0:2}" "01"
 check "the beacon names the report" "${beacon_frame:2:2}" "00"
 
-# A beacon is the request path's frame, not a second format: same ten-byte
-# header, same two values behind it.
+# A beacon has the same ten-byte header and values as a requested sample.
 check "the beacon is header plus the report's values" "${#beacon_frame}" "32"
 
 heard="$(grep -c '^report 0 seq' "$work_dir/bridge.log" || true)"
@@ -136,7 +124,7 @@ else
 	failures=$((failures + 1))
 fi
 
-# The counters are what an operator has when the ground goes quiet.
+# Beacon counters.
 printf '%s\n' 'hk show' >&3
 sleep 2
 sent="$(tr -d '\r' <"$work_dir/node.log" | sed -n 's/^beacons sent: //p' | tail -1)"
@@ -147,7 +135,7 @@ else
 	failures=$((failures + 1))
 fi
 
-# Turning it off has to be as reachable as turning it on.
+# Turn beacons off again.
 printf '%s\n' 'hk beacon 0 16 0' >&3
 sleep 1
 if tr -d '\r' <"$work_dir/node.log" | grep -q 'report 0 stops beaconing'; then

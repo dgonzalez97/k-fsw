@@ -1,6 +1,4 @@
-/* The UHF modem's serial rate. Fixed at build time on purpose: a node that
- * could change its own radio baud from the ground can strand itself.
- */
+/* UHF modem baud rate, fixed at build time. */
 &usart3 {
 	current-speed = <57600>;
 };

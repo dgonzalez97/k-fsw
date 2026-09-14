@@ -2,10 +2,7 @@
 #define KFSW_APP_CLOCK_HOST_H
 
 /**
- * @brief Take the wall clock from the machine this node runs on.
- *
- * Only meaningful for a node running as a Linux process. A board has nothing
- * to take the time from and has to be told.
+ * @brief Set the wall clock from the host. Only for a native_sim node.
  */
 int kfsw_clock_from_host(void);
 

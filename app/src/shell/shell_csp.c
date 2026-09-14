@@ -24,10 +24,7 @@ static void print_clock(const struct shell *sh, const char *label,
 	char text[32];
 
 	if (!kfsw_csp_clock_is_set(clock)) {
-		/* Said plainly, and including the reading itself: an operator
-		 * looking at a node stuck in the year 2000 should be able to
-		 * see that is what happened.
-		 */
+		/* Print the raw reading as well. */
 		shell_print(sh, "%s: not set (reads %" PRId32 ")", label, clock->seconds);
 		return;
 	}
@@ -112,10 +109,7 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 	int parse_error = 0;
 	int result;
 
-	/* No node means this one. The address comes from the running CSP
-	 * configuration rather than the build option, so it is whatever the
-	 * node actually came up as.
-	 */
+	/* No node means this one, at its running address. */
 	kfsw_csp_get_info(&info);
 
 	if (argc < 2U) {
@@ -129,11 +123,8 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 		}
 	}
 
-	/* A node pinging itself has no link to traverse: reaching the shell at
-	 * all is the answer. Saying so is honest, where reporting a round-trip
-	 * time would invent a measurement of nothing. Loopback traffic is also
-	 * where this libcsp loses the source address, so a real self-ping never
-	 * completes.
+	/* Pinging this node needs no link, so report that instead of a time. A real
+	 * self-ping doesn't complete because libcsp loses the loopback source address.
 	 */
 	if ((uint16_t)node == info.address) {
 		shell_print(sh, "CSP ping %lu: this node, no link traversed", node);
@@ -151,9 +142,7 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
-/* Thin, like every adapter here: the trace itself lives in kfsw-comms, because
- * it is libcsp's router and this node's send path that produce the lines.
- */
+/* The trace itself is in kfsw-comms. */
 static int cmd_csp_debug(const struct shell *sh, size_t argc, char **argv)
 {
 	bool enabled;
@@ -186,10 +175,7 @@ static int cmd_csp_ident(const struct shell *sh, size_t argc, char **argv)
 	char *end = NULL;
 	int result;
 
-	/* Asking this node who it is needs no network. Answering locally keeps
-	 * the question working on a node whose links are all down, which is
-	 * exactly when an operator is most likely to be asking it.
-	 */
+	/* This node's identity is answered locally, without the network. */
 	if (argc < 2U) {
 		kfsw_csp_get_info(&info);
 		shell_print(sh, "CSP ident %u (this node)", info.address);
@@ -220,12 +206,7 @@ static int cmd_csp_ident(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "revision: %s", identity.revision);
 	shell_print(sh, "built: %s %s", identity.date, identity.time);
 
-	/* A second exchange, because the identity reply has no room for a
-	 * clock and the wire format is libcsp's rather than ours. Asked here so
-	 * one question answers both halves of "what are you and when do you
-	 * think it is", which is what an operator actually wants to know before
-	 * trusting a timestamp in a downlink.
-	 */
+	/* A second exchange for the clock, which the identity reply doesn't carry. */
 	if (kfsw_csp_clock_read((uint16_t)node, KFSW_CSP_PING_TIMEOUT_MS, &clock) == 0) {
 		print_clock(sh, "clock", &clock);
 	} else {
@@ -235,10 +216,7 @@ static int cmd_csp_ident(const struct shell *sh, size_t argc, char **argv)
 }
 
 #if CONFIG_KFSW_COMMAND && CONFIG_REBOOT
-/* Thin, like every adapter here: it parses, hands the pin to the command
- * service and prints. The pin is checked on the node that would restart, not
- * here, because a guard applied by the caller guards nothing.
- */
+/* The pin is checked on the node that restarts. */
 static int cmd_csp_reboot(const struct shell *sh, size_t argc, char **argv)
 {
 	struct kfsw_command_result result = {0};
@@ -273,10 +251,7 @@ static int cmd_csp_reboot(const struct shell *sh, size_t argc, char **argv)
 }
 #endif
 
-/* Reads a clock, or hands one over. Which of the two depends on the arguments,
- * because they are the same exchange on the wire: the far side answers with
- * what it has either way.
- */
+/* Read or set a clock. Both use the same exchange. */
 static int cmd_csp_clock(const struct shell *sh, size_t argc, char **argv)
 {
 	struct kfsw_csp_clock clock = {0};
@@ -290,9 +265,7 @@ static int cmd_csp_clock(const struct shell *sh, size_t argc, char **argv)
 		return 0;
 	}
 
-	/* `set` first, because a node has to be given the time before it can
-	 * pass it on, and nothing on a board knows the date at power-on.
-	 */
+	/* set first: a node needs the time before it can pass it on. */
 	if (strcmp(argv[1], "set") == 0) {
 		long long seconds;
 
@@ -339,9 +312,7 @@ static int cmd_csp_clock(const struct shell *sh, size_t argc, char **argv)
 			shell_error(sh, "clock node=%lu: %d", node, result);
 			return result;
 		}
-		/* What came back is the node's own reading after the write, so
-		 * this reports what landed rather than what was sent.
-		 */
+		/* Print what the node read back after the write. */
 		print_clock(sh, "clock", &clock);
 		return 0;
 	}

@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
-# CSP over CAN between a NUCLEO-L496ZG and a host CAN adapter.
-#
-# There is no transceiver on the NUCLEO: PD0 and PD1 are logic level and a
-# transceiver sits between them and CAN_H/CAN_L. Wiring, the adapter and the
-# bus termination are the operator's, and this script reports what it observed
-# rather than assuming any of it.
+# CSP over CAN between a NUCLEO-L496ZG and a host CAN adapter. The NUCLEO needs
+# an external transceiver on PD0/PD1, and the bus needs termination.
 #
 #   sudo tests/hil/stm32/nucleo-l496zg/can-up.sh 500000 normal
 #   tests/hil/stm32/nucleo-l496zg/can-smoke.sh
@@ -28,9 +24,7 @@ skip() { echo "CAN SMOKE RESULT: NOT RUN - $*"; exit 0; }
 command -v ip >/dev/null || skip "ip is not available"
 ip link show "$interface" >/dev/null 2>&1 || skip "no $interface; is the adapter plugged in?"
 
-# A CAN transmitter needs another node to acknowledge its frames, so a bus with
-# nothing on it is not a quiet failure but an accumulating one. Refuse to start
-# rather than report errors that only mean the link was never up.
+# CAN frames need another node to acknowledge them, so check the bus first.
 state="$(ip -details link show "$interface" | awk '/can state/ {print $3; exit}')"
 [[ "$state" == "ERROR-ACTIVE" ]] || skip "$interface is $state; bring it up with can-up.sh"
 
@@ -80,8 +74,7 @@ speed="$(sed -n "s/^$flight:can_speed = \([0-9]*\).*/\1/p" "$work/session.log" |
 [[ "$speed" == "$bitrate" ]] || fail "node $flight reports can_speed=$speed, expected $bitrate"
 grep -q "^$flight:uid = " "$work/session.log" || fail "no string parameter read over CAN"
 
-# Frames the adapter actually saw, which is the only evidence the bus carried
-# anything rather than the two nodes agreeing in simulation.
+# Frames counted by the adapter, to show the bus carried traffic.
 read -r rx tx < <(ip -s link show "$interface" |
 	awk '/RX:/{getline; r=$2} /TX:/{getline; t=$2} END{print r, t}')
 errors="$(ip -details link show "$interface" |

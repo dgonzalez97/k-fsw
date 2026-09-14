@@ -7,20 +7,13 @@
 
 #include <kfsw/services/parameter.h>
 
-/* The parameter service initializes once per image, so a suite that needs its
- * own set of definitions needs its own configuration. String handling is worth
- * that: it is the one type whose length is part of the value, and every layer
- * that carries it has to agree on where the terminator went.
- */
+/* String parameters need their own configuration, since the service initializes once. */
 
 static char string_storage[8];
 static char refuse_storage[8];
 static int refusals;
 
-/* Accepts only the empty default. A validator that refused its own compiled
- * default would be caught at registration, which is the service refusing to
- * build a table its owner never sanctioned.
- */
+/* Accepts only the empty default. */
 static int refuse_anything_written(const char *text)
 {
 	if (text[0] == '\0') {
@@ -88,8 +81,7 @@ static void *strings_setup(void)
 {
 	const struct kfsw_param_definition_set *const sets[] = {&string_set};
 
-	/* The service initializes once per image, so every case here shares
-	 * this one table rather than each building its own. */
+	/* The service initializes once, so the cases share this table. */
 	zassert_ok(kfsw_param_init(sets, ARRAY_SIZE(sets)));
 	return NULL;
 }
@@ -103,16 +95,14 @@ ZTEST(services_param_strings, test_a_string_round_trips_and_is_bounded)
 	zassert_str_equal(value.text, "abc");
 	zassert_equal(value.size, 4U, "size carries the terminator");
 
-	/* Exactly filling the declared capacity is accepted: seven characters
-	 * and a terminator in eight bytes. */
+	/* Seven characters and a terminator fill the eight bytes. */
 	(void)strcpy(value.text, "1234567");
 	value.size = 8U;
 	zassert_ok(kfsw_param_set("text", &value));
 	zassert_ok(kfsw_param_get("text", &value));
 	zassert_str_equal(value.text, "1234567");
 
-	/* One more is refused rather than truncated. A truncated value is a
-	 * different value, and the operator is never told. */
+	/* One more is refused, not truncated. */
 	(void)strcpy(value.text, "12345678");
 	value.size = 9U;
 	zassert_equal(kfsw_param_set("text", &value), -EMSGSIZE);
@@ -141,7 +131,7 @@ ZTEST(services_param_strings, test_an_owner_can_refuse_a_string)
 	value.size = 3U;
 
 	zassert_equal(kfsw_param_set("guarded", &value), -EINVAL);
-	zassert_equal(refusals, before + 1, "the owner's validator has to be the one deciding");
+	zassert_equal(refusals, before + 1, "the validator must decide");
 	zassert_ok(kfsw_param_get("guarded", &value));
 	zassert_equal(strlen(value.text), 0U);
 }
@@ -171,8 +161,7 @@ ZTEST(services_param_strings, test_an_array_is_written_whole_or_not_at_all)
 	zassert_ok(kfsw_param_get("levels", &value));
 	zassert_equal(value.bytes[2], 7U);
 
-	/* Short of the declared length is refused: a partial write would leave
-	 * the rest at their old values with no way to tell which. */
+	/* A short array write is refused. */
 	value.size = ARRAY_SIZE(array_storage) - 1U;
 	zassert_equal(kfsw_param_set("levels", &value), -EMSGSIZE);
 
@@ -189,8 +178,7 @@ ZTEST(services_param_strings, test_an_owner_judges_the_array_as_a_whole)
 	struct kfsw_param_value value = {0};
 	const int before = array_refusals;
 
-	/* Validated together rather than per element, because a partially valid
-	 * array would be refused after some of it had been judged acceptable. */
+	/* The whole array is validated at once. */
 	zassert_ok(kfsw_param_get("levels", &value));
 	value.bytes[1] = 99U;
 	zassert_equal(kfsw_param_set("levels", &value), -ERANGE);

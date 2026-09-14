@@ -110,15 +110,15 @@ rewrite a commit already pinned by another PR.
 
 ## Choose the repository
 
-| Change | Owner |
+| Change | Repository |
 | --- | --- |
 | Time, reset, watchdog, storage mechanism | `kfsw-platform` |
 | Reusable service behaviour | `kfsw-services` |
-| CSP, routing, packet ownership, transports | `kfsw-comms` |
+| CSP, routing, packet buffers, transports | `kfsw-comms` |
 | Device or subsystem client | `kfsw-modules` |
 | Startup, targets, shell adapters, tools, integration tests, docs | `k-fsw` |
 
-Public APIs belong in the owner's `include/kfsw/` headers. Keep private
+Public APIs go in that repository's `include/kfsw/` headers and private
 helpers in its source tree.
 
 For a new service, add its Kconfig dependencies, conditional build, public
@@ -157,8 +157,7 @@ Use `build/nucleo_l496zg/zephyr/zephyr.elf` and check that build's
 
 ## Documentation
 
-Edit guides under `docs/` and document public C APIs in their owning
-headers. Keep instructions short: command, expected result, then limits
+Edit guides under `docs/` and document public C APIs in their headers. Keep instructions short: command, expected result, then limits
 that affect its use. Link to upstream references for general RTOS and
 protocol background.
 

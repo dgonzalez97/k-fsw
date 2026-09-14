@@ -11,10 +11,8 @@
 
 #if CONFIG_KFSW_HEALTH
 #define KFSW_APP_REPORT_MS_DEFAULT (CONFIG_KFSW_APP_HEALTH_DEADLINE_MS / 4U)
-/* A report period at or beyond half the deadline leaves no room for an ordinary
- * scheduling delay, so one late cycle would look like a stopped thread and
- * reset a working board. Refused rather than accepted: this is the one value
- * here that can reset a healthy satellite by being set to a plausible number.
+/* The report period must be below half the health deadline, or one late cycle
+ * would look like a stopped thread and reset the board.
  */
 #define KFSW_APP_REPORT_MS_MAX (CONFIG_KFSW_APP_HEALTH_DEADLINE_MS / 2U)
 #else
@@ -22,22 +20,14 @@
 #define KFSW_APP_REPORT_MS_MAX UINT16_MAX
 #endif
 
-/* Read once at start-up, before any service runs, for a marginal power budget.
- * Stored rather than live: by the time it could be applied the boot it delays
- * has already happened.
- */
+/* Read once at start-up, before any service runs. Takes effect at the next boot. */
 static uint16_t system_boot_delay_ms;
 static uint16_t system_app_report_ms = KFSW_APP_REPORT_MS_DEFAULT;
 
-/* Four zeros out of the box. A node that ships with no PIN at all would accept
- * a reboot from anyone who guessed the node number, and one that ships with a
- * secret nobody knows cannot be rebooted at all.
- */
+/* 0000 by default. */
 static char system_reboot_pin[KFSW_SYSTEM_REBOOT_PIN_SIZE] = "0000";
 
-/* Refused before it is stored. A PIN that cannot be typed back is a node that
- * cannot be restarted, and there is no way to undo it from the ground.
- */
+/* A PIN that can't be typed would make the node impossible to restart. */
 static int validate_reboot_pin(const char *text)
 {
 	size_t length = strlen(text);
@@ -64,9 +54,7 @@ bool kfsw_system_reboot_pin_matches(const char *pin)
 	if (strlen(pin) != strlen(system_reboot_pin)) {
 		return false;
 	}
-	/* Every byte is compared even after a mismatch, so how long the answer
-	 * takes does not say how much of the PIN was right.
-	 */
+	/* Compare every byte so the time taken doesn't depend on the match. */
 	for (index = 0U; index < strlen(system_reboot_pin); index++) {
 		difference |= (uint8_t)(pin[index] ^ system_reboot_pin[index]);
 	}
@@ -106,10 +94,7 @@ static const struct kfsw_param_definition system_param_definitions[] = {
 	{
 		.offset = 0x02U,
 		.type = KFSW_PARAM_U16,
-		/* Declared live without a callback: the application loop reads
-		 * this every cycle, so the next cycle already uses a new value
-		 * and there is nothing for a callback to apply.
-		 */
+		/* Live without a callback: the application reads it every cycle. */
 		.flags = KFSW_PARAM_FLAG_CONFIGURATION | KFSW_PARAM_FLAG_PERSISTENT |
 			 KFSW_PARAM_FLAG_LIVE,
 		.name = "app_report_ms",

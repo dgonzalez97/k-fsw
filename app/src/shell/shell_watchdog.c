@@ -72,11 +72,7 @@ static int cmd_watchdog_starve(const struct shell *sh, size_t argc, char **argv)
 
 	ARG_UNUSED(argv);
 
-	/* This ends in a reset that cannot be called off, so it is not
-	 * something to trip over by pressing tab and enter. The confirmation
-	 * word is required rather than a yes/no prompt so the command stays
-	 * usable from a script and over a link with no interactive echo.
-	 */
+	/* The reset can't be undone, so require the word confirm. */
 	if (argc != 2U || strcmp(argv[1], "confirm") != 0) {
 		shell_error(sh, "This stops feeding the watchdog and the board will reset.");
 		shell_error(sh, "Run: watchdog starve confirm");

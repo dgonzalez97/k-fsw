@@ -2,43 +2,18 @@
 
 [TOC]
 
-## Shell basics
+## Basics
 
-Type commands at the Zephyr shell prompt, without a `kfsw` prefix:
+Type commands at the shell prompt:
 
 ```text
 kfsw:~$ status
 ```
 
-Wait for `@READY` before using services. Use `help` to list commands and
-`<command> -h` for syntax. History and Tab completion are available.
-Only commands enabled by the target's Kconfig appear.
-
-## Editing, history, and discovery
-
-Press `Tab` to complete a unique command or show matching commands. Use
-`help` to list the root command set and `help <command>` or `<command> help`
-where Zephyr's command tree offers contextual usage. Up/Down history and normal
-line editing work when the attached terminal sends supported metakey escape
-sequences.
-
-```text
-kfsw:~$ csp <Tab>
-info  interfaces  ping  routes
-
-kfsw:~$ help
-kfsw:~$ param help
-```
-
-`Tab` completes command and subcommand names. It cannot complete free-form
-arguments such as a node number or a path, so each command states its arguments
-in its own help line. Three ways to reach that line:
-
-```text
-kfsw:~$ ftp                       group help plus every subcommand
-kfsw:~$ ftp generate -h           one subcommand's usage
-kfsw:~$ ftp generate              wrong argument count prints the same usage
-```
+Wait for `@READY` before using services. `help` lists the commands in the
+build and `<command> -h` shows the syntax. Tab completes command and
+subcommand names, but not arguments such as a node or a path. A command with
+the wrong number of arguments prints its usage:
 
 ```text
 kfsw:~$ ftp generate
@@ -46,61 +21,37 @@ generate: wrong parameter count
 generate - Create deterministic local data: generate <path> <bytes 0..32768>.
 ```
 
-Printing usage on a wrong argument count is enabled by `KFSW_DEBUG_SHELL`; it
-applies to every command, not only `ftp`.
+## Commands and build options
 
-Command availability is a build property. A shell-only target will not show
-`uhf`, `csp`, `uart`, `param`, `storage`, or `ftp` because their Kconfig owners
-are disabled. The shell does not provide placeholder commands for absent
-services.
+The shell needs `CONFIG_KFSW_DEBUG_SHELL`. Each command group depends on its
+service:
 
-The shell thread and prompt may be active before the K-FSW startup sequence has
-printed `@READY`. Wait for that marker, then query service-specific state.
+| Command | Build option |
+| --- | --- |
+| `status`, `version`, `time`, `log` | always |
+| `csp` | `CONFIG_KFSW_CSP` |
+| `uart` | `CONFIG_KFSW_CSP_KISS_UART` |
+| `param` | `CONFIG_KFSW_PARAM`; saving needs `CONFIG_KFSW_PARAM_PERSISTENCE` |
+| `storage` | `CONFIG_KFSW_STORAGE` |
+| `ftp` | `CONFIG_KFSW_FTP` |
+| `cmd` | `CONFIG_KFSW_COMMAND` |
+| `event` | `CONFIG_KFSW_EVENT` |
+| `hk` | `CONFIG_KFSW_HK` |
+| `fbo` | `CONFIG_KFSW_FBO` |
+| `fwu` | `CONFIG_KFSW_FWU` |
+| `watchdog` | `CONFIG_KFSW_WATCHDOG` |
+| `health` | `CONFIG_KFSW_HEALTH` |
+| `uhf` | `CONFIG_KFSW_RADIO_UHF_SHELL` |
+| `temp` | `CONFIG_KFSW_TEMP_EXAMPLE_SHELL` |
+| `boton_test`, `test` | `CONFIG_KFSW_BOTON_TEST_SHELL` |
 
-## Command domains
+## Identity and time
 
-```text
-root
-├── status, time, version
-├── log
-│   └── test
-├── uhf                       when KFSW_RADIO_UHF_SHELL=y
-│   └── status
-├── csp                       when KFSW_CSP=y
-│   ├── info, interfaces, routes, ping
-├── uart                      when KFSW_CSP_KISS_UART=y
-│   ├── info, test
-├── param                     when KFSW_PARAM=y
-│   ├── list, get, set
-│   └── save, load, defaults, clear
-│       when persistence is enabled
-├── boton_test                when KFSW_BOTON_TEST_SHELL=y
-│   └── status
-├── test                      when KFSW_BOTON_TEST_SHELL=y
-│   └── led <colour> <on|off>
-├── storage                   when KFSW_STORAGE=y
-│   ├── info, test
-├── ftp                       when KFSW_FTP=y
-│   ├── list/ls, stat, mkdir, put, get
-│   └── generate, verify      diagnostic helpers
-├── cmd                       when KFSW_COMMAND=y
-│   ├── list
-│   └── <registered names>    supplied by the registry, not this tree
-└── event                     when KFSW_EVENT=y
-    ├── list, stats, clear
-```
-
-`cmd` is the only root whose subcommands are not fixed at build time in this
-file. It offers whatever the command registry holds, so completion and help
-stay correct as components contribute commands.
-
-## Runtime identity and time
-
-| Command | Arguments | Meaning |
-| --- | --- | --- |
-| `status` | none | Print configured role/name, CSP node when enabled, compiled Zephyr board target, and monotonic uptime |
-| `version` | none | Print K-FSW development revision text, Zephyr kernel version, and board target |
-| `time` | none | Print monotonic milliseconds and microseconds |
+| Command | Prints |
+| --- | --- |
+| `status` | Role, name, CSP node, board, hardware ID and uptime |
+| `version` | K-FSW version, Zephyr version, board, SoC and hardware ID |
+| `time` | Milliseconds and microseconds since boot |
 
 ```text
 kfsw:~$ status
@@ -109,28 +60,23 @@ Role: flight
 Name: kfsw
 CSP node: 1
 board: native_sim/native/64
-uptime_ms: ...
+unit: 007f0101
+uptime_ms: 10
 ```
 
-Role and name are composition metadata; they do not select hidden behavior.
-`status` does not aggregate service health or restate `@READY`. `time` is
-elapsed local time, not UTC/TAI/GNSS or synchronized spacecraft time.
+Role and name are labels set in the build. `time` is time since boot; wall
+time is in `csp clock`.
 
 ## Logging
 
-| Command | Arguments | Meaning |
-| --- | --- | --- |
-| `log test` | none | Emit one message at every log level compiled into the image |
+`log test` prints one message at each level compiled into the image. Change
+`log_level`, or `log_levels` for a single module, to filter them.
 
-Runtime filtering may suppress lower-severity test lines. Change the
-`log_level` parameter to exercise that callback; save it explicitly only if
-the new threshold should survive reboot.
+## UHF radio
 
-## UHF radio diagnostics
-
-`uhf status` exists only when the reusable UHF module and its shell adapter are
-enabled. It reports the selected implementation, expected hardware and serial
-contract, hardware-status availability, and RF-link knowledge.
+`uhf status` prints the radio implementation, the expected hardware and serial
+settings, and the link state. With `CONFIG_KFSW_RADIO_UHF_CRYPTO`, `uhf connect`
+starts new encrypted sessions with the configured peer.
 
 ```text
 kfsw-gnd-uhf# uhf status
@@ -145,18 +91,15 @@ hardware status: unavailable
 RF link: unknown
 ```
 
-The command does not enter SiK command mode or read the modem. Expected values
-must be compared with `uart info`; actual interface traffic and errors remain
-under `csp interfaces` and `uart info`.
+`uhf status` doesn't talk to the modem. Traffic and errors are in `uart info`
+and `csp interfaces`.
 
-## boton_test diagnostic
-
-The module-owned diagnostic exists only when `CONFIG_KFSW_BOTON_TEST_SHELL=y`:
+## Button and LED example
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `boton_test status` | none | Print one coherent snapshot of button and LED state |
-| `test led` | `<green|blue|red> <on|off>` | Set one developer LED through the module owner |
+| `boton_test status` | none | Press count, last press and LED states |
+| `test led` | `<green|blue|red> <on|off>` | Switch one LED |
 
 ```text
 kfsw:~$ boton_test status
@@ -168,41 +111,35 @@ led_red: off
 debounce_ms: 30
 ```
 
-`debounce_ms` is printed by GPIO-enabled compositions; a software-only build
-can omit that line.
+`test led` and the LED parameters use the same module function. Holding the
+button counts one press, and everything resets at boot.
 
-The status command calls `kfsw_boton_test_get_status()`; it does not read GPIO
-or look up parameters. `test led` and writable LED PARAMs call the same owner
-setter, so they cannot create parallel GPIO state. Unknown colours and states
-other than `on`/`off` are rejected without changing state. The module
-intentionally provides no production
-`fake-press` or reset command. Holding the button does not generate repeated
-counts, and state resets only when the image reboots.
+`temp status` prints the cached die temperature of the temperature example
+and its read counters.
 
-## CSP diagnostics
-
-These commands exist only with `CONFIG_KFSW_CSP=y`.
+## CSP
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `csp debug` | `[on\|off]` | Trace every packet in and out; with no argument, report whether tracing is on |
-| `csp info` | none | Show local address, identity, build date and free packet buffers |
-| `csp interfaces` | none | List registered interfaces with addresses and packet/error/drop counters |
-| `csp routes` | none | List address prefixes, selected interface, and optional next hop |
-| `csp ping` | `<node>` | Send libcsp's standard ping with CRC32, bounded payload, and a one-second timeout |
-| `csp reboot` | `<node> <pin>` | Restart a node, if it quotes the pin that node holds |
+| `csp info` | none | Local address, identity, build date and free buffers |
+| `csp ident` | `[node]` | Hostname, model, revision, build date and clock |
+| `csp interfaces` | none | Interfaces with addresses and packet, error and drop counters |
+| `csp routes` | none | Route table |
+| `csp ping` | `[node]` | Ping with CRC32 and a one-second timeout |
+| `csp debug` | `[on\|off]` | Print every packet in and out |
+| `csp clock` | `[set <utc>]` or `<node> [sync]` | Read or set wall time |
+| `csp reboot` | `<node> <pin>` | Restart a node |
 
 ```text
-kfsw:~$ csp info
 kfsw:~$ csp routes
 0/0 -> KISS direct
 kfsw:~$ csp ping 2
 CSP ping 2: success, rtt_ms=...
 ```
 
-Tracing answers the question a link failure actually poses, which no counter
-can: did the packet leave, did it arrive, and where was it addressed. It prints
-both nodes, both ports, the priority, the flags and the interface carrying it.
+`csp debug on` prints each packet's source and destination node and port,
+priority, flags, size and interface. It is off by default and only affects the
+node where it is turned on.
 
 ```text
 kfsw:~$ csp debug on
@@ -213,29 +150,22 @@ kfsw:~$ csp ping 2
 CSP ping 2: success, rtt_ms=60
 ```
 
-It is off by default and per node: a busy link would push the line an operator
-is reading off the screen, and a hop that drops traffic is found by turning it
-on at each end and seeing which one stops reporting.
-
-A multi-interface composition exposes the names and next hop without collapsing
-them to a generic transport:
+With several links, `csp routes` shows the interface and next hop of each
+route:
 
 ```text
 kfsw:~$ csp routes
 10/14 -> KISS_1 direct
 11/14 -> KISS_2 via 11
-kfsw:~$ csp interfaces
-KISS_1 addr=8/14 ...
-KISS_2 addr=9/14 ...
 ```
 
-Routes are static startup configuration. The debug shell intentionally has no
-route-load/save command; `csp routes` is inspection-only.
+Routes are set at build time and can't be changed from the shell. A ping
+timeout can mean no peer, a wrong address or route, framing errors or no free
+buffers; check `csp interfaces`, `csp routes` and `uart info`.
 
 ### Restarting a node
 
-`csp reboot <node> <pin>` restarts a node, and the node checks the pin before
-it agrees:
+`csp reboot <node> <pin>` restarts a node if the pin matches:
 
 ```text
 kfsw:~$ csp reboot 2 1234
@@ -245,20 +175,12 @@ kfsw:~$ csp reboot 2 0000
 reboot node=2: OK rebooting in 500 ms
 ```
 
-The pin is `reboot_pin` in the system table, persistent, settable from the
-ground, and `0000` out of the box. It is text rather than a number, so `0000`
-stays four characters: read as an integer it would be zero, and a node whose
-pin was `0007` would then accept `7`.
+The pin is `reboot_pin` in the system table: `0000` by default, persistent,
+and settable from the ground. It is text, so `0007` doesn't match `7`. The pin
+is sent in clear text and only protects against rebooting the wrong node by
+mistake.
 
-**It guards against a mistake, not against an adversary.** The pin crosses the
-link in the clear, so anyone listening has it. What it stops is a mistyped node
-number restarting the wrong spacecraft, which is the failure that actually
-happens. The node that would restart is the one that checks, never the caller:
-a guard the asker applies to itself guards nothing. The comparison runs over
-the pin's full width, so how long the answer takes says nothing about how much
-of it was right.
-
-After a restart, the boot table says why the previous run ended:
+After a restart the boot table shows why the previous run ended:
 
 ```text
 kfsw:~$ param table 2 32
@@ -267,57 +189,40 @@ kfsw:~$ param table 2 32
 32  0x38  last_uptime_ms   u32  r  5427214
 ```
 
-All three zero means the node lost power outright and left nothing behind.
+All three at zero means the node lost power.
 
-A ping timeout can mean no peer, no physical bridge, wrong address, wrong
-route, a stopped router, framing errors, or packet exhaustion. Inspect
-`csp interfaces`, `csp routes`, and `uart info` before treating every timeout
-as an application-service failure.
-
-## Dedicated UART/KISS diagnostics
-
-These commands exist only with `CONFIG_KFSW_CSP_KISS_UART=y`.
+## UART/KISS
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `uart info` | none | Show every configured UART, baud, readiness, KISS name/address, and independent counters |
-| `uart test` | `[node]` | Resolve the configured peer or explicit node through CSP, require a managed UART/KISS route, and ping with a 128-byte payload |
+| `uart info` | none | Each CSP UART with baud, state, KISS name, address and counters |
+| `uart test` | `[node]` | Check that the route uses a UART/KISS link, then ping with a 128-byte payload |
 
-`uart test` is stronger than a generic ping because it first verifies route
-selection and reports the interface name that libcsp selected. Use an explicit
-node to distinguish links in a multi-interface image, for example `uart test
-10` and `uart test 11`. It does not test every service or electrical condition.
+Give the node to test one link out of several, for example `uart test 10` and
+`uart test 11`. On the NUCLEO these commands run on the ST-LINK console and the
+packets leave on USART3; don't connect the shell terminal to the CSP UART.
 
-On NUCLEO, these commands are entered through the ST-LINK shell while the
-tested packets leave on USART3. Do not connect the shell terminal to the CSP
-UART.
-
-## Local parameters
-
-Local commands exist with `CONFIG_KFSW_PARAM=y`.
+## Parameters
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `param tables` | none | List registered tables with their identifier, band and size |
-| `param list` | none | List every parameter by table, offset, type, write mode and value |
-| `param get` | `<name>` | Read one local scalar |
-| `param set` | `<name> <value>` | Validate and change one local scalar in RAM |
-
-A parameter is addressed by **table and offset**, not by a flat identifier. The
-band a table sits in says who owns it: 1 to 24 core, 25 to 49 services, 50 to 99
-modules. Zero is reserved and never valid, so an uninitialised field cannot
-address a real table.
+| `param tables` | none | Local tables with ID, band, size and saved values |
+| `param tablelist` | `[node]` | Tables of a node |
+| `param list` | `[node]` | All parameters |
+| `param table` | `[node] <table>` | One table |
+| `param get` | `[node] <name>` | Read a value |
+| `param set` | `[node] <name> <value>` | Write a value |
 
 ```text
 kfsw:~$ param tables
- id  band     name        params
----  -------  ----------  ------
-  1  core     board            6
-  2  core     system           2
-  3  core     telemetry        5
-  4  core     csp              7
-  5  core     storage          4
- 25  service  log              1
+ id  band     name        params    kept
+---  -------  ----------  ------  ------
+  1  core     board           11       0
+  2  core     system           3       3
+  3  core     telemetry        5       0
+  4  core     csp              8       0
+  5  core     storage          4       0
+ 25  service  log              5       2
 ```
 
 ```text
@@ -325,234 +230,112 @@ kfsw:~$ param list
 table       addr  name                              type    mode  value
 ----------  ----  --------------------------------  ------  ----  -----
 board       0x00  node_id                           u16     r     1
-system      0x00  boot_delay_ms                     u16     b     0
-system      0x02  app_report_ms                     u16     wb    1000
-telemetry   0x00  uptime_s                          u32     r     41
-log         0x00  log_level                         u8      wb    1
+system      0x00  boot_delay_ms                     u16     wpb   0
+system      0x02  app_report_ms                     u16     wp    1000
+telemetry   0x00  uptime_s                          u32     r     0
+log         0x00  log_level                         u8      wp    1
 ```
 
-The `mode` column is the parameter's write contract, and it is derived from the
-definition rather than written by hand:
+Mode letters: `r` read-only, `w` writable, `p` saved in the snapshot, `b`
+applied at the next boot. Strings are printed quoted and arrays as lists.
+Input is parsed with the parameter's type; overflow, negative unsigned values
+and bad numbers are rejected.
 
-| Mode | Meaning |
-| --- | --- |
-| `r` | Read-only. Written by the flight software; a write is refused. |
-| `w` | The write takes effect immediately. |
-| `b` | The write is stored, but the running system keeps its old value until reboot. |
-| `wb` | Both. |
-
-A `b` parameter says so on write rather than acknowledging with a bare `OK`,
-because a stored value that the operator believes is live is the failure this
-scheme exists to prevent:
-
-```text
-kfsw:~$ param set boot_delay_ms 250
-boot_delay_ms = 250
-stored; takes effect after reboot
-```
-
-Names are at most 32 characters, refused at registration rather than truncated:
-a truncated name is printed but cannot be typed.
-
-`echo_enabled` controls whether the console repeats what is typed at it. It is
-off by default, because the shell prints back every input byte and a session
-driven by a script would otherwise show each command twice:
+`echo_enabled` makes the console repeat what it receives. It is off by
+default:
 
 ```text
 kfsw:~$ param set echo_enabled 1
-kfsw:~$ status          <- the command, repeated by the shell
+kfsw:~$ status          <- repeated by the shell
 K-FSW status
 ```
 
-Turn it on when you need to see what the console received, such as checking tab
-completion.
+### Remote nodes
 
-`node_id` is read-only. `log_level` accepts 0 through 4. Integer parsing rejects
-overflow and unsigned-negative input; the command reads the parameter
-description first so it can parse the exact type.
-
-The opt-in NUCLEO hardware-test profile additionally exposes five module-owned
-live values. The button values remain read-only; LED values are writable
-non-persistent booleans and accept only `0` or `1`:
-
-```text
-kfsw:~$ param get press_count
-press_count = 0
-kfsw:~$ param get last_press_s
-last_press_s = 0
-kfsw:~$ param get led_green
-led_green = 0
-kfsw:~$ param set led_green 1
-led_green = 1
-```
-
-All five reset to zero/off on boot. A rejected `param set`, including an LED
-value other than `0` or `1`, changes neither typed owner state nor GPIO output.
-
-## Remote parameters
-
-When `CONFIG_KFSW_PARAM_CSP=y`, `list`, `get`, and `set` accept an explicit
-node before the normal arguments:
-
-| Command | Meaning |
-| --- | --- |
-| `param list <node>` | Refresh and list the remote descriptor cache for that node |
-| | A remote listing knows the table from the identifier but not its name, so the number stands in for it |
-| `param get <node> <name>` | Read a remote scalar over CSP |
-| `param set <node> <name> <value>` | Validate text against the remote descriptor and request a remote RAM write |
+With `CONFIG_KFSW_PARAM_CSP`, put the node before the other arguments:
 
 ```text
 kfsw:~$ param get 2 log_level
 2:log_level = 1
 kfsw:~$ param set 2 log_level 2
 2:log_level = 2
+kfsw:~$ param table 2 25
 ```
 
-The same adapter can observe the button module on node 2:
+The node is a decimal number. Remote listings show the table number instead
+of its name, because table names are not sent over the link.
 
-```text
-kfsw:~$ param get 2 press_count
-2:press_count = 0
-kfsw:~$ param get 2 last_press_s
-2:last_press_s = 0
-```
-
-Remote writes to either value fail as read-only. This visibility does not make
-`boton_test` a CSP-aware module; PARAM/CSP and routing remain separate
-composition capabilities.
-
-The node argument is decimal. Remote changes are not automatically persisted
-on the destination. The current API has no remote “save” command.
-
-When the CSP adapter is disabled, optional node arguments are not accepted;
-the same command names remain local-only.
-
-## Parameter persistence
-
-These commands exist with `CONFIG_KFSW_PARAM_PERSISTENCE=y` and always act on
-the local node.
+### Saving
 
 | Command | Effect |
 | --- | --- |
-| `param save` | Build, CRC, sync, and atomically replace the saved snapshot from persistent RAM entries |
-| `param load` | Validate and apply compatible entries from the saved snapshot |
-| `param defaults` | Restore persistent entries to compiled defaults in RAM; saved file unchanged |
-| `param clear` | Remove active/temporary snapshots; RAM unchanged |
+| `param save` | Write all persistent values to the snapshot |
+| `param persist <table>` | Write the snapshot and show that table's share |
+| `param load` | Apply the saved snapshot |
+| `param defaults` | Reset persistent values to their defaults, in RAM only |
+| `param clear` | Delete the snapshot; RAM is unchanged |
 
-A safe trial sequence is:
-
-```text
-kfsw:~$ param get log_level
-kfsw:~$ param set log_level 2
-kfsw:~$ param get log_level
-kfsw:~$ param defaults
-kfsw:~$ param get log_level
-```
-
-Only run `param save` after deciding the runtime state should become the next
-boot's restored state. @ref services explains the complete state model.
+These act on the local node. With `param_autosave` on, a change to a
+persistent value is saved without `param save`. See @ref services.
 
 ## Storage
 
-Storage commands exist with `CONFIG_KFSW_STORAGE=y`.
-
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `storage info` | none | Show filesystem, flash backend, `/kfsw` mount point, readiness, total bytes, and free bytes |
-| `storage test` | none | Run bounded create/write/read/overwrite/delete diagnostics |
-| `storage test write` | `<value>` | Write the integration persistence fixture |
-| `storage test read` | `<value>` | Read and compare the integration persistence fixture |
+| `storage info` | none | Filesystem, backend, mount point, state, total and free bytes |
+| `storage test` | none | Create, write, read, overwrite and delete a test file |
+| `storage test write` | `<value>` | Write the persistence test value |
+| `storage test read` | `<value>` | Read and compare the persistence test value |
 
 ```text
 kfsw:~$ storage info
-kfsw:~$ storage test
-Storage test: PASS
+K-FSW storage
+filesystem: LittleFS
+backend: flash-controller@0
+mount_point: /kfsw
+ready: yes
+total_bytes: 262144
+free_bytes: 237568
 ```
 
-`storage test` modifies only its diagnostic path, but it is still a write test.
-Use `storage info` when a read-only readiness check is sufficient.
+`storage test` writes to flash. `storage info` only reads.
 
 ## File transfer
 
-FTP commands exist with `CONFIG_KFSW_FTP=y`. K-FSW FTP is not Internet FTP;
-all paths are virtual paths below `/kfsw/ftp` on the selected node.
-
-The preferred operator syntax places the node first for operations that act on
-a remote server:
+Paths are virtual and rooted at `/kfsw/ftp` on the node.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `ftp <node> ls` | `[remote-directory]` | List one remote directory; `list` is an alias |
-| `ftp <node> stat` | `<remote-path>` | Report remote type, byte size, and file CRC |
-| `ftp <node> mkdir` | `<remote-directory>` | Create one directory whose parent exists |
-| `ftp <node> put` | `<local-path> <remote-path>` | Upload and atomically finalize a file |
-| `ftp <node> get` | `<remote-path> <local-path>` | Download and atomically finalize a file |
+| `ftp <node> ls` | `[directory]` | List a directory; `list` also works |
+| `ftp <node> stat` | `<path>` | Type, size and CRC |
+| `ftp <node> mkdir` | `<directory>` | Create a directory |
+| `ftp <node> put` | `<local> <remote>` | Upload a file |
+| `ftp <node> get` | `<remote> <local>` | Download a file |
+| `ftp generate` | `<path> <bytes>` | Create a test file of up to 32768 bytes |
+| `ftp verify` | `<first> <second>` | Compare two local files |
 
-Verb-first forms such as `ftp put <node> ...` remain available because they
-map naturally to Zephyr static subcommands and completion.
-
-### The local node
-
-`ls`, `list`, `stat`, and `mkdir` accept this node's own CSP address. Those
-requests are served directly from local storage: no connection is opened, no
-route is used, and the result does not depend on any peer being reachable.
-
-```text
-kfsw:~$ csp info
-CSP node: 1
-kfsw:~$ ftp 1 ls /
-kfsw:~$ ftp 1 mkdir /exchange
-```
-
-The local node still needs storage mounted and the FTP service started;
-otherwise the command reports `service or storage not ready`.
-
-`put` and `get` move a file between two nodes. Addressing them at the local
-node reports `transfers need two nodes` rather than copying in place. Use
-`ftp generate` and `ftp verify` for local file work.
-
-Local diagnostic helpers are:
-
-| Command | Arguments | Meaning |
-| --- | --- | --- |
-| `ftp generate` | `<local-path> <bytes>` | Generate deterministic data, up to 32768 bytes |
-| `ftp verify` | `<first-local-path> <second-local-path>` | Compare two local sandbox files byte for byte |
-
-A complete round trip is:
+The verb can also go first, `ftp put <node> ...`, which is the form Tab
+completion shows. `ls`, `stat` and `mkdir` work on the node's own address
+without a connection; `put` and `get` need another node.
 
 ```text
 kfsw:~$ ftp generate /build/sample.bin 1024
 kfsw:~$ ftp 2 mkdir /exchange
 kfsw:~$ ftp put 2 /build/sample.bin /exchange/sample.bin
 kfsw:~$ ftp stat 2 /exchange/sample.bin
-kfsw:~$ ftp 2 ls /exchange
 kfsw:~$ ftp get 2 /exchange/sample.bin /build/returned.bin
 kfsw:~$ ftp verify /build/sample.bin /build/returned.bin
 ```
 
-Paths must begin with `/` and may not contain traversal or empty components.
-An FTP result line reports node, paths, byte count, or the mapped failure. A
-successful transport does not imply that a later `verify` can be skipped when
-an operator needs an explicit local comparison.
+Paths must start with `/` and can't contain `..` or empty components.
 
 ## Commands
 
-`cmd` exists with `CONFIG_KFSW_COMMAND=y`. It is the generic command registry:
-one definition, reachable by name here and by numeric identifier over CSP from
-a ground station. Both routes resolve to the same handler and the same
-validation, so a shell operator and a remote caller cannot diverge.
-
-`cmd` implements nothing itself. It converts text into the argument types a
-definition declares and calls the same entry point the remote front end uses.
-
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `cmd list` | none | Show every registered command with its identifier, argument count and description |
+| `cmd list` | none | Registered commands with ID, arguments and description |
 | `cmd <name>` | `[arguments]` | Run a command on this node |
-| `cmd <node> <name>` | `[arguments]` | Run it on a remote node over CSP |
-
-A leading numeric token selects a remote node, the same convention as
-`param get [node] <name>` and `ftp <node> <op>`.
+| `cmd <node> <name>` | `[arguments]` | Run a command on another node over CSP |
 
 ```text
 kfsw:~$ cmd list
@@ -561,59 +344,38 @@ kfsw:~$ cmd list
   2 info         0 args Report uptime and storage state.
   4 event_stats  0 args Report event record counters.
   5 event_tail   1 arg  Read one recorded event by age, newest is 0.
+  6 hk_define    2 args Name what a report collects: <report> "[node:]table:offset ...".
+  7 hk_period    2 args Collect repeatedly: hk_period <report> <ms>, 0 to stop.
+  8 hk_clear     1 arg  Forget a report: hk_clear <report>.
   3 reboot       1 arg  [mutating] Reset this node after a short delay: reboot <pin>.
-
-kfsw:~$ cmd info
-info node=0: OK uptime_ms=10 storage=ready free_bytes=40960
 
 kfsw:~$ cmd 2 info
 info node=2: OK uptime_ms=4140 storage=ready free_bytes=12288
 ```
 
-Registered names are offered by completion and by `cmd -h`, because the
-subcommand set is built from the registry rather than written out. A command
-marked `[mutating]` changes node state.
+The name is looked up in the local registry before the request is sent, so
+both nodes need the same command IDs. `[mutating]` commands change the node.
+Remote commands need `CONFIG_KFSW_COMMAND_CSP` (port 11). There is no
+authentication.
 
-A name is resolved against **this** node's registry before a remote request is
-sent, so a command the local node does not know cannot be invoked remotely. The
-failure is local and immediate rather than a timeout.
+## Events
 
-Remote commands need `CONFIG_KFSW_COMMAND_CSP=y`, which serves CSP port 11.
-There is no authentication: the request carries its source node, and a handler
-must not treat any particular source as trusted.
-
-## Event record
-
-`event` exists with `CONFIG_KFSW_EVENT=y`. It shows the numeric record of what
-this node has done, which is what remains available when no console is
-attached.
-
-| Command | Arguments | Meaning |
-| --- | --- | --- |
-| `event list` | none | Show held records, oldest first |
-| `event stats` | none | Show held, capacity, recorded, overwritten and rejected counts |
-| `event clear` | none | Discard held records; counters are preserved |
+| Command | Meaning |
+| --- | --- |
+| `event list` | Held records, oldest first |
+| `event stats` | Held, capacity, recorded, overwritten and rejected counts |
+| `event clear` | Discard held records; counters are kept |
 
 ```text
 kfsw:~$ event list
      SEQ    TIME_MS SOURCE   SEVERITY    ID PAYLOAD
        0          0 boot     info         1 0000000800
-       1         10 command  info         1 0002000000
-Events listed: 2
+Events listed: 1
 ```
 
-Payloads are shown as bytes and are not decoded. Their meaning belongs to the
-producing component, which documents the layout alongside its identifiers in
-its own public header.
-
-A gap in `SEQ` means records were lost. `event stats` reports how many, because
-a ring that wraps increments an overwritten counter rather than discarding
-silently.
-
-The record lives in RAM and does not survive a reset.
-
-To read a **remote** node's record, use the command service rather than a
-separate protocol:
+Payloads are printed as bytes; their layout is in the producer's header. A gap
+in `SEQ` means records were overwritten, and `event stats` shows how many. The
+record is lost at reset. For another node:
 
 ```text
 kfsw:~$ cmd 2 event_stats
@@ -622,77 +384,82 @@ kfsw:~$ cmd 2 event_tail 0
 event_tail node=2: OK seq=8 t=8120ms ftp/1 sev=0 0002000001000ce9d363
 ```
 
+## Housekeeping
+
+| Command | Arguments | Meaning |
+| --- | --- | --- |
+| `hk define` | `<report> [node:]table:offset ...` | Set what a report collects |
+| `hk clear` | `<report>` | Delete a report |
+| `hk show` | none | Reports and counters |
+| `hk collect` | `<report>` | Collect now |
+| `hk get` | `<report> [count]` | Print collected samples |
+| `hk period` | `<report> <ms>` | Collect periodically, 0 to stop |
+| `hk store` | `<report> <ms>` | Also write samples to a file, 0 to stop |
+| `hk store_clear` | `<report>` | Stop storing and delete the file |
+| `hk beacon` | `<report> <node> <ms>` | Send the latest sample periodically, 0 to stop |
+| `hk save` | none | Save the report settings |
+
+See @ref ground for Yamcs and the ground bridge.
+
+## File based operations
+
+| Command | Arguments | Meaning |
+| --- | --- | --- |
+| `fbo run` | `<name>` | Run a procedure file |
+| `fbo stop` | none | Stop the running procedure |
+| `fbo status` | none | Procedure, current line and counters |
+
 ## Firmware update
 
-Present when `CONFIG_KFSW_FWU` is composed in.
-
-```
+```text
 fwu status               state, slot geometry and checksums
-fwu abort                abandon a transfer and erase the slot
 fwu begin <size> <crc>   start a transfer by hand
 fwu finish               verify and offer the image to the bootloader
-```
-
-With `CONFIG_KFSW_FWU_LITE_CSP`, a node can also send an image to another:
-
-```
+fwu abort                abandon a transfer and erase the slot
 fwu send <node> <path>   send an image block by block
-fwu flash <node>         ask that node to boot what it has accepted
+fwu flash <node>         ask a node to boot the image it received
 ```
 
-`fwu send` reports how many blocks had to be repeated. A rising count is the
-link degrading well before it fails outright.
+`send` and `flash` need `CONFIG_KFSW_FWU_LITE_CSP`. `fwu send` reports how many
+blocks had to be resent; a growing number means the link is getting worse.
 
-`swap_scheduled` in `fwu status` is the line that matters after a transfer. An
-image written to the wrong offset leaves the bootloader with nothing to swap,
-and it reports that only by quietly running the old image on the next boot.
+After a transfer, check `swap_scheduled` in `fwu status`. If it is not set,
+MCUboot has nothing to swap and boots the old image. See
+@ref firmware_update.
 
-## Watchdog
+## Watchdog and health
 
-Present only in a composition that enables `CONFIG_KFSW_WATCHDOG` and binds a
-device through the `kfsw,watchdog` chosen property.
-
-```
-watchdog status          configuration and activity
-watchdog feed            feed once
-watchdog starve confirm  stop feeding; the board resets
-```
-
-`watchdog status` reports whether a device is bound, the lifecycle state
-(`unconfigured`, `configured`, `running`, `starved`), the configured timeout,
-the interval the keep-alive feeds at, the number of feeds since boot, and how
-long ago the last one was.
-
-`watchdog starve` requires the literal word `confirm`. It stops the keep-alive
-and the part resets within one timeout period; on hardware whose watchdog
-cannot be disarmed, which includes the STM32 independent watchdog, there is no
-way to call it off once issued. The confirmation is a word rather than an
-interactive prompt so the command stays usable from a script and over a link
-with no echo.
-
-After the reset the boot banner names the cause:
-
-```
-@BOOT sw=7c592ef board=nucleo_l496zg/stm32l496xx reset=0x00000011 reset_rc=0 reset_cause=watchdog
+```text
+watchdog status                    configuration and activity
+watchdog feed                      feed once
+watchdog starve confirm            stop feeding; the board resets
+health status                      whether the watchdog is being fed
+health list                        watched components and deadlines
+health report <handle>             report a component as alive
+health watch <name> <ms> confirm   watch a component that never reports
 ```
 
-The raw mask is kept alongside the decoded name because a reset can latch
-several causes at once; `0x11` above is the pin and watchdog bits together.
-The name reports the one an operator needs first.
+The `watchdog` commands need `CONFIG_KFSW_WATCHDOG` and a `kfsw,watchdog`
+devicetree property. `watchdog status` shows the state (`unconfigured`,
+`configured`, `running` or `starved`), the timeout, the feed interval, the
+number of feeds and the time since the last one.
 
-## Automation guidance
+`watchdog starve confirm` can't be undone, since the STM32 independent
+watchdog can't be disarmed; the board resets within one timeout. `health
+watch` also ends in a reset once the deadline passes. The next boot marker
+shows the cause:
 
-Commands are sent without automatic retries. A timeout may mean the reply was
-lost after execution. Check the resulting state before submitting the command
-again. Radio replay protection rejects repeated wire frames; a newly submitted
-command is a new request.
+```text
+@BOOT sw=v1.0.1 board=nucleo_l496zg/stm32l496xx unit=203037324d46500c0010001f reset=0x00000011 reset_rc=0 reset_cause=watchdog
+```
 
-Prefer stable markers and result lines over terminal timing. Wait for
-`@READY`, send one command, assert its command-specific output, and wait for
-the prompt before sending the next command. The project integration and Robot
-runners follow this pattern.
+The raw mask is printed as well because several causes can be latched at once;
+`0x11` is the reset pin and the watchdog.
 
-Do not parse cosmetic spacing as a protocol. Shell output is an operator/test
-interface; CSP service formats and public C return contracts are the machine
-interfaces. When a script needs to span nodes, use the existing service API or
-test fixture instead of sending a shell string to the remote node.
+## Scripts
+
+Commands are not retried. A timeout can mean the reply was lost after the
+command ran, so check the state before sending it again. Wait for `@READY`,
+send one command, check its output and wait for the prompt before the next
+one. Don't rely on the spacing of shell output; use the C APIs or the CSP
+services when a script needs a stable format.

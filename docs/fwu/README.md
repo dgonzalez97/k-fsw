@@ -4,8 +4,8 @@
 
 Upload a signed image, reboot into it, then confirm it after checking the node.
 MCUboot restores the previous image if the trial is unconfirmed at the next reset.
-The watchdog provides
-that reset only when it is configured and its health policy stops feeding it.
+The watchdog causes that reset only when it is configured and health
+monitoring stops feeding it.
 
 ## Firmware files
 
@@ -134,5 +134,5 @@ A failed erase leaves the service in `failed` with its transfer details intact.
 
 ## Related
 
-- @ref targets — flash map and MCUboot configuration.
-- `tests/hil/mcuboot/rollback.sh` — bootloader revert and wrong-key tests.
+- @ref targets has the flash map and MCUboot configuration.
+- `tests/hil/mcuboot/rollback.sh`: bootloader revert and wrong-key tests.

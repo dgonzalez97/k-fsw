@@ -1,18 +1,9 @@
 #!/usr/bin/env bash
-# Checks that a housekeeping report says what its parameters say.
+# Checks that a housekeeping report matches reading its parameters one by one,
+# at the declared widths, and that bad definitions are refused.
 #
-# That comparison is the whole point of the service. Collecting a set is only
-# worth doing if the set agrees with reading its members one at a time; a frame
-# that is fast and wrong is worse than the round trips it replaced.
-#
-# So the script reads three values individually, collects a report naming the
-# same three, and asserts the frame carries exactly those numbers at exactly
-# the declared widths. It also checks the refusals, because a report that
-# cannot be collected must be refused when it is defined rather than discovered
-# during a pass.
-#
-# Runs against the hosted image by default. Pass --serial to run it against a
-# board over its debug UART instead, in which case the by-id path is required.
+# Runs against the hosted image by default. Pass --serial to use a board's debug
+# UART instead, with a by-id path.
 
 set -euo pipefail
 
@@ -108,12 +99,10 @@ expect 'report 0 defines 2 values'
 expect 'report 0 collected'
 
 printf '\n=== The frame agrees with the parameters ===\n'
-# node_id is a u16 and fs_total_kb a u32, so the payload is six bytes: the
-# widths come from the declarations, not from what the values happen to need.
+# node_id is a u16 and fs_total_kb a u32, so the payload is six bytes.
 expect_re 'seq 0 .* 2 values .* 16 bytes' 'the frame is the declared width'
 
-# The shell terminates its lines with CR, so it is stripped before matching
-# rather than every pattern here having to allow for it.
+# Strip the CR the shell adds to each line.
 tr -d '\r' <"$work_dir/output.log" >"$work_dir/plain.log"
 node_id="$(sed -n 's/^node_id = \([0-9]*\)$/\1/p' "$work_dir/plain.log" | head -1)"
 total_kb="$(sed -n 's/^fs_total_kb = \([0-9]*\)$/\1/p' "$work_dir/plain.log" | head -1)"

@@ -15,8 +15,7 @@ lossy_link=0
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 	--lossy)
-		# Drop bytes in the bridge, so the transfer has to recover rather
-		# than merely complete.
+		# Drop bytes in the bridge so the transfer has to recover.
 		lossy_link=1
 		;;
 	*)
@@ -63,9 +62,7 @@ wait_for_output()
 	local file="$1"
 	local expected="$2"
 	local process_pid="$3"
-	# Seconds. A shell command answers in well under the default; a transfer
-	# of a hundred blocks does not, and the machine running this may be much
-	# slower than the one it was written on.
+	# Seconds. A transfer of a hundred blocks takes longer than a shell command.
 	local limit="${4:-30}"
 	local waited=0
 
@@ -78,8 +75,7 @@ wait_for_output()
 	done
 }
 
-# How long a whole-image transfer may take. Generous on purpose: an unhelpful
-# timeout here reports a stall that never happened.
+# Time limit for a whole image transfer, generous for slow machines.
 readonly TRANSFER_LIMIT_S=600
 
 trap cleanup EXIT
@@ -93,10 +89,7 @@ cp "$KGROUND_REPO_DIR/ground-station/nodes/kfsw-gnd-uhf.env" \
 	"$station_dir/nodes/kfsw-gnd-uhf.env"
 cp "$KGROUND_REPO_DIR/ground-station/nodes/kfsw-ops.env" \
 	"$station_dir/nodes/kfsw-ops.env"
-# Both nodes carry the update service: one to receive an image, the other to
-# send it. The direct upload path is exercised here rather than the file
-# transfer route, so blocks and their individual checksums are what crosses the
-# link.
+# Both nodes have the update service. This test uses the direct upload path.
 fwu_kconfig='CONFIG_KFSW_FWU=y
 CONFIG_KFSW_FWU_MCUBOOT=n
 CONFIG_KFSW_FWU_SLOT_OFFSET_SECTORS=1
@@ -104,9 +97,7 @@ CONFIG_KFSW_FWU_LITE=y
 CONFIG_KFSW_FWU_LITE_CSP=y
 CONFIG_KFSW_FWU_LITE_BLOCK_SIZE=192
 CONFIG_KFSW_FWU_LITE_RDP=n
-# Both nodes are processes on one machine, so a reply that is coming arrives in
-# milliseconds. A short timeout keeps a deliberately lossy run tractable
-# instead of spending seconds waiting for packets that were discarded.
+# Both nodes run on one machine, so a short timeout keeps the lossy run quick.
 CONFIG_KFSW_FWU_LITE_TIMEOUT_MS=1500
 CONFIG_KFSW_FWU_LITE_BLOCK_RETRIES=12'
 
@@ -166,9 +157,7 @@ node19_pty="$(sed -n 's/^uart_1 connected to pseudotty: //p' \
 	"$work_dir/node19.log" | head -1)"
 
 if [[ "$lossy_link" -eq 1 ]]; then
-	# A transfer that only ever runs over a clean link has never exercised
-	# the part of it that recovers. Bytes are dropped in runs, which is what
-	# a lost packet looks like from either end.
+	# Drop bytes in runs, like lost packets.
 	python3 "$KGROUND_REPO_DIR/tests/support/lossy-link.py" \
 		--left "$node16_pty" --right "$node19_pty" \
 		--drop-every 9000 --drop-bytes 6 \
@@ -189,13 +178,8 @@ printf '%s\n' 'csp ping 19' >&3
 wait_for_output "$work_dir/node16.log" "CSP ping 19: success" "$node16_pid" || \
 	fail "node 16 could not ping node 19"
 
-# The image lives on the host, which is where a ground station's images
-# actually are. A node running as a process reads it directly rather than
-# needing it copied into a simulated flash partition first, which would add a
-# step and a size limit a real firmware image would exceed.
-#
-# Large enough to cross many blocks: at 192 bytes a block this is over a
-# hundred, so ordering and the final short block are both exercised.
+# The image is a host file, read directly by the native node. It is large
+# enough for over a hundred 192-byte blocks, including a short last block.
 image_path="$work_dir/image.bin"
 head -c 20000 /dev/urandom >"$image_path" || fail "could not create a stand-in image"
 
@@ -206,8 +190,7 @@ print(f'{zlib.crc32(pathlib.Path(sys.argv[1]).read_bytes()) & 0xFFFFFFFF:08x}')
 [[ -n "$image_crc" ]] || fail "could not compute the image checksum"
 echo "K-GROUND FWU-LITE: host image $image_path crc32=$image_crc"
 
-# The receiving node must start from nothing, so a stale slot cannot be
-# mistaken for a successful transfer.
+# Start from an empty slot so an old image can't pass as this transfer.
 printf '%s\n' 'fwu abort' 'fwu status' >&3
 wait_for_output "$work_dir/node16.log" "state: idle" "$node16_pid" || \
 	fail "node 16 did not start idle"
@@ -216,9 +199,7 @@ printf '%s\n' "fwu send 16 $image_path" >&4
 wait_for_output "$work_dir/node19.log" "Image accepted and verified" \
 	"$node19_pid" "$TRANSFER_LIMIT_S" || fail "the image was not accepted by node 16"
 
-# What the receiver holds must match what the sender computed, byte count and
-# checksum both. Either alone would pass on a transfer that lost a whole block
-# and gained a duplicate.
+# Byte count and checksum must both match.
 printf '%s\n' 'fwu status' >&3
 wait_for_output "$work_dir/node16.log" "received: 20000" "$node16_pid" || \
 	fail "node 16 did not receive the whole image"
@@ -227,8 +208,7 @@ wait_for_output "$work_dir/node16.log" "actual_crc32: $image_crc" "$node16_pid" 
 wait_for_output "$work_dir/node16.log" "expected_crc32: $image_crc" \
 	"$node16_pid" || fail "node 16 recorded the wrong expected checksum"
 
-# Sending stops at a verified image. Committing it is a separate command, so a
-# node is never left booting something merely because it arrived.
+# Sending stops at a verified image; flashing is a separate command.
 wait_for_output "$work_dir/node16.log" "state: verified" "$node16_pid" || \
 	fail "node 16 should hold a verified image until it is told to flash"
 
@@ -245,9 +225,7 @@ resent="$(sed -n 's/.*verified; \([0-9]*\) block(s) resent.*/\1/p' \
 resent="${resent:-0}"
 
 if [[ "$lossy_link" -eq 1 ]]; then
-	# The point of the lossy run. A clean result here would mean the losses
-	# were not reaching the transfer, and the recovery path would still be
-	# untested.
+	# The lossy run must show resent blocks.
 	[[ "$resent" -gt 0 ]] || \
 		fail "the link dropped bytes but no block was resent; the loss never reached the transfer"
 	echo "K-GROUND FWU-LITE RESULT: PASS crc32=$image_crc bytes=20000 blocks=105 lossy=yes resent=$resent"

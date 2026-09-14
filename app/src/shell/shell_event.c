@@ -6,9 +6,7 @@
 
 #include <kfsw/services/event.h>
 
-/* Local view of the event record. Payloads are shown as bytes, not decoded:
- * their meaning belongs to the producing component and to ground tooling.
- */
+/* Local event record. Payloads are printed as bytes. */
 
 struct event_print_context {
 	const struct shell *shell;

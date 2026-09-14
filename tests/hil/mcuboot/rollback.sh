@@ -1,28 +1,12 @@
 #!/usr/bin/env bash
-# Hardware acceptance for the MCUboot image layout and rollback flow, k-fsw#2.
-#
-# The issue is done when HIL demonstrates:
+# Hardware test for the MCUboot layout and rollback (k-fsw#2):
 #
 #   A -> test B -> no confirm -> A        (automatic revert)
 #   A -> test B -> confirm    -> B        (permanent upgrade)
 #
-# This checks both, plus two properties that make those two mean something:
-#
-#   * an image signed with the WRONG key is refused. Without this, "the
-#     bootloader ran the image" proves only that it ran something. The default
-#     key MCUboot ships in its own public tree is used as the wrong key, which
-#     is exactly the mistake this composition was once making silently.
-#
-#   * a file written under image A is still readable at the very end, after
-#     every swap, revert and reboot. Merely checking that storage mounts would
-#     prove almost nothing here: this test erases the whole chip before it
-#     installs anything, so the filesystem it would find is a fresh one it made
-#     itself. Writing a value and reading it back at the end is what actually
-#     shows the swap machinery leaves the storage partition alone.
-#
-# Images A and B are the same binary signed with different versions. Using one
-# build isolates what is under test: any difference in behaviour is the
-# bootloader's doing, not a difference between two programs.
+# It also checks that an image signed with MCUboot's public development key is
+# refused, and that a value written under image A is still there after every
+# swap. A and B are the same binary signed with different versions.
 #
 # Required environment:
 #   KFSW_DEBUG_SERIAL  NUCLEO ST-LINK virtual COM port, by-id path only.
@@ -49,12 +33,9 @@ do_build=1
 readonly FLASH_BASE=0x08000000
 readonly SLOT0_ADDR=0x08010000
 readonly SLOT1_ADDR=0x08068000
-# MCUboot runs in BOOT_SWAP_USING_OFFSET mode, Zephyr's default. In that mode
-# an update must be written one sector into the secondary slot, not at its
-# start: "firmware updates must be placed at the second sector in the second
-# slot instead of the first". Writing at the start is not rejected -- the
-# bootloader simply finds nothing to swap and carries on with the old image,
-# which is a silent no-op and exactly how this test failed the first time.
+# MCUboot uses swap-using-offset, so an update goes one sector into the
+# secondary slot. An image written at the start is not swapped and the old one
+# keeps running.
 readonly SECTOR_SIZE=0x800
 readonly SLOT1_IMAGE_ADDR=0x08068800
 readonly SLOT_SIZE=360448
@@ -107,12 +88,8 @@ send()
 	sleep 0.6
 }
 
-# Everything the board has said since the marker was last placed.
-#
-# The marker is a byte offset into the local capture, not a string echoed by
-# the board. An echoed marker needs a running shell to come back, so it cannot
-# be used to wait for the first boot after flashing -- which is exactly when it
-# is needed most, and which is how this failed the first time.
+# Output since the last marker. The marker is a byte offset in the capture, so
+# it also works before the first boot prints anything.
 marker_offset=0
 
 mark()
@@ -137,10 +114,8 @@ wait_for()
 	return 1
 }
 
-# The running image's version, read from MCUboot's own shell. It places its own
-# marker first so a previous reply left in the log cannot be read as this one:
-# the first "version:" line after the marker is the primary slot, which is what
-# is executing.
+# Version of the running image from MCUboot's shell. A marker is placed first so
+# an older reply isn't read; the first version line is the primary slot.
 version_query=0
 
 running_version()
@@ -217,9 +192,7 @@ fi
 build_sha="$(git -C "$KFSW_REPO_DIR" rev-parse --short HEAD)"
 printf 'build: %s\nkey:   %s\n' "$build_sha" "$signing_key"
 
-# Prove the bootloader really was built with this key before trusting anything
-# it does later. A bootloader carrying the wrong public key would accept the
-# wrong images and every result below would be meaningless.
+# Check that the bootloader has this key before trusting any later result.
 banner "Signing key"
 if python3 "$imgtool" verify -k "$signing_key" \
 	"$build_dir/app/zephyr/zephyr.signed.bin" 2>&1 | grep -q "correctly validated"; then
@@ -266,8 +239,7 @@ mark
 [[ "$(running_version)" == "$VERSION_A"* ]] && pass "A is confirmed and persists" || \
 	fail "A did not persist after confirmation"
 
-# Leave a value behind. Everything that follows -- swaps, a revert, several
-# reboots and a rejected image -- must not disturb it.
+# Write a value that the swaps, revert, reboots and rejected image must not change.
 mark
 send "storage test write $STORAGE_WITNESS"
 sleep 1.5
@@ -296,7 +268,7 @@ state="$(confirmed_state)"
 [[ "$state" == "0" ]] && pass "B is running unconfirmed, as a test image" || \
 	fail "B reports confirmed=$state; a test image must not be confirmed"
 
-# The whole point: reboot without confirming.
+# Reboot without confirming.
 reboot_board "no-confirm"
 mark
 version="$(running_version)"

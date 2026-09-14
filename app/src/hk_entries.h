@@ -8,12 +8,7 @@
 /**
  * @brief Parse one housekeeping entry written as [node:]table:offset.
  *
- * The identifier a report stores is (table << 8) | offset, which is what the
- * wire uses, but nobody wants to type it in hexadecimal. Numbers are read in
- * any base strtoul accepts, so 0x10 and 16 are the same offset.
- *
- * Says nothing on failure: the shell and the command service report a bad
- * entry differently, and this is shared by both.
+ * Numbers can use any base strtoul accepts. Nothing is printed on failure.
  *
  * @param text Entry text.
  * @param entry Destination.

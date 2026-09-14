@@ -1,20 +1,8 @@
 #!/usr/bin/env bash
-# Manual hardware acceptance for the boton_test reference module.
-#
-# Debounce, one-count-per-press and hold behaviour cannot be proven by an
-# automated test: they need a finger on the physical USER button. This fixture
-# flashes the opt-in NUCLEO profile, records a timeline of every press the
-# module reports, and drives the developer LEDs through both the shell and the
-# parameter table so an operator can confirm them by eye.
-#
-# It deliberately does not try to keep step with the operator. An earlier
-# version opened a window per gesture and advanced when the counter moved,
-# which straddled gestures whenever the operator worked ahead of it and
-# produced per-step deltas that were wrong even though the total was right.
-# This records one line per observed press with its device-side timestamp, and
-# the gestures are read back out of that timeline afterwards.
-#
-# It reports what it recorded. It never decides that the acceptance passed.
+# Manual hardware test for the boton_test module. Flashes the NUCLEO profile,
+# prints one line per button press with the device timestamp, and drives the
+# LEDs through the shell and the parameter table. It records the results but
+# doesn't decide pass or fail.
 #
 # Required environment:
 #   KFSW_DEBUG_SERIAL  NUCLEO ST-LINK virtual COM port, by-id path only.
@@ -32,9 +20,9 @@ capture_pid=""
 do_flash=1
 record_s=120
 
-# How long to sit still at the start, proving the input invents nothing.
+# Time to wait untouched at the start.
 readonly BASELINE_S=10
-# Counter poll interval. Fast enough to separate a deliberate double-press.
+# Counter poll interval, fast enough to separate a double press.
 readonly POLL_S=0.3
 
 usage()

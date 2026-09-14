@@ -20,15 +20,6 @@
 
 #include "parameters/tables.h"
 
-/* What is tested here is the scheme, not the numbers. A value read from a
- * table is only as good as the layer underneath it, and asserting a particular
- * free-space figure would test LittleFS rather than this code. What must hold
- * is that every core table registers, that its identifier falls in the band
- * its owner is allocated, that offsets and names cannot collide, that a
- * read-only parameter refuses a write, and that a sampled value follows the
- * state it reports rather than a copy taken once at start-up.
- */
-
 #define CORE_TABLE_COUNT 6U
 #define SERVICE_TABLE_COUNT 8U
 
@@ -69,10 +60,7 @@ static const struct kfsw_param_definition_set *const core_sets[] = {
 	&kfsw_health_param_definitions,
 };
 
-/* The counters only move for invocations that reach the service, and an
- * uninitialised registry refuses one before it gets there. A registry of one
- * command is enough to exercise the path the counters describe.
- */
+/* A registry with one command is enough to move the counters. */
 static int handler_ok(const struct kfsw_command_arg *args, size_t arg_count,
 		      const struct kfsw_command_source *source, struct kfsw_command_result *result)
 {
@@ -98,26 +86,14 @@ static void *tables_setup(void)
 
 	(void)kfsw_command_init(command_sets, ARRAY_SIZE(command_sets));
 
-	/* Storage is mounted first so the two tables that report it have
-	 * something real to read; the parameter service does not depend on it,
-	 * but a filesystem that never mounted would make those rows
-	 * indistinguishable from ones that are simply broken.
-	 */
+	/* Mount storage so the storage rows have real values. */
 	(void)kfsw_storage_init();
 	(void)kfsw_storage_mount();
 
-	/* The watchdog table reports what the platform installed, so the
-	 * platform has to have installed it. Reading the table before
-	 * initialization reports zeros, which is honest but says nothing about
-	 * whether the table follows the hardware.
-	 */
+	/* Install the watchdog so its table has values. */
 	(void)kfsw_platform_watchdog_init();
 
-	/* Same reasoning for identity: the board table samples the running CSP
-	 * configuration rather than the build options, so CSP has to be running
-	 * for those rows to say anything. Before initialization they report
-	 * empty, which is honest and worth nothing as a test.
-	 */
+	/* Start CSP so the identity rows have values. */
 	(void)kfsw_csp_init();
 
 	zassert_ok(kfsw_param_init(core_sets, ARRAY_SIZE(core_sets)));
@@ -199,8 +175,7 @@ ZTEST(app_param_tables, test_every_core_table_is_registered)
 	zassert_equal(seen.ids[13], KFSW_BOOT_PARAM_TABLE_ID);
 
 	zassert_true(seen.ascending, "a listing must read in one direction");
-	zassert_true(seen.bands_match_owners,
-		     "a table outside its owner's band would collide with another owner's");
+	zassert_true(seen.bands_match_owners, "every table must be in its band");
 }
 
 ZTEST(app_param_tables, test_table_identifiers_sit_in_their_band)
@@ -240,10 +215,7 @@ ZTEST(app_param_tables, test_parameters_are_addressed_by_table_and_offset)
 /* --------------------------------------------------------------- the modes */
 
 /*
- * One letter per property, so each question is answered on its own: can I
- * write it, does it survive a reset, and does it take effect now or at the
- * next start. The old encoding named combinations instead, and "b" meant both
- * kept and deferred, which are different consequences.
+ * One letter per property: writable, saved, applied at boot.
  */
 ZTEST(app_param_tables, test_mode_follows_the_flags)
 {
@@ -260,9 +232,7 @@ ZTEST(app_param_tables, test_mode_follows_the_flags)
 	/* Written, applied now, and gone at the next start. */
 	zassert_str_equal(kfsw_param_mode_name(0U), "wb");
 
-	/* A read-only value is never applied, so the deferral letter would say
-	 * nothing; that it is kept still matters to whoever reads it back.
-	 */
+	/* Read-only values don't get the boot letter, but can be saved. */
 	zassert_str_equal(kfsw_param_mode_name(KFSW_PARAM_FLAG_READ_ONLY |
 					       KFSW_PARAM_FLAG_PERSISTENT | KFSW_PARAM_FLAG_LIVE),
 			  "rp");
@@ -275,9 +245,7 @@ ZTEST(app_param_tables, test_telemetry_is_read_only_throughout)
 	struct kfsw_param_info info;
 	struct kfsw_param_value value;
 
-	/* A write here must be refused rather than accepted and ignored: an
-	 * operator who believes a housekeeping value took a new setting has
-	 * been told something false. */
+	/* A write to a read-only value must be refused. */
 	zassert_ok(kfsw_param_get_info("uptime_s", &info));
 	zassert_equal(info.table, KFSW_PARAM_TABLE_TELEMETRY);
 	zassert_true(info.read_only);
@@ -307,11 +275,7 @@ ZTEST(app_param_tables, test_a_sampled_value_follows_what_it_reports)
 	struct kfsw_param_value before;
 	struct kfsw_param_value after;
 
-	/* The point of sampling on read is that the answer is current when it
-	 * was asked for. A value refreshed on a timer, or copied once at
-	 * start-up, would pass every other check in this file and still report
-	 * a stale uptime to the ground.
-	 */
+	/* Sampled values must follow the current state. */
 	zassert_ok(kfsw_param_get("uptime_s", &before));
 	k_sleep(K_MSEC(1100));
 	zassert_ok(kfsw_param_get("uptime_s", &after));
@@ -335,8 +299,7 @@ ZTEST(app_param_tables, test_storage_reports_a_mounted_volume)
 	zassert_true(free_space.scalar.u32 <= total.scalar.u32,
 		     "free space beyond capacity would mean the sample is not of one snapshot");
 
-	/* Never reported as a full filesystem while it is simply unmounted:
-	 * that would trigger the wrong response on the ground. */
+	/* An unmounted volume reports zero, not full. */
 	zassert_ok(kfsw_param_get("used_pct", &used));
 	zassert_true(used.scalar.u8 <= 100U);
 }
@@ -347,13 +310,7 @@ ZTEST(app_param_tables, test_watchdog_reports_no_hardware_rather_than_a_timeout)
 	struct kfsw_param_value timeout;
 	struct kfsw_param_value feeds;
 
-	/* This target has no watchdog device, and the fixture has already tried
-	 * to bind one. The table must say so instead of reporting the
-	 * configured timeout: a timeout that was never installed in hardware
-	 * looks, from the ground, exactly like one that was, and it is the
-	 * difference between a board that will reset itself and one that will
-	 * hang forever.
-	 */
+	/* No watchdog device here, so the table must not report a timeout. */
 	zassert_ok(kfsw_param_get("device_bound", &bound));
 	zassert_equal(bound.scalar.u8, 0U);
 
@@ -367,10 +324,7 @@ ZTEST(app_param_tables, test_watchdog_reports_no_hardware_rather_than_a_timeout)
 
 ZTEST(app_param_tables, test_the_feed_interval_leaves_a_margin)
 {
-	/* Pure arithmetic, available on every target including this one, so the
-	 * margin can be asserted where the hardware cannot be: two feeds must
-	 * be missable before the timeout expires.
-	 */
+	/* Two feeds must be missable before the timeout. */
 	const uint32_t interval =
 		kfsw_platform_watchdog_feed_interval_ms(CONFIG_KFSW_WATCHDOG_TIMEOUT_MS);
 
@@ -407,13 +361,7 @@ ZTEST(app_param_tables, test_a_report_period_that_would_reset_the_board_is_refus
 	zassert_str_equal(kfsw_param_mode_name(info.flags), "wp",
 			  "the loop reads it every cycle and the value survives a reboot");
 
-	/* A period at or beyond half the health deadline leaves no room for an
-	 * ordinary scheduling delay, so one late cycle would look like a
-	 * stopped thread and reset a board that is working. This is the one
-	 * value in the core tables that can do that by being set to a number
-	 * that looks perfectly reasonable, so it is refused rather than
-	 * accepted.
-	 */
+	/* A period at or above half the health deadline is refused. */
 	zassert_ok(kfsw_param_get("app_report_ms", &value));
 	value.scalar.u16 = UINT16_MAX;
 	zassert_equal(kfsw_param_set("app_report_ms", &value), -ERANGE);
@@ -436,10 +384,7 @@ ZTEST(app_param_tables, test_identity_is_reported_as_text)
 	struct kfsw_param_info info;
 	struct kfsw_param_value value;
 
-	/* Sampled from the running CSP identity rather than kept as a second
-	 * copy of the build options: two sources for one fact eventually
-	 * disagree, and the one an operator can reach would be the wrong one.
-	 */
+	/* Sampled from the running CSP identity. */
 	zassert_ok(kfsw_param_get_info("uid", &info));
 	zassert_equal(info.table, KFSW_PARAM_TABLE_BOARD);
 	zassert_equal(info.type, KFSW_PARAM_STRING);
@@ -451,9 +396,7 @@ ZTEST(app_param_tables, test_identity_is_reported_as_text)
 		kfsw_csp_get_info(&csp_info);
 		zassert_ok(kfsw_param_get("uid", &value));
 		zassert_equal(value.type, KFSW_PARAM_STRING);
-		/* Compared against what CSP actually reports, not against the
-		 * build option: the point of sampling is that the two can
-		 * differ, and the table has to follow the running one. */
+		/* Compared with CSP's running value, not the build option. */
 		zassert_str_equal(value.text, csp_info.hostname);
 		zassert_true(strlen(csp_info.hostname) + 1U <= info.array_size,
 			     "a truncated identity looks like a different node");
@@ -471,10 +414,7 @@ ZTEST(app_param_tables, test_a_string_reports_its_capacity)
 {
 	struct kfsw_param_info info;
 
-	/* array_size carries the declared capacity so every layer -- the
-	 * listing, the snapshot, the wire -- sees one number for how much
-	 * storage the owner set aside.
-	 */
+	/* array_size is the declared capacity. */
 	zassert_ok(kfsw_param_get_info("uid", &info));
 	zassert_true(info.array_size > 1U);
 	zassert_true(info.array_size <= KFSW_PARAM_STRING_MAX);
@@ -505,9 +445,7 @@ ZTEST(app_param_tables, test_a_service_table_sits_in_the_service_band)
 {
 	struct kfsw_param_info info;
 
-	/* The band is what keeps two independently developed owners from being
-	 * given the same table, so it is worth asserting per owner rather than
-	 * only across the listing. */
+	/* Each table must be in its component's band. */
 	zassert_ok(kfsw_param_get_info("events_recorded", &info));
 	zassert_equal(info.table, KFSW_EVENT_PARAM_TABLE_ID);
 	zassert_str_equal(kfsw_param_band_name(info.table), "service");
@@ -525,9 +463,7 @@ ZTEST(app_param_tables, test_update_state_cannot_be_set_from_outside)
 {
 	struct kfsw_param_value value;
 
-	/* If an operator could write these, an unverified image could be marked
-	 * ready, which is the one thing the update service exists to prevent.
-	 */
+	/* The update table is read-only. */
 	zassert_ok(kfsw_param_get("fwu_state", &value));
 	zassert_equal(kfsw_param_set("fwu_state", &value), -EACCES);
 
@@ -548,8 +484,7 @@ ZTEST(app_param_tables, test_the_event_table_follows_the_record)
 	zassert_ok(kfsw_param_get("events_capacity", &capacity));
 	zassert_equal(capacity.scalar.u16, stats.capacity);
 
-	/* Emitting has to move the counter the table reports, or the table is
-	 * describing something other than the record. */
+	/* Recording an event must move the table's counter. */
 	zassert_ok(kfsw_param_get("events_recorded", &recorded));
 	kfsw_event_emit(KFSW_EVENT_SOURCE_APP, 1U, KFSW_EVENT_INFO, NULL, 0U);
 	{
@@ -573,12 +508,7 @@ ZTEST(app_param_tables, test_a_check_slower_than_the_watchdog_is_refused)
 	/* Zero would be missed the instant it was set. */
 	zassert_equal(kfsw_health_check_interval_ms(0U), -EINVAL);
 
-	/* This target binds no watchdog, so there is nothing for a slow check
-	 * to outlast and any interval is accepted. Refusing here would refuse
-	 * on every target without watchdog hardware. The refusal itself is
-	 * hardware behaviour and belongs to the hardware acceptance, which is
-	 * where it is recorded.
-	 */
+	/* No watchdog here, so any interval is accepted. */
 	zassert_ok(kfsw_health_check_interval_ms(60000U));
 
 	zassert_ok(kfsw_param_get("health_interval_ms", &value));
@@ -618,9 +548,7 @@ ZTEST(app_param_tables, test_a_transfer_size_larger_than_the_buffer_is_refused)
 {
 	struct kfsw_param_value value;
 
-	/* The workspace is sized at build time and the protocol codec refuses
-	 * anything larger, so a bigger value would be stored here and rejected
-	 * at the first transfer. */
+	/* A chunk larger than the build-time buffer is refused. */
 	zassert_ok(kfsw_param_get("ftp_chunk_size", &value));
 	value.scalar.u16 = KFSW_FTP_CHUNK_SIZE + 1U;
 	zassert_equal(kfsw_param_set("ftp_chunk_size", &value), -ERANGE);
@@ -638,12 +566,10 @@ ZTEST(app_param_tables, test_echo_is_off_until_asked_for)
 	struct kfsw_param_info info;
 	struct kfsw_param_value value;
 
-	/* Off by default: the shell repeats every input byte, so a session
-	 * driven by a script shows each command twice. */
+	/* Echo is off by default. */
 	zassert_ok(kfsw_param_get_info("echo_enabled", &info));
 	zassert_equal(info.table, KFSW_COMMAND_PARAM_TABLE_ID);
-	zassert_str_equal(kfsw_param_mode_name(info.flags), "w",
-			  "worth toggling while watching the console, not at the next boot");
+	zassert_str_equal(kfsw_param_mode_name(info.flags), "w", "echo must apply immediately");
 
 	zassert_ok(kfsw_param_get("echo_enabled", &value));
 	zassert_equal(value.scalar.u8, 0U);
@@ -665,15 +591,13 @@ ZTEST(app_param_tables, test_the_boot_table_reports_a_real_image)
 {
 	struct kfsw_param_value value;
 
-	/* The version has to name the source it was built from, or comparing a
-	 * node against a build record proves nothing. */
+	/* The version names the build source. */
 	zassert_ok(kfsw_param_get("boot_image", &value));
 	zassert_equal(value.type, KFSW_PARAM_STRING);
 	zassert_true(strlen(value.text) > 0U);
 	zassert_str_equal(value.text, kfsw_boot_get_image_version());
 
-	/* Read-only and persistent together: the service writes it, a snapshot
-	 * keeps it, and nobody rewrites how often the node has restarted. */
+	/* Read-only and persistent. */
 	zassert_ok(kfsw_param_get("boot_count", &value));
 	zassert_equal(kfsw_param_set("boot_count", &value), -EACCES);
 }

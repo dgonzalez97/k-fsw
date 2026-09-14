@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# Render the .dot sources under docs/media to SVG.
-#
-# Committed as SVG rather than rendered on the fly, because GitHub will not run
-# graphviz when it displays a README and a diagram nobody can see is worse than
-# the ASCII it replaced.
+# Render the .dot sources in docs/media to SVG. The SVGs are committed because
+# GitHub doesn't render graphviz in READMEs.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

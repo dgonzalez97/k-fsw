@@ -6,8 +6,6 @@
 
 #include <kfsw/services/fbo.h>
 
-/* Thin, like every adapter here: parse, call the service, print. */
-
 static int cmd_fbo_run(const struct shell *sh, size_t argc, char **argv)
 {
 	int result;
@@ -19,10 +17,7 @@ static int cmd_fbo_run(const struct shell *sh, size_t argc, char **argv)
 		shell_error(sh, "run %s: %d", argv[1], result);
 		return result;
 	}
-	/* Started, not finished: the procedure runs on the service's own thread
-	 * because a wait line blocks, so the answer here is that it was
-	 * accepted. Watch it with `fbo status` or in the event record.
-	 */
+	/* The procedure runs on the service thread; this only starts it. */
 	shell_print(sh, "%s started", argv[1]);
 	return 0;
 }

@@ -12,8 +12,6 @@
 
 #include "hk_entries.h"
 
-/* Thin, like every adapter here: parse, call the service, print. */
-
 static int setting_result(const struct shell *sh, int result)
 {
 	if (result == KFSW_HK_APPLIED_UNSAVED) {
@@ -38,9 +36,7 @@ static int parse_u32(const struct shell *sh, const char *text, uint32_t *out, co
 	return 0;
 }
 
-/* The parse lives in hk_entries.c because the command service needs the same
- * one; only the complaint is the shell's.
- */
+/* Parsing is shared with the command service in hk_entries.c. */
 static int parse_entry(const struct shell *sh, const char *text, struct kfsw_hk_entry *entry)
 {
 	if (kfsw_app_hk_parse_entry(text, entry) != 0) {
@@ -148,10 +144,7 @@ static int cmd_hk_show(const struct shell *sh, size_t argc, char **argv)
 		shell_print(sh, "report %u: %u values, period %u ms, %u samples held", report,
 			    (unsigned int)count, period, depth);
 #if CONFIG_KFSW_HK_BEACON
-		/* Printed only when it is on: a node that beacons is a node
-		 * that transmits without being asked, and an operator should
-		 * not have to remember whether they left it that way.
-		 */
+		/* Only printed when beaconing is on. */
 		{
 			uint16_t beacon_node = 0U;
 			uint32_t beacon_ms = 0U;
@@ -221,10 +214,7 @@ static int cmd_hk_get(const struct shell *sh, size_t argc, char **argv)
 			break;
 		}
 
-		/* Both flags are named rather than left in a hex byte: a reader
-		 * who has to decode 0x02 to find out the timestamp is missing
-		 * will read the zero as a date instead.
-		 */
+		/* Name the flags instead of printing the hex byte. */
 		shell_print(sh, "seq %u  at %u%s  %u values%s  %u bytes", sample.sequence,
 			    sample.seconds,
 			    ((sample.flags & KFSW_HK_FLAG_CLOCK_UNSET) != 0U) ? " (no clock)" : "",

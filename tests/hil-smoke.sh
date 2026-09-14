@@ -93,8 +93,8 @@ grep -Fq '@READY ' "$capture_file" && ready_ok=1
 
 if [[ "$boot_ok" == 1 && "$ready_ok" == 1 ]]; then
     echo "HIL RESULT: PASS"
-    echo "  [✓] @BOOT"
-    echo "  [✓] @READY"
+    echo "  [ok] @BOOT"
+    echo "  [ok] @READY"
     exit 0
 fi
 
