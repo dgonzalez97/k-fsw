@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
-# Line, function and branch coverage of the unit suites.
-#
-# Twister builds the suites instrumented, runs them and composes the gcovr
-# report. Nothing here re-renders its output.
-#
-# Only the unit suites are measured. The integration and HIL runs exercise far
-# more, but they drive a built image rather than instrumented objects, and
-# counting them here would mean claiming coverage the numbers do not describe.
+# Line, function and branch coverage of the unit suites, reported by gcovr
+# through Twister. Integration and hardware tests are not included.
 set -Eeuo pipefail
 
 KFSW_COVERAGE_TOOL="$(readlink -f "${BASH_SOURCE[0]}")"
@@ -29,18 +23,16 @@ html_dir="$out_dir/html"
 rm -rf "$out_dir"
 mkdir -p "$out_dir"
 
-# native_sim compiles with the host compiler, so the host gcov is the one that
-# reads its notes. Named explicitly because Twister otherwise reaches for
-# ZEPHYR_TOOLCHAIN_VARIANT and crashes when it is unset, which it is here.
+# native_sim uses the host compiler, so use the host gcov. Twister fails when
+# ZEPHYR_TOOLCHAIN_VARIANT is unset.
 gcov_tool="${KFSW_GCOV_TOOL:-$(command -v gcov)}"
 [[ -x "$gcov_tool" ]] || {
 	echo "ERROR: no gcov found; set KFSW_GCOV_TOOL"
 	exit 1
 }
 
-# Twister has no option for gcovr's filters, but gcovr reads gcovr.cfg from its
-# root, which Twister sets from --coverage-basedir. Without it the report covers
-# all of Zephyr and picolibc: 1208 files rather than 46.
+# gcovr reads gcovr.cfg from --coverage-basedir; without it the report covers
+# all of Zephyr.
 install -m 644 "$KFSW_REPO_DIR/config/gcovr.cfg" "$KFSW_ROOT/gcovr.cfg"
 
 echo "COVERAGE: running the unit suites instrumented, gcov $gcov_tool"

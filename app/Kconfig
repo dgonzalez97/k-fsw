@@ -27,11 +27,9 @@ config KFSW_DEBUG_SHELL
 	select SHELL_HELP
 	select SHELL_HELP_ON_WRONG_ARGUMENT_COUNT
 	help
-	  Enable the serial developer/debug shell and K-FSW command tree.
-	  SHELL_MINIMAL defaults the wrong-argument-count help off, so it is
-	  selected here: an operator who omits an argument is shown the command
-	  usage instead of only an error. Disable this option for release builds
-	  that must not include the interactive shell.
+	  Enable the serial debug shell and the K-FSW commands. It also turns
+	  on usage help for wrong argument counts, which SHELL_MINIMAL disables.
+	  Disable it for release builds without an interactive shell.
 
 config KFSW_PARAM_TEST_DEFINITIONS
 	bool "Test-only parameter fixture definitions"
@@ -61,9 +59,8 @@ config SHELL_PROMPT_UART
 config SHELL_PROMPT_CHANGE
 	default y if KFSW_DEBUG_SHELL
 
-# Room for the prompt text plus the escape sequences that colour it. Zephyr's
-# default of 10 fits the text alone and rejects the coloured form; 40 is the
-# most the subsystem allows and covers the longest prompt in use.
+# Room for the prompt and its colour codes. Zephyr's default of 10 only fits
+# the text; 40 is the maximum.
 config SHELL_PROMPT_BUFF_SIZE
 	default 40 if KFSW_DEBUG_SHELL
 
@@ -75,7 +72,5 @@ config KFSW_APP_HEALTH_DEADLINE_MS
 	default 4000
 	range 200 60000
 	help
-	  The application reports once per quarter of this, so an ordinary
-	  scheduling delay is not mistaken for the thread having stopped. Long
-	  enough to tolerate a busy moment, short enough that a seized system is
-	  noticed well within the watchdog timeout.
+	  The application reports four times per deadline, so a normal
+	  scheduling delay doesn't look like a stopped thread.

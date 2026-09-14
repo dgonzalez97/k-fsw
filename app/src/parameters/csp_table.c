@@ -4,17 +4,13 @@
 #include <zephyr/sys/util.h>
 
 #include <kfsw/comms/csp.h>
-/* Attributes this file's messages, so its level can be raised alone. */
 #define KFSW_LOG_MODULE KFSW_LOG_MODULE_CSP
 #include <kfsw/services/log.h>
 #include <kfsw/services/parameter.h>
 
 #include "tables.h"
 
-/* Interface counters, summed across every registered interface. A per-interface
- * table would need one table per composition; the totals answer the question an
- * operator actually asks first, which is whether anything is moving at all.
- */
+/* Interface counters, summed over all interfaces. */
 struct csp_totals {
 	uint32_t tx_packets;
 	uint32_t rx_packets;

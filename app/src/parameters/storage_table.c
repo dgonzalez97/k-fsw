@@ -32,10 +32,7 @@ static void sample_storage(void)
 	storage_total_kb = (uint32_t)(info.total_bytes / KFSW_BYTES_PER_KB);
 	storage_free_kb = (uint32_t)(info.free_bytes / KFSW_BYTES_PER_KB);
 
-	/* Reported as zero while unmounted rather than as a full filesystem: an
-	 * unmounted volume is not 100% used, and saying so would trigger the
-	 * wrong response on the ground.
-	 */
+	/* Zero while unmounted, not 100% used. */
 	if ((info.total_bytes == 0U) || (info.free_bytes > info.total_bytes)) {
 		storage_used_pct = 0U;
 		return;

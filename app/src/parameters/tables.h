@@ -7,15 +7,8 @@
 
 /**
  * @file
- * Core parameter tables, identifiers 1 to 24.
- *
- * The composition, the platform and the links -- what a node cannot be reached
- * or diagnosed without. They live here rather than in `kfsw-platform` or
- * `kfsw-comms` because those sit below the parameter service and must not
- * depend on it; the composition is where the two can meet.
- *
- * Each reads through the owning layer's public API, so that layer still owns
- * the state and this only publishes it.
+ * Core parameter tables, IDs 1 to 24. They are in the application because the
+ * platform and comms layers can't depend on the parameter service.
  */
 
 /** Table 1: identity and the composition switches that decide reachability. */
@@ -65,15 +58,10 @@ uint16_t kfsw_system_app_report_ms(void);
 #define KFSW_SYSTEM_REBOOT_PIN_SIZE 9U
 
 /**
- * @brief Whether a supplied PIN matches the one this node will accept.
+ * @brief Whether a supplied PIN matches the one this node accepts.
  *
- * The PIN is a guard against a mistake, not against an adversary: it crosses
- * the link in the clear, so anyone listening has it. What it stops is a
- * mistyped node number resetting the wrong spacecraft, which is the failure
- * that actually happens. Treating it as security would be a mistake.
- *
- * Compared over the full width regardless of where the first difference is,
- * so the time taken says nothing about how much of the PIN was right.
+ * The PIN is sent in clear text; it only protects against a wrong node number.
+ * The comparison takes the same time whether it matches or not.
  */
 bool kfsw_system_reboot_pin_matches(const char *pin);
 

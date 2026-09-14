@@ -53,9 +53,9 @@ HK_PROTOCOL_VERSION = 1
 HK_HEADER_BYTES = 10
 HK_FLAG_INCOMPLETE = 0x01
 
-# The bridge's envelope, ahead of the frame the node sent: 8 bytes of Unix
-# milliseconds and 4 of sequence, which is the shape Yamcs reads a time and a
-# count in. Kept in step with ENVELOPE_BYTES in hk-report.py.
+# Envelope added before the node's frame: 8 bytes of Unix milliseconds and 4 of
+# sequence, the sizes Yamcs reads. Keep in step with ENVELOPE_BYTES in
+# hk-report.py.
 ENVELOPE = struct.Struct(">QI")
 
 
@@ -131,10 +131,8 @@ def parse_csp_header(frame):
     }
 
 
-# libcsp checksums with CRC-32C (Castagnoli), not the CRC-32 in zlib. The two
-# differ only in the polynomial, and a frame checked with the wrong one is
-# simply dropped with nothing said, so this is worth stating rather than
-# reaching for binascii and wondering why nothing answers.
+# libcsp uses CRC-32C (Castagnoli), not the CRC-32 in zlib. A frame with the
+# wrong CRC is dropped without an error.
 CRC32C_POLYNOMIAL = 0x82F63B78
 CRC32C_TABLE = []
 for _index in range(256):
@@ -212,9 +210,7 @@ def envelope(sample, host_time_ms):
     version, _report, sequence, seconds, _count, _flags = struct.unpack_from(">BBHIBB", sample)
     if version != HK_PROTOCOL_VERSION:
         raise ValueError(f"housekeeping protocol version {version}, expected {HK_PROTOCOL_VERSION}")
-    # A node whose clock was never set reports zero, and stamping 1970 on it
-    # would put the sample at the far end of the archive. Host time is a worse
-    # answer than the node's own, and a much better one than that.
+    # A node whose clock was never set reports zero; use the host time instead.
     when = seconds * 1000 if seconds else host_time_ms
     return ENVELOPE.pack(when, sequence) + sample
 
@@ -276,9 +272,7 @@ def main():
         sink = (socket.socket(socket.AF_INET, socket.SOCK_DGRAM), (host, int(port)))
 
     reader = KissReader()
-    # Bounded on purpose. A set would grow for as long as the bridge runs, and
-    # sequence numbers wrap at 65536 anyway, so remembering the recent ones is
-    # both cheaper and more correct than remembering all of them.
+    # Only recent sequence numbers are kept; they wrap at 65536 anyway.
     seen = collections.deque(maxlen=1024)
     with serial.Serial(args.device, args.baud, timeout=0.1) as link:
         while True:

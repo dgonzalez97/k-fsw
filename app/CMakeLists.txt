@@ -65,8 +65,7 @@ target_sources_ifdef(CONFIG_KFSW_LASTWORDS app PRIVATE
     src/fatal.c
 )
 
-# A node running as a Linux process takes the time from the machine under it.
-# Only there: a board has nothing to take it from.
+# A native_sim node takes the time from the host.
 if(CONFIG_KFSW_CSP AND CONFIG_BOARD_NATIVE_SIM)
     target_sources(app PRIVATE src/clock_host.c)
 endif()

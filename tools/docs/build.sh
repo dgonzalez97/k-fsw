@@ -40,9 +40,7 @@ echo "DOCS: output: $KFSW_DOCS_OUTPUT/html"
 
 cd "$KFSW_REPO_DIR"
 
-# Name the commit the manual was generated from, the same way the image does,
-# so a page and a running node can be compared. Empty outside a git tree, which
-# Doxygen renders as no version at all rather than a wrong one.
+# Show the commit the manual was built from. Empty outside a git tree.
 KFSW_DOCS_VERSION="$(git describe --tags --always --dirty 2>/dev/null || true)"
 export KFSW_DOCS_VERSION
 

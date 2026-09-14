@@ -1,7 +1,4 @@
-/* The firmware update service writes into the secondary image slot, which is
- * defined by nucleo-mcuboot-flash.overlay. This binds it, so the service names
- * no address of its own.
- */
+/* Binds the update service to the secondary slot from nucleo-mcuboot-flash.overlay. */
 / {
 	chosen {
 		kfsw,fwu-partition = &slot1_partition;

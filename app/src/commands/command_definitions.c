@@ -9,7 +9,6 @@
 #include <zephyr/sys/reboot.h>
 #include <zephyr/sys/util.h>
 
-/* Attributes this file's messages, so its level can be raised alone. */
 #define KFSW_LOG_MODULE KFSW_LOG_MODULE_COMMAND
 #if CONFIG_KFSW_LASTWORDS
 #include <kfsw/platform/lastwords.h>
@@ -35,13 +34,7 @@
 #endif
 
 /*
- * Application-owned commands. These exist to prove the mechanism end to end
- * from both front ends: one with no arguments and no effect, one read-only
- * with a payload, and one mutating.
- *
- * Remote parameter access deliberately has no command here. The parameter
- * service already owns that path over CSP, and a second route to the same
- * operation would split its validation.
+ * Application commands: noop, info (read-only) and reboot (mutating).
  */
 
 #define KFSW_COMMAND_ID_NOOP 1U
@@ -98,9 +91,7 @@ static void reboot_work_handler(struct k_work *work)
 
 	kfsw_log_warning("Rebooting on command");
 #if CONFIG_KFSW_LASTWORDS
-	/* Left immediately before the reset, so a restart that turns out badly
-	 * can still be told apart from one nobody asked for.
-	 */
+	/* Leave a note before the reset. */
 #if CONFIG_KFSW_PARAM
 	kfsw_lastwords_write(KFSW_LASTWORDS_COMMANDED, 0U, k_uptime_get_32(),
 			     kfsw_boot_get_count());
@@ -113,9 +104,7 @@ static void reboot_work_handler(struct k_work *work)
 
 static K_WORK_DELAYABLE_DEFINE(reboot_work, reboot_work_handler);
 
-/* Text, not a number, so 0000 stays four characters. Read as an integer it
- * would be zero, and a node whose pin was 0007 would then accept 7.
- */
+/* Text, so 0000 keeps four characters and 0007 doesn't match 7. */
 static const enum kfsw_command_type reboot_arg_types[] = {KFSW_COMMAND_TYPE_TEXT};
 
 static int command_reboot(const struct kfsw_command_arg *args, size_t arg_count,
@@ -124,14 +113,8 @@ static int command_reboot(const struct kfsw_command_arg *args, size_t arg_count,
 {
 	ARG_UNUSED(arg_count);
 
-	/* Checked here, on the node that would restart, rather than by whatever
-	 * asked. A guard the caller applies to itself guards nothing.
-	 */
-	/* With no parameter service there is no settable pin, so the compiled
-	 * default is the whole guard. Still required rather than skipped: a
-	 * composition that quietly stopped asking would be the one surprise
-	 * nobody wants from a reboot command.
-	 */
+	/* The pin is checked on the node that restarts. */
+	/* Without the parameter service the compiled default is the pin. */
 #if CONFIG_KFSW_PARAM
 	if (!kfsw_system_reboot_pin_matches(args[0].value.text)) {
 #else
@@ -143,11 +126,7 @@ static int command_reboot(const struct kfsw_command_arg *args, size_t arg_count,
 		return -EACCES;
 	}
 
-	/*
-	 * Rebooting inside the handler would drop the connection before the
-	 * caller learned the command was accepted, so the reset is deferred
-	 * just long enough for the reply to be sent.
-	 */
+	/* Reset after a short delay so the reply is sent first. */
 	if (k_work_schedule(&reboot_work, K_MSEC(KFSW_COMMAND_REBOOT_DELAY_MS)) < 0) {
 		result->status = KFSW_COMMAND_BUSY;
 		return -EBUSY;
@@ -179,11 +158,7 @@ static int command_event_stats(const struct kfsw_command_arg *args, size_t arg_c
 	return 0;
 }
 
-/*
- * One record per call, addressed by age. Reading the record back is what makes
- * an unattended node answerable, so it is reachable the same way any other
- * command is rather than needing its own protocol.
- */
+/* Read event records by age. */
 static int command_event_tail(const struct kfsw_command_arg *args, size_t arg_count,
 			      const struct kfsw_command_source *source,
 			      struct kfsw_command_result *result)
@@ -224,16 +199,9 @@ static const enum kfsw_command_type event_tail_args[] = {KFSW_COMMAND_TYPE_U32};
 
 #if CONFIG_KFSW_HK
 /*
- * Housekeeping from the ground.
- *
- * Everything here existed only on a console before, so a node could serve
- * samples over the link but could not be told what to collect without somebody
- * standing next to it. The command service already rides on CSP, so this works
- * over whatever the node is on without a line of transport code.
- *
- * The entry list travels as one text argument in the syntax the shell already
- * takes, because a command carries at most four arguments and a report names
- * up to sixteen values.
+ * Housekeeping commands, so reports can be set up from the ground. The entries
+ * are one text argument in the shell syntax, because a command has at most four
+ * arguments.
  */
 static int command_hk_define(const struct kfsw_command_arg *args, size_t arg_count,
 			     const struct kfsw_command_source *source,
@@ -259,10 +227,8 @@ static int command_hk_define(const struct kfsw_command_arg *args, size_t arg_cou
 			(void)snprintf(result->detail, sizeof(result->detail),
 				       "more than %u entries", (unsigned int)ARRAY_SIZE(entries));
 		} else {
-			/* A text argument is capped at 64 bytes, so a list too
-			 * long to travel arrives truncated and fails here as a
-			 * malformed entry. Quoting it back is what tells the
-			 * two apart from the ground.
+			/* A text argument is at most 64 bytes, so a long list arrives cut
+			 * and fails here; quote it back so the ground can see that.
 			 */
 			(void)snprintf(result->detail, sizeof(result->detail),
 				       "cannot read '%s' as [node:]table:offset",

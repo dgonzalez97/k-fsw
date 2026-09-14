@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# The unit suites under the undefined behaviour sanitizer.
-#
-# Valgrind watches memory; this watches the arithmetic. Signed overflow,
-# oversized shifts and misaligned loads are not memory errors, so Valgrind
-# never sees them, and the compiler only rejects the ones it can prove.
+# The unit suites under the undefined behaviour sanitizer, which catches signed
+# overflow, bad shifts and misaligned loads that Valgrind doesn't see.
 set -Eeuo pipefail
 
 KFSW_UBSAN_TOOL="$(readlink -f "${BASH_SOURCE[0]}")"
@@ -20,9 +17,8 @@ KFSW_TWISTER_OUT_DIR="$out_dir" "$KFSW_CI_DIR/unit.sh" --enable-ubsan
 twister_result=$?
 set -e
 
-# A violation aborts the run, so Twister already fails. Checked again here
-# because a sanitizer that reports and continues would leave the gate green,
-# and the reports are worth naming either way.
+# A violation aborts the run; the logs are checked too in case the sanitizer
+# only reported and continued.
 reports="$(grep -rho "runtime error: .*" "$out_dir" 2>/dev/null | sort -u || true)"
 
 if [[ -n "$reports" ]]; then

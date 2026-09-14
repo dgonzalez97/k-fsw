@@ -81,7 +81,7 @@ load_role_config()
 
 	unset KFSW_ROLE KFSW_CSP_NODE KFSW_CSP_PEER KFSW_CSP_ROUTES \
 		KFSW_RADIO_UHF KFSW_EXTRA_KCONFIG KFSW_EXTRA_OVERLAY KFSW_CAN_INTERFACE
-	# Node files are deliberately simple shell-compatible environment files.
+	# Node files are simple shell environment files.
 	set -a
 	# shellcheck disable=SC1090
 	source "$config_file"

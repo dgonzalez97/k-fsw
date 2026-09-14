@@ -3,11 +3,7 @@
 #include <zephyr/shell/shell_uart.h>
 
 /*
- * The prompt is always on screen, so jade makes it identifiable at a glance --
- * node output from operator input, and one node's console from another's.
- *
- * Applied at runtime rather than in CONFIG_SHELL_PROMPT_UART, because Kconfig
- * strings do not carry escape sequences.
+ * Colour the prompt at runtime; Kconfig strings can't hold escape codes.
  */
 
 /* 256-colour 36 is the closest terminal approximation to jade. */
@@ -35,13 +31,8 @@ void kfsw_shell_prompt_apply(void)
 		return;
 	}
 
-	/* The shell measures the prompt with a plain string length to know how
-	 * far the cursor starts from the left edge. Escape sequences occupy no
-	 * columns, so that count is wrong by exactly their length and every
-	 * line edit -- cursor movement, wrapping, tab completion -- lands in
-	 * the wrong place. Correcting it to the visible width is the price of
-	 * colouring the prompt at all; the alternative is a prompt the shell
-	 * cannot edit under.
+	/* The shell measures the prompt with strlen to place the cursor, so set it to
+	 * the visible width without the escape codes.
 	 */
 	sh->ctx->vt100_ctx.cons.name_len = sizeof(CONFIG_SHELL_PROMPT_UART) - 1U;
 }

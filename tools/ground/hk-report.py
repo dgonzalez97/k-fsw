@@ -22,11 +22,8 @@ import yaml
 XTCE_NS = "http://www.omg.org/spec/XTCE/20180204"
 XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
 
-# The bridge's envelope, ahead of the frame the node sent. Yamcs reads an
-# 8-byte time and a 4-byte count at fixed offsets, and the housekeeping header
-# carries 4 and 2, so the bridge restates them in the shape Yamcs asks for.
-# Without it every sample of a pull lands at the same reception instant and the
-# history the ring kept collapses into one moment.
+# Envelope the bridge adds before the node's frame. Yamcs reads an 8-byte time
+# and a 4-byte count at fixed offsets, so each sample keeps its own time.
 ENVELOPE_BYTES = 12
 
 # Widths must match entry_width() in kfsw-services/src/hk/hk.c. A report is
@@ -141,9 +138,7 @@ def integer_type(types, name, bits, signed, unit=None, calibration=None, valid=N
         sub(calibrator, "Term", coefficient=calibration.get("intercept", 0.0), exponent=0)
         sub(calibrator, "Term", coefficient=calibration["slope"], exponent=1)
     if valid:
-        # A parameter that reports a reserved value when it has nothing to say
-        # would otherwise drag every plot to that reserved value. Marking the
-        # range keeps the absence visible without letting it set the scale.
+        # Mark the valid range so a reserved value doesn't set the plot scale.
         sub(node, "ValidRange", minInclusive=valid["min"], maxInclusive=valid["max"])
     return node
 
@@ -242,8 +237,7 @@ def add_report(types, parameters, containers, report):
         sub(entry_list, "ParameterRefEntry", parameterRef=f"{prefix}_{display_name(entry)}")
     base = sub(container, "BaseContainer", containerRef="hk_frame")
     criteria = sub(base, "RestrictionCriteria")
-    # A bare Comparison rather than a ComparisonList: the schema wants at least
-    # two entries in a list, and the report id is the only discriminator there is.
+    # A Comparison, not a ComparisonList: the schema needs two entries for a list.
     sub(criteria, "Comparison", parameterRef="hk_report", value=report["report"])
 
 
@@ -252,8 +246,7 @@ def cmd_xtce(report, args):
     root = build_xtce([report])
     ET.indent(root, space="\t")
     xml = ET.tostring(root, encoding="unicode")
-    # The schema hint carries a prefix ElementTree will not emit alongside a
-    # default namespace, so it is stitched on rather than fought with.
+    # ElementTree won't write this prefix with a default namespace, so add it by hand.
     xml = xml.replace(
         "<SpaceSystem ",
         f'<SpaceSystem xmlns:xsi="{XSI_NS}" '

@@ -7,11 +7,7 @@
 
 #include "tables.h"
 
-/* Read-only throughout. The timeout is installed in hardware once at
- * initialization, so a value written here would be stored and never applied.
- * The platform also sits below the parameter service and cannot read it back,
- * which is what would be needed to make it take effect on the next boot.
- */
+/* Read-only: the timeout is installed once at init. */
 static uint32_t watchdog_timeout_ms;
 static uint32_t watchdog_feed_interval_ms;
 static uint32_t watchdog_feeds;
