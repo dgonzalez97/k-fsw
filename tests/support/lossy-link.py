@@ -1,15 +1,8 @@
 #!/usr/bin/env python3
-"""Forward bytes between two serial endpoints, losing some of them on purpose.
+"""Forward bytes between two serial endpoints and drop some of them.
 
-A transfer that only ever runs over a clean link has never exercised the part
-of it that recovers. This sits where a bridge would and drops a run of bytes
-every so often, which downstream looks like a packet that never arrived: the
-transport's own checksum discards whatever is left damaged, so the receiver
-stays silent and the sender has to notice for itself.
-
-Dropping is deliberately blunt. The point is not to model a radio faithfully
-but to make losses happen often enough, and early enough, to see whether the
-sender recovers or gives up.
+Every so often a run of bytes is dropped, which the receiver sees as a lost
+packet, so a transfer's recovery can be tested.
 """
 
 import argparse

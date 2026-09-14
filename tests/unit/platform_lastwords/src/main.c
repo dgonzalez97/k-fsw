@@ -4,9 +4,7 @@
 
 #include <kfsw/platform/lastwords.h>
 
-/* The record lives in memory start-up does not clear, so these run in one
- * image and each case leaves it empty for the next.
- */
+/* The note is in RAM start-up doesn't clear, so each case clears it for the next. */
 static void clear_record(void)
 {
 	struct kfsw_lastwords discard;
@@ -45,9 +43,7 @@ ZTEST(kfsw_platform_lastwords, test_a_note_is_reported_once)
 	kfsw_lastwords_write(KFSW_LASTWORDS_BROWNOUT, 0U, 10U, 1U);
 
 	zassert_true(kfsw_lastwords_take(&record));
-	/* Attributing one restart's reason to the next would be worse than
-	 * saying nothing, so reading has to consume it.
-	 */
+	/* Reading clears the note. */
 	zassert_false(kfsw_lastwords_take(&record), "a note must not be reported twice");
 	zassert_equal(record.reason, KFSW_LASTWORDS_NONE);
 }
@@ -58,10 +54,7 @@ ZTEST(kfsw_platform_lastwords, test_the_last_note_wins)
 
 	clear_record();
 	kfsw_lastwords_write(KFSW_LASTWORDS_COMMANDED, 1U, 100U, 1U);
-	/* Whatever is closest to the restart is the more useful account: a
-	 * commanded reboot that then browns out went down for the second
-	 * reason.
-	 */
+	/* A second write replaces the first. */
 	kfsw_lastwords_write(KFSW_LASTWORDS_BROWNOUT, 2U, 200U, 1U);
 
 	zassert_true(kfsw_lastwords_take(&record));
@@ -76,10 +69,7 @@ ZTEST(kfsw_platform_lastwords, test_a_writer_can_take_its_own_note_back)
 	clear_record();
 	kfsw_lastwords_write(KFSW_LASTWORDS_STARVED, 0U, 10U, 1U);
 
-	/* A writer that predicts a restart has to be able to withdraw when the
-	 * restart does not come, or a later reset for an unrelated cause would
-	 * be blamed on it.
-	 */
+	/* A predicted restart can be withdrawn. */
 	zassert_true(kfsw_lastwords_withdraw(KFSW_LASTWORDS_STARVED));
 	zassert_false(kfsw_lastwords_take(&record), "a withdrawn note must be gone");
 }
@@ -91,9 +81,7 @@ ZTEST(kfsw_platform_lastwords, test_a_writer_cannot_take_back_someone_elses)
 	clear_record();
 	kfsw_lastwords_write(KFSW_LASTWORDS_FATAL, 0x0800abcdU, 10U, 1U);
 
-	/* Health withdrawing a crash report would lose the account that
-	 * mattered, so the reason has to match before anything is discarded.
-	 */
+	/* Withdrawing with a different reason must not clear the note. */
 	zassert_false(kfsw_lastwords_withdraw(KFSW_LASTWORDS_STARVED));
 	zassert_true(kfsw_lastwords_take(&record));
 	zassert_equal(record.reason, KFSW_LASTWORDS_FATAL);
@@ -108,9 +96,7 @@ ZTEST(kfsw_platform_lastwords, test_withdrawing_nothing_is_not_an_error)
 
 ZTEST(kfsw_platform_lastwords, test_every_reason_has_a_name)
 {
-	/* Ground and the log both print these, so a missing one would surface
-	 * as a blank field rather than an error.
-	 */
+	/* Every reason has a name. */
 	zassert_str_equal(kfsw_lastwords_reason_name(KFSW_LASTWORDS_NONE), "none");
 	zassert_str_equal(kfsw_lastwords_reason_name(KFSW_LASTWORDS_COMMANDED), "commanded");
 	zassert_str_equal(kfsw_lastwords_reason_name(KFSW_LASTWORDS_BROWNOUT), "brownout");
@@ -121,9 +107,7 @@ ZTEST(kfsw_platform_lastwords, test_every_reason_has_a_name)
 
 ZTEST(kfsw_platform_lastwords, test_no_detector_is_reported_not_pretended)
 {
-	/* A composition that believes it is watching the rail when nothing is
-	 * would read a missing brown-out record as good news.
-	 */
+	/* No detector on this host. */
 	zassert_equal(kfsw_lastwords_watch_supply(), -ENOTSUP);
 }
 

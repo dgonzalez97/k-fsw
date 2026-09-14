@@ -1,10 +1,6 @@
 /*
- * Housekeeping collection from a node that is not this one.
- *
- * The two remote reads are wrapped and answered by fakes, so the cases worth
- * asserting -- a node that never replies, one that lists fewer parameters than
- * were asked of it, one that lists them and then fails to hand them over --
- * are reached here rather than by standing up a second node and provoking it.
+ * Housekeeping collection from a remote node, with the remote reads faked: no
+ * reply, a missing parameter, and a failed read.
  */
 
 #include <string.h>
@@ -82,10 +78,8 @@ static void define_report(size_t entry_count)
 		{.node = REMOTE_NODE, .param_id = SECOND_ID},
 	};
 
-	/* Defining a remote entry asks the node how wide its value is, so the
-	 * node has to describe itself before the report can exist. The fakes
-	 * are cleared afterwards, leaving each test to say what the node does
-	 * when the report is collected rather than when it was defined.
+	/* Defining a remote entry needs the node's descriptors. The fakes are
+	 * cleared afterwards so each test sets what happens at collection.
 	 */
 	offered_ids[0] = FIRST_ID;
 	offered_ids[1] = SECOND_ID;
@@ -182,9 +176,7 @@ ZTEST(services_hk_remote, test_node_short_of_values_leaves_the_sample_incomplete
 	__wrap_kfsw_param_remote_visit_until_fake.custom_fake = offer_parameters;
 	__wrap_kfsw_param_remote_get_many_until_fake.custom_fake = hand_values;
 
-	/* A partial sample is kept and flagged rather than thrown away, so the
-	 * collection succeeds and the sample carries the bad news itself.
-	 */
+	/* A partial sample is kept and flagged. */
 	zassert_ok(kfsw_hk_collect(REPORT_ID));
 	zassert_ok(kfsw_hk_get(REPORT_ID, 0U, &sample));
 
@@ -192,9 +184,8 @@ ZTEST(services_hk_remote, test_node_short_of_values_leaves_the_sample_incomplete
 	zassert_equal(sample.flags & KFSW_HK_FLAG_INCOMPLETE, KFSW_HK_FLAG_INCOMPLETE,
 		      "the missing value should mark the sample incomplete");
 
-	/* A value the node never listed is not counted as a failed entry: the
-	 * counter follows reads that were attempted and refused, while the
-	 * sample flag is what reports a value that never arrived at all.
+	/* A value the node never listed doesn't count as a failed entry; the
+	 * sample flag reports it.
 	 */
 	zassert_equal(after.entries_failed - before.entries_failed, 0U,
 		      "a value that was never listed is reported by the flag, not the counter");

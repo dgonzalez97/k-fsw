@@ -235,7 +235,7 @@ ZTEST(kfsw_hk, test_redefining_discards_what_was_collected)
 	zassert_equal(depth, 0U, "samples from the old layout survived the redefinition");
 }
 
-/* A period below the floor is refused rather than quietly clamped. */
+/* A period below the floor is refused, not clamped. */
 ZTEST(kfsw_hk, test_a_period_below_the_floor_is_refused)
 {
 	const struct kfsw_hk_entry entries[] = {
@@ -252,7 +252,7 @@ ZTEST(kfsw_hk, test_a_period_below_the_floor_is_refused)
 		   "the floor itself was refused");
 }
 
-/* A report that was never defined answers nothing rather than an empty frame. */
+/* An undefined report returns nothing. */
 ZTEST(kfsw_hk, test_an_undefined_report_collects_nothing)
 {
 	struct kfsw_hk_sample sample;
@@ -274,10 +274,8 @@ ZTEST(kfsw_hk, test_a_sample_without_a_clock_says_so)
 	zassert_ok(kfsw_hk_collect(0U));
 	zassert_ok(kfsw_hk_get(0U, 0U, &sample));
 
-	/* This composition has no CSP, so there is nowhere for a wall clock to
-	 * come from and every sample is collected without one. The timestamp
-	 * being zero is not enough on its own: zero is a real instant, and a
-	 * reader that took it at face value would place the sample in 1970.
+	/* No CSP, so there is no wall clock. The sample must be flagged, because a
+	 * zero timestamp alone looks like 1970.
 	 */
 	zassert_equal(sample.seconds, 0U, "a node with no clock cannot time a sample");
 	zassert_not_equal(sample.flags & KFSW_HK_FLAG_CLOCK_UNSET, 0U,
@@ -302,14 +300,10 @@ ZTEST(kfsw_hk, test_disabling_stops_the_schedule_and_keeps_the_history)
 	kfsw_hk_get_stats(&stats);
 	zassert_false(stats.enabled, "the switch has to be visible in the table");
 
-	/* Disabling is a decision about the schedule, not a lock on the
-	 * service: an operator who asks for a sample by hand has asked.
-	 */
+	/* Manual collection still works while periodic collection is off. */
 	zassert_ok(kfsw_hk_collect(0U));
 
-	/* And nothing already collected is thrown away, so turning it off
-	 * during a firmware upload does not cost the pass its history.
-	 */
+	/* Collected samples are kept. */
 	zassert_ok(kfsw_hk_depth(0U, &depth));
 	zassert_equal(depth, 2U, "samples must survive being switched off");
 

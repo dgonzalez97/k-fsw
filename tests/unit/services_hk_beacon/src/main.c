@@ -12,15 +12,8 @@
 #define TEST_TABLE 30U
 
 /*
- * A beacon is the one thing housekeeping does without being asked, so the
- * questions here are not about values: they are about whether an unprompted
- * transmitter can be trusted with a link. What does it address, when does it
- * stay quiet, and what does it refuse to be configured as.
- *
- * The tick is internal to the service because nothing outside it should decide
- * when a beacon is due. A test is the exception, and declaring it here is
- * honest about that: driving it through the collector thread instead would
- * make every case below a sleep.
+ * Beacon addressing, timing, limits and buffer handling. The tick is internal,
+ * so it is declared here to avoid sleeping in every case.
  */
 void kfsw_hk_beacon_tick(uint8_t report, int64_t now);
 
@@ -129,9 +122,7 @@ static void beacon_before(void *fixture)
 
 ZTEST_SUITE(kfsw_hk_beacon, NULL, beacon_setup, beacon_before, NULL, NULL);
 
-/* The floor is what stops an operator turning a node into a transmitter that
- * swamps its own link, so it is refused rather than clamped.
- */
+/* An interval below the floor is refused, not clamped. */
 ZTEST(kfsw_hk_beacon, test_an_interval_under_the_floor_is_refused)
 {
 	uint16_t node = 0U;
@@ -149,9 +140,7 @@ ZTEST(kfsw_hk_beacon, test_the_floor_itself_is_allowed)
 		   "the floor was refused by its own limit");
 }
 
-/* Address 0 is the broadcast-ish unset case and 16383 is the top of the CSP
- * address space; beyond it the field simply cannot carry the number.
- */
+/* Address 0 and addresses above 16383 are refused. */
 ZTEST(kfsw_hk_beacon, test_an_address_that_cannot_exist_is_refused)
 {
 	zassert_equal(kfsw_hk_set_beacon(0U, 0U, CONFIG_KFSW_HK_BEACON_FLOOR_MS), -EINVAL,
@@ -199,13 +188,8 @@ ZTEST(kfsw_hk_beacon, test_zero_stops_it)
 }
 
 /*
- * The regression this suite exists for.
- *
- * A ground listener recognises housekeeping by the port a frame came *from*,
- * so a beacon must leave from the serving port or it is invisible. It must
- * arrive somewhere nothing binds, or it lands on another node's request
- * handler, where a frame whose first byte is also a version number can be read
- * as a request. The two are different ports and neither may drift.
+ * Beacons are sent from the housekeeping port, which ground listeners use, to a
+ * port nothing binds, so they can't be read as requests.
  */
 ZTEST(kfsw_hk_beacon, test_the_ports_are_the_ones_the_ground_expects)
 {
@@ -225,9 +209,7 @@ ZTEST(kfsw_hk_beacon, test_the_ports_are_the_ones_the_ground_expects)
 	zassert_equal(sent.destination, 5U, "the beacon went to the wrong node");
 }
 
-/* Low priority and a CRC, because a beacon must never outrank the traffic
- * somebody is waiting for, and a corrupt sample should be dropped not decoded.
- */
+/* Low priority and CRC32. */
 ZTEST(kfsw_hk_beacon, test_a_beacon_yields_to_real_traffic)
 {
 	define_and_collect(0U);
@@ -258,9 +240,7 @@ ZTEST(kfsw_hk_beacon, test_a_beacon_carries_the_newest_sample)
 }
 
 /*
- * The rule that makes an unprompted transmitter safe to have at all: a reply
- * somebody is waiting for outranks a broadcast nobody asked for. Counted
- * rather than logged, so a quiet beacon can still be explained after the pass.
+ * A beacon is skipped and counted when too few buffers are free.
  */
 ZTEST(kfsw_hk_beacon, test_a_beacon_never_takes_the_last_buffers)
 {
@@ -282,7 +262,7 @@ ZTEST(kfsw_hk_beacon, test_a_beacon_never_takes_the_last_buffers)
 	zassert_equal(after.beacons_sent, before.beacons_sent, "a skipped beacon was counted sent");
 }
 
-/* And it recovers once the pool does, rather than staying off. */
+/* Beacons resume once buffers are free again. */
 ZTEST(kfsw_hk_beacon, test_it_speaks_again_once_the_pool_recovers)
 {
 	define_and_collect(0U);

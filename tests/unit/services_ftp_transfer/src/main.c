@@ -1,10 +1,6 @@
 /*
- * The FTP send and receive loops, driven through a faked transport.
- *
- * Both loops are reached over CSP in the integration suites, which proves the
- * happy path and little else: a peer will not replay an offset or drop a link
- * halfway on request. ftp_link.h is the only transport the transfer engine
- * speaks, so faking it reaches those cases from the host.
+ * FTP send and receive loops through a fake transport, for cases a real peer
+ * doesn't produce: replayed offsets, dropped links and failed sends.
  */
 
 #include <errno.h>
@@ -37,9 +33,7 @@ FAKE_VALUE_FUNC(int, __wrap_kfsw_ftp_link_receive, struct kfsw_ftp_link *,
 		struct kfsw_ftp_link_frame *);
 FAKE_VOID_FUNC(__wrap_kfsw_ftp_link_release, struct kfsw_ftp_link_frame *);
 
-/* One scripted inbound message per call, so a test says what the peer sends
- * rather than what it would have to be persuaded to send.
- */
+/* One scripted inbound message per call. */
 #define SCRIPT_MAX 4
 static struct kfsw_ftp_message scripted[SCRIPT_MAX];
 static int scripted_result[SCRIPT_MAX];
@@ -67,9 +61,7 @@ static int deliver_scripted(struct kfsw_ftp_link *link, struct kfsw_ftp_link_fra
 	return 0;
 }
 
-/* A message that would be accepted, so a test only has to spoil the one field
- * it is about.
- */
+/* A valid message, so each test only changes the field it checks. */
 static struct kfsw_ftp_message good_message(uint32_t offset, size_t which, uint32_t total,
 					    uint32_t crc)
 {
@@ -196,7 +188,7 @@ ZTEST(services_ftp_transfer, test_a_link_that_stops_answering_ends_the_receive)
 	zassert_equal(transfer.offset, (uint32_t)sizeof(payload[0]),
 		      "only the chunk that arrived should count");
 	zassert_equal(__wrap_kfsw_ftp_link_release_fake.call_count, 1U,
-		      "a receive that failed owns no frame to release");
+		      "a failed receive has no frame to release");
 }
 
 ZTEST(services_ftp_transfer, test_a_replayed_chunk_is_refused)
@@ -255,7 +247,7 @@ ZTEST(services_ftp_transfer, test_a_chunk_running_past_the_agreed_size_is_refuse
 	const uint32_t total = (uint32_t)sizeof(payload[0]);
 
 	transfer.total_size = total;
-	/* Agreed on one chunk, offered two chunks' worth in one message. */
+	/* Agreed on one chunk, but two chunks of data in one message. */
 	scripted[0] = good_message(0U, 0U, total, 0U);
 	scripted[0].data_size = (uint16_t)(2U * sizeof(payload[0]));
 	scripted_count = 1U;

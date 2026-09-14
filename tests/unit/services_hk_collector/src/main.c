@@ -11,16 +11,9 @@
 #define TEST_TABLE 30U
 
 /*
- * The thread that collects on a schedule, and the two gates in front of it.
- *
- * Neither gate is cosmetic. A ring full of samples stamped zero cannot be put
- * in order, and the period keeps running while the clock is missing — so a
- * node that came up without one would overwrite its own history before anybody
- * could ask for it. The enable is the switch an operator has when they want
- * the node to stop filling the ring without losing what is in it.
- *
- * These cases wait in real time because that is what the thread does. The
- * period floor is lowered in prj.conf to keep the waiting short.
+ * The periodic collector and its two gates: the clock must be set and collection
+ * enabled. These cases wait in real time; the period floor is lowered in
+ * prj.conf.
  */
 
 static uint16_t counter_u16 = 0x1234U;
@@ -52,9 +45,7 @@ static const struct kfsw_param_definition_set test_set = {
 
 static void set_clock(bool valid)
 {
-	/* Seconds zero is what an unset clock reads as, which is exactly how
-	 * the service decides it has none.
-	 */
+	/* Zero seconds is an unset clock. */
 	struct kfsw_csp_clock clock = {.seconds = valid ? 1788000000 : 0, .nanoseconds = 0U};
 
 	(void)kfsw_csp_clock_set(&clock);
@@ -102,17 +93,14 @@ static void collector_before(void *fixture)
 
 ZTEST_SUITE(kfsw_hk_collector, NULL, collector_setup, collector_before, NULL, NULL);
 
-/* Starting twice is what a restarted service does, and it must not start a
- * second thread on the same state.
- */
+/* Starting twice must not start a second thread. */
 ZTEST(kfsw_hk_collector, test_starting_again_is_harmless)
 {
 	zassert_ok(kfsw_hk_start(), "starting an already running collector failed");
 }
 
 /*
- * The gate that matters most. Without it the period runs, the ring fills with
- * samples that cannot be ordered, and the history an operator wanted is gone.
+ * Without the clock nothing is collected on a schedule.
  */
 ZTEST(kfsw_hk_collector, test_nothing_is_collected_until_the_node_knows_the_time)
 {
@@ -192,8 +180,7 @@ ZTEST(kfsw_hk_collector, test_a_report_without_a_period_is_left_alone)
 }
 
 /*
- * The operator's switch. It stops the schedule and keeps the history, which is
- * the whole difference between disabling a report and clearing it.
+ * Disabling stops the schedule and keeps the samples.
  */
 ZTEST(kfsw_hk_collector, test_disabling_stops_the_schedule_and_keeps_what_was_collected)
 {
@@ -224,7 +211,7 @@ ZTEST(kfsw_hk_collector, test_disabling_stops_the_schedule_and_keeps_what_was_co
 	zassert_true(collections() > before, "the collector did not resume when enabled again");
 }
 
-/* Two reports on their own schedules, because one is the easy case. */
+/* Two reports on their own schedules. */
 ZTEST(kfsw_hk_collector, test_reports_keep_their_own_schedules)
 {
 	uint16_t fast = 0U;

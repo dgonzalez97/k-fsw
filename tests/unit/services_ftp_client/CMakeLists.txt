@@ -19,9 +19,8 @@ target_sources(app PRIVATE src/main.c)
 target_include_directories(app PRIVATE "${KFSW_WORKSPACE_ROOT}/kfsw-services/src/ftp")
 target_link_libraries(app PRIVATE kfsw::services kfsw::comms)
 
-# The whole transport, so the peer is scripted rather than run. is_ready and the
-# node limits are wrapped too: without them the client refuses before it reaches
-# the exchange under test.
+# The transport is wrapped so the peer can be scripted. is_ready and the node
+# limits are wrapped too, or the client refuses before the exchange.
 zephyr_link_libraries(
     -Wl,--wrap=kfsw_ftp_link_connect
     -Wl,--wrap=kfsw_ftp_link_send

@@ -9,11 +9,9 @@
 #include <kfsw/services/fwu.h>
 #include <kfsw/services/fwu_lite.h>
 
-/* The protocol is tested without a transport: requests are handed to the
- * handler directly and the replies inspected. What a link would add is the
- * carrying, which the CSP smoke tests cover; what matters here is that every
- * malformed or ill-timed request produces a reply saying why, and that a block
- * which fails its checksum can simply be sent again.
+/* The protocol is tested without a transport: requests go straight to the
+ * handler. Every bad request must get a reply, and a damaged block can be sent
+ * again.
  */
 
 #define BLOCK KFSW_FWU_LITE_MAX_BLOCK_SIZE
@@ -82,9 +80,7 @@ static void begin_transfer(struct kfsw_fwu_lite_message *reply)
 
 ZTEST(services_fwu_lite, test_header_is_twelve_bytes_and_big_endian)
 {
-	/* The layout is checked byte by byte rather than by round trip, because
-	 * a round trip would agree with itself even if both halves were wrong.
-	 */
+	/* Check the layout byte by byte; a round trip would pass even if both halves were wrong. */
 	struct kfsw_fwu_lite_message message = {
 		.opcode = KFSW_FWU_LITE_OP_BLOCK,
 		.status = 0x11,
@@ -182,9 +178,7 @@ ZTEST(services_fwu_lite, test_decode_rejects_bad_input)
 
 ZTEST(services_fwu_lite, test_an_unknown_request_is_answered_not_ignored)
 {
-	/* Silence is indistinguishable from a lost packet, so even a request
-	 * that makes no sense gets a reply.
-	 */
+	/* Even a request that makes no sense gets a reply. */
 	struct kfsw_fwu_lite_message request = {.opcode = 0x7F};
 	struct kfsw_fwu_lite_message reply;
 
@@ -231,9 +225,7 @@ ZTEST(services_fwu_lite, test_a_block_out_of_order_is_named_not_written)
 
 ZTEST(services_fwu_lite, test_a_corrupt_block_can_simply_be_sent_again)
 {
-	/* This is the whole point of the per-block checksum: a bad block costs
-	 * one block, not the eight minute upload around it.
-	 */
+	/* A bad block costs one block, not the whole upload. */
 	struct kfsw_fwu_lite_message reply;
 	uint8_t corrupted[BLOCK];
 
@@ -243,8 +235,7 @@ ZTEST(services_fwu_lite, test_a_corrupt_block_can_simply_be_sent_again)
 	memcpy(corrupted, &image[BLOCK], sizeof(corrupted));
 	corrupted[10] ^= 0xFFU;
 
-	/* The checksum sent is the one for the good block, so the node sees the
-	 * damage rather than trusting what arrived. */
+	/* The checksum is for the good block, so the node sees the damage. */
 	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_BLOCK, 1U, crc32_ieee(&image[BLOCK], BLOCK), 0U,
 			  corrupted, BLOCK),
 		      KFSW_FWU_LITE_STATUS_BAD_BLOCK);
@@ -258,9 +249,7 @@ ZTEST(services_fwu_lite, test_a_corrupt_block_can_simply_be_sent_again)
 
 ZTEST(services_fwu_lite, test_a_short_block_in_the_middle_is_rejected)
 {
-	/* Block indices are derived from how much the node holds, so a short
-	 * block that is not the last would desynchronise both ends silently.
-	 */
+	/* Only the last block may be short. */
 	struct kfsw_fwu_lite_message reply;
 
 	begin_transfer(&reply);
@@ -397,9 +386,7 @@ ZTEST(services_fwu_lite, test_abort_returns_to_idle_and_a_new_transfer_can_start
 
 ZTEST(services_fwu_lite, test_a_second_begin_while_receiving_is_refused)
 {
-	/* Both upload routes feed one update service, so a second sender must
-	 * be told the node is busy rather than quietly resetting the first.
-	 */
+	/* A second sender is told the node is busy. */
 	struct kfsw_fwu_lite_message reply;
 
 	begin_transfer(&reply);

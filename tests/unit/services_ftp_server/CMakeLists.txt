@@ -21,9 +21,7 @@ target_include_directories(app PRIVATE
 )
 target_link_libraries(app PRIVATE kfsw::services kfsw::comms)
 
-# The link is the seam the server was already built around. Standing a fake one
-# up in its place is what lets a request be asked and its answer read without a
-# radio, a router or a second node.
+# A fake link replaces the transport, so requests can be tested without CSP.
 zephyr_link_libraries(
     -Wl,--wrap=kfsw_ftp_link_receive
     -Wl,--wrap=kfsw_ftp_link_release

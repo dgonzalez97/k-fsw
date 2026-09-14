@@ -14,15 +14,8 @@
 #define MAX_REPLIES 8
 
 /*
- * What a housekeeping request means.
- *
- * The accept loop around this only accepts, reads and closes; everything that
- * can be got wrong lives in the answer — refusing a frame too short to hold a
- * request, refusing a version this build cannot decode, honouring a count and
- * a starting age, and stopping cleanly when the buffer pool runs dry rather
- * than holding a connection open while the router needs it.
- *
- * The request is served directly, so none of this needs a router.
+ * Housekeeping request handling: short frames, unknown versions, count and
+ * starting age, and running out of buffers. Requests are served directly.
  */
 void kfsw_hk_serve_request(struct csp_conn_s *connection, struct csp_packet_s *request);
 
@@ -140,10 +133,7 @@ static void server_before(void *fixture)
 ZTEST_SUITE(kfsw_hk_server, NULL, server_setup, server_before, NULL, NULL);
 
 /*
- * A request the server cannot trust is dropped, and its buffer is always given
- * back. A leaked buffer per bad frame is a node that stops answering after a
- * few minutes of a noisy link, which is the hardest kind of fault to find from
- * the ground.
+ * A bad request is dropped and its buffer freed.
  */
 ZTEST(kfsw_hk_server, test_a_request_too_short_to_read_is_refused)
 {
@@ -184,9 +174,7 @@ ZTEST(kfsw_hk_server, test_a_report_with_no_samples_says_nothing)
 	zassert_equal(link.replies, 0U, "a report holding nothing produced a reply");
 }
 
-/* One packet per sample, so a lost packet costs one sample rather than the
- * whole answer.
- */
+/* One packet per sample. */
 ZTEST(kfsw_hk_server, test_each_sample_is_its_own_packet)
 {
 	struct kfsw_hk_sample newest;
@@ -264,9 +252,7 @@ ZTEST(kfsw_hk_server, test_an_age_beyond_what_is_held_says_nothing)
 }
 
 /*
- * An empty pool is normal under load, not a fault. The server sends what it
- * managed and stops, rather than waiting on a buffer while holding a
- * connection the router wants back.
+ * With no free buffers the server sends what it can and stops.
  */
 ZTEST(kfsw_hk_server, test_an_empty_pool_ends_the_answer_rather_than_waiting)
 {
@@ -296,7 +282,7 @@ ZTEST(kfsw_hk_server, test_no_pool_at_all_is_survivable)
 	zassert_equal(link.frees, 1U, "the request leaked its buffer when the pool was empty");
 }
 
-/* Whatever else happens, the request itself is given back exactly once. */
+/* The request is freed once. */
 ZTEST(kfsw_hk_server, test_the_request_is_always_given_back)
 {
 	define_report(0U);

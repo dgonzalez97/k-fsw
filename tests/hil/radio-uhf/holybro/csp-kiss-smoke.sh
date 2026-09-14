@@ -107,9 +107,7 @@ validate_log_callback()
 	local active_level="$1"
 	local callback_output
 
-	# Anchored on the echoed command alone. The prompt is coloured, so an
-	# escape sequence sits between it and the command and the two are no
-	# longer one contiguous run of text.
+	# Match the echoed command only; the coloured prompt is not plain text.
 	callback_output="$(sed -n '/log test/,$p' "$work_dir/nucleo.log")"
 	grep -Fq '[ERROR] K-FSW shell log test: error' <<<"$callback_output" || return 1
 	if [[ "$active_level" == 2 ]]; then
@@ -202,10 +200,8 @@ west flash -d "$nucleo_build_dir" --runner openocd || \
 wait_for_output "$work_dir/nucleo.log" "@READY " "$debug_capture_pid" || \
 	fail "NUCLEO did not report readiness"
 
-# Console echo is off by default, so a scripted session does not show every
-# command twice. This fixture windows the board's output by looking for the
-# command it sent, which only exists when the console repeats it, so the test
-# asks for what it needs to read.
+# Echo is off by default, and this script finds output by the echoed command, so
+# turn echo on.
 printf '%s\r\n' 'param set echo_enabled 1' >"$debug_serial"
 sleep 1
 
@@ -276,9 +272,8 @@ wait_for_output "$work_dir/nucleo.log" "CSP ping 16: success" \
 	fail "NUCLEO node 2 could not ping k-ground node 16 over Holybro"
 
 printf '%s\n' 'param list 2' 'param get 2 log_level' >&3
-# The listing addresses each parameter by table and offset. A remote node's
-# table names are not on the wire, so the number stands in for them: node_id is
-# offset 0 of the core board table, log_level offset 0 of the log service's.
+# Remote listings show table numbers: node_id is offset 0 of the board table and
+# log_level offset 0 of the log table.
 wait_for_output "$work_dir/ground.log" "1           0x00  node_id" "$ground_pid" || \
 	fail "the production NUCLEO parameter list is missing node_id"
 wait_for_output "$work_dir/ground.log" "25          0x00  log_level" "$ground_pid" || \
@@ -288,17 +283,13 @@ wait_for_output "$work_dir/ground.log" "1           0x10  uid" "$ground_pid" || 
 	fail "the production NUCLEO parameter list is missing uid"
 wait_for_output "$work_dir/ground.log" "4           0x20  route_table" "$ground_pid" || \
 	fail "the production NUCLEO parameter list is missing route_table"
-# A writable service setting changed from the ground, and the image identity
-# read back. Between them these are the point of the service tables: something
-# an operator can see, and something they can change on a pass.
+# Change a writable setting from the ground and read the image identity.
 printf '%s\n' 'param get 2 boot_image' 'param set 2 ftp_timeout_ms 20000' \
 	'param get 2 ftp_timeout_ms' >&3
 wait_for_output "$work_dir/ground.log" "2:ftp_timeout_ms = 20000" "$ground_pid" || \
 	fail "a service setting could not be changed over the radio"
 
-# A string read across the radio. This is the whole string path end to end:
-# sampled from the running CSP identity on the NUCLEO, packed into a libparam
-# transfer, carried over RF, and rendered quoted on the ground.
+# A string read over the radio.
 printf '%s\n' 'param get 2 uid' >&3
 wait_for_output "$work_dir/ground.log" '2:uid = "kfsw-2"' "$ground_pid" || \
 	fail "the NUCLEO identity did not survive the radio as text"
@@ -336,7 +327,7 @@ wait_for_output_count "$work_dir/nucleo.log" "K-FSW status" \
 	"$((nucleo_status_count_before + 1))" "$debug_capture_pid" || \
 	fail "the NUCLEO log callback output did not reach its status barrier"
 validate_log_callback "$alternate_log_level" || \
-	fail "the owner callback did not apply the remote log_level"
+	fail "the change callback did not apply the remote log_level"
 
 default_count_before="$(grep -Fc \
 	"2:log_level = $compiled_log_level_default" "$work_dir/ground.log" || true)"
@@ -375,14 +366,11 @@ printf '%s\n' \
 	'cmd 2 event_tail 0' \
 	'cmd 2 bogus' >&3
 
-# The ground node is 16, so this is addressed to itself. There is no link to
-# traverse and reaching the shell at all is the answer; reporting a round-trip
-# time would be a measurement of nothing.
+# Node 16 pinging itself needs no link, so no round-trip time is printed.
 wait_for_output "$work_dir/ground.log" "CSP ping 16: this node, no link traversed" \
 	"$ground_pid" || fail "the ground node did not answer for itself"
-# Addressed to this node, so the command runs here rather than being sent into
-# the network and back. Source node 0 is the marker for a command that did not
-# arrive over CSP, which is now the truth for it.
+# Addressed to this node, so it runs locally. Source node 0 means it did not
+# arrive over CSP.
 wait_for_output "$work_dir/ground.log" "noop node=16: OK noop from node 0" \
 	"$ground_pid" || fail "a self-addressed command was not run locally"
 wait_for_output "$work_dir/ground.log" "noop node=2: OK noop from node 16" \
@@ -401,9 +389,8 @@ printf '%s\r\n' 'event stats' 'cmd 2 event_stats' >"$debug_serial"
 wait_for_output "$work_dir/nucleo.log" "recorded: " "$debug_capture_pid" || \
 	fail "NUCLEO did not report its event counters"
 
-# File transfer across the radio. The NUCLEO flash persists between runs, so
-# the directory may already exist and the file may already be present; the
-# upload must overwrite it atomically either way.
+# File transfer over the radio. The directory and file may exist from an earlier
+# run; the upload replaces the file.
 printf '%s\n' \
 	'ftp generate /build/test.txt 256' \
 	'ftp 2 mkdir /uplink' \

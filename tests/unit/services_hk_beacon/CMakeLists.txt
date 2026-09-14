@@ -18,10 +18,8 @@ project(kfsw_services_hk_beacon_tests LANGUAGES C)
 target_sources(app PRIVATE src/main.c)
 target_link_libraries(app PRIVATE kfsw::services kfsw::comms)
 
-# The link is the seam. A beacon's whole contract is what it puts on the wire
-# and when it refuses to, and neither can be observed through a running router:
-# wrapping the three calls lets a test read the addressing off the packet and
-# starve the pool on demand.
+# The link calls are wrapped so the test can read the packet addressing and
+# empty the buffer pool.
 zephyr_link_libraries(
     -Wl,--wrap=csp_sendto
     -Wl,--wrap=csp_buffer_get

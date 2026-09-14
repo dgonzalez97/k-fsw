@@ -15,8 +15,7 @@ lossy_link=0
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 	--lossy)
-		# Drop bytes in the bridge, so the transfer has to recover rather
-		# than merely complete.
+		# Drop bytes in the bridge so the transfer has to recover.
 		lossy_link=1
 		;;
 	*)
@@ -63,9 +62,7 @@ wait_for_output()
 	local file="$1"
 	local expected="$2"
 	local process_pid="$3"
-	# Seconds. A shell command answers in well under the default; a transfer
-	# of a hundred blocks does not, and the machine running this may be much
-	# slower than the one it was written on.
+	# Seconds. A transfer of a hundred blocks takes longer than a shell command.
 	local limit="${4:-30}"
 	local waited=0
 
@@ -78,8 +75,7 @@ wait_for_output()
 	done
 }
 
-# How long a whole-image transfer may take. Generous on purpose: an unhelpful
-# timeout here reports a stall that never happened.
+# Time limit for a whole image transfer, generous for slow machines.
 readonly TRANSFER_LIMIT_S=600
 
 trap cleanup EXIT
@@ -93,10 +89,7 @@ cp "$KGROUND_REPO_DIR/ground-station/nodes/kfsw-gnd-uhf.env" \
 	"$station_dir/nodes/kfsw-gnd-uhf.env"
 cp "$KGROUND_REPO_DIR/ground-station/nodes/kfsw-ops.env" \
 	"$station_dir/nodes/kfsw-ops.env"
-# Both nodes carry the update service: one to receive an image, the other to
-# send it. The direct upload path is exercised here rather than the file
-# transfer route, so blocks and their individual checksums are what crosses the
-# link.
+# Both nodes have the update service. This test uses the direct upload path.
 fwu_kconfig='CONFIG_KFSW_FWU=y
 CONFIG_KFSW_FWU_MCUBOOT=n
 CONFIG_KFSW_FWU_SLOT_OFFSET_SECTORS=1
@@ -104,9 +97,7 @@ CONFIG_KFSW_FWU_LITE=y
 CONFIG_KFSW_FWU_LITE_CSP=y
 CONFIG_KFSW_FWU_LITE_BLOCK_SIZE=192
 CONFIG_KFSW_FWU_LITE_RDP=n
-# Both nodes are processes on one machine, so a reply that is coming arrives in
-# milliseconds. A short timeout keeps a deliberately lossy run tractable
-# instead of spending seconds waiting for packets that were discarded.
+# Both nodes run on one machine, so a short timeout keeps the lossy run quick.
 CONFIG_KFSW_FWU_LITE_TIMEOUT_MS=1500
 CONFIG_KFSW_FWU_LITE_BLOCK_RETRIES=12'
 
@@ -166,9 +157,7 @@ node19_pty="$(sed -n 's/^uart_1 connected to pseudotty: //p' \
 	"$work_dir/node19.log" | head -1)"
 
 if [[ "$lossy_link" -eq 1 ]]; then
-	# A transfer that only ever runs over a clean link has never exercised
-	# the part of it that recovers. Bytes are dropped in runs, which is what
-	# a lost packet looks like from either end.
+	# Drop bytes in runs, like lost packets.
 	python3 "$KGROUND_REPO_DIR/tests/support/lossy-link.py" \
 		--left "$node16_pty" --right "$node19_pty" \
 		--drop-every 3000 --drop-bytes 32 \
@@ -189,9 +178,7 @@ printf '%s\n' 'csp ping 19' >&3
 wait_for_output "$work_dir/node16.log" "CSP ping 19: success" "$node16_pid" || \
 	fail "node 16 could not ping node 19"
 
-# The file transfer route needs the image as a file on the sending node, so it
-# is generated there rather than read from the host. That is the difference
-# between the two routes: this one moves a file that already exists on a node.
+# The file transfer route needs the image as a file on the sending node.
 printf '%s\n' 'ftp generate /build/image.bin 20000' >&4
 wait_for_output "$work_dir/node19.log" "FTP generate" "$node19_pid" || \
 	fail "the sending node could not produce a stand-in image"
@@ -209,9 +196,7 @@ printf '%s\n' 'ftp put 16 /build/image.bin firmware.bin' >&4
 wait_for_output "$work_dir/node19.log" "FTP put" "$node19_pid" "$TRANSFER_LIMIT_S" || \
 	fail "the put did not complete"
 
-# The image must be in the update service, not in the filesystem. A file of
-# that name appearing in the transfer root would mean the reserved path was not
-# recognised and the image was quietly stored as data.
+# The image must go to the update service, not into the transfer root.
 printf '%s\n' 'fwu status' 'ftp 16 ls /' >&3
 wait_for_output "$work_dir/node16.log" "received: 20000" "$node16_pid" || \
 	fail "the update service did not receive the image"
@@ -223,9 +208,7 @@ if sed -n '/ftp 16 ls \//,$p' "$work_dir/node16.log" | grep -aq "firmware.bin"; 
 fi
 
 if [[ "$lossy_link" -eq 1 ]]; then
-	# The point of the lossy run. A clean result here would mean the losses
-	# were not reaching the transfer, and the recovery path would still be
-	# untested.
+	# The lossy run must show resent blocks.
 	echo "K-GROUND FWU-FTP RESULT: PASS crc32=$image_crc bytes=20000 lossy=yes"
 else
 	echo "K-GROUND FWU-FTP RESULT: PASS crc32=$image_crc bytes=20000"

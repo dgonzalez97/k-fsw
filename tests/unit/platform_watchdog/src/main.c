@@ -6,18 +6,14 @@
 #include <kfsw/platform/reset.h>
 #include <kfsw/platform/watchdog.h>
 
-/* This suite runs on native_sim, which has no watchdog driver at all. That is
- * deliberate: it pins the arithmetic and the reset-cause decoding, which are
- * pure and must hold everywhere, and it pins the contract a composition sees
- * on a board with no watchdog hardware. Arming a real device and observing the
- * reset it causes belongs to the hardware acceptance, not here.
+/* native_sim has no watchdog driver, so this suite tests the feed interval,
+ * reset-cause decoding and the -ENODEV behaviour. Real resets are tested on
+ * hardware.
  */
 
 ZTEST(platform_watchdog, test_feed_interval_leaves_room_for_two_misses)
 {
-	/* A third of the timeout means two consecutive feeds can be missed
-	 * before the hardware expires. Anything larger removes that margin.
-	 */
+	/* A third of the timeout, so two feeds can be missed. */
 	zassert_equal(kfsw_platform_watchdog_feed_interval_ms(9000U), 3000U);
 	zassert_equal(kfsw_platform_watchdog_feed_interval_ms(8000U), 2666U);
 
@@ -54,8 +50,7 @@ ZTEST(platform_watchdog, test_watchdog_cause_is_recognized_among_others)
 
 ZTEST(platform_watchdog, test_cause_name_prefers_the_watchdog)
 {
-	/* After an unattended restart the watchdog is the answer an operator
-	 * needs, so it outranks whatever else was latched alongside it. */
+	/* The watchdog is reported first when several causes are latched. */
 	zassert_str_equal(kfsw_platform_reset_cause_name(RESET_WATCHDOG), "watchdog");
 	zassert_str_equal(kfsw_platform_reset_cause_name(RESET_WATCHDOG | RESET_PIN), "watchdog");
 	zassert_str_equal(kfsw_platform_reset_cause_name(RESET_POR | RESET_WATCHDOG), "watchdog");
@@ -70,9 +65,7 @@ ZTEST(platform_watchdog, test_absent_hardware_is_reported_not_pretended)
 {
 	struct kfsw_platform_watchdog_info info;
 
-	/* native_sim has no watchdog. Every operation must say so rather than
-	 * appearing to succeed, or a composition would believe it is guarded
-	 * when nothing is watching it. */
+	/* Without a watchdog every call must fail. */
 	zassert_equal(kfsw_platform_watchdog_init(), -ENODEV);
 	zassert_equal(kfsw_platform_watchdog_start(), -ENODEV);
 	zassert_equal(kfsw_platform_watchdog_feed(), -ENODEV);

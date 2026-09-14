@@ -1,7 +1,5 @@
-/* Reading one remote parameter used to cost one CSP exchange per parameter the
- * node owned: the whole descriptor list, downloaded to answer a question about
- * a single entry. These cases pin the exchange count, which is the property
- * that regressed, rather than only the value that came back.
+/* Reading one remote parameter must take one descriptor exchange, not a download
+ * of the whole list. These cases count the exchanges.
  */
 #include <errno.h>
 #include <string.h>
@@ -21,8 +19,7 @@
 
 #include "param_list.h"
 
-/* One node per case. The descriptor cache holds a single node at a time, so
- * switching nodes is what gives each test a cold cache to measure against. */
+/* One node per case, so each test starts with an empty cache. */
 #define PEER_NAMED 42
 #define PEER_REPEAT 43
 #define PEER_SILENT 44
@@ -202,8 +199,8 @@ static void before(void *unused)
 	lookup_pending = false;
 }
 
-/* The claim that matters: one descriptor exchange and one value exchange, no
- * matter how many parameters the node owns.
+/* One descriptor exchange and one value exchange, however many parameters the
+ * node has.
  */
 ZTEST(param_lookup, test_a_named_read_asks_only_for_that_name)
 {
@@ -230,8 +227,8 @@ ZTEST(param_lookup, test_a_second_read_reuses_the_descriptor)
 	zassert_equal(transactions, 1, "a repeat read cost more than its value");
 }
 
-/* A node that predates the lookup answers nothing, and must not be reported as
- * missing the parameter: the walk still has to happen.
+/* A node without lookup support doesn't answer; the client must fall back to the
+ * list instead of reporting the parameter as missing.
  */
 ZTEST(param_lookup, test_silence_falls_back_to_walking_the_list)
 {
@@ -253,9 +250,7 @@ ZTEST(param_lookup, test_an_unknown_name_is_reported_without_a_walk)
 	zassert_equal(list_requests, 0, "an absent name triggered a whole-list download");
 }
 
-/* A reply naming something else is a different parameter's descriptor, and
- * accepting it would publish one parameter's value under another's name.
- */
+/* A reply for a different parameter must be rejected. */
 ZTEST(param_lookup, test_a_misnamed_answer_is_refused)
 {
 	struct kfsw_param_value value;

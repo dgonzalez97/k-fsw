@@ -1,18 +1,8 @@
 #!/usr/bin/env bash
-# Checks that the ground bridge reads a housekeeping sample the node agrees with.
+# Checks that the ground bridge receives the same housekeeping bytes the node's
+# shell prints, and covers the housekeeping CSP server.
 #
-# The bridge is a second implementation of the wire: it frames CSP over KISS on
-# the host, where the node does it in C. Two implementations of one protocol is
-# how a protocol quietly forks, so this asserts the only thing that stops it —
-# the bytes the bridge pulls off the link are the bytes the node's own shell
-# prints for the same sample.
-#
-# It also covers the CSP side of housekeeping, which nothing else does: the
-# unit suites exercise the ring and the collector, and the server on port 14
-# had no test before this.
-#
-# Software only. No Yamcs, no radio: the node runs hosted and the bridge talks
-# to its uart_1 pseudo-terminal.
+# Software only: the node runs hosted and the bridge uses its uart_1 PTY.
 
 set -euo pipefail
 
@@ -84,16 +74,13 @@ pty="$(sed -n 's/^uart_1 connected to pseudotty: //p' "$work_dir/node.log" | hea
 	exit 1
 }
 
-# The same file that generates the mission database tells the node what to
-# collect, which is the only reason the two can be expected to agree.
+# The same report file generates the node definition and the Yamcs database.
 define_command="$("$python" "$KFSW_REPO_DIR/tools/ground/hk-report.py" "$definition" define)"
 printf '%s\n' "$define_command" 'hk collect 0' 'hk get 0' >&3
 sleep 2
 
-# A report naming a table the image does not carry is refused at define time,
-# which is the service working correctly and the test being pointed at the
-# wrong build. Say which, because the failure that follows otherwise is just
-# an empty sample.
+# A table missing from this image is refused at define time; say so instead of
+# failing on an empty sample.
 if grep -q 'define report 0: -2' "$work_dir/node.log"; then
 	printf 'this image does not carry every table the report names.\n' >&2
 	printf 'build it with the profile:\n' >&2
@@ -130,8 +117,7 @@ bridge_frame="$(sed -n 's/^  \([0-9a-f]\{2,\}\)$/\1/p' "$work_dir/bridge.log" | 
 
 echo "HK YAMCS BRIDGE SMOKE"
 
-# The shell prints the payload only; the bridge forwards the whole frame, so
-# its first ten bytes are the header the shell reports in words.
+# The shell prints only the payload; the bridge also has the ten-byte header.
 check "the bridge and the shell read the same values" \
 	"${bridge_frame:20}" "$shell_payload"
 check "the frame carries the protocol version" "${bridge_frame:0:2}" "01"

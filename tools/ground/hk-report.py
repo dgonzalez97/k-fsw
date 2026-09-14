@@ -77,11 +77,10 @@ def cmd_define(report, _args):
 
 
 def cmd_check(report, args):
-    """Compare the file against a `param list` capture from a node.
+    """Compare the file with a `param list` capture from a node.
 
-    The file names a table and an offset; the node knows what lives there. If
-    those disagree the frame still decodes, silently and wrongly, which is the
-    failure this exists to catch.
+    An entry whose table or offset doesn't match the node would still decode,
+    with the wrong values.
     """
     # `table_name  0xNN  name  type  mode  value`, columns padded with spaces.
     row = re.compile(r"^(\S+)\s+0x([0-9a-f]{2})\s+(\S+)\s+(\S+)\s")
@@ -181,7 +180,7 @@ def build_xtce(reports):
          "the host clock when it is not."),
         ("gs_sequence", "gs_sequence_type", "The frame's sequence, restated for Yamcs."),
         ("hk_version", "hk_u8_type", "Housekeeping protocol version."),
-        ("hk_report", "hk_u8_type", "Which report this sample belongs to."),
+        ("hk_report", "hk_u8_type", "Report ID of this sample."),
         ("hk_sequence", "hk_u16_type",
          "Per-report counter. A gap here is a lost sample, not a lost value."),
         ("hk_seconds", "hk_seconds_type",

@@ -1,10 +1,5 @@
 /*
- * The FTP client's request and response handling, with the peer scripted.
- *
- * Over a real link the peer is another node running the server, so it answers
- * correctly or not at all. The answers the client is written to refuse -- a
- * reply to a different request, the wrong opcode, a status carrying a refusal,
- * a malformed stat -- take a misbehaving peer, which is what the fakes are.
+ * FTP client request and response handling, with a scripted peer.
  */
 
 #include <errno.h>

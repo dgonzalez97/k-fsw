@@ -5,10 +5,7 @@
 
 #include <kfsw/platform/hardware.h>
 
-/* Reading twice is what the callers do: the shell formats one line and the
- * board table samples the same value into a parameter. Both have to agree, so
- * most cases here start from one known-good read.
- */
+/* Callers read the ID more than once; both reads must agree. */
 static void read_identifier(char *text, size_t size)
 {
 	int result = kfsw_platform_get_hardware_id(text, size);
@@ -54,10 +51,7 @@ ZTEST(platform_hardware, test_null_buffer_is_refused)
 		      "a NULL buffer was accepted");
 }
 
-/* A truncated identifier names a different unit, which is the one failure this
- * function exists to prevent. Refusing has to leave the caller's buffer alone
- * as well, or a caller that ignores the code prints half an identity.
- */
+/* A buffer that is too small is refused and left untouched. */
 ZTEST(platform_hardware, test_short_buffer_is_refused_without_writing)
 {
 	char text[KFSW_HARDWARE_ID_TEXT_SIZE];

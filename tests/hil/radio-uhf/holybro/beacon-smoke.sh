@@ -1,13 +1,7 @@
 #!/usr/bin/env bash
-# Does a node beacon over a real radio, and does the ground hear it?
-#
-# Every other beacon test runs hosted, where "the link" is a pseudo-terminal
-# that never drops a byte. This is the claim that only a radio can settle: the
-# node transmits on its own, over the air, and something on the ground that
-# never asks for anything picks the frames up.
-#
-# The ground side is hk-bridge.py in --listen, which binds no port and sends no
-# packet. If a frame reaches it, the node sent it unprompted.
+# Checks housekeeping beacons over a real radio. The ground side runs
+# hk-bridge.py --listen, which sends nothing, so every frame it receives was sent
+# by the node on its own.
 #
 # Hardware: NUCLEO-L496ZG on ST-LINK, one Holybro on the board's UART and its
 # pair on host USB. Source tests/hil/radio-uhf/holybro/bench.env first.
@@ -31,8 +25,7 @@ radio_stty=""
 failures=0
 build_image=yes
 
-# Ports outlive this script if they are not given back, and a held port looks
-# exactly like a broken board on the next run.
+# Release the serial ports on exit, or the next run can't open them.
 cleanup()
 {
 	[[ -n "$debug_capture_pid" ]] && kill "$debug_capture_pid" 2>/dev/null || true
@@ -132,8 +125,7 @@ echo "HOLYBRO BEACON"
 printf '%s\r\n' 'param set echo_enabled 1' >"$debug_serial"
 sleep 1
 
-# Beacons follow the clock: a node that never learned the time does not
-# announce itself without saying when.
+# Beacons need the clock to be set.
 printf '%s\r\n' "csp clock set $(date -u +%s)" >"$debug_serial"
 sleep 1
 
@@ -142,8 +134,7 @@ wait_for_output "$work_dir/nucleo.log" "report 0 defines 2 values" 20 ||
 	fail "the report was not defined"
 sleep 3
 
-# Under the floor first: the limit that stops an operator turning the node into
-# a transmitter that swamps the link it shares.
+# An interval below the floor must be refused.
 printf '%s\r\n' 'hk beacon 0 16 250' >"$debug_serial"
 sleep 2
 if grep -qa 'beacon for report 0: -34' "$work_dir/nucleo.log"; then
@@ -181,7 +172,7 @@ if [[ -n "$frame" ]]; then
 	check "the beacon names the report" "${frame:2:2}" "00"
 fi
 
-# The counters an operator reads when the ground goes quiet.
+# Beacon counters.
 printf '%s\r\n' 'hk show' >"$debug_serial"
 sleep 3
 sent="$(tr -d '\r' <"$work_dir/nucleo.log" | sed -n 's/^beacons sent: //p' | tail -1)"

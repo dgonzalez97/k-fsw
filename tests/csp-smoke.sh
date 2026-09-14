@@ -214,49 +214,34 @@ wait_for_output "$work_dir/node2.log" "UART CSP test: PASS" \
     "$node2_pid" || fail "node 2 UART transport test did not pass"
 wait_for_output "$work_dir/node1.log" "2:test_u32 = 1234" \
     "$node1_pid" || fail "remote parameter set/readback did not pass"
-# A remote write to a parameter that also samples. The change arrives in the
-# backing store and is handed back to be applied; sampling at that moment would
-# overwrite it with the value the owner still holds, so the write would report
-# success and change nothing. Only the remote path goes through that code, so
-# this is the only place it shows.
+# Remote write to a sampled parameter: sampling must not overwrite the new value
+# when it is applied.
 wait_for_output "$work_dir/node1.log" "2:log_level = 3" \
     "$node1_pid" || fail "a remote write to a sampled parameter did not take effect"
 
-# One table rather than the whole listing, and the tables a node carries. Both
-# reuse the descriptors the first remote read fetched: a node's descriptors do
-# not change while it is up, so paying for them once is the difference between
-# reading one value and reading the whole table on a link that can barely
-# carry either.
+# One table and the table list, reusing the descriptors from the first read.
 wait_for_output "$work_dir/node1.log" " 32  service" \
     "$node1_pid" || fail "the remote table summary did not list the boot table"
 wait_for_output "$work_dir/node1.log" "32          0x00  boot_image" \
     "$node1_pid" || fail "the remote table did not list its parameters"
 
-# A table listing asks for its values in one exchange per window; a single get
-# asks for one. Both must answer the same thing, or the batch has bought speed
-# by returning something else. `uid` is the check because it is a string, which
-# is where a queue that packed several values would go wrong first.
+# A table listing reads values in windows and a get reads one; both must agree.
+# uid is a string, which a wrongly packed request breaks first.
 wait_for_output "$work_dir/node1.log" "1           0x10  uid" \
     "$node1_pid" || fail "the batched table read did not list the board identity"
 if ! grep -Eq '^1 +0x10 +uid +string +r +"kfsw-2"' "$work_dir/node1.log"; then
     fail "the batched table read disagreed with the single read of uid"
 fi
-# The same listing must also carry a scalar, so a queue that packed a string
-# correctly and everything after it wrongly does not pass.
+# A scalar in the same listing too.
 if ! grep -Eq '^1 +0x00 +node_id +u16 +r +2' "$work_dir/node1.log"; then
     fail "the batched table read did not return the node identifier"
 fi
 
-# A string across the link, and a sampled value that is current when it is
-# asked for. The server hands libparam the backing storage directly, so a
-# sampled parameter that is not refreshed first answers with whatever the
-# storage last held: an identity that is always empty, an uptime always zero.
+# A string over the link, and a sampled value that is current when read.
 wait_for_output "$work_dir/node1.log" '2:uid = "kfsw-2"' \
     "$node1_pid" || fail "the remote identity did not arrive as text"
-# Buffers free is the sampled value worth asserting a number for: uptime in
-# whole seconds is legitimately zero this early, while a node that just
-# answered a request cannot have zero buffers. Before the server sampled, this
-# read back as the compiled default and looked like an exhausted node.
+# Free buffers can't be zero on a node that just answered, unlike uptime this
+# early.
 wait_for_output "$work_dir/node1.log" "2:csp_buf_free = " \
     "$node1_pid" || fail "the remote buffer count was not readable"
 if grep -Fq "2:csp_buf_free = 0" "$work_dir/node1.log"; then
@@ -264,7 +249,7 @@ if grep -Fq "2:csp_buf_free = 0" "$work_dir/node1.log"; then
 fi
 
 wait_for_output "$work_dir/node1.log" "2:log_level = 1" \
-	"$node1_pid" || fail "remote owner validation did not restore the compiled default"
+	"$node1_pid" || fail "remote validation did not restore the compiled default"
 wait_for_output "$work_dir/node1.log" \
     "get: parameter 'missing' not found" "$node1_pid" || \
     fail "invalid remote parameter was not rejected"
@@ -283,9 +268,8 @@ wait_for_output "$work_dir/node1.log" \
 
 node1_expected=(
     "noop node=0: OK noop from node 0"
-    # Addressed to this node, so it is run locally rather than sent into the
-    # network and back. Source node 0 is the marker for a command that did not
-    # arrive over CSP, which is now the truth for this one.
+    # Addressed to this node, so it runs locally. Source node 0 means it did not
+    # arrive over CSP.
     "noop node=1: OK noop from node 0"
     "CSP ping 1: this node, no link traversed"
     "noop node=2: OK noop from node 1"
@@ -305,8 +289,7 @@ node1_expected=(
     "CSP interface: KISS"
     "CSP peer: 2"
     "UART CSP test: PASS"
-    # A remote listing knows the table from the identifier but not its name,
-    # so the number stands in for it.
+    # Remote listings show the table number instead of the name.
     "1           0x00  node_id"
     "2:test_u32 = 42"
     "2:test_u32 = 1234"

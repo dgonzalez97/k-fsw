@@ -7,12 +7,8 @@
 
 #include <kfsw/services/health.h>
 
-/* This target has no watchdog device, so supervision cannot be started here:
- * taking the watchdog over is what makes withholding a feed mean anything, and
- * a service that pretended to supervise without one would be worse than one
- * that refuses. What is tested here is the bookkeeping and the decision, which
- * is where a mistake would quietly keep feeding a system that had stopped
- * working. Actually resetting a part belongs to the hardware acceptance.
+/* No watchdog device on this target, so supervision can't start. These cases
+ * test the bookkeeping and the decision; resets are tested on hardware.
  */
 
 #define SHORT_DEADLINE_MS 60U
@@ -29,10 +25,7 @@ static void *health_setup(void)
 	return NULL;
 }
 
-/* The table is fixed and registration is permanent until something
- * unregisters, so a test that fills it would starve every test after it. Each
- * one clears up after itself, which also exercises unregistration.
- */
+/* The table is fixed, so each test unregisters what it registers. */
 static void health_before(void *fixture)
 {
 	ARG_UNUSED(fixture);
@@ -54,8 +47,7 @@ ZTEST(services_health, test_registration_rejects_nonsense)
 	zassert_equal(kfsw_health_register("x", 100U, NULL), -EINVAL);
 	zassert_equal(kfsw_health_register("", 100U, &handle), -EINVAL);
 
-	/* A deadline of zero would be missed the instant it was set, so a
-	 * component registered that way would reset the board immediately. */
+	/* A zero deadline is refused. */
 	zassert_equal(kfsw_health_register("zero", 0U, &handle), -EINVAL);
 }
 
@@ -84,9 +76,7 @@ ZTEST(services_health, test_the_table_is_bounded)
 	char name[8];
 	int registered = 0;
 
-	/* The table is sized at build time; filling it must be refused rather
-	 * than overrun. Earlier cases have taken some slots, so this counts
-	 * what it manages rather than assuming an empty table. */
+	/* A full table refuses more; earlier cases may have used some slots. */
 	for (int index = 0; index < KFSW_HEALTH_MAX_COMPONENTS + 4; index++) {
 		(void)snprintk(name, sizeof(name), "c%d", index);
 		if (kfsw_health_register(name, 500U, &handle) == 0) {
@@ -100,10 +90,7 @@ ZTEST(services_health, test_the_table_is_bounded)
 
 ZTEST(services_health, test_unregistering_frees_a_slot)
 {
-	/* A service can be stopped deliberately. One that is no longer running
-	 * but still watched would miss its deadline and reset a board that is
-	 * working exactly as intended.
-	 */
+	/* A stopped service must be able to unregister. */
 	uint8_t handle = 0U;
 	char name[8];
 
@@ -132,16 +119,13 @@ ZTEST(services_health, test_reporting_needs_a_registered_handle)
 
 ZTEST(services_health, test_evaluate_is_refused_before_supervision_starts)
 {
-	/* Without a watchdog there is nothing to withhold. Reporting healthy
-	 * here would be a lie that costs nothing to tell and everything to
-	 * believe. */
+	/* Without a watchdog there is nothing to withhold, so this must not report healthy. */
 	zassert_equal(kfsw_health_evaluate(), -EINVAL);
 }
 
 ZTEST(services_health, test_supervision_needs_a_watchdog_to_take_over)
 {
-	/* No watchdog device on this target, so starting must fail rather than
-	 * appear to supervise. */
+	/* No watchdog device, so starting fails. */
 	zassert_equal(kfsw_health_start(), -ENODEV);
 }
 

@@ -1,13 +1,6 @@
 #!/usr/bin/env bash
-# Checks that a node handed a file carries out what is in it.
-#
-# The point of file based operations is that a pass can run without an operator
-# on the link for every step, so what matters is not that commands run but that
-# the guards work: a failure continues or stops as the file says, and a line
-# guarded by an event that never happened is skipped rather than run.
-#
-# The procedure is staged straight into the node's filesystem rather than sent
-# over a link, because this is a test of the runner and not of file transfer.
+# Runs a procedure file on a node and checks the on-error and if-event guards.
+# The procedure is written straight into the node's filesystem.
 
 set -euo pipefail
 
@@ -63,9 +56,7 @@ expect 'line 4 failed (-2)' 'an unknown command fails its line'
 expect 'FBO: smoke.txt finished at line 8' 'on-error continue runs past the failure'
 expect 'lines failed: 1' 'exactly one line failed'
 expect 'lines skipped: 1' 'if-event skipped a line whose event never happened'
-# Seven run and one skipped make the eight lines the file has. A skipped line
-# is deliberately not counted as run: the distinction is the whole point of the
-# guard, and collapsing them would hide whether a condition fired.
+# Seven lines run and one skipped: a skipped line isn't counted as run.
 expect 'lines run: 7' 'blanks and comments are not lines'
 expect 'run absent.txt: -2' 'a procedure that does not exist is refused'
 

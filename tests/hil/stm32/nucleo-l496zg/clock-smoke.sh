@@ -1,16 +1,6 @@
 #!/usr/bin/env bash
-# Does the board's clock outlive a reset?
-#
-# It has to. Everything gated on a valid clock stays quiet without one:
-# scheduled collection produces nothing, and a beacon says nothing. A node that
-# reboots on a watchdog between passes would otherwise sit silent until a
-# ground station came into view to tell it the time — which is exactly when
-# somebody would rather hear from it.
-#
-# The reset here is commanded rather than a power cycle, and that is the case
-# under test: the RTC's counter lives in a backup domain a reset does not
-# clear. A power cycle is a board question, because the domain only survives
-# one where VBAT is backed.
+# Checks that the board's RTC keeps counting across a commanded reset, and that
+# housekeeping resumes without setting the clock again.
 #
 # Hardware: NUCLEO-L496ZG on ST-LINK. No radio.
 set -Eeuo pipefail
@@ -99,8 +89,7 @@ echo "CLOCK SMOKE"
 printf '%s\r\n' 'param set echo_enabled 1' >"$debug_serial"
 sleep 1
 
-# A time far enough above the floor that it cannot be mistaken for an unset
-# clock, and recent enough to be a plausible date in a log.
+# A time well above the floor, so it can't be mistaken for an unset clock.
 set_seconds=1788400000
 printf '%s\r\n' "csp clock set $set_seconds" >"$debug_serial"
 wait_for "clock: " 20 || fail "the clock could not be set"
@@ -111,9 +100,7 @@ wait_for "reset_cause=software" 60 || fail "the board did not reset on command"
 wait_for "@READY " 60 || fail "the board did not come back"
 sleep 2
 
-# The claim: not merely preserved, but still counting. A value copied before
-# the reboot and restored after would read the same as it was set; a running
-# clock reads later.
+# The clock must still be running: later than the value that was set.
 printf '%s\r\n' 'csp clock' >"$debug_serial"
 sleep 3
 after="$(tr -d '\r' <"$work_dir/node.log" | sed 's/\x1b\[[0-9;]*m//g' |

@@ -9,11 +9,7 @@
 
 #include <kfsw/services/fwu.h>
 
-/* This suite runs on native_sim against the simulated flash, so the real write
- * path is exercised rather than a stand-in: every acceptance and rejection
- * below ends in actual flash. What it cannot cover is the bootloader handshake,
- * because there is no bootloader here; that is what the HIL acceptance is for.
- */
+/* Runs on native_sim with simulated flash. The bootloader handshake is tested on hardware. */
 
 #define FWU_PARTITION_NODE DT_CHOSEN(kfsw_fwu_partition)
 #define FWU_PARTITION_ID DT_FIXED_PARTITION_ID(FWU_PARTITION_NODE)
@@ -80,9 +76,7 @@ ZTEST(services_fwu, test_failed_abort_retains_details_until_cleanup_succeeds)
 	zassert_equal(after.received, 0U);
 }
 
-/* Read what actually reached the flash, at the offset the service claims to
- * write at.
- */
+/* Read the flash at the offset the service writes to. */
 static int read_slot(uint32_t image_offset, uint8_t *destination, size_t size)
 {
 	const struct flash_area *area;
@@ -135,10 +129,7 @@ ZTEST(services_fwu, test_target_is_bound_and_sized)
 
 ZTEST(services_fwu, test_write_offset_skips_a_whole_sector)
 {
-	/* MCUboot's swap-using-offset mode needs the image one sector in.
-	 * Writing at the slot start is a silent no-op on hardware, so the
-	 * offset is asserted rather than assumed.
-	 */
+	/* The image must start one sector in, for swap-using-offset. */
 	uint32_t offset = kfsw_fwu_slot_write_offset();
 
 	zassert_equal(offset, 4096U, "expected one 4 KB sector, got %u", offset);
@@ -179,7 +170,7 @@ ZTEST(services_fwu, test_begin_rejects_a_second_transfer)
 {
 	zassert_ok(kfsw_fwu_begin(TEST_IMAGE_SIZE, 0U));
 	zassert_equal(kfsw_fwu_begin(TEST_IMAGE_SIZE, 0U), -EBUSY,
-		      "a transfer already in progress must not be silently restarted");
+		      "a transfer in progress must not be restarted");
 	zassert_ok(kfsw_fwu_abort());
 }
 
@@ -200,10 +191,7 @@ ZTEST(services_fwu, test_write_is_rejected_when_no_transfer_is_running)
 
 ZTEST(services_fwu, test_write_rejects_a_gap)
 {
-	/* A hole would leave erased flash inside the image. It might still pass
-	 * a whole-image CRC only by collision, but it would certainly not be
-	 * noticed until the bootloader jumped into it.
-	 */
+	/* A gap would leave erased flash inside the image. */
 	zassert_ok(kfsw_fwu_begin(TEST_IMAGE_SIZE, 0U));
 	zassert_ok(kfsw_fwu_write(0U, test_image, 100U));
 	zassert_equal(kfsw_fwu_write(200U, &test_image[200], 100U), -ESPIPE);
@@ -251,8 +239,7 @@ ZTEST(services_fwu, test_finish_rejects_a_crc_mismatch_and_erases_the_slot)
 	uint32_t correct = crc32_ieee(test_image, TEST_IMAGE_SIZE);
 	uint8_t readback[32];
 
-	/* The counters are lifetime totals, not per-transfer, so the change
-	 * across this test is what matters. */
+	/* The counters are lifetime totals, so check the change. */
 	zassert_ok(kfsw_fwu_get_status(&before));
 
 	zassert_equal(transfer_whole_image(TEST_IMAGE_SIZE, correct ^ 0xFFFFFFFFU, 512U), -EILSEQ);
@@ -272,9 +259,7 @@ ZTEST(services_fwu, test_finish_rejects_a_crc_mismatch_and_erases_the_slot)
 
 ZTEST(services_fwu, test_accepted_image_reaches_flash_at_the_write_offset)
 {
-	/* The point of the whole service: the bytes are in the slot, one sector
-	 * in, byte for byte.
-	 */
+	/* The bytes are in the slot, one sector in. */
 	uint32_t crc = crc32_ieee(test_image, TEST_IMAGE_SIZE);
 	static uint8_t readback[TEST_IMAGE_SIZE];
 
@@ -287,9 +272,7 @@ ZTEST(services_fwu, test_accepted_image_reaches_flash_at_the_write_offset)
 
 ZTEST(services_fwu, test_nothing_is_written_before_the_offset)
 {
-	/* If the offset were dropped, the image would start at the slot base
-	 * and the bootloader would find nothing to swap -- silently.
-	 */
+	/* Without the offset the bootloader would find nothing to swap. */
 	const struct flash_area *area;
 	uint32_t crc = crc32_ieee(test_image, TEST_IMAGE_SIZE);
 	uint8_t leading[256];
@@ -488,9 +471,7 @@ ZTEST(services_fwu, test_abort_after_completion_returns_to_idle)
 
 ZTEST(services_fwu, test_an_all_zero_image_is_carried_faithfully)
 {
-	/* Erased flash reads as 0xFF, so an image of zeros is the case where a
-	 * write that silently did nothing would still look plausible.
-	 */
+	/* An all-zero image, which would look plausible if the write did nothing. */
 	static uint8_t zeros[512];
 	static uint8_t readback[512];
 	uint32_t crc = crc32_ieee(zeros, sizeof(zeros));

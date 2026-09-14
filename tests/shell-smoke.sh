@@ -22,9 +22,7 @@ if [[ ! -x "$executable" ]]; then
 fi
 
 {
-	# Completion is only observable when the console repeats what it built,
-	# and echo is off by default so a scripted session does not show every
-	# command twice. The test asks for what it needs to see.
+	# Echo is off by default; turn it on to see tab completion.
 	printf 'param set echo_enabled 1\n'
 	sleep 0.2
 	printf 'pa\t g\t test_u32\n'
@@ -71,8 +69,7 @@ cat "$capture_file"
 expected_output=(
     '@BOOT '
     '@READY '
-    # Not anchored to the prompt: it carries colour escapes, so the prompt and
-    # the echoed command are no longer one contiguous run of text.
+    # Not anchored to the prompt, which has colour codes.
     'param  get  test_u32'
     # Off by default, and the test turned it on for the completion check above.
     'echo_enabled = 1'
@@ -100,9 +97,7 @@ expected_output=(
     'CSP interface: KISS'
     'CSP node: 1'
     'CSP peer: 2'
-    # Listed as table, offset, name: the columns are what makes a listing
-    # readable, so the smoke test checks the columns and not just the names.
-    # Every core table is registered and named, in ascending identifier order.
+    # Listed as table, offset, name, with every core table in ID order.
     '  1  core     board'
     '  2  core     system'
     '  3  core     telemetry'
@@ -157,9 +152,7 @@ for expected in "${expected_output[@]}"; do
     fi
 done
 
-# The version is resolved from the build, so asserting a literal would either
-# pin one commit or, as it did, keep asserting a placeholder the code stopped
-# printing. What matters is that a non-empty version is reported.
+# The version comes from the build, so only check that one is printed.
 if ! grep -Eq '^K-FSW: .+' "$capture_file"; then
 	echo "SHELL RESULT: FAIL"
 	echo "  version reported no image version"

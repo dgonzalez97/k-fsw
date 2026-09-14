@@ -18,17 +18,8 @@
 #define STORAGE_PARTITION_ID DT_FIXED_PARTITION_ID(STORAGE_PARTITION_NODE)
 
 /*
- * What survives a reset, and what must not.
- *
- * A definition is the one piece of housekeeping state an operator builds by
- * hand over a link, so losing it to a reset costs a pass. That makes the file
- * worth keeping — and makes every way of reading it back wrong worth refusing
- * loudly, because a definition decoded from a damaged file does not fail: it
- * collects the wrong parameters and reports them as if they were the right
- * ones. Ground would have no way to tell.
- *
- * Save and load are internal because nothing outside the service should choose
- * when they happen. Declaring them here is the exception a test earns.
+ * Saving and loading report definitions, and refusing damaged files. Save and
+ * load are internal, so they are declared here.
  */
 int kfsw_hk_persist_save(void);
 int kfsw_hk_persist_load(void);
@@ -121,13 +112,8 @@ static size_t read_file(uint8_t *buffer, size_t size);
 static void write_file(const uint8_t *buffer, size_t size);
 
 /*
- * What a reset actually looks like from the service's side.
- *
- * Defining a report writes the file, and so does clearing one — the snapshot
- * tracks the live set rather than waiting to be asked. So a test cannot make
- * the service forget by clearing, because that persists the forgetting too.
- * It has to put the bytes back afterwards, which is what a node that lost
- * power mid-pass would come back to.
+ * Simulate a reset: defining and clearing both write the file, so the test puts
+ * the saved bytes back instead.
  */
 static void restart_with(const uint8_t *saved, size_t size)
 {
@@ -162,7 +148,7 @@ static void write_file(const uint8_t *buffer, size_t size)
 
 ZTEST_SUITE(kfsw_hk_persistence, NULL, persist_setup, persist_before, NULL, NULL);
 
-/* The whole point: a report built over a link comes back after a reset. */
+/* A report defined over the link comes back after a reset. */
 ZTEST(kfsw_hk_persistence, test_a_definition_comes_back)
 {
 	struct kfsw_hk_entry read_back[CONFIG_KFSW_HK_ENTRIES];
@@ -235,19 +221,14 @@ ZTEST(kfsw_hk_persistence, test_several_reports_come_back)
 	}
 }
 
-/* Nothing saved is not an error worth resetting over, but it must not be read
- * as an empty set of definitions either.
- */
+/* A missing file is not an error, and loads no definitions. */
 ZTEST(kfsw_hk_persistence, test_no_file_is_not_a_definition)
 {
 	zassert_not_equal(kfsw_hk_persist_load(), 0, "a missing file loaded successfully");
 }
 
 /*
- * The three ways a file can be wrong, each refused rather than decoded.
- *
- * This is the part that matters: every one of these, accepted, produces a
- * report that looks defined and collects something other than what it names.
+ * Damaged files are refused.
  */
 ZTEST(kfsw_hk_persistence, test_a_file_from_another_format_is_refused)
 {
@@ -313,9 +294,8 @@ ZTEST(kfsw_hk_persistence, test_a_truncated_file_is_refused)
 }
 
 /*
- * A definition is re-validated on the way in, not trusted. A parameter named
- * by a definition written before a firmware update may not exist any more, and
- * a report that cannot be collected must not come back looking defined.
+ * Loaded definitions are checked again; a parameter may no longer exist after
+ * an update.
  */
 ZTEST(kfsw_hk_persistence, test_a_report_naming_what_is_gone_does_not_come_back)
 {
@@ -330,13 +310,11 @@ ZTEST(kfsw_hk_persistence, test_a_report_naming_what_is_gone_does_not_come_back)
 	zassert_ok(kfsw_hk_persist_save(), "the definitions were not saved");
 	size = read_file(blob, sizeof(blob));
 
-	/* Point the first entry at an offset this build does not define, then
-	 * re-checksum so the file is honestly formed and only its content is
-	 * stale — which is exactly what a firmware update leaves behind.
+	/* Point the first entry at an offset this build doesn't have and fix the CRC,
+	 * like a file left by an older image.
 	 *
-	 * 12 bytes of file header, then 16 naming the report, its period and
-	 * the policy around it, then entries of node and identifier: the first
-	 * identifier is at 30.
+	 * 12 bytes of file header, then 16 for the report, its period and settings,
+	 * then node and ID entries: the first ID is at 30.
 	 */
 	sys_put_be16(KFSW_PARAM_ID(TEST_TABLE, 0x7F), &blob[30]);
 	sys_put_be32(0U, &blob[crc_offset]);
@@ -351,12 +329,7 @@ ZTEST(kfsw_hk_persistence, test_a_report_naming_what_is_gone_does_not_come_back)
 }
 
 /*
- * Version 2 of the snapshot, and why it exists.
- *
- * A definition that comes back without the policy built around it is the half
- * that does not help: the node collects again, but its store is off and it
- * says nothing on its own, which is exactly the state an operator cannot fix
- * if the reset happened between passes.
+ * Version 2 also saves the store and beacon settings.
  */
 ZTEST(kfsw_hk_persistence, test_a_store_interval_comes_back)
 {
@@ -421,9 +394,7 @@ ZTEST(kfsw_hk_persistence, test_a_report_that_was_silent_stays_silent)
 }
 
 /*
- * A board updated in place has a version 1 file on it. Refusing that would
- * cost the reports it holds for no reason: the fields version 2 added are
- * simply absent, which is the same as not configured.
+ * Version 1 files are still read.
  */
 ZTEST(kfsw_hk_persistence, test_a_version_one_file_is_still_read)
 {
@@ -463,7 +434,7 @@ ZTEST(kfsw_hk_persistence, test_a_version_one_file_is_still_read)
 	zassert_equal(period, 4000U, "the period in a version 1 file was lost");
 }
 
-/* A version this reader does not know is still refused rather than guessed. */
+/* An unknown version is refused. */
 ZTEST(kfsw_hk_persistence, test_a_version_three_file_is_refused)
 {
 	uint8_t blob[256];

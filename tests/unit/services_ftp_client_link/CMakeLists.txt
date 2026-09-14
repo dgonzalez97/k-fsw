@@ -21,10 +21,8 @@ target_include_directories(app PRIVATE
 )
 target_link_libraries(app PRIVATE kfsw::services kfsw::comms)
 
-# The client's side of the same seam. A fake link lets a test be the peer, and
-# so ask the questions a real one will not answer on demand: a reply to a
-# request that already timed out, a reply of the wrong kind, a peer that
-# accepts the connection and then says nothing.
+# A fake link lets the test act as the peer: late replies, wrong replies and
+# silence.
 zephyr_link_libraries(
     -Wl,--wrap=kfsw_ftp_link_receive
     -Wl,--wrap=kfsw_ftp_link_release

@@ -1,25 +1,7 @@
 #!/usr/bin/env bash
-# Hardware acceptance for the platform watchdog.
-#
-# Issue kfsw-platform#3 is done when a HIL test can intentionally trigger a
-# watchdog reset and the next boot reports the watchdog reset reason. That is
-# what this checks, in one uninterrupted serial capture so the reset and the
-# boot that follows it are the same observation rather than two hopeful ones.
-#
-# The sequence is:
-#
-#   1. flash and wait for @READY;
-#   2. confirm the watchdog is armed and being fed, and that the feed counter
-#      actually advances, so a reset later cannot be credited to a watchdog
-#      that was never running;
-#   3. confirm the board survives longer than the timeout while fed, which is
-#      what rules out a watchdog that resets regardless;
-#   4. stop the feed;
-#   5. observe the reset land inside a bounded window; and
-#   6. observe the next boot name the watchdog as the cause.
-#
-# Step 3 is the one that makes the rest mean anything. Without it a board that
-# resets every few seconds for an unrelated reason would pass.
+# Hardware test for the platform watchdog (kfsw-platform#3): the board must stay
+# up past the timeout while fed, reset within a bounded time after the feed
+# stops, and name the watchdog on the next boot.
 #
 # Required environment:
 #   KFSW_DEBUG_SERIAL  NUCLEO ST-LINK virtual COM port, by-id path only.
@@ -132,9 +114,7 @@ feeds_first="$(field feeds)"
 printf 'state=%s device=%s feeds=%s timeout_ms=%s\n' \
 	"$state" "$device" "$feeds_first" "$(field timeout_ms)"
 
-# Survive longer than one timeout while being fed. Without this the reset
-# observed later would prove nothing: a board resetting on its own would look
-# identical.
+# Stay up longer than one timeout while fed.
 survive_s=$(( (timeout_ms / 1000) * 2 + 2 ))
 banner "Survives ${survive_s}s of normal operation"
 boots_before="$(grep -ac "@BOOT " "$work_dir/nucleo.log")"
@@ -151,7 +131,7 @@ feeds_second="$(field feeds)"
 printf 'survived %s s, feeds %s -> %s, no reset\n' \
 	"$survive_s" "$feeds_first" "$feeds_second"
 
-banner "Deliberate starvation"
+banner "Starving the watchdog"
 reset_deadline=$(( (timeout_ms / 1000) + 5 ))
 send "watchdog starve confirm"
 

@@ -18,17 +18,8 @@
 #define STORAGE_PARTITION_ID DT_FIXED_PARTITION_ID(STORAGE_PARTITION_NODE)
 
 /*
- * The ring that lives on the filesystem.
- *
- * Its whole reason to exist is that a pass is short and a ring in RAM is
- * small: a node collects for hours and the ground turns up for ten minutes. So
- * the properties worth pinning are the ones an operator would be hurt by — the
- * file stops growing once every slot has been used, a record lands in the slot
- * its own sequence number names so a repeated flush does not shift the ring,
- * and a report that cannot fit is refused while somebody is still listening
- * rather than when the filesystem fills mid-pass.
- *
- * Sizing is exposed because the refusal is arithmetic worth checking directly.
+ * The housekeeping ring file: it stops growing once full, records go to the slot
+ * their sequence number selects, and a store that doesn't fit is refused.
  */
 int kfsw_hk_store_bytes_needed(uint16_t record_size);
 
@@ -129,8 +120,7 @@ ZTEST(kfsw_hk_store, test_an_unknown_report_is_refused)
 }
 
 /*
- * The floor is about flash, not about bandwidth: every write costs an erase
- * cycle on a part that has a finite number of them.
+ * The floor limits flash wear.
  */
 ZTEST(kfsw_hk_store, test_an_interval_under_the_floor_is_refused)
 {
@@ -187,9 +177,7 @@ ZTEST(kfsw_hk_store, test_the_file_names_its_format)
 }
 
 /*
- * The bound that makes this safe to leave running for months: the file reaches
- * capacity and stops. A store that grew would fill the partition during a pass
- * nobody was watching.
+ * The file stops growing at its capacity.
  */
 ZTEST(kfsw_hk_store, test_the_file_stops_growing_at_capacity)
 {
@@ -231,10 +219,7 @@ ZTEST(kfsw_hk_store, test_the_file_is_the_size_it_promised)
 		      "the file is not the size the refusal arithmetic promised");
 }
 
-/* A record lands where its sequence number says, so the newest can be found by
- * reading sequences rather than by trusting a counter that would have to be
- * rewritten on every single write.
- */
+/* Records go to the slot their sequence number selects. */
 ZTEST(kfsw_hk_store, test_a_record_lands_in_the_slot_its_sequence_names)
 {
 	struct fs_file_t file;
@@ -264,12 +249,7 @@ ZTEST(kfsw_hk_store, test_a_record_lands_in_the_slot_its_sequence_names)
 }
 
 /*
- * Stopping is not discarding.
- *
- * Turning a store off used to unlink the file in the same call, so the command
- * that reads as "stop writing" also destroyed the pass already captured. An
- * operator who turns storing off to save flash is not necessarily asking to
- * lose what the node collected, so the two are now separate requests.
+ * Stopping the store keeps the file; clearing it deletes the file.
  */
 ZTEST(kfsw_hk_store, test_turning_it_off_keeps_what_was_written)
 {
@@ -310,14 +290,14 @@ ZTEST(kfsw_hk_store, test_clearing_the_store_removes_the_file)
 		      "a report that does not exist could be cleared");
 }
 
-/* Clearing a store that was never on is not an error worth refusing. */
+/* Clearing a store that was never on is not an error. */
 ZTEST(kfsw_hk_store, test_clearing_a_store_that_never_ran_is_harmless)
 {
 	define_report(0U);
 	zassert_ok(kfsw_hk_clear_store(0U), "clearing an unused store failed");
 }
 
-/* The sizing the refusal is built on, checked directly rather than inferred. */
+/* The sizing behind the refusal. */
 ZTEST(kfsw_hk_store, test_the_sizing_is_header_plus_every_slot)
 {
 	zassert_equal(kfsw_hk_store_bytes_needed(16U),

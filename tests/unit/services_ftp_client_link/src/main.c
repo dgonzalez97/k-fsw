@@ -21,17 +21,8 @@
 #define MAX_SCRIPTED 8
 
 /*
- * What the client does with the answers it gets.
- *
- * A real peer is cooperative: it replies to the request you sent, once, with
- * the opcode you expected. The failures worth designing against are the ones
- * it will not produce on demand — a reply to a request that already timed out,
- * a reply of a different kind, a status that is not success, a peer that
- * accepts the connection and then says nothing.
- *
- * Each of those, mishandled, is a client that believes a stale answer. Over a
- * radio where a slow reply and a lost one look identical from this end, that
- * is not a remote possibility; it is what a bad pass does.
+ * Client behaviour with bad replies: a reply to an old request, a reply of the
+ * wrong kind, an error status, and a peer that never answers.
  */
 
 static struct {
@@ -110,7 +101,7 @@ int __wrap_kfsw_ftp_link_receive(struct kfsw_ftp_link *link, struct kfsw_ftp_lin
 {
 	ARG_UNUSED(link);
 	if (link_fake.received >= link_fake.scripted_count) {
-		/* A peer that says nothing is what a lost reply looks like. */
+		/* A lost reply. */
 		return -ETIMEDOUT;
 	}
 	if (link_fake.scripted_result[link_fake.received] != 0) {
@@ -129,10 +120,8 @@ int __wrap_kfsw_ftp_link_receive(struct kfsw_ftp_link *link, struct kfsw_ftp_lin
 }
 
 /*
- * The real one no-ops on a frame that holds nothing, which is how releasing
- * twice is made harmless: the contract is enforced here rather than by every
- * caller. A fake that counted both calls would invent a double-free that the
- * code does not have.
+ * The real release does nothing for an empty frame, so a second release is
+ * harmless. The fake does the same.
  */
 void __wrap_kfsw_ftp_link_release(struct kfsw_ftp_link_frame *frame)
 {
@@ -143,9 +132,7 @@ void __wrap_kfsw_ftp_link_release(struct kfsw_ftp_link_frame *frame)
 	frame->buffer = NULL;
 }
 
-/* Queues one reply. The request id is filled in from what the client actually
- * sent, so a case only has to say when it wants them to disagree.
- */
+/* Queue one reply. The request ID is copied from the client's request. */
 static void peer_will_reply(uint8_t opcode, uint8_t status)
 {
 	struct kfsw_ftp_message *reply = &link_fake.scripted[link_fake.scripted_count];
@@ -205,8 +192,7 @@ ZTEST(kfsw_ftp_client_link, test_a_link_that_is_not_up_is_refused)
 }
 
 /*
- * The sandbox is enforced before anything is transmitted, which matters twice
- * over: a path that climbs out is refused, and the peer never sees it.
+ * Paths outside the sandbox are refused before anything is sent.
  */
 ZTEST(kfsw_ftp_client_link, test_a_path_climbing_out_is_refused_before_it_is_sent)
 {
@@ -243,11 +229,7 @@ ZTEST(kfsw_ftp_client_link, test_a_directory_request_is_sent_and_answered)
 }
 
 /*
- * The one that matters most over a radio.
- *
- * A slow reply and a lost one look identical from this end, so a client that
- * accepts any reply will eventually pair an answer with the wrong question:
- * the status of a mkdir read as the status of the delete that followed it.
+ * A reply to an earlier request must not be accepted for the current one.
  */
 ZTEST(kfsw_ftp_client_link, test_a_reply_to_a_different_request_is_refused)
 {
@@ -327,9 +309,7 @@ ZTEST(kfsw_ftp_client_link, test_a_stat_with_nowhere_to_put_the_answer_is_refuse
 	zassert_equal(link_fake.sends, 0U, "the client asked for a stat it could not store");
 }
 
-/* Whatever the outcome, the connection is given back exactly as often as it
- * was taken. A leak here is a node that stops answering after a noisy pass.
- */
+/* The connection is released once per open, whatever the outcome. */
 ZTEST(kfsw_ftp_client_link, test_every_connection_is_closed)
 {
 	peer_will_reply(KFSW_FTP_OP_MKDIR_RESPONSE, KFSW_FTP_STATUS_OK);
@@ -347,15 +327,8 @@ ZTEST(kfsw_ftp_client_link, test_every_connection_is_closed)
 /* ------------------------------------------------------- transfers */
 
 /*
- * Upload and download are where the client spends most of its lines, and they
- * are the paths a bad pass actually exercises: a peer that refuses before the
- * first byte, one that goes quiet halfway, one that acknowledges a different
- * number of bytes than were sent.
- *
- * That last one is the reason the client checks at all. The peer echoes what
- * it committed, so a disagreement means the file on the far side is not the
- * file that was sent — and a transfer that reports success there is worse than
- * one that fails, because nobody looks again.
+ * Upload and download failures: a refusal before the first byte, a peer that
+ * goes quiet, and a byte count that doesn't match.
  */
 
 #define UPLOAD_LOCAL "/upload.bin"
@@ -456,9 +429,7 @@ ZTEST(kfsw_ftp_client_link, test_an_upload_to_a_peer_that_goes_quiet_times_out)
 }
 
 /*
- * The integrity check, and the reason it exists: the peer echoes what it
- * committed. A transfer that reported success while the far side holds
- * different bytes is worse than one that failed, because nobody looks again.
+ * The peer reports what it committed; a mismatch must fail the transfer.
  */
 ZTEST(kfsw_ftp_client_link, test_an_upload_the_peer_counted_differently_is_an_integrity_failure)
 {
