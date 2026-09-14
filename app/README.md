@@ -1,79 +1,64 @@
 # K-FSW Application
 
-This directory selects features, binds hardware, and starts services.
-Reusable behaviour belongs in the owning repository.
+This directory selects the features, binds the hardware and starts the
+services. Reusable code goes in the other repositories.
 
-Core parameter tables live here because platform and comms must not depend
-on the parameter service. Shell adapters parse arguments, call a service,
+The core parameter tables are here because the platform and comms layers can't
+depend on the parameter service. Shell commands parse arguments, call a service
 and print the result.
 
 ## Communications
 
-The application picks Kconfig values and devicetree UART instances, then starts
-the single router that `kfsw-comms` owns. One chosen UART gives one interface
-named `KISS` and a direct default route. A multi-link overlay declares any
-number of named UART/KISS children and supplies a route table, which libcsp
-parses and uses — route selection never happens in application code.
+The application sets the Kconfig values and the devicetree UARTs, then starts
+the router from `kfsw-comms`. One chosen UART gives one interface named `KISS`
+with a default route. A multi-link overlay declares several named UART/KISS
+interfaces and a route table, which libcsp parses; the application doesn't
+pick routes itself.
 
-## Storage composition
+## Storage
 
-The application enables the `kfsw-platform` LittleFS lifecycle and mounts the
-selected fixed flash partition at `/kfsw`. Board overlays own the physical
-layout; the platform implementation contains no raw flash address.
+The application enables the LittleFS support from `kfsw-platform` and mounts
+the storage partition at `/kfsw`. The board overlays define the flash layout,
+so the platform code has no flash addresses.
 
-The STM32L496ZG has 1 MiB of internal flash with 2 KiB erase pages and 8-byte
-write alignment. K-FSW reserves the final 64 KiB (32 erase pages, 6.25% of
-flash) for the filesystem:
+The STM32L496ZG has 1 MiB of flash with 2 KiB erase pages and 8-byte write
+alignment. K-FSW uses the last 64 KiB (32 pages) for the filesystem:
 
-| Offset | Size | Current use |
+| Offset | Size | Use |
 | --- | ---: | --- |
-| `0x00000000` | 960 KiB | K-FSW application partition |
-| `0x000F0000` | 64 KiB | LittleFS storage partition |
+| `0x00000000` | 960 KiB | Application |
+| `0x000F0000` | 64 KiB | LittleFS |
 
-That is a conservative split: enough for parameter snapshots, transferred
-files and staging metadata, without spending a large share of the device on a
-filesystem. The application sits well below the 960 KiB ceiling.
+That is enough for parameter snapshots, transferred files and housekeeping
+data, and the application is well below 960 KiB. The MCUboot layout splits the
+start of flash into a boot partition and two image slots but keeps the storage
+partition where it is, so the filesystem survives the change.
 
-This is the layout without a bootloader. The MCUboot composition rearranges the
-front of the flash into a boot partition and two image slots and **leaves the
-storage partition exactly where it is** — that is what lets an existing
-filesystem, with its snapshots and files, survive the migration.
-
-KFSW-Linux uses the same lifecycle, Zephyr flash map, and LittleFS code over
-native_sim's simulated flash. `tools/run-linux.sh` gives each Linux instance a
-persistent backing image under its build directory. Tests pass explicit
-temporary flash images so parallel nodes do not share media and transient test
-data is cleaned up.
+KFSW-Linux uses the same LittleFS code on native_sim's simulated flash.
+`tools/run-linux.sh` keeps a flash file in the build directory, and tests use
+their own temporary flash files.
 
 ## Persistent parameters
 
-With parameters and storage both enabled, the snapshot is restored after the
-tables are built and before the CSP server starts, so a remote reader never
-sees a value that is about to change. A missing or invalid snapshot leaves the
-compiled defaults in place and does not stop the application.
+With parameters and storage enabled, the snapshot is restored after the tables
+are registered and before the CSP server starts, so a remote reader never sees
+a value that is about to change. A missing or invalid snapshot leaves the
+compiled defaults and startup continues.
 
-Writing a value never touches flash on its own. Saving is a separate,
-deliberate act.
+`/kfsw/params/parameters.dat` holds the persistent values with a versioned
+header and a CRC32. A save writes and syncs `parameters.tmp` and renames it
+over the active file. `param defaults` only changes RAM and `param clear` only
+deletes the saved file.
 
-The single `/kfsw/params/parameters.dat` file contains explicitly selected
-writable values, a versioned header, portable name/type/value entries, and an
-IEEE CRC32. Saves write and sync `parameters.tmp` before LittleFS atomically
-renames it over the active file. `param defaults` changes RAM only; `param
-clear` deletes saved state only.
-
-## CSP file transfer
+## File transfer
 
 File transfer starts after storage is mounted and the router is running, and
-before `@READY`. It listens on CSP port 9 with RDP and CRC32, does not own a
-second router, and does not care which transport is underneath it.
+before `@READY`. It listens on CSP port 9 with RDP and CRC32.
 
-Remote and KFSW-Linux client paths are virtual paths below `/kfsw/ftp`. The
-service creates `/kfsw/ftp/build` as the local exchange directory, so the
-operator path `/build/sample.txt` refers to
-`/kfsw/ftp/build/sample.txt` inside the Zephyr filesystem. It does not expose
-the native host filesystem.
-
-The primary shell syntax is:
+Paths are virtual and rooted at `/kfsw/ftp`. The service creates
+`/kfsw/ftp/build` as a local exchange directory, so `/build/sample.txt` is
+`/kfsw/ftp/build/sample.txt` in the Zephyr filesystem. The host filesystem of a
+native node can't be reached.
 
 ```text
 ftp <node> mkdir <remote-directory>
@@ -83,24 +68,20 @@ ftp <node> put <local-path> <remote-path>
 ftp <node> get <remote-path> <local-path>
 ```
 
-The same root command also exposes Zephyr static subcommands in verb-first
-form, such as `ftp put <node> ...`, so normal subcommand tab completion works.
-`ls` aliases `list`. For example:
+The verb can also go first, `ftp put <node> ...`, which is the form Tab
+completion shows. `ls` is the same as `list`:
 
 ```text
 ftp 7 put /build/sample.txt /flash/sample.txt
 ftp 7 ls /flash
 ```
 
-The debug shell also provides `ftp generate <path> <bytes>` for bounded,
-deterministic test fixtures and `ftp verify <first> <second>` for a
-byte-for-byte local comparison. These helpers still use the same Zephyr
-filesystem and FTP sandbox.
+`ftp generate <path> <bytes>` creates a test file and
+`ftp verify <first> <second>` compares two local files.
 
-Protocol version 1 uses a 96-byte maximum virtual path and 192-byte streaming
-chunks. PUT/GET validate total size and IEEE CRC32, and receivers commit a
-synced `.part` file with atomic rename only after validation. Successful PUT
-replaces an existing final file; failed transfers preserve it. One request is
-active per server, overlapping clients receive `busy`, and resume is not
-supported in version 1. This protocol is K-FSW's own and claims no wire
-compatibility with anything else that uses the FTP or TFTP name.
+Protocol version 1 uses paths of up to 96 bytes and 192-byte chunks. PUT and
+GET check the size and CRC32, and the receiver renames the synced `.part` file
+only after the check. A successful PUT replaces an existing file and a failed
+one leaves it unchanged. The server handles one request at a time and answers
+`busy` to the rest. Transfers can't be resumed, and the protocol is not
+compatible with other FTP or TFTP implementations.

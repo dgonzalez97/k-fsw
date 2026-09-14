@@ -1,9 +1,9 @@
 # K-FSW Tests
 
-Host and HIL test runners. Developer build, run, flash, debug, and serial
-utilities remain in `tools/`.
+Test scripts for the host and for hardware. Build, flash, debug and serial
+tools are in `tools/`.
 
-Run test scripts from the west workspace root, for example:
+Run them from the west workspace root:
 
 ```bash
 ./k-fsw/tools/ci/unit.sh
@@ -15,73 +15,40 @@ Run test scripts from the west workspace root, for example:
 ./k-fsw/tools/ci/all.sh
 ```
 
-`tools/ci/unit.sh` runs the ztest suites under `tests/unit/` through Zephyr
-Twister on `native_sim/native/64`. Results and logs are kept under
-`build/twister/` by default; set `KFSW_TWISTER_OUT_DIR` to override it.
-`tools/ci/valgrind.sh` runs a bounded KFSW-Linux boot under Memcheck and keeps
-its logs under `build/valgrind/`.
-`tools/ci/integration.sh` builds the native flight, ground, and focused
-three-node routing profiles and executes all shell, CSP, PARAM, persistence,
-storage, FTP, multi-KISS, and two-node k-ground integration scripts.
-`tools/ci/robot.sh` validates every Robot suite and then runs all scenarios
-except those tagged `physical`. `tools/ci/all.sh` composes these software-only
-checks with the build, quality, unit, memory, and documentation gates.
+- `tools/ci/unit.sh` runs the ztest suites in `tests/unit/` with Twister on
+  `native_sim/native/64`. Results go to `build/twister/`, or to
+  `KFSW_TWISTER_OUT_DIR`.
+- `tools/ci/valgrind.sh` boots KFSW-Linux under Memcheck and keeps the logs in
+  `build/valgrind/`.
+- `tools/ci/integration.sh` builds the flight, ground and three-node routing
+  images and runs the shell, CSP, parameter, persistence, storage, FTP,
+  multi-KISS, housekeeping and k-ground scripts.
+- `tools/ci/robot.sh` checks every Robot suite and runs the cases that are not
+  tagged `physical`.
+- `tools/ci/all.sh` runs all of these plus the build, quality and
+  documentation checks.
 
-`tests/param-local-smoke.sh` builds a test-only native composition with local
-parameters and persistence enabled while both the CSP parameter adapter and CSP
-itself are disabled. It exercises local list/get/set validation, defaults, and
-snapshot save/load/clear without adding another supported product target.
+`tests/param-local-smoke.sh` builds a native image with local parameters and
+persistence but without CSP, and checks list, get, set, defaults, save, load
+and clear.
 
-Current:
+## Robot Framework
 
-- platform monotonic-time ztests
-- CSP pre-initialization state and error-contract ztests
-- parameter lifecycle, validation, and serialization ztests
-- storage lifecycle, format-policy, information, and file-operation ztests
-- native K-FSW shell and local-parameter smoke test
-- native LittleFS create/write/read/overwrite/delete integration test
-- LittleFS persistence across two separate native_sim executions
-- explicit parameter save/load/defaults/clear semantics across native processes
-- corrupt parameter-snapshot boot fallback without filesystem corruption
-- two-node native CSP/KISS parameter integration test
-- route-parser/precedence/VIA ztests plus malformed, unknown-interface, and
-  duplicate-KISS-name rejection
-- three-process native routing with simultaneous `KISS_1`/`KISS_2`, distinct
-  PTYs, per-interface counters, direct route selection, preserved VIA, and
-  bidirectional node-10-to-node-11 transit
-- k-ground UHF gateway node 16 and operator node 19 with role-specific prompts
-  and bidirectional CSP ping; only node 16 composes Holybro `radio-uhf`
-- K-FSW FTP protocol/path/CRC/atomic-commit ztests
-- two-node CSP/RDP file transfer for zero-byte through 8 KiB files
-- LIST/STAT/PUT/GET, byte comparison, missing-file, and traversal checks
-- Robot operator-level remote file transfer through the KFSW-Linux shell
-- NUCLEO boot/readiness HIL smoke test
-- physical FTDI-to-NUCLEO CSP UART HIL test
-- raw and CSP/KISS Holybro UHF HIL runners with measured passing-bench evidence
-
-The multi-KISS topology is software-only. The physical evidence remains the
-single current Holybro KISS path; no physical `KISS_2` result is claimed.
-
-## Robot Framework system and HIL tests
-
-Robot provides operator-level system scenarios and wraps the proven physical
-smoke scripts under `tests/hil/`; it does not duplicate their shell, flash,
-serial, or PTY bridge control. Install its pinned Python dependency and
-validate every suite without hardware:
+Robot runs the system scenarios and wraps the hardware scripts in `tests/hil/`.
+Install its dependency and check every suite without hardware:
 
 ```bash
 pip install -r ./k-fsw/tests/hil/requirements.txt
 ./k-fsw/tests/hil/run.sh --dryrun
 ```
 
-Execute every software-compatible scenario, including shell, CSP, PARAM,
-parameter persistence, storage, and FTP, while excluding physical HIL:
+Run all the software scenarios:
 
 ```bash
 ./k-fsw/tests/hil/run.sh --exclude physical
 ```
 
-Run the smoke-tagged physical suite with explicit device paths:
+Run the hardware smoke suite with explicit device paths:
 
 ```bash
 KFSW_DEBUG_SERIAL=/dev/serial/by-id/usb-STLINK_DEVICE-if02 \
@@ -89,75 +56,52 @@ KFSW_FTDI_DEVICE=/dev/serial/by-id/usb-FTDI_DEVICE-if00-port0 \
 ./k-fsw/tests/hil/run.sh --include smoke
 ```
 
-`boot.robot` verifies `@BOOT` and `@READY` through `hil-smoke.sh`.
-`uart.robot` verifies the debug shell, `status`, bidirectional CSP ping,
-and UART transport checks through `uart-csp-smoke.sh`. Reports are written to
-`build/robot/` by default. The compact tag vocabulary is `smoke`, `software`,
-`physical`, `terminal`, `shell`, `csp`, `uart`, `param`, `storage`, `ftp`, and
-`persistence`, with `holybro`, `radio`, and `raw` reserved for the UHF fixture.
-Hosted CI dry-runs all suites and executes tests selected by
-`--exclude physical`; it never needs a serial device or development board.
+`boot.robot` checks `@BOOT` and `@READY` with `hil-smoke.sh`. `uart.robot`
+checks the shell, `status`, CSP ping in both directions and the UART test with
+`uart-csp-smoke.sh`. Reports go to `build/robot/`. The tags are `smoke`,
+`software`, `physical`, `terminal`, `shell`, `csp`, `uart`, `param`,
+`storage`, `ftp` and `persistence`, plus `holybro`, `radio` and `raw` for the
+radio tests. CI runs the dry run and the cases selected by
+`--exclude physical`, so it never needs a board.
 
-The Holybro fixtures remain separate by design. The raw runner flashes a
-temporary NUCLEO peer and proves one or more deterministic byte exchanges
-without CSP. The CSP/KISS runner then builds the 57600-baud NUCLEO/ground
-profiles with the reusable Holybro module and requires module diagnostics,
-routes, bidirectional point-to-point CSP ping, production PARAM behavior,
-bounded negative cases, and clean post-traffic counters. See
-`tests/hil/radio-uhf/holybro/README.md` for the commands and latest physical
-result.
+The Holybro radio has two scripts. The raw one flashes a test peer on the
+NUCLEO and exchanges bytes without CSP. The CSP/KISS one builds the 57600-baud
+NUCLEO and ground images and checks the module status, routes, ping in both
+directions, parameters, error cases and counters. See
+`tests/hil/radio-uhf/holybro/README.md`.
 
-The shell-only board profiles share one manual physical acceptance script:
+The shell-only boards share one script:
 
 ```bash
 ./k-fsw/tests/hil/shell-smoke.sh frdm_k64f
 ./k-fsw/tests/hil/shell-smoke.sh rpi_pico_w
 ```
 
-Each target descriptor supplies its Zephyr board, flash USB identity, runner,
-console fixture, baud rate, and expected prompt. The script builds, flashes,
-and checks the prompt plus `status`, `version`, and `help` without requiring
-CSP or storage. After a host-side Pico UF2 copy and usbipd reattachment, set
-`KFSW_FLASH=0` to run the same checks against the already-flashed application.
+Each target file gives the Zephyr board, flash USB ID, runner, console, baud
+rate and prompt. The script builds, flashes, and checks the prompt, `status`,
+`version` and `help`. After copying a Pico UF2 by hand, set `KFSW_FLASH=0` to
+skip flashing.
 
-### Terminal runner submodule
+### Terminal runner
 
 [`robot-terminal-runner`](https://github.com/dgonzalez97/robot-terminal-runner)
-is an external Git submodule at `tests/platform/robot-terminal-runner`. It
-provides the generic process/terminal interaction used by Robot to operate the
-KFSW-Linux console and, later, the physical NUCLEO shell. Initialize it after
-cloning K-FSW:
+is a submodule at `tests/platform/robot-terminal-runner`. Robot uses it to
+drive the KFSW-Linux console. Initialize it after cloning:
 
 ```bash
 git submodule update --init --recursive
 ```
 
-The terminal-tagged tests control a two-node native K-FSW CSP setup through the
-KFSW-Linux shell. They cover an operator-style `csp ping 2`, remote
-parameter get/set/readback, invalid-name handling, read-only rejection, and
-observable `storage info` / `storage test` behavior.
+The terminal tests run two native nodes over CSP. They cover `csp ping 2`,
+remote parameter get, set and read-back, unknown names, read-only parameters,
+`storage info`, `storage test`, and the `ftp` command: create a file and a
+remote directory, upload, list, stat, download, compare, and try a missing file
+and path traversal. `tests/csp-smoke.sh` also transfers files from zero bytes
+to 8 KiB and checks ping, parameters and CSP buffers afterwards.
 
-The same two-node terminal setup exercises the root `ftp` command, including
-`ftp <node> ...` syntax, over CSP/RDP. It generates a local exchange file,
-creates a remote directory, uploads, lists/stats, downloads, compares the
-returned bytes, and checks missing-file and traversal errors. The default
-`tests/csp-smoke.sh` run includes zero-byte, single-packet, multi-packet, and
-8 KiB transfers, then verifies CSP ping, PARAM access, and CSP buffer recovery.
-
-The terminal suite also starts KFSW-Linux with an isolated persistent flash
-image, saves a parameter, restarts the simulator process, verifies automatic
-restore, and checks the distinct `defaults`, `load`, and `clear` semantics.
+The terminal suite also restarts a node with a persistent flash file, checks
+that saved parameters come back, and checks `defaults`, `load` and `clear`.
 
 ```bash
 ./k-fsw/tests/hil/run.sh --include terminal
 ```
-
-Planned:
-
-- fake clocks for deterministic time injection
-- fake devices
-- SocketCAN/vcan
-- ZMQ simulation
-- fault injection
-- telemetry inspection
-- soak tests

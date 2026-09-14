@@ -2,7 +2,7 @@
 
 [TOC]
 
-## Why Zephyr?
+## Zephyr
 
 Zephyr supplies the RTOS kernel, drivers, board descriptions, shell,
 filesystems, and build tools used by K-FSW. Its native simulator runs the
@@ -26,7 +26,7 @@ dependencies as well as the platform layer.
 | Timeout and sleep | Bounded waits and periodic work |
 | Spinlock | Short event-ring updates |
 
-Calls that wait on a mutex, filesystem, or network belong in thread context.
+Calls that wait on a mutex, the filesystem or the network must run in a thread.
 Check each public API before calling it from an ISR. UART reception ingests
 bytes and leaves packet routing to the CSP router thread.
 

@@ -2,8 +2,7 @@
  * @defgroup kfsw_platform K-FSW Platform
  * @brief Zephyr-backed platform lifecycle and hardware capabilities.
  *
- * Platform APIs expose mechanisms needed by services and the application
- * without creating a replacement hardware abstraction layer.
+ * Platform APIs used by the services and the application. This is not a HAL.
  *
  * @defgroup kfsw_platform_time Time
  * @ingroup kfsw_platform
@@ -29,8 +28,8 @@
  * @defgroup kfsw_comms K-FSW Communications
  * @brief CSP lifecycle, routing, and transport status.
  *
- * Communications owns libcsp integration and packet-routing lifecycle. Client
- * services use the public K-FSW APIs instead of owning routers or transports.
+ * Communications sets up libcsp and runs the router. Services use the public
+ * K-FSW APIs and don't create their own routers or transports.
  *
  * @defgroup kfsw_comms_csp CSP
  * @ingroup kfsw_comms
@@ -80,7 +79,7 @@
  *
  * @defgroup kfsw_services_command Command
  * @ingroup kfsw_services
- * @brief One normalized path for invoking an operation, local or remote.
+ * @brief Local and remote commands.
  *
  * kfsw_command_init() aggregates compile-time definition sets and freezes the
  * registry. kfsw_command_invoke() resolves by name for a local caller;
@@ -93,18 +92,16 @@
  *
  * @defgroup kfsw_services_event Event record
  * @ingroup kfsw_services
- * @brief Bounded numeric record of what a node has done.
+ * @brief RAM record of numeric events.
  *
  * kfsw_event_emit() records an identifier, timestamp, sequence number,
- * severity and opaque payload into a fixed RAM ring. Identifiers belong to the
- * producing component and are declared in its own header with the payload
- * layout. A wrapped ring increments an overwritten counter, so lost history is
- * visible. The record does not survive a reset.
+ * severity and payload into a fixed RAM ring. Each producer declares its IDs and
+ * payload layout in its own header. When the ring wraps, the overwritten counter
+ * increases. The record does not survive a reset.
  *
  * @defgroup kfsw_modules K-FSW Modules
  * @brief Compile-time-selected device and subsystem behavior.
  *
- * Modules own their domain semantics, coherent state, typed interface, and
- * parameter definitions. Product composition owns target selection and
- * devicetree hardware binding.
+ * Each module has its own state, typed interface and parameter table. The
+ * application selects the modules and binds the hardware in devicetree.
  */
