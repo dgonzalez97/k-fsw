@@ -60,4 +60,38 @@ ZTEST(comms_csp_state, test_hides_interfaces_and_routes_before_init)
 	zassert_equal(route_visits, 0U);
 }
 
+ZTEST(comms_csp_state, test_reports_error_counters)
+{
+	struct kfsw_csp_counters counters = {.buffer_out = 9U, .last_error = 9U};
+
+	/* Nothing has run, so every counter reads zero. */
+	kfsw_csp_get_counters(&counters);
+	zassert_equal(counters.buffer_out, 0U);
+	zassert_equal(counters.conn_out, 0U);
+	zassert_equal(counters.conn_overflow, 0U);
+	zassert_equal(counters.conn_noroute, 0U);
+	zassert_equal(counters.invalid_reply, 0U);
+	zassert_equal(counters.last_error, 0U);
+	zassert_equal(counters.last_can_error, 0U);
+
+	kfsw_csp_clear_counters();
+	counters.buffer_out = 9U;
+	kfsw_csp_get_counters(&counters);
+	zassert_equal(counters.buffer_out, 0U);
+
+	/* A null destination is ignored. */
+	kfsw_csp_get_counters(NULL);
+}
+
+ZTEST(comms_csp_state, test_names_error_codes)
+{
+	zassert_equal(strcmp(kfsw_csp_error_name(0U), "none"), 0);
+	zassert_equal(strcmp(kfsw_csp_error_name(2U), "MTU exceeded"), 0);
+	zassert_equal(strcmp(kfsw_csp_error_name(5U), "unknown"), 0);
+	zassert_equal(strcmp(kfsw_csp_error_name(200U), "unknown"), 0);
+	zassert_equal(strcmp(kfsw_csp_can_error_name(0U), "none"), 0);
+	zassert_equal(strcmp(kfsw_csp_can_error_name(1U), "frame lost"), 0);
+	zassert_equal(strcmp(kfsw_csp_can_error_name(200U), "unknown"), 0);
+}
+
 ZTEST_SUITE(comms_csp_state, NULL, NULL, NULL, NULL, NULL);

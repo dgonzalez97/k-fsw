@@ -143,6 +143,8 @@ printf 'csp \t\n' >&3
 printf 'uart \t\n' >&3
 printf '%s\n' \
 	'csp info' \
+	'csp counters' \
+	'csp counters clear' \
 	'csp interfaces' \
 	'csp routes' \
 	'csp ping 2' \
@@ -317,9 +319,12 @@ node1_expected=(
     "interface: KISS"
     "  info"
     "  test"
+    "counters"
     "interfaces"
     "ping"
     "routes"
+    "last_can_error=0 (none)"
+    "CSP counters cleared"
 )
 
 for expected in "${node1_expected[@]}"; do
