@@ -95,6 +95,71 @@ static void sample_interfaces(void *value)
 	*(uint8_t *)value = csp_interfaces;
 }
 
+/* libcsp's own error counters, sampled together. */
+static uint8_t csp_buffer_out;
+static uint8_t csp_conn_out;
+static uint8_t csp_conn_ovf;
+static uint8_t csp_conn_noroute;
+static uint8_t csp_invalid_reply;
+static uint8_t csp_last_error;
+static uint8_t csp_last_can_error;
+
+static void sample_counters(void)
+{
+	struct kfsw_csp_counters counters;
+
+	kfsw_csp_get_counters(&counters);
+	csp_buffer_out = counters.buffer_out;
+	csp_conn_out = counters.conn_out;
+	csp_conn_ovf = counters.conn_overflow;
+	csp_conn_noroute = counters.conn_noroute;
+	csp_invalid_reply = counters.invalid_reply;
+	csp_last_error = counters.last_error;
+	csp_last_can_error = counters.last_can_error;
+}
+
+static void sample_buffer_out(void *value)
+{
+	sample_counters();
+	*(uint8_t *)value = csp_buffer_out;
+}
+
+static void sample_conn_out(void *value)
+{
+	sample_counters();
+	*(uint8_t *)value = csp_conn_out;
+}
+
+static void sample_conn_ovf(void *value)
+{
+	sample_counters();
+	*(uint8_t *)value = csp_conn_ovf;
+}
+
+static void sample_conn_noroute(void *value)
+{
+	sample_counters();
+	*(uint8_t *)value = csp_conn_noroute;
+}
+
+static void sample_invalid_reply(void *value)
+{
+	sample_counters();
+	*(uint8_t *)value = csp_invalid_reply;
+}
+
+static void sample_last_error(void *value)
+{
+	sample_counters();
+	*(uint8_t *)value = csp_last_error;
+}
+
+static void sample_last_can_error(void *value)
+{
+	sample_counters();
+	*(uint8_t *)value = csp_last_can_error;
+}
+
 static void sample_router_running(void *value)
 {
 	struct kfsw_csp_info info;
@@ -163,6 +228,76 @@ static const struct kfsw_param_definition csp_param_definitions[] = {
 		.value = &csp_interfaces,
 		.default_value = {.u8 = 0U},
 		.sample = sample_interfaces,
+	},
+	{
+		.offset = 0x16U,
+		.type = KFSW_PARAM_U8,
+		.flags = KFSW_PARAM_FLAG_READ_ONLY,
+		.name = "buffer_out",
+		.description = "Times no packet buffer was free",
+		.value = &csp_buffer_out,
+		.default_value = {.u8 = 0U},
+		.sample = sample_buffer_out,
+	},
+	{
+		.offset = 0x17U,
+		.type = KFSW_PARAM_U8,
+		.flags = KFSW_PARAM_FLAG_READ_ONLY,
+		.name = "conn_out",
+		.description = "Times no connection slot was free",
+		.value = &csp_conn_out,
+		.default_value = {.u8 = 0U},
+		.sample = sample_conn_out,
+	},
+	{
+		.offset = 0x18U,
+		.type = KFSW_PARAM_U8,
+		.flags = KFSW_PARAM_FLAG_READ_ONLY,
+		.name = "conn_ovf",
+		.description = "Packets dropped by a full connection queue",
+		.value = &csp_conn_ovf,
+		.default_value = {.u8 = 0U},
+		.sample = sample_conn_ovf,
+	},
+	{
+		.offset = 0x19U,
+		.type = KFSW_PARAM_U8,
+		.flags = KFSW_PARAM_FLAG_READ_ONLY,
+		.name = "conn_noroute",
+		.description = "Packets dropped with no route to the destination",
+		.value = &csp_conn_noroute,
+		.default_value = {.u8 = 0U},
+		.sample = sample_conn_noroute,
+	},
+	{
+		.offset = 0x1aU,
+		.type = KFSW_PARAM_U8,
+		.flags = KFSW_PARAM_FLAG_READ_ONLY,
+		.name = "invalid_reply",
+		.description = "Replies that matched no open connection",
+		.value = &csp_invalid_reply,
+		.default_value = {.u8 = 0U},
+		.sample = sample_invalid_reply,
+	},
+	{
+		.offset = 0x1bU,
+		.type = KFSW_PARAM_U8,
+		.flags = KFSW_PARAM_FLAG_READ_ONLY,
+		.name = "last_error",
+		.description = "Code of the last libcsp error",
+		.value = &csp_last_error,
+		.default_value = {.u8 = 0U},
+		.sample = sample_last_error,
+	},
+	{
+		.offset = 0x1cU,
+		.type = KFSW_PARAM_U8,
+		.flags = KFSW_PARAM_FLAG_READ_ONLY,
+		.name = "last_can_error",
+		.description = "Code of the last CAN framing error",
+		.value = &csp_last_can_error,
+		.default_value = {.u8 = 0U},
+		.sample = sample_last_can_error,
 	},
 	{
 		.offset = 0x20U,
