@@ -125,6 +125,26 @@ Services bind their ports after `kfsw_csp_init()` and before
 `kfsw_csp_start()`. The API gives the state, interfaces, routes, free buffers
 and ping. `csp interfaces` and `uart info` show the counters since boot.
 
+## Counters
+
+`csp interfaces` shows what each link carried. `csp counters` shows libcsp's
+own error counters, which are the first thing to read when a link misbehaves:
+
+| Counter | Raised when |
+| --- | --- |
+| `buffer_out` | No packet buffer was free |
+| `conn_out` | No connection slot was free |
+| `conn_ovf` | A full connection queue dropped a packet |
+| `conn_noroute` | A packet had no route to its destination |
+| `invalid_reply` | A reply matched no open connection |
+| `last_error` | Code of the last libcsp error |
+| `last_can_error` | Code of the last CAN framing error |
+
+The counters are 8-bit, wrap at 255, and libcsp updates them without locking,
+so read them as an indication. `csp counters clear` zeroes them before a run.
+Parameter table 4 carries the same values, so a ground station reads them like
+any other parameter.
+
 ## Test topologies
 
 The two-node software test connects two Linux processes through their
