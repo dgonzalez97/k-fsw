@@ -104,6 +104,18 @@ git -C kfsw-services rev-parse HEAD
 The checked-out SHA must match the manifest. Hosted CI must be able to fetch
 it from the declared remote.
 
+## Forked dependencies
+
+`libcsp` and `libparam` are pinned to K-FSW forks, `dgonzalez97/kfsw-libcsp`
+and `dgonzalez97/kfsw-libparam`, on their `kfsw` branches. Each fork has a
+`KFSW.md` listing what differs from upstream. `kfsw-libparam` lists nothing and
+exists so the pin cannot move.
+
+Carry a change as one commit with its reason in the message, rebase the branch
+onto upstream instead of merging upstream into it, and move the `west.yml`
+revision the same way as any other dependency. Before tagging a release, check
+whether upstream has new commits or tags since the pin.
+
 A merge commit preserves the pinned SHA. Squash or rebase produces a new
 SHA; update the pin and rerun composition CI if either is used. Do not
 rewrite a commit already pinned by another PR.

@@ -17,8 +17,9 @@ k-fsw-workspace/                    workspace root
 |-- k-fsw/                          manifest and application
 |-- kfsw-platform/                  pinned dependency
 |-- kfsw-services/                  pinned dependency
+|   `-- third_party/libparam/       pinned fork
 |-- kfsw-comms/                     pinned dependency
-|   `-- third_party/libcsp/         pinned west project
+|   `-- third_party/libcsp/         pinned fork
 |-- kfsw-modules/                   pinned dependency
 |-- zephyr/                         pinned Zephyr tree
 |-- modules/                        Zephyr modules
