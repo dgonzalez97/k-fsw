@@ -142,6 +142,31 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
+static int cmd_csp_counters(const struct shell *sh, size_t argc, char **argv)
+{
+	struct kfsw_csp_counters counters;
+
+	if (argc > 1U) {
+		if (strcmp(argv[1], "clear") != 0) {
+			shell_error(sh, "Invalid argument: %s (expected clear)", argv[1]);
+			return -EINVAL;
+		}
+		kfsw_csp_clear_counters();
+		shell_print(sh, "CSP counters cleared");
+		return 0;
+	}
+
+	kfsw_csp_get_counters(&counters);
+	shell_print(sh, "buffer_out=%u conn_out=%u conn_ovf=%u conn_noroute=%u invalid_reply=%u",
+		    counters.buffer_out, counters.conn_out, counters.conn_overflow,
+		    counters.conn_noroute, counters.invalid_reply);
+	shell_print(sh, "last_error=%u (%s)", counters.last_error,
+		    kfsw_csp_error_name(counters.last_error));
+	shell_print(sh, "last_can_error=%u (%s)", counters.last_can_error,
+		    kfsw_csp_can_error_name(counters.last_can_error));
+	return 0;
+}
+
 /* The trace itself is in kfsw-comms. */
 static int cmd_csp_debug(const struct shell *sh, size_t argc, char **argv)
 {
@@ -330,6 +355,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(csp_commands,
 	SHELL_CMD_ARG(clock, NULL,
 		      "Time: clock, clock set <utc>, clock <node>, clock <node> sync.",
 		      cmd_csp_clock, 1, 2),
+	SHELL_CMD_ARG(counters, NULL, "Show libcsp error counters: counters [clear].",
+		      cmd_csp_counters, 1, 1),
 	SHELL_CMD_ARG(debug, NULL, "Trace packets in and out: debug [on|off].", cmd_csp_debug, 1,
 		      1),
 	SHELL_CMD_ARG(ident, NULL, "Identify a node, or this one when no node is given.",
