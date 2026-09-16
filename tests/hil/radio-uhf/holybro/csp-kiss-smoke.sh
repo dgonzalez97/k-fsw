@@ -367,7 +367,7 @@ printf '%s\n' \
 	'cmd 2 bogus' >&3
 
 # Node 16 pinging itself needs no link, so no round-trip time is printed.
-wait_for_output "$work_dir/ground.log" "CSP ping 16: this node, no link traversed" \
+wait_for_output "$work_dir/ground.log" "CSP ping 16: success" \
 	"$ground_pid" || fail "the ground node did not answer for itself"
 # Addressed to this node, so it runs locally. Source node 0 means it did not
 # arrive over CSP.

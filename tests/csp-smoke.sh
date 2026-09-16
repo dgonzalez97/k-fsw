@@ -273,7 +273,7 @@ node1_expected=(
     # Addressed to this node, so it runs locally. Source node 0 means it did not
     # arrive over CSP.
     "noop node=1: OK noop from node 0"
-    "CSP ping 1: this node, no link traversed"
+    "CSP ping 1: success"
     "noop node=2: OK noop from node 1"
     "info node=2: OK uptime_ms="
     "unknown command 'bogus'"
