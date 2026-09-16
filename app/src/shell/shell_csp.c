@@ -123,14 +123,7 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 		}
 	}
 
-	/* Pinging this node needs no link, so report that instead of a time. A real
-	 * self-ping doesn't complete because libcsp loses the loopback source address.
-	 */
-	if ((uint16_t)node == info.address) {
-		shell_print(sh, "CSP ping %lu: this node, no link traversed", node);
-		return 0;
-	}
-
+	/* Pinging this node goes through the loopback interface. */
 	result = kfsw_csp_ping((uint16_t)node, KFSW_CSP_PING_TIMEOUT_MS, KFSW_CSP_PING_PAYLOAD_SIZE,
 			       &round_trip_ms);
 	if (result != 0) {
