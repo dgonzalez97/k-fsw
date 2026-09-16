@@ -145,6 +145,26 @@ so read them as an indication. `csp counters clear` zeroes them before a run.
 Parameter table 4 carries the same values, so a ground station reads them like
 any other parameter.
 
+## Capturing traffic
+
+Counters say that something went wrong; a capture says what. The bench uses
+[kfsw-csp-tools](https://github.com/dgonzalez97/kfsw-csp-tools), a fork of
+Daniel Estevez's `csp-tools`:
+
+| Tool | Use |
+| --- | --- |
+| `cspdump` | Read packets from a CAN interface or a ZMQ socket and write a pcap |
+| `csp-iperf` | Send packets and measure throughput, round trip time and losses |
+| `csp-ping-server` | Answer those packets when the far end is not a K-FSW node |
+
+It also carries a Wireshark dissector for CSP over ZMQ, so a capture opens with
+the fields named. On the CAN bench, point `cspdump` at the same SocketCAN
+interface the Linux node uses and the capture covers both directions.
+
+K-FSW answers the CSP ping service itself, so `csp-iperf` measures a link
+against the flight image with nothing added to it. The tools are Rust programs
+that run on the bench host. No build, test or release artifact depends on them.
+
 ## Test topologies
 
 The two-node software test connects two Linux processes through their
