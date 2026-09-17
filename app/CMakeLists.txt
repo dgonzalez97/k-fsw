@@ -133,6 +133,9 @@ if(CONFIG_KFSW_DEBUG_SHELL)
     target_sources_ifdef(CONFIG_KFSW_GNDWDT app PRIVATE
         src/shell/shell_gndwdt.c
     )
+    target_sources_ifdef(CONFIG_KFSW_RESMON app PRIVATE
+        src/shell/shell_resmon.c
+    )
     target_sources_ifdef(CONFIG_KFSW_HK app PRIVATE
         src/shell/shell_hk.c
     )
