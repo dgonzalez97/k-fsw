@@ -42,6 +42,9 @@
 #if CONFIG_KFSW_GNDWDT
 #include <kfsw/services/gndwdt.h>
 #endif
+#if CONFIG_KFSW_RESMON
+#include <kfsw/services/resmon.h>
+#endif
 #if CONFIG_KFSW_HK
 #include <kfsw/services/hk.h>
 #endif
@@ -94,7 +97,7 @@ int main(void)
 	uint32_t startup_failures = 0;
 #if CONFIG_KFSW_STORAGE || CONFIG_KFSW_PARAM || CONFIG_KFSW_CSP || CONFIG_KFSW_RADIO_UHF ||        \
 	CONFIG_KFSW_BOTON_TEST || CONFIG_KFSW_COMMAND || CONFIG_KFSW_WATCHDOG ||                   \
-	CONFIG_KFSW_GNDWDT
+	CONFIG_KFSW_GNDWDT || CONFIG_KFSW_RESMON
 	int result;
 #endif
 
@@ -150,6 +153,9 @@ int main(void)
 #endif
 #if CONFIG_KFSW_GNDWDT
 		&kfsw_gndwdt_param_definitions,
+#endif
+#if CONFIG_KFSW_RESMON
+		&kfsw_resmon_param_definitions,
 #endif
 #if CONFIG_KFSW_HK
 		&kfsw_hk_param_definitions,
@@ -414,6 +420,15 @@ int main(void)
 			kfsw_log_info("Watchdog armed with a %d ms timeout",
 				      CONFIG_KFSW_WATCHDOG_TIMEOUT_MS);
 		}
+	}
+#endif
+
+#if CONFIG_KFSW_RESMON
+	/* After the services have started, so their threads are in the first sweep. */
+	result = kfsw_resmon_start();
+	if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Failed to start the resource monitor: %d", result);
 	}
 #endif
 
