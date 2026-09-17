@@ -234,6 +234,25 @@ The NUCLEO uses CAN1 on PD0/PD1 with an external transceiver, and a Linux node
 uses a SocketCAN interface. Both ends of the bus need the same bitrate; the
 profiles use 500 kbit/s.
 
+### A bus without hardware
+
+`vcan` is a kernel interface that carries CAN frames between processes on one
+host, so two Linux nodes reach each other over CSP with no controller, no
+transceiver and no wiring:
+
+```bash
+sudo k-fsw/tests/vcan-up.sh
+./k-fsw/tests/can-smoke.sh
+```
+
+The first command needs root and only has to run once after a boot. The test
+runs a node at address 2 against the `kfsw-gnd-can` ground role at 16, pings
+both ways, reads remote parameters and checks the counters afterwards.
+
+The interface name comes from `--can-if` at run time, so the same images run
+against a real adapter by naming `can0` instead. A virtual bus has no bit
+timing, so it proves routing, framing and the services, not the wire.
+
 ## Shell UART and CSP UART
 
 The NUCLEO has two serial connections:
