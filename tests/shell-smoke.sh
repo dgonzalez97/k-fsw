@@ -87,6 +87,10 @@ expected_output=(
     'uptime_ms: '
     'monotonic_ms: '
     'monotonic_us: '
+    # Every repository compiled into the image, not just the k-fsw version.
+    'Revisions: app:'
+    ' comms:'
+    ' mod:'
     'Zephyr: 4.4.0'
     'Board: native_sim/native/64'
     'UART transport'
