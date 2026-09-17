@@ -31,6 +31,7 @@ fi
 		'status' \
 		'time' \
 		'version' \
+		'resmon show' \
 		'uart info' \
 		'param tables' \
 		'param get uid' \
@@ -87,6 +88,10 @@ expected_output=(
     'uptime_ms: '
     'monotonic_ms: '
     'monotonic_us: '
+    # The resource monitor sweeps once at start-up, so it has numbers already.
+    'state: sweeping'
+    'worst_used: '
+    'alert_at: 90%'
     # Every repository compiled into the image, not just the k-fsw version.
     'Revisions: app:'
     ' comms:'

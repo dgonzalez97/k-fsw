@@ -398,6 +398,48 @@ Requests are not deduplicated, so check the node state before sending a
 command again after a lost reply. Remote parameters use the parameter service,
 not commands.
 
+## Resource monitor
+
+A thread that runs out of stack fails in a way that is hard to read afterwards,
+and the numbers were only reachable from a bench probe. The resource monitor
+walks the kernel's thread list on a period and records how much stack each one
+has left, so nothing has to be instrumented or registered.
+
+Use is a percentage of each thread's own stack. Bytes alone say nothing across
+threads sized differently: the idle thread sits near its limit by design, while
+a worker with a kilobyte spare may be the one about to fail.
+
+Table 36 carries what it found:
+
+| Parameter | Access | Meaning |
+| --- | --- | --- |
+| `stack_worst_used` | r | Highest stack use on any thread since start |
+| `stack_last_used` | r | Highest stack use in the most recent sweep |
+| `stack_alert_used` | rw | A thread at or above this raises an event |
+| `stack_worst_free` | r | Unused bytes on the busiest thread |
+| `stack_worst_size` | r | Stack size of that thread |
+| `stack_sweeps` | r | Sweeps completed |
+| `stack_alerts` | r | Times a sweep first found a thread at the alert level |
+| `stack_threads` | r | Threads the last sweep could read |
+| `stack_worst_thread` | r | Thread holding the highest stack use |
+
+An event is raised when a sweep first reaches the alert level, and not again
+until a later sweep is back below it, so a node that stays busy does not fill
+the ring with the same record.
+
+From the shell: `resmon show`, `resmon sample` to sweep now, and
+`resmon alert <percent>`.
+
+The figures are real on an MCU target. On the Linux target a thread runs on a
+host stack and the declared one is ignored, so what it reports there exercises
+the sweep, the counters and the event without measuring anything; read those
+numbers as a check that the service works, not as headroom.
+
+`KFSW_RESMON` selects `INIT_STACKS`, `THREAD_STACK_INFO`, `THREAD_MONITOR` and
+`THREAD_NAME`. Stacks are filled with a known value when a thread is created
+and the kernel keeps its thread list, which is what makes the measurement
+possible; a composition that cannot afford that leaves the service out.
+
 ## Ground watchdog
 
 A node can be running, healthy by its own measure, and still unreachable: a
