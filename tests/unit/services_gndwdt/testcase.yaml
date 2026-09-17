@@ -1,0 +1,11 @@
+---
+tests:
+  kfsw.services.gndwdt:
+    tags:
+      - unit
+      - services
+      - gndwdt
+    platform_allow:
+      - native_sim/native/64
+    integration_platforms:
+      - native_sim/native/64
