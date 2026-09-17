@@ -29,6 +29,23 @@ failures=N` means some services failed to start. `@READY` marks the end of
 startup; release builds set the version and source commit explicitly, see
 @ref development.
 
+### What was compiled into an image
+
+`boot_image` carries `git describe` of `k-fsw` alone, so two images built from
+the same tag with different dependency pins report the same version. The image
+also carries the short revision of every repository that went into it:
+
+```text
+kfsw:~$ version
+K-FSW: v1.0.1-26-g1ba9630
+Revisions: app:1ba96309fb plat:31818d2c37 svc:919c4c43ba comms:d35abd4986 mod:b476a0c9ed
+```
+
+The same string is `boot_revisions` in table 32, so a ground station reads it
+like any other parameter. A repository that had uncommitted changes when it was
+built gets a trailing `+`, which is how a bench image is told apart from a
+built one.
+
 ## Housekeeping
 
 Reports collect local and remote parameters. A periodic report keeps its
