@@ -1,0 +1,4 @@
+/* Flight side node of the software CAN test. The host interface comes from
+ * --can-if at run time; the devicetree default is only a fallback.
+ */
+#include "../../config/profiles/k-ground-can.overlay"
