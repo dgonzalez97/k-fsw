@@ -39,6 +39,9 @@
 #if CONFIG_KFSW_EVENT
 #include <kfsw/services/event.h>
 #endif
+#if CONFIG_KFSW_GNDWDT
+#include <kfsw/services/gndwdt.h>
+#endif
 #if CONFIG_KFSW_HK
 #include <kfsw/services/hk.h>
 #endif
@@ -74,11 +77,24 @@
 #endif
 #endif
 
+#if CONFIG_KFSW_GNDWDT && CONFIG_KFSW_CSP
+/* A packet from any other node counts as contact. Runs on the router thread. */
+static void gndwdt_inbound_packet(uint16_t source_node, uint8_t destination_port)
+{
+	ARG_UNUSED(destination_port);
+
+	if (source_node != CONFIG_KFSW_CSP_ADDRESS) {
+		kfsw_gndwdt_contact(source_node);
+	}
+}
+#endif
+
 int main(void)
 {
 	uint32_t startup_failures = 0;
 #if CONFIG_KFSW_STORAGE || CONFIG_KFSW_PARAM || CONFIG_KFSW_CSP || CONFIG_KFSW_RADIO_UHF ||        \
-	CONFIG_KFSW_BOTON_TEST || CONFIG_KFSW_COMMAND || CONFIG_KFSW_WATCHDOG
+	CONFIG_KFSW_BOTON_TEST || CONFIG_KFSW_COMMAND || CONFIG_KFSW_WATCHDOG ||                   \
+	CONFIG_KFSW_GNDWDT
 	int result;
 #endif
 
@@ -131,6 +147,9 @@ int main(void)
 		&kfsw_boot_param_definitions,
 #if CONFIG_KFSW_EVENT
 		&kfsw_event_param_definitions,
+#endif
+#if CONFIG_KFSW_GNDWDT
+		&kfsw_gndwdt_param_definitions,
 #endif
 #if CONFIG_KFSW_HK
 		&kfsw_hk_param_definitions,
@@ -395,6 +414,17 @@ int main(void)
 			kfsw_log_info("Watchdog armed with a %d ms timeout",
 				      CONFIG_KFSW_WATCHDOG_TIMEOUT_MS);
 		}
+	}
+#endif
+
+#if CONFIG_KFSW_GNDWDT
+#if CONFIG_KFSW_CSP
+	kfsw_csp_set_inbound_hook(gndwdt_inbound_packet);
+#endif
+	result = kfsw_gndwdt_start();
+	if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Failed to start the ground watchdog: %d", result);
 	}
 #endif
 
