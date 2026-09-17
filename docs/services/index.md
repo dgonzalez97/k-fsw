@@ -381,6 +381,45 @@ Requests are not deduplicated, so check the node state before sending a
 command again after a lost reply. Remote parameters use the parameter service,
 not commands.
 
+## Ground watchdog
+
+A node can be running, healthy by its own measure, and still unreachable: a
+route that no longer resolves, a link left in the wrong configuration, a
+service that stopped answering. Health monitoring cannot see any of that,
+because every component inside the node is reporting normally.
+
+The ground watchdog resets the node when it hears nothing from anyone. Contact
+is any packet the CSP router accepts from another node, counted through a hook
+in `kfsw-comms`, so no service has to report anything and a packet to any port
+holds the countdown open. Packets this node sends to itself do not count.
+
+```text
+packet from another node -> router -> contact -> countdown restarts
+no packet for gndwdt_timeout_s   ->   event, log line, then a reset
+```
+
+Table 35 carries the timer:
+
+| Parameter | Access | Meaning |
+| --- | --- | --- |
+| `gndwdt_enabled` | rw | Whether the countdown is armed |
+| `gndwdt_timeout_s` | rw | Silence allowed, one day by default |
+| `gndwdt_since_s` | r | Seconds since the last contact |
+| `gndwdt_contacts` | r | Packets counted as contact |
+| `gndwdt_expiries` | r | Times the timeout passed |
+| `gndwdt_last_node` | r | Node of the most recent contact |
+| `gndwdt_running` | r | Whether the service was started |
+
+Writing `gndwdt_timeout_s` restarts the countdown, so raising it never resets a
+node for silence it has already been through.
+`CONFIG_KFSW_GNDWDT_TIMEOUT_MIN_S` is a floor on what an operator can write,
+which keeps a mistyped value from putting a node into a reset loop that takes a
+pass to notice.
+
+From the shell: `gndwdt show`, `gndwdt on`, `gndwdt off`,
+`gndwdt timeout <seconds>` and `gndwdt contact`, which records contact without
+a packet so a bench can hold the countdown open.
+
 ## Event record
 
 `CONFIG_KFSW_EVENT` keeps events in a RAM ring. Each event has an ID, a
