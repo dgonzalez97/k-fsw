@@ -42,6 +42,7 @@ static int cmd_version(const struct shell *sh, size_t argc, char **argv)
 	ARG_UNUSED(argv);
 
 	shell_print(sh, "K-FSW: %s", kfsw_boot_get_image_version());
+	shell_print(sh, "Revisions: %s", kfsw_boot_get_revisions());
 	shell_print(sh, "Zephyr: %s", KERNEL_VERSION_STRING);
 	shell_print(sh, "Board: %s", CONFIG_BOARD_TARGET);
 	shell_print(sh, "SoC: %s", CONFIG_SOC);
