@@ -16,4 +16,5 @@ project(kfsw_services_fbo_tests LANGUAGES C)
 target_sources(app PRIVATE src/main.c)
 target_link_libraries(app PRIVATE kfsw::services)
 
-zephyr_link_libraries(-Wl,--wrap=fs_read -Wl,--wrap=fs_stat)
+zephyr_link_libraries(-Wl,--wrap=fs_read -Wl,--wrap=fs_stat -Wl,--wrap=kfsw_fbo_clock_seconds
+    -Wl,--wrap=kfsw_time_monotonic_ms)
