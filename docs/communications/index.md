@@ -145,25 +145,56 @@ so read them as an indication. `csp counters clear` zeroes them before a run.
 Parameter table 4 carries the same values, so a ground station reads them like
 any other parameter.
 
+## Remote interface counters
+
+`csp ifstat 2 KISS` reads a named interface on node 2 through CSP management.
+It reports packet and byte counts, transmit/receive errors, drops, authentication
+and framing errors, and the driver's interrupt count. `csp interfaces` still
+lists this node's interfaces; the remote name must be known beforehand.
+
+The query has a one-second timeout. An unknown interface also times out because
+CMP has no not-found reply. Counts can wrap and change while read, and the
+query itself contributes traffic. Parameter table 4 continues to expose the
+aggregate counters.
+
 ## Capturing traffic
 
-Counters say that something went wrong; a capture says what. The bench uses
-[kfsw-csp-tools](https://github.com/dgonzalez97/kfsw-csp-tools), a fork of
-Daniel Estevez's `csp-tools`:
+[kfsw-csp-tools](https://github.com/dgonzalez97/kfsw-csp-tools) is an optional
+host dependency pinned in `west.yml`. Its original `cspdump`, `csp-iperf` and
+`csp-ping-server` use CSP 1 over CAN/ZMQ. Their four-byte headers and original
+Wireshark dissector do not match K-FSW's CSP 2 configuration.
 
-| Tool | Use |
-| --- | --- |
-| `cspdump` | Read packets from a CAN interface or a ZMQ socket and write a pcap |
-| `csp-iperf` | Send packets and measure throughput, round trip time and losses |
-| `csp-ping-server` | Answer those packets when the far end is not a K-FSW node |
+The fork's `csp-kiss` entry point supports CSP 2 directly on the native Linux
+PTY or a serial KISS link. It implements ping, CMP interface statistics, and
+passive capture. No ZMQ gateway or firmware transport change is needed.
 
-It also carries a Wireshark dissector for CSP over ZMQ, so a capture opens with
-the fields named. On the CAN bench, point `cspdump` at the same SocketCAN
-interface the Linux node uses and the capture covers both directions.
+From `k-fsw`, with Rust 1.88 or newer installed:
 
-K-FSW answers the CSP ping service itself, so `csp-iperf` measures a link
-against the flight image with nothing added to it. The tools are Rust programs
-that run on the bench host. No build, test or release artifact depends on them.
+```bash
+west update kfsw-csp-tools
+./tools/kfsw-linux csp-tools build
+./tools/kfsw-linux run
+```
+
+Use the `uart_1 connected to pseudotty` path printed by that node in another
+terminal. One program uses that PTY at a time:
+
+```bash
+./tools/kfsw-linux csp-tools --device /dev/pts/7 ping --node 1 --count 5
+./tools/kfsw-linux csp-tools --device /dev/pts/7 ifstat --node 1 --interface KISS
+./tools/kfsw-linux csp-tools --device /dev/pts/7 dump --seconds 10 --pcap-file traffic.pcap
+```
+
+The source address defaults to 16; `--baud` defaults to 115200. Both KISS and
+CSP CRC32C checks are verified. An unanswered ping or interface query fails.
+A capture sends nothing and records packets transmitted by the node, such as
+HK beacons or pings issued from its shell. It fails if no packets arrive.
+
+PCAP uses LINKTYPE_USER0 (147), with the original six-byte CSP 2 header and
+payload, including any CSP checksum. Only KISS framing and its outer checksum
+are removed. The old CSP 1/ZMQ dissector does not decode this format. Output
+files must be new. Host-tool builds are separate from firmware builds, and
+normal west updates leave the `host-tools` group disabled.
 
 ## Test topologies
 
