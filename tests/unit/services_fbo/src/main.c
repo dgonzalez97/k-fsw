@@ -11,6 +11,28 @@
 static atomic_t commands;
 static int fail_after = -1;
 static bool hide_size;
+static int64_t utc_values[8];
+static size_t utc_count;
+static size_t utc_read;
+static int utc_error;
+static bool expire_wait;
+
+uint64_t __real_kfsw_time_monotonic_ms(void);
+uint64_t __wrap_kfsw_time_monotonic_ms(void)
+{
+	return __real_kfsw_time_monotonic_ms() +
+	       ((expire_wait && utc_read >= 2U) ? 1000U * CONFIG_KFSW_FBO_WAIT_MAX_S : 0U);
+}
+
+int __wrap_kfsw_fbo_clock_seconds(int64_t *seconds)
+{
+	if (utc_error != 0) {
+		return utc_error;
+	}
+	*seconds = utc_values[MIN(utc_read, utc_count - 1U)];
+	utc_read++;
+	return (*seconds < 0) ? -ENODATA : 0;
+}
 static K_SEM_DEFINE(entered, 0, 1);
 static K_SEM_DEFINE(release_handler, 0, 1);
 
@@ -124,6 +146,10 @@ static void *setup(void)
 
 static void before(void *fixture)
 {
+	utc_error = -ENODATA;
+	utc_count = 0U;
+	utc_read = 0U;
+	expire_wait = false;
 	ARG_UNUSED(fixture);
 	atomic_set(&commands, 0);
 	fail_after = -1;
@@ -201,6 +227,100 @@ ZTEST(services_fbo, test_line_limit_is_reported)
 {
 	run_text("count\ncount\ncount\ncount\ncount\ncount\ncount\ncount\ncount\n", -E2BIG);
 	zassert_equal(atomic_get(&commands), CONFIG_KFSW_FBO_LINES_MAX);
+}
+
+static void clock_script(const int64_t *values, size_t count)
+{
+	memcpy(utc_values, values, count * sizeof(*values));
+	utc_count = count;
+	utc_read = 0U;
+	utc_error = 0;
+}
+
+ZTEST(services_fbo, test_utc_future_due_and_tolerance)
+{
+	const int64_t values[] = {100, 101, 102};
+
+	clock_script(values, ARRAY_SIZE(values));
+	run_text("wait-until 102 0\ncount\n", 0);
+	zassert_equal(atomic_get(&commands), 1);
+}
+
+ZTEST(services_fbo, test_utc_forward_step_too_late_stops)
+{
+	const int64_t values[] = {100, 110};
+
+	clock_script(values, ARRAY_SIZE(values));
+	run_text("wait-until 102 1\ncount\n", -ETIME);
+	zassert_equal(atomic_get(&commands), 0);
+}
+
+ZTEST(services_fbo, test_utc_clock_becomes_unset_while_waiting)
+{
+	const int64_t values[] = {100, -1};
+
+	clock_script(values, ARRAY_SIZE(values));
+	run_text("wait-until 102 0\ncount\n", -ENODATA);
+	zassert_equal(atomic_get(&commands), 0);
+}
+
+ZTEST(services_fbo, test_utc_already_due_within_tolerance)
+{
+	const int64_t values[] = {103};
+
+	clock_script(values, ARRAY_SIZE(values));
+	run_text("wait-until 102 1\ncount\n", 0);
+	zassert_equal(atomic_get(&commands), 1);
+}
+
+ZTEST(services_fbo, test_utc_backward_step_keeps_waiting)
+{
+	const int64_t values[] = {100, 90, 101, 102};
+
+	clock_script(values, ARRAY_SIZE(values));
+	run_text("wait-until 102 0\ncount\n", 0);
+	zassert_equal(utc_read, 4);
+	zassert_equal(atomic_get(&commands), 1);
+}
+
+ZTEST(services_fbo, test_utc_backward_step_cannot_exceed_monotonic_budget)
+{
+	const int64_t values[] = {100, 90};
+
+	clock_script(values, ARRAY_SIZE(values));
+	expire_wait = true;
+	run_text("wait-until 102 0\ncount\n", -ETIMEDOUT);
+	zassert_equal(atomic_get(&commands), 0);
+}
+
+ZTEST(services_fbo, test_utc_unset_clock_and_invalid_bounds)
+{
+	const char *invalid[] = {"wait-until 0 0\n",  "wait-until 2147483648 0\n",
+				 "wait-until -1 0\n", "wait-until 102 -1\n",
+				 "wait-until 102\n",  "wait-until 102 601\n"};
+	const int64_t values[] = {100};
+
+	run_text("wait-until 102 0\ncount\n", -ENODATA);
+	clock_script(values, ARRAY_SIZE(values));
+	run_text("wait-until 701 0\ncount\n", -ERANGE);
+	for (size_t i = 0; i < ARRAY_SIZE(invalid); i++) {
+		run_text(invalid[i], -EINVAL);
+	}
+	zassert_equal(atomic_get(&commands), 0);
+}
+
+ZTEST(services_fbo, test_stop_wakes_utc_wait_with_continue_policy)
+{
+	const char text[] = "on-error continue\nwait-until 102 0\ncount\n";
+	const int64_t values[] = {100};
+
+	clock_script(values, ARRAY_SIZE(values));
+	write_procedure(text, strlen(text));
+	zassert_ok(kfsw_fbo_run("test"));
+	k_sleep(K_MSEC(30));
+	zassert_ok(kfsw_fbo_stop());
+	zassert_equal(completed(), -ECANCELED);
+	zassert_equal(atomic_get(&commands), 0);
 }
 
 ZTEST_SUITE(services_fbo, NULL, setup, before, NULL, NULL);
