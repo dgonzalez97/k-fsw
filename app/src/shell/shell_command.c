@@ -121,7 +121,7 @@ static void print_result(const struct shell *sh, uint16_t node, const char *name
 
 /* One path for both front-end forms; only the destination node differs. */
 static int run_command(const struct shell *sh, uint16_t node, const char *name, size_t text_count,
-		       char **text_args)
+		       char **text_args, bool retry)
 {
 	struct kfsw_command_arg args[KFSW_COMMAND_MAX_ARGS];
 	struct kfsw_command_result result;
@@ -157,12 +157,15 @@ static int run_command(const struct shell *sh, uint16_t node, const char *name, 
 		outcome = kfsw_command_invoke(name, args, text_count, &result);
 	} else {
 #if CONFIG_KFSW_COMMAND_CSP
-		outcome = kfsw_command_invoke_remote(node, name, args, text_count, &result);
+		outcome = retry ? kfsw_command_invoke_remote_retry(node, name, args, text_count,
+								   &result)
+				: kfsw_command_invoke_remote(node, name, args, text_count, &result);
 		if (outcome != 0) {
 			shell_error(sh, "%s node=%u: transport failed (%d)", name, node, outcome);
 			return outcome;
 		}
 #else
+		ARG_UNUSED(retry);
 		shell_error(sh, "Remote commands need CONFIG_KFSW_COMMAND_CSP");
 		return -ENOTSUP;
 #endif
@@ -174,7 +177,7 @@ static int run_command(const struct shell *sh, uint16_t node, const char *name, 
 /* Reached when the command name matched a registered subcommand. */
 static int cmd_command_named(const struct shell *sh, size_t argc, char **argv)
 {
-	return run_command(sh, 0U, argv[0], argc - 1U, &argv[1]);
+	return run_command(sh, 0U, argv[0], argc - 1U, &argv[1], false);
 }
 
 /*
@@ -203,13 +206,23 @@ static int cmd_command_root(const struct shell *sh, size_t argc, char **argv)
 	uint16_t node = 0U;
 
 	if (!is_node_token(argv[1], &node)) {
-		return run_command(sh, 0U, argv[1], argc - 2U, &argv[2]);
+		return run_command(sh, 0U, argv[1], argc - 2U, &argv[2], false);
 	}
 	if (argc < 3U) {
 		shell_error(sh, "Usage: cmd <node> <name> [arguments]");
 		return -EINVAL;
 	}
-	return run_command(sh, node, argv[2], argc - 3U, &argv[3]);
+	return run_command(sh, node, argv[2], argc - 3U, &argv[3], false);
+}
+
+static int cmd_command_retry(const struct shell *sh, size_t argc, char **argv)
+{
+	uint16_t node;
+
+	if (!is_node_token(argv[1], &node) || (node == 0U) || (node == 16383U)) {
+		return -EINVAL;
+	}
+	return run_command(sh, node, argv[2], argc - 3U, &argv[3], true);
 }
 
 /*
@@ -234,7 +247,15 @@ static void command_name_get(size_t idx, struct shell_static_entry *entry)
 		entry->handler = cmd_command_list;
 		return;
 	}
-	info = command_at(idx - 1U, &search);
+	if (idx == 1U) {
+		entry->syntax = "retry";
+		entry->help = "Ticketed remote call: retry <node> <name> [args].";
+		entry->handler = cmd_command_retry;
+		entry->args.mandatory = 3U;
+		entry->args.optional = KFSW_COMMAND_MAX_ARGS;
+		return;
+	}
+	info = command_at(idx - 2U, &search);
 	if (info == NULL) {
 		return;
 	}

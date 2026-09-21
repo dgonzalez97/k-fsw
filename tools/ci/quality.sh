@@ -49,6 +49,8 @@ format_sources+=(
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command/command_csp.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command/command_internal.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command/command_protocol.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command/command_retry.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command/command_retry.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/command.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/event.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/event/event.c"
@@ -140,6 +142,9 @@ cppcheck \
 	-DCONFIG_KFSW_EVENT=1 \
 	-DCONFIG_KFSW_EVENT_RING_DEPTH=32 \
 	-DCONFIG_KFSW_COMMAND_CSP=1 \
+	-DCONFIG_KFSW_COMMAND_RETRY=1 \
+	-DCONFIG_KFSW_COMMAND_RETRY_SLOTS=8 \
+	-DCONFIG_KFSW_COMMAND_RETRY_WINDOW_MS=60000 \
 	-DCONFIG_KFSW_COMMAND_MAX_COMMANDS=16 \
 	-DCONFIG_KFSW_COMMAND_TIMEOUT_MS=10000 \
 	-DCONFIG_KFSW_PARAM=1 \
