@@ -31,3 +31,19 @@ that bench image. It restores the original clock plus elapsed host seconds on
 exit (or restores an unset state if initially unset); it cannot restore time
 if the bench disconnects. It verifies a due step, rejection of a late step,
 cancellation, and an unset clock without invoking the following noop.
+
+The journal software case starts a node, records an intentionally unknown
+command as a warning, waits for it to be committed, then starts a second
+process on the same flash. It checks the previous record byte-for-byte through
+local commands and CSP, including its original time, and a new boot identity.
+
+The physical `journalANDphysical` case requires `CONFIG_KFSW_JOURNAL=y` and
+storage. It adds an unknown-command event and checks local/CSP retrieval. It
+does not reset or power-cycle the board. For the later persistence check, save
+the returned `boot=N`, deliberately reset the dedicated bench image, and run
+`tests/journal-smoke.py` with the explicit `--serial`, `--kiss-device`, `--node`
+and `--expected-previous-boot N` arguments and a new output directory. Qualify
+power cuts during record writes and filesystem sync separately. The fixture
+waits for `queued=0` before calling a record committed; unwritten queue entries
+are not expected to survive. Keep other event-producing tests idle so the
+expected record is not displaced while it is being checked.

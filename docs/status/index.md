@@ -30,7 +30,10 @@ under `tests/hil/`; use @ref testing to find the relevant fixture.
   Other links need their own access policy. Legacy commands have no request deduplication. The optional ticketed
   `cmd retry` path suppresses duplicates within one invocation; a new shell
   invocation is a new operation. Inspect uncertain outcomes before resubmitting.
-- Events and retained reset notes are held in RAM.
+- The ordinary event ring and retained reset notes are held in RAM. The
+  optional persistent journal stores boot reports and selected important
+  events; queued records can be lost on power failure. Native restart and
+  storage-fault tests cover it; physical power-cut qualification is pending.
 - HK skips elapsed schedule slots after a slow collection. Remote reads have
   a shared budget; local callbacks and drivers need their own time bounds.
 - A 120-second loaded CAN run measured a 107.124 ms maximum HK collection
