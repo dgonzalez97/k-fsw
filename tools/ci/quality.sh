@@ -54,6 +54,10 @@ format_sources+=(
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/fbo/fbo.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/fbo/fbo_clock.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/fbo/fbo_internal.h"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/journal.h"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/journal/journal.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/journal/journal_store.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/journal/journal_store.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/command.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/event.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/event/event.c"
@@ -144,6 +148,12 @@ cppcheck \
 	-DCONFIG_KFSW_COMMAND=1 \
 	-DCONFIG_KFSW_EVENT=1 \
 	-DCONFIG_KFSW_EVENT_RING_DEPTH=32 \
+	-DCONFIG_KFSW_JOURNAL=1 \
+	-DCONFIG_KFSW_JOURNAL_CAPACITY=128 \
+	-DCONFIG_KFSW_JOURNAL_QUEUE_DEPTH=16 \
+	-DCONFIG_KFSW_JOURNAL_MIN_SEVERITY=1 \
+	-DCONFIG_KFSW_JOURNAL_FLUSH_MS=1000 \
+	-DCONFIG_KFSW_JOURNAL_STACK_SIZE=3072 \
 	-DCONFIG_KFSW_COMMAND_CSP=1 \
 	-DCONFIG_KFSW_COMMAND_RETRY=1 \
 	-DCONFIG_KFSW_COMMAND_RETRY_SLOTS=8 \

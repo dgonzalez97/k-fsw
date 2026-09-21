@@ -173,4 +173,24 @@ ZTEST(services_event, test_names_are_reported_for_shell_output)
 	zassert_equal(strcmp(kfsw_event_severity_name((enum kfsw_event_severity)9), "unknown"), 0);
 }
 
+ZTEST(services_event, test_service_sources_and_severity_bounds)
+{
+	struct kfsw_event_record record;
+	struct kfsw_event_stats before;
+	struct kfsw_event_stats after;
+
+	kfsw_event_get_stats(&before);
+	for (unsigned int source = KFSW_EVENT_SOURCE_FBO; source <= KFSW_EVENT_SOURCE_RESMON;
+	     source++) {
+		kfsw_event_emit(source, 1, KFSW_EVENT_WARNING, NULL, 0);
+		zassert_ok(kfsw_event_get(0, &record));
+		zassert_equal(record.source, source);
+		zassert_not_equal(strcmp(kfsw_event_source_name(source), "unknown"), 0);
+	}
+	kfsw_event_emit(KFSW_EVENT_SOURCE_APP, 1, 255, NULL, 0);
+	kfsw_event_get_stats(&after);
+	zassert_equal(after.recorded - before.recorded, 3);
+	zassert_equal(after.rejected - before.rejected, 1);
+}
+
 ZTEST_SUITE(services_event, NULL, event_setup, NULL, NULL, NULL);
