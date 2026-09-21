@@ -342,6 +342,7 @@ Paths must start with `/` and can't contain `..` or empty components.
 | `cmd list` | none | Registered commands with ID, arguments and description |
 | `cmd <name>` | `[arguments]` | Run a command on this node |
 | `cmd <node> <name>` | `[arguments]` | Run a command on another node over CSP |
+| `cmd retry <node> <name>` | `[arguments]` | Reserve a ticket and retry lost exchanges within this invocation |
 
 ```text
 kfsw:~$ cmd list

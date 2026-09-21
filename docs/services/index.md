@@ -404,7 +404,7 @@ startup. Duplicate IDs or names, missing handlers and too many arguments are
 rejected. Handlers run on the command thread, one at a time, never in a CSP
 receive context.
 
-A message has a 12-byte big-endian header (version, opcode, status, argument
+A legacy version 1 message has a 12-byte big-endian header (version, opcode, status, argument
 count, command ID, request ID and payload size) followed by type-length-value
 arguments. Every length is checked before use, and a message always fits one
 CSP packet.
@@ -413,9 +413,37 @@ There is no authentication. The request carries the source node and an
 authentication flag that is always false. See @ref kfsw_services_command.
 
 A handler runs to completion and returns a status and an optional short text.
-Requests are not deduplicated, so check the node state before sending a
-command again after a lost reply. Remote parameters use the parameter service,
+Legacy requests are not deduplicated, so check the node state before sending
+a command again after a lost reply. Remote parameters use the parameter service,
 not commands.
+
+### Ticketed retries
+
+`CONFIG_KFSW_COMMAND_RETRY` adds `cmd retry <node> <name> [arguments]`.
+It is enabled in the Linux image. Both peers must support it and have working
+entropy. A protected invocation first reserves a ticket, then executes it;
+up to three attempts per phase reuse the same request bytes. An older peer
+fails the protected call; the client never falls back to legacy on its own.
+
+Version 2 adds an eight-byte token to the header (20 bytes total), preserving
+argument encoding. Opcodes 3/4 prepare and return a ticket; opcode 5 executes
+it, and opcode 2 returns the result. Prepare carries a random client nonce;
+execute carries the returned random server ticket. The cache matches source
+node, ticket, command ID, request ID, argument count and the entire payload.
+A repeated prepare within its lifetime returns the same ticket without
+extending its deadline. A repeated execute returns the recorded result.
+
+The default cache holds eight reservations/results for 60 seconds from
+reservation. New calls get BUSY when all slots are live. Expired or unknown
+tickets get UNAVAILABLE and cannot execute. A server restart discards all
+tickets. A failed entropy read prevents allocation. Tickets suppress duplicates. They are not authentication, and they do not
+make an effect happen exactly once.
+
+Typing the command again starts a new operation. If all result attempts fail,
+or a handler resets the node, the outcome can remain unknown; inspect the
+node before starting another operation. Handlers still run synchronously and
+need their own execution bounds. Ordinary `cmd <node> ...` keeps its one-shot
+legacy behavior. Changing clocks does not affect ticket lifetimes.
 
 ## Resource monitor
 
