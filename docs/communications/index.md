@@ -165,8 +165,8 @@ host dependency pinned in `west.yml`. Its original `cspdump`, `csp-iperf` and
 Wireshark dissector do not match K-FSW's CSP 2 configuration.
 
 The fork's `csp-kiss` entry point supports CSP 2 directly on the native Linux
-PTY or a serial KISS link. It implements ping, CMP interface statistics, and
-passive capture. No ZMQ gateway or firmware transport change is needed.
+PTY or a serial KISS link. It implements ping, CMP interface statistics,
+neighbors, remote log retrieval and passive capture.
 
 From `k-fsw`, with Rust 1.88 or newer installed:
 
@@ -195,6 +195,60 @@ payload, including any CSP checksum. Only KISS framing and its outer checksum
 are removed. The old CSP 1/ZMQ dissector does not decode this format. Output
 files must be new. Host-tool builds are separate from firmware builds, and
 normal west updates leave the `host-tools` group disabled.
+
+## Remote text logs and neighbors
+
+```bash
+./tools/kfsw-linux csp-tools --device /dev/pts/7 logs --node 1 --output logs.jsonl
+./tools/kfsw-linux csp-tools --device /dev/pts/7 logs --node 1 --count 16 --min-level 2
+./tools/kfsw-linux csp-tools --device /dev/pts/7 neighbors --nodes 1,2 --output nodes.jsonl
+./tools/kfsw-linux csp-tools --device /dev/pts/7 --source 100 neighbors --range 1:16 --budget-ms 5000
+```
+
+`logs` considers the latest 1 to 32 retained records, then filters by severity
+(0 debug, 1 info, 2 warning, 3 error). JSONL contains a start record, log
+records and an end record with `complete: true` only after all expected
+replies arrive. `text_hex` preserves the original bytes; `text` replaces
+invalid UTF-8 with replacement characters. Output files must be new, and
+each record is flushed. A failed transfer keeps partial output and exits
+nonzero. An absent end record also means incomplete output. The global
+`--timeout-ms` is the budget for the entire log transfer; raise it for slow
+links. Use `--port` inside `logs` when the node's log port differs from 16.
+
+`neighbors` queries explicit unicast addresses or an inclusive range, up to
+64 addresses. It pings each node and then asks for CMP identity. It reports
+`identified`, `reachable` without a valid identity, `no_reply`, `invalid_ping`,
+or `not_queried` when the overall budget expires. An unanswered node is an
+inventory result; an unfinished inventory exits nonzero. Its final summary
+states whether every requested node was queried. `--timeout-ms` bounds each
+exchange and `--budget-ms` bounds the whole inventory. Ctrl-C stops either
+command; flushed records remain, without a successful completion marker.
+
+The source address defaults to 16 and must not be included in the requested
+nodes. Address 16383 is excluded. `neighbors` observes nodes reachable through
+configured CSP routes; it does not implement ARP, build a routing topology,
+or detect duplicate addresses. Queries use the existing ping and CMP services
+and make no configuration or clock changes.
+
+### Log history wire format
+
+All integers below are big endian. Requests and replies require CSP CRC32C;
+the KISS link adds its own checksum. One request is served per connection.
+
+| Message | Fields, in order |
+| --- | --- |
+| Request (12 bytes) | version u8 = 1, minimum severity u8, count u16 (1 to 32), nonce u64 |
+| Reply header (10 bytes) | version u8 = 1, type u8, echoed nonce u64 |
+| Start, type 0 (34 bytes total) | header, first sequence u64, exclusive end sequence u64, overwritten count u64 |
+| Record, type 1 (30 to 221 bytes total) | header, sequence u64, uptime_ms u64, module u8, severity u8, truncated u8 (0/1), text length u8, text bytes |
+| End, type 2 (13 bytes total) | header, status u8, sent record count u16 |
+
+End statuses: 0 finished, 1 a requested record was overwritten, 2 no packet
+buffer for a record. Invalid requests receive no response. An exhausted packet
+pool can also prevent start/end transmission, resulting in a client timeout.
+The nonce distinguishes separate reads; it is not authentication. Module IDs
+use `enum kfsw_log_module` from the services API. Reads do not generate a log
+message themselves.
 
 ## Test topologies
 

@@ -41,6 +41,12 @@
  */
 
 /**
+ * @file ../kfsw-services/include/kfsw/services/log_history.h
+ * @brief Bounded, non-destructive text log history.
+ * @ingroup kfsw_services_logging
+ */
+
+/**
  * @file ../kfsw-services/include/kfsw/services/parameter.h
  * @brief Local, remote, and persistent parameter API.
  * @ingroup kfsw_services_param

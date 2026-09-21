@@ -94,6 +94,25 @@ spaces. Lines are coloured by level: errors red, warnings yellow, info white
 and debug dim. The colour codes wrap the whole line, so `[LEVEL] message`
 stays intact for scripts. `log_color` turns colour off.
 
+`CONFIG_KFSW_LOG_HISTORY` keeps the most recent K-FSW messages in a RAM ring
+(32 records by default, configurable from 1 to 128). `log history` prints up
+to 32 records locally. Each has a sequence, uptime in milliseconds, module,
+severity and up to 191 text bytes; longer messages are marked truncated.
+The existing compile-time and runtime filters apply before retention.
+Zephyr logs, driver output and shell responses are not captured.
+
+`CONFIG_KFSW_LOG_HISTORY_CSP` serves the same history on CSP port 16 by default.
+It is enabled in the Linux composition. Other CSP compositions can use
+`config/profiles/log-history.conf`. Start the server after the CSP router.
+Reads do not remove records or write flash. History and sequences restart
+on reboot. UTC is not required.
+
+The host `csp-kiss logs` command reads a bounded window and saves JSON lines;
+see [remote diagnostics](../communications/index.md#remote-text-logs-and-neighbors).
+It reports overwritten history, truncation and incomplete transfers. A busy
+writer can overwrite a requested record during transmission; that read fails
+explicitly and can be retried. There is no persistent cursor across resets.
+
 ## Parameters
 
 Parameters are named, typed values grouped in tables. Each service or module

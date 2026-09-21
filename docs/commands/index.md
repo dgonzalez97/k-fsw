@@ -72,6 +72,11 @@ time is in `csp clock`.
 `log test` prints one message at each level compiled into the image. Change
 `log_level`, or `log_levels` for a single module, to filter them.
 
+`log history` shows up to 32 recent retained messages when
+`CONFIG_KFSW_LOG_HISTORY` is enabled. It includes sequence, uptime, module,
+level and truncation status. To retrieve them over CSP, use the host
+`csp-kiss logs` command described in [communications](../communications/index.md#remote-text-logs-and-neighbors).
+
 ## UHF radio
 
 `uhf status` prints the radio implementation, the expected hardware and serial
