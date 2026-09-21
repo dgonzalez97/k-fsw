@@ -97,6 +97,57 @@ immediately; it cannot be bypassed by `on-error continue`. Other errors follow
 the procedure's usual `on-error` policy. This is a cancellable procedure wait,
 not a hard real-time scheduler or a schedule that survives restart.
 
+## Persistent event journal
+
+`CONFIG_KFSW_JOURNAL` adds a fixed-size journal to the existing storage volume.
+The Linux image enables it. Boot/reset reports are always selected; other
+events must meet `CONFIG_KFSW_JOURNAL_MIN_SEVERITY` (warning by default).
+Text logging and the existing RAM event ring remain separate.
+
+```text
+cmd journal_stats
+cmd journal_tail 0
+cmd journal_time 0
+cmd 2 journal_tail 0
+```
+
+Age 0 is the newest committed record. `journal_tail` returns boot identity,
+source, event ID, severity and the original payload in hex. `journal_time`
+returns the journal sequence, original event uptime in microseconds, UTC and
+its validity. UTC is sampled by the writer, not in the event callback; uptime
+is the event's timestamp. Ages move as records arrive. To line up separate responses, read
+`journal_time` before and after the tail and check the sequence.
+The C read API returns all fields from one record. Reads do not consume data.
+
+The writer wakes every `CONFIG_KFSW_JOURNAL_FLUSH_MS` (1000 ms by default),
+draining at most the configured queue depth (16) per batch. Each record is
+written and synced on the worker. No filesystem or wall-clock driver calls
+run in the emitter/ISR. A full queue drops incoming events and increments
+`drop`. Boot-ready and retained-lastwords reports are queued once per boot;
+a failed queue insertion permits a later attempt. Repeated start calls do
+not allocate another boot identity or start another writer.
+
+The default file `/kfsw/journal.bin` retains 128 records and occupies at most
+9232 bytes on the volume: a 16-byte header plus 128 checksummed 72-byte slots.
+Filesystem metadata, copy-on-write space and flash wear are additional. The
+queue and one pending record are RAM-only. Adjust severity and flush interval
+for the expected event rate. Bulk text belongs in the console log.
+
+Restart recovery validates the header and each slot, skips records with bad
+checksums and incomplete trailing data, and resumes after the largest valid
+sequence. It never reformats a corrupt or incompatible header. Capacity is
+part of the header: changing it requires an explicit migration/new journal.
+Boot identities advance from retained history and restart at one on a new
+volume. Do not treat them as globally unique identifiers.
+
+Write failures retain one pending record and retry its slot after rescanning,
+so a failed sync does not create two journal entries. Subsequent events can
+fill the queue and be dropped. `journal_stats` exposes queue depth, drops,
+write errors, damaged slots found in the latest recovery, readiness and the
+last error. Records still queued, failed or in progress can be lost at power
+failure. Native fault tests cover these policies; physical power-cut
+qualification remains pending.
+
 ## Logging
 
 Messages have four levels: DEBUG, INFO, WARNING and ERROR.
