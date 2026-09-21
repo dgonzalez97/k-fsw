@@ -46,3 +46,23 @@ UTC Procedures Run And Cancel On A Dedicated Board
     ...    --serial    ${BATCH_SHELL}    --output    ${OUTPUT DIR}/fbo-utc-board
     ...    stderr=STDOUT    timeout=45
     HIL Command Should Pass    ${result}    FBO UTC SMOKE RESULT: PASS
+
+Journal Retains Events Across Linux Process Restarts
+    [Tags]    software    firmware-batches    journal
+    ${result}=    Run Process
+    ...    ${KFSW_REPO_DIR}/../.venv/bin/python    ${KFSW_REPO_DIR}/tests/journal-smoke.py
+    ...    --executable    ${KFSW_REPO_DIR}/../build/linux/zephyr/zephyr.exe
+    ...    --output    ${OUTPUT DIR}/journal-native
+    ...    stderr=STDOUT    timeout=45
+    HIL Command Should Pass    ${result}    JOURNAL SMOKE RESULT: PASS
+
+Board Commits And Returns An Important Event
+    [Tags]    physical    firmware-batches    journal
+    Skip If    not $BATCH_SHELL or not $BATCH_KISS    Set explicit shell and KISS devices.
+    ${result}=    Run Process
+    ...    ${KFSW_REPO_DIR}/../.venv/bin/python    ${KFSW_REPO_DIR}/tests/journal-smoke.py
+    ...    --serial    ${BATCH_SHELL}    --kiss-device    ${BATCH_KISS}
+    ...    --node    ${BATCH_NODE}    --baud    ${BATCH_BAUD}
+    ...    --output    ${OUTPUT DIR}/journal-board
+    ...    stderr=STDOUT    timeout=45
+    HIL Command Should Pass    ${result}    JOURNAL SMOKE RESULT: PASS

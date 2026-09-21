@@ -27,6 +27,7 @@ class NativeNode:
                                         stdout=self.stream, stderr=subprocess.STDOUT, text=True)
         try:
             self.wait(r'@READY ')
+            self.wait(r'@SERVICES ok failures=0')
             self.device = self.wait(r'uart_1 connected to pseudotty: (\S+)')[1]
         except BaseException:
             self.__exit__(None, None, None)
