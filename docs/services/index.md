@@ -82,6 +82,21 @@ noop
 `if-event <source> <id> skip` skips the next line unless that event is in the
 event record. There are no loops or jumps.
 
+`wait-until <unix-seconds> <late-tolerance-seconds>` waits on the existing UTC
+clock. For example, `wait-until 1900000002 1` permits a step at that UTC second
+or up to one second late. The clock must already be valid; use the ordinary
+clock set/get commands. No time synchronization is started by a procedure.
+The target range is 1..2147483647, matching the current CSP clock.
+
+The initial wait and late tolerance must not exceed `CONFIG_KFSW_FBO_WAIT_MAX_S`
+(default 600 seconds). UTC is checked every 100 ms. A forward step may make the
+line due or too late; a backward step keeps waiting, with a monotonic deadline
+of at most the configured maximum from entry. An unset/failed clock aborts the
+line, including if it becomes unset while waiting. `fbo stop` wakes the wait
+immediately; it cannot be bypassed by `on-error continue`. Other errors follow
+the procedure's usual `on-error` policy. This is a cancellable procedure wait,
+not a hard real-time scheduler or a schedule that survives restart.
+
 ## Logging
 
 Messages have four levels: DEBUG, INFO, WARNING and ERROR.
