@@ -20,3 +20,14 @@ to drop a prepare reply and a result, and checks that the client reuses its
 nonce/ticket. A simulated legacy peer verifies that no fallback command runs.
 Physical execution selects `command-retryANDphysical`; it runs only the
 server-side checks and does not change the board's command timeout.
+
+The UTC procedure case needs FBO, CSP clock set/get, and a valid writable clock.
+The software case stages its private flash before starting a node. For the
+physical case, upload `tests/procedures/utc-wait.txt` to
+`/kfsw/ftp/procedures/utc-wait.txt` on a dedicated test image first. Select
+`fbo-utcANDphysical`. The fixture explicitly sets UTC forward/backward and
+below the valid-clock floor, so keep periodic or scheduled work disabled on
+that bench image. It restores the original clock plus elapsed host seconds on
+exit (or restores an unset state if initially unset); it cannot restore time
+if the bench disconnects. It verifies a due step, rejection of a late step,
+cancellation, and an unset clock without invoking the following noop.
