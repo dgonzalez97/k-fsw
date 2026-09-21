@@ -53,3 +53,30 @@ KFSW_CSP_TOOLS_TEST_BINARY="$PWD/../tools/kfsw-csp-tools/target/release/csp-kiss
 
 These use private PTYs to simulate multiple peers, missing/invalid identities,
 old log nonces, dropped/duplicate/truncated records and an absent end reply.
+
+## CSP benchmark
+
+Build with `tools/kfsw-linux csp build`, then run the native-only fixture:
+
+```bash
+export KFSW_CSP_IPERF_TEST_BINARY="$PWD/../tools/kfsw-csp-tools/target/release/csp-iperf"
+KFSW_ROBOT_OUT_DIR="$PWD/../build/robot/iperf-native" \
+  tests/hil/run.sh --include iperfANDsoftware
+```
+
+It starts its own Linux node and sends 64-byte echo requests at 640 CSP
+bytes/second for two seconds, with a one-second reply deadline. The result
+must contain at least ten requests, no loss and valid RTTs. JSON, stderr and
+native logs are retained. The source is 30; no clock synchronization is used.
+
+The physical case is prepared but has not been run. Later, explicitly set
+`KFSW_DIAGNOSTICS_KISS`, `KFSW_DIAGNOSTICS_NODE`, `KFSW_DIAGNOSTICS_BAUD` and
+an unused `KFSW_IPERF_SOURCE` (default 30), then select `iperfANDphysical`.
+Only this echo fixture runs with that selection; it does not change HK
+reports, logs or clocks. Stop other readers of the KISS device first. This
+checks connectivity and loss; it does not measure what the link can carry.
+
+Protocol fault tests use private PTYs and optional loopback ZMQ. Build
+`csp-ping-server` with Cargo and install PyZMQ in the test environment to run
+the legacy interoperability case, then run `unittest discover -s tests/ground`
+with `KFSW_CSP_IPERF_TEST_BINARY` set. Missing PyZMQ skips that case explicitly.
