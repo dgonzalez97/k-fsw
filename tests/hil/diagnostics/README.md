@@ -3,14 +3,14 @@
 Physical execution is pending. The same fixture runs against native_sim without
 devices. It checks two HK reports, capture/replay byte equality, a failed poll,
 interface statistics, and optionally the CSP tools ping, PCAP capture, remote
-text logs and `neighbors` inventory. The host-tool fixture checks repeated
+text logs and `discover` inventory. The host-tool fixture checks repeated
 reads, severity filters, ring overwrite and deadline/partial-file handling.
 
 Build the Linux image and optional host tool, then run from `k-fsw`:
 
 ```bash
 tools/kfsw-linux build
-tools/kfsw-linux csp-tools build
+tools/kfsw-linux csp build
 tools/kfsw-linux diagnostics ../build/diagnostics/my-run
 ```
 

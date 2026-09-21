@@ -1,4 +1,4 @@
-"""Shared Linux/bench checks for remote logs and the neighbors inventory."""
+"""Shared Linux/bench checks for remote logs and CSP discovery."""
 
 import json
 import subprocess
@@ -51,20 +51,20 @@ def check_remote_diagnostics(tool, node, send, read_log, output):
     wrapped = [json.loads(line) for line in wrap.stdout.splitlines()]
     assert wrapped[0]['overwritten'] > 0 and wrapped[-1]['complete'], wrapped
 
-    inventory = output / 'neighbors.jsonl'
-    call(['--timeout-ms', '100', 'neighbors', '--nodes', f'{node},100',
-          '--output', str(inventory)], 'neighbors')
-    neighbors = rows(inventory)
-    found = next(row for row in neighbors if row.get('node') == node)
+    inventory = output / 'discover.jsonl'
+    call(['--timeout-ms', '100', 'discover', '--nodes', f'{node},100',
+          '--output', str(inventory)], 'discover')
+    nodes = rows(inventory)
+    found = next(row for row in nodes if row.get('node') == node)
     assert found['status'] == 'identified' and found['identity']['hostname'], found
-    assert next(row for row in neighbors if row.get('node') == 100)['status'] == 'no_reply'
-    assert neighbors[-1]['complete'], neighbors
-    call(['neighbors', '--nodes', str(node), '--output', str(inventory)], 'neighbors-existing', success=False)
-    assert rows(inventory) == neighbors
-    call(['neighbors', '--range', '0:16382'], 'neighbors-range', success=False)
-    call(['neighbors', '--nodes', '16'], 'neighbors-source', success=False)
-    partial = call(['--timeout-ms', '200', 'neighbors', '--nodes', '100,101', '--budget-ms', '30'],
-                   'neighbors-budget', success=False)
+    assert next(row for row in nodes if row.get('node') == 100)['status'] == 'no_reply'
+    assert nodes[-1]['complete'], nodes
+    call(['discover', '--nodes', str(node), '--output', str(inventory)], 'discover-existing', success=False)
+    assert rows(inventory) == nodes
+    call(['discover', '--range', '0:16382'], 'discover-range', success=False)
+    call(['discover', '--nodes', '16'], 'discover-source', success=False)
+    partial = call(['--timeout-ms', '200', 'discover', '--nodes', '100,101', '--budget-ms', '30'],
+                   'discover-budget', success=False)
     partial_rows = [json.loads(line) for line in partial.stdout.splitlines()]
     assert partial_rows[1]['status'] == 'not_queried' and not partial_rows[-1]['complete']
     print('REMOTE DIAGNOSTICS RESULT: PASS')

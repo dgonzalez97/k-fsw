@@ -108,7 +108,7 @@ Reads do not remove records or write flash. History and sequences restart
 on reboot. UTC is not required.
 
 The host `csp-kiss logs` command reads a bounded window and saves JSON lines;
-see [remote diagnostics](../communications/index.md#remote-text-logs-and-neighbors).
+see [remote diagnostics](../communications/index.md#remote-text-logs-and-discovery).
 It reports overwritten history, truncation and incomplete transfers. A busy
 writer can overwrite a requested record during transmission; that read fails
 explicitly and can be retried. There is no persistent cursor across resets.

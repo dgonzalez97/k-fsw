@@ -166,13 +166,13 @@ Wireshark dissector do not match K-FSW's CSP 2 configuration.
 
 The fork's `csp-kiss` entry point supports CSP 2 directly on the native Linux
 PTY or a serial KISS link. It implements ping, CMP interface statistics,
-neighbors, remote log retrieval and passive capture.
+node discovery, remote log retrieval and passive capture.
 
 From `k-fsw`, with Rust 1.88 or newer installed:
 
 ```bash
 west update kfsw-csp-tools
-./tools/kfsw-linux csp-tools build
+./tools/kfsw-linux csp build
 ./tools/kfsw-linux run
 ```
 
@@ -180,9 +180,9 @@ Use the `uart_1 connected to pseudotty` path printed by that node in another
 terminal. One program owns that PTY at a time:
 
 ```bash
-./tools/kfsw-linux csp-tools --device /dev/pts/7 ping --node 1 --count 5
-./tools/kfsw-linux csp-tools --device /dev/pts/7 ifstat --node 1 --interface KISS
-./tools/kfsw-linux csp-tools --device /dev/pts/7 dump --seconds 10 --pcap-file traffic.pcap
+./tools/kfsw-linux csp --device /dev/pts/7 ping --node 1 --count 5
+./tools/kfsw-linux csp --device /dev/pts/7 ifstat --node 1 --interface KISS
+./tools/kfsw-linux csp --device /dev/pts/7 dump --seconds 10 --pcap-file traffic.pcap
 ```
 
 The source address defaults to 16; `--baud` defaults to 115200. Both KISS and
@@ -196,13 +196,13 @@ are removed. The old CSP 1/ZMQ dissector does not decode this format. Output
 files must be new. Host-tool builds are separate from firmware builds, and
 normal west updates leave the `host-tools` group disabled.
 
-## Remote text logs and neighbors
+## Remote text logs and discovery
 
 ```bash
-./tools/kfsw-linux csp-tools --device /dev/pts/7 logs --node 1 --output logs.jsonl
-./tools/kfsw-linux csp-tools --device /dev/pts/7 logs --node 1 --count 16 --min-level 2
-./tools/kfsw-linux csp-tools --device /dev/pts/7 neighbors --nodes 1,2 --output nodes.jsonl
-./tools/kfsw-linux csp-tools --device /dev/pts/7 --source 100 neighbors --range 1:16 --budget-ms 5000
+./tools/kfsw-linux csp --device /dev/pts/7 logs --node 1 --output logs.jsonl
+./tools/kfsw-linux csp --device /dev/pts/7 logs --node 1 --count 16 --min-level 2
+./tools/kfsw-linux csp --device /dev/pts/7 discover --nodes 1,2 --output nodes.jsonl
+./tools/kfsw-linux csp --device /dev/pts/7 --source 100 discover --range 1:16 --budget-ms 5000
 ```
 
 `logs` considers the latest 1–32 retained records, then filters by severity
@@ -215,7 +215,7 @@ nonzero. An absent end record also means incomplete output. The global
 `--timeout-ms` is the budget for the entire log transfer; raise it for slow
 links. Use `--port` inside `logs` when the node's log port differs from 13.
 
-`neighbors` queries explicit unicast addresses or an inclusive range, up to
+`discover` queries explicit unicast addresses or an inclusive range, up to
 64 addresses. It pings each node and then asks for CMP identity. It reports
 `identified`, `reachable` without a valid identity, `no_reply`, `invalid_ping`,
 or `not_queried` when the overall budget expires. An unanswered node is an
@@ -225,7 +225,7 @@ exchange and `--budget-ms` bounds the whole inventory. Ctrl-C stops either
 command; flushed records remain, without a successful completion marker.
 
 The source address defaults to 16 and must not be included in the requested
-nodes. Address 16383 is excluded. `neighbors` observes nodes reachable through
+nodes. Address 16383 is excluded. `discover` observes nodes reachable through
 configured CSP routes; it does not implement ARP, build a routing topology,
 or detect duplicate addresses. Queries use the existing ping and CMP services
 and make no configuration or clock changes.

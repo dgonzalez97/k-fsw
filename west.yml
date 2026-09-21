@@ -12,7 +12,7 @@ manifest:
   projects:
     - name: kfsw-csp-tools
       url: https://github.com/dgonzalez97/kfsw-linux-workbench-20260921.git
-      revision: d6551ae4f57d5d8ad4f5f8fb180ceefb9719ef43
+      revision: f138229f9e5abe2ead8a5fda902c161a99349213
       path: tools/kfsw-csp-tools
       groups: [host-tools]
 

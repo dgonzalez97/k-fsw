@@ -62,7 +62,7 @@ class CspToolsTest(unittest.TestCase):
             raise errors[0]
         return result
 
-    def test_neighbors_multiple_peers_and_missing_or_invalid_identity(self):
+    def test_discover_multiple_peers_and_missing_or_invalid_identity(self):
         def respond(header, payload):
             node = header['destination']
             if node == 4:
@@ -78,7 +78,7 @@ class CspToolsTest(unittest.TestCase):
                 identity[2:22] = b'x' * 20
             return [bytes(identity)]
 
-        result = self.exchange(['neighbors', '--nodes', '1,2,3,4'], respond)
+        result = self.exchange(['discover', '--nodes', '1,2,3,4'], respond)
         self.assertEqual(result.returncode, 0, result.stderr)
         rows = [json.loads(line) for line in result.stdout.splitlines()]
         self.assertEqual([row['status'] for row in rows[:-1]],

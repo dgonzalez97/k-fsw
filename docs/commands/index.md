@@ -75,7 +75,7 @@ time is in `csp clock`.
 `log history` shows up to 32 recent retained messages when
 `CONFIG_KFSW_LOG_HISTORY` is enabled. It includes sequence, uptime, module,
 level and truncation status. To retrieve them over CSP, use the host
-`csp-kiss logs` command described in [communications](../communications/index.md#remote-text-logs-and-neighbors).
+`csp-kiss logs` command described in [communications](../communications/index.md#remote-text-logs-and-discovery).
 
 ## UHF radio
 
