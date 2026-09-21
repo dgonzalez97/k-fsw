@@ -6,6 +6,9 @@
 #include <kfsw/services/boot.h>
 #define KFSW_LOG_MODULE KFSW_LOG_MODULE_APP
 #include <kfsw/services/log.h>
+#if CONFIG_KFSW_LOG_HISTORY
+#include <kfsw/services/log_history.h>
+#endif
 
 static int cmd_status(const struct shell *sh, size_t argc, char **argv)
 {
@@ -65,7 +68,39 @@ static int cmd_log_test(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
+#if CONFIG_KFSW_LOG_HISTORY
+static int cmd_log_history(const struct shell *sh, size_t argc, char **argv)
+{
+	struct kfsw_log_history_window window;
+	struct kfsw_log_record record;
+
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+	(void)kfsw_log_history_window(KFSW_LOG_HISTORY_MAX_READ, &window);
+	shell_print(sh, "Log history: first=%llu end=%llu overwritten=%llu",
+		    (unsigned long long)window.first, (unsigned long long)window.end,
+		    (unsigned long long)window.overwritten);
+	for (uint64_t sequence = window.first; sequence < window.end; sequence++) {
+		int result = kfsw_log_history_get(sequence, &record);
+
+		if (result != 0) {
+			shell_error(sh, "Log history changed during read; retry");
+			return result;
+		}
+		shell_print(sh, "%llu t=%llums %s level=%u%s %s",
+			    (unsigned long long)record.sequence,
+			    (unsigned long long)record.uptime_ms,
+			    kfsw_log_module_name((enum kfsw_log_module)record.module),
+			    record.severity, record.truncated ? " truncated" : "", record.text);
+	}
+	return 0;
+}
+#endif
+
 SHELL_STATIC_SUBCMD_SET_CREATE(log_commands,
+#if CONFIG_KFSW_LOG_HISTORY
+	SHELL_CMD_ARG(history, NULL, "Read recent K-FSW log messages.", cmd_log_history, 1, 0),
+#endif
 	SHELL_CMD_ARG(test, NULL, "Exercise all K-FSW log levels.", cmd_log_test, 1, 0),
 	SHELL_SUBCMD_SET_END);
 

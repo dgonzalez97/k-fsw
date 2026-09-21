@@ -11,8 +11,8 @@ manifest:
 
   projects:
     - name: kfsw-csp-tools
-      remote: kfsw
-      revision: 020e12facacd379f1b976360936206048773ebd7
+      url: https://github.com/dgonzalez97/kfsw-linux-workbench-20260921.git
+      revision: d6551ae4f57d5d8ad4f5f8fb180ceefb9719ef43
       path: tools/kfsw-csp-tools
       groups: [host-tools]
 
@@ -28,12 +28,12 @@ manifest:
       path: kfsw-platform
 
     - name: kfsw-services
-      remote: kfsw
-      revision: 9fc6e87ae028ae1a947aee5ea1ec7de18c939934
+      url: https://github.com/dgonzalez97/kfsw-linux-workbench-20260921.git
+      revision: 0ebe2cc10924d63fd8ac05573a5cedc10132b530
       path: kfsw-services
 
     - name: kfsw-comms
-      remote: kfsw
+      url: https://github.com/dgonzalez97/kfsw-linux-workbench-20260921.git
       revision: 8e03f3ba9d804b6eaacaa878ecc62c83950d7f8a
       path: kfsw-comms
 

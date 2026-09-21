@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation    HK capture/replay and CSP 2 interface diagnostics.
+Documentation    HK capture/replay, remote text logs and CSP 2 neighbors/interface diagnostics.
 Resource         resources/common.resource
 
 *** Variables ***
@@ -22,7 +22,7 @@ Linux Preserves Both HK Reports And Replays Their Bytes
     HIL Command Should Pass    ${result}    DIAGNOSTICS SMOKE RESULT: PASS
 
 CSP Tools Diagnose A Linux Node Through KISS
-    [Tags]    software    diagnostics    csp    host-tools
+    [Tags]    software    diagnostics    csp    host-tools    logs    neighbors
     Skip If    not $CSP_TOOL    Set KFSW_CSP_TOOLS_TEST_BINARY to the built csp-kiss binary.
     ${result}=    Run Process
     ...    ${DIAGNOSTICS_PYTHON}    ${DIAGNOSTICS_SCRIPT}
@@ -33,7 +33,7 @@ CSP Tools Diagnose A Linux Node Through KISS
     HIL Command Should Pass    ${result}    DIAGNOSTICS SMOKE RESULT: PASS
 
 Board Telemetry Can Be Captured And Replayed
-    [Tags]    physical    diagnostics    hk    csp
+    [Tags]    physical    diagnostics    hk    csp    logs    neighbors
     Skip If    not $BENCH_SHELL or not $BENCH_KISS or not $CSP_TOOL
     ...    Set KFSW_DIAGNOSTICS_SHELL, KFSW_DIAGNOSTICS_KISS and KFSW_CSP_TOOLS_TEST_BINARY.
     ${result}=    Run Process

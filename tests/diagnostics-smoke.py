@@ -12,6 +12,8 @@ import subprocess
 import sys
 import time
 
+from remote_diagnostics import check_remote_diagnostics
+
 REPO = Path(__file__).resolve().parents[1]
 BRIDGE = REPO / 'tools/ground/hk-bridge.py'
 spec = importlib.util.spec_from_file_location('hk_bridge', BRIDGE)
@@ -128,6 +130,7 @@ def main():
         assert bad.returncode != 0 and 'requested samples' in bad.stderr, bad
         if args.csp_tool:
             tool = [str(args.csp_tool.resolve()), '--device', device, '--baud', str(args.baud)]
+            check_remote_diagnostics(tool, args.node, send, read_log, args.output)
             output = run(tool + ['ping', '--node', node, '--count', '3'])
             assert 'PING RESULT: PASS received=3' in output, output
             (args.output / 'ping.log').write_text(output)
