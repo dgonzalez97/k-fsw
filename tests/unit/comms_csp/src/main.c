@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <errno.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -46,6 +47,8 @@ ZTEST(comms_csp_state, test_rejects_operations_before_init)
 	zassert_equal(kfsw_csp_start(), CSP_ERR_INVAL);
 	zassert_equal(kfsw_csp_ping(1U, 10U, 1U, &round_trip_ms), CSP_ERR_INVAL);
 	zassert_equal(round_trip_ms, UINT32_MAX);
+	struct kfsw_csp_interface_stats stats;
+	zassert_equal(kfsw_csp_interface_stats_read(1, "KISS", 10, &stats), -ENETDOWN);
 }
 
 ZTEST(comms_csp_state, test_hides_interfaces_and_routes_before_init)

@@ -15,12 +15,34 @@ usage()
 		'Commands:' \
 		'  build    Build the supported KFSW-Linux target' \
 		'  run      Run KFSW-Linux with its shell on this terminal' \
+		'  hk       Capture or replay housekeeping (hk --help)' \
+		'  csp-tools Build or run CSP 2 KISS diagnostics (csp-tools --help)' \
+		'  diagnostics <new-output-dir> Run native HK and CSP tool checks' \
 		'  help     Show this help'
 }
 
 command="${1:-}"
 
 case "$command" in
+	hk)
+		shift
+		exec "$KFSW_LINUX_WORKSPACE/.venv/bin/python" "$KFSW_LINUX_TOOLS_DIR/ground/hk-bridge.py" "$@"
+		;;
+	csp-tools)
+		shift
+		exec "$KFSW_LINUX_TOOLS_DIR/kfsw-csp-tools" "$@"
+		;;
+	diagnostics)
+		shift
+		if [[ $# -ne 1 ]]; then
+			echo 'Usage: tools/kfsw-linux diagnostics <new-output-dir>' >&2
+			exit 2
+		fi
+		exec "$KFSW_LINUX_WORKSPACE/.venv/bin/python" \
+			"$KFSW_LINUX_REPO_DIR/tests/diagnostics-smoke.py" \
+			--executable "$KFSW_LINUX_EXECUTABLE" \
+			--csp-tool "$KFSW_LINUX_TOOLS_DIR/kfsw-csp-tools" --output "$1"
+		;;
 	build)
 		shift
 		if [[ $# -ne 0 ]]; then

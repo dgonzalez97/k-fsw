@@ -124,6 +124,7 @@ and its read counters.
 | `csp info` | none | Local address, identity, build date and free buffers |
 | `csp ident` | `[node]` | Hostname, model, revision, build date and clock |
 | `csp interfaces` | none | Interfaces with addresses and packet, error and drop counters |
+| `csp ifstat` | `<node> <interface>` | Remote interface packet/byte/error counters |
 | `csp routes` | none | Route table |
 | `csp ping` | `[node]` | Ping with CRC32 and a one-second timeout |
 | `csp debug` | `[on\|off]` | Print every packet in and out |

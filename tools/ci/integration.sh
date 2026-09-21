@@ -16,6 +16,11 @@ KFSW_EXTRA_CONF_FILE="$KFSW_REPO_DIR/tests/config/param-fixtures.conf;$KFSW_REPO
 	"$KFSW_CI_DIR/build.sh" linux
 KFSW_PRISTINE=always "$KFSW_REPO_DIR/tests/build-linux-node2.sh"
 
+echo "INTEGRATION: ground tools and HK capture/replay"
+"$KFSW_REPO_DIR/../.venv/bin/python" -m unittest discover -s "$KFSW_REPO_DIR/tests/ground" -v
+diagnostics_output="$(mktemp -d /tmp/kfsw-diagnostics.XXXXXX)/run"
+"$KFSW_REPO_DIR/../.venv/bin/python" "$KFSW_REPO_DIR/tests/diagnostics-smoke.py" \
+	--executable "$KFSW_REPO_DIR/../build/linux/zephyr/zephyr.exe" --output "$diagnostics_output"
 echo "INTEGRATION: shell and local PARAM"
 "$KFSW_REPO_DIR/tests/shell-smoke.sh"
 

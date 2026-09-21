@@ -344,3 +344,36 @@ writable because the module doesn't use SiK command mode.
   ping in both directions and the counters.
 
 Radio settings and commands are in `tests/hil/radio-uhf/holybro/README.md`.
+
+## Saving and replaying HK
+
+From `k-fsw`, capture accepted HK samples to a new JSONL file:
+
+```bash
+tools/kfsw-linux hk --device /dev/pts/7 --node 1 --listen --capture hk.jsonl --yamcs none
+tools/kfsw-linux hk --replay hk.jsonl --yamcs 127.0.0.1:10015
+```
+
+Each version-1 record contains the source node, host receipt time in milliseconds,
+and original HK bytes. Replay opens no serial device and sends the saved samples
+in file order without delays. The Yamcs envelope uses the original sample time,
+or the saved receipt time when the node's clock was unset. An invalid or
+truncated record stops replay; earlier records may already have been sent.
+
+Distinct reports with the same sequence number are kept. Exact duplicate
+samples from the same node are suppressed for up to 60 seconds, within a
+1024-entry window. A changed timestamp or value makes a sample distinct. There
+is no boot identifier on the wire, so a byte-identical sample after a reset
+cannot be distinguished until it leaves that window. Captures contain samples
+accepted after this filtering, not every raw frame on the link.
+
+Polling counts only matching replies towards `--count`; unrelated beacons can
+still be captured. An incomplete `--once` poll exits unsuccessfully and retains
+any accepted samples. Continuous polling reports the timeout and retries after
+`--interval`. Passive listening stays active between receive windows.
+
+The bridge checks framing, CRCs, HK version, flags and size bounds. It cannot
+verify each value's width without the report definition; keep the matching
+report YAML with a capture. JSONL files grow with accepted samples, so stop or
+rotate captures between runs. Live serial access needs PySerial; offline replay
+uses only Python's standard library.

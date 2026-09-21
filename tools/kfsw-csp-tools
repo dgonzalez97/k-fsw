@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+tools_dir="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+workspace="$(dirname "$(dirname "$tools_dir")")"
+source_dir="${KFSW_CSP_TOOLS_DIR:-$workspace/tools/kfsw-csp-tools}"
+binary="$source_dir/target/release/csp-kiss"
+
+if [[ "${1:-}" == build ]]; then
+	if [[ $# -ne 1 ]]; then
+		echo 'Usage: tools/kfsw-csp-tools build' >&2
+		exit 2
+	fi
+	if [[ ! -f "$source_dir/Cargo.toml" ]]; then
+		echo 'Fetch the optional tool first: west update kfsw-csp-tools' >&2
+		exit 1
+	fi
+	cargo="$(command -v cargo || true)"
+	if [[ -z "$cargo" && -x "$HOME/.cargo/bin/cargo" ]]; then
+		cargo="$HOME/.cargo/bin/cargo"
+	fi
+	if [[ -z "$cargo" ]]; then
+		echo 'Rust 1.88 or newer is required; install it with rustup.' >&2
+		exit 1
+	fi
+	exec "$cargo" build --locked --release --manifest-path "$source_dir/Cargo.toml" --bin csp-kiss
+fi
+
+if [[ ! -x "$binary" ]]; then
+	echo 'Build the host tool first: tools/kfsw-linux csp-tools build' >&2
+	exit 1
+fi
+exec "$binary" "$@"
