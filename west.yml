@@ -12,7 +12,7 @@ manifest:
   projects:
     - name: kfsw-csp-tools
       remote: kfsw
-      revision: 98adedcd2c54f593293c79a736220d90f7b8ef88
+      revision: 45557f39c015329767cd92bd481966da2175f067
       path: tools/kfsw-csp-tools
       groups: [host-tools]
 
