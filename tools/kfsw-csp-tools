@@ -23,7 +23,12 @@ if [[ "${1:-}" == build ]]; then
 		echo 'Rust 1.88 or newer is required; install it with rustup.' >&2
 		exit 1
 	fi
-	exec "$cargo" build --locked --release --manifest-path "$source_dir/Cargo.toml" --bin csp-kiss
+	exec "$cargo" build --locked --release --manifest-path "$source_dir/Cargo.toml" --bin csp-kiss --bin csp-iperf
+fi
+
+if [[ "${1:-}" == perf ]]; then
+	shift
+	binary="$source_dir/target/release/csp-iperf"
 fi
 
 if [[ ! -x "$binary" ]]; then

@@ -17,6 +17,7 @@ usage()
 		'  run      Run KFSW-Linux with its shell on this terminal' \
 		'  hk       Capture or replay housekeeping (hk --help)' \
 		'  csp      Build or run CSP 2 KISS diagnostics (csp --help)' \
+		'  csp perf Benchmark CSP echo throughput (csp perf --help)' \
 		'  diagnostics <new-output-dir> Run native HK and CSP tool checks' \
 		'  help     Show this help'
 }

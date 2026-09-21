@@ -160,9 +160,10 @@ aggregate counters.
 ## Capturing traffic
 
 [kfsw-csp-tools](https://github.com/dgonzalez97/kfsw-csp-tools) is an optional
-host dependency pinned in `west.yml`. Its original `cspdump`, `csp-iperf` and
-`csp-ping-server` use CSP 1 over CAN/ZMQ. Their four-byte headers and original
-Wireshark dissector do not match K-FSW's CSP 2 configuration.
+host dependency pinned in `west.yml`. Its CAN/ZMQ transports, `cspdump` and
+`csp-ping-server` use CSP 1. Their four-byte headers and original Wireshark
+dissector do not match K-FSW's CSP 2 configuration. The adapted `csp-iperf`
+also supports CSP 2 over KISS.
 
 The fork's `csp-kiss` entry point supports CSP 2 directly on the native Linux
 PTY or a serial KISS link. It implements ping, CMP interface statistics,
@@ -195,6 +196,37 @@ payload, including any CSP checksum. Only KISS framing and its outer checksum
 are removed. The old CSP 1/ZMQ dissector does not decode this format. Output
 files must be new. Host-tool builds are separate from firmware builds, and
 normal west updates leave the `host-tools` group disabled.
+
+## Echo throughput and RTT
+
+```bash
+./tools/kfsw-linux csp perf --device /dev/pts/7 --dest-addr 1 \
+  --packet-size 64 --tx-rate 640 --duration 10 --reply-timeout 1 --json
+```
+
+`csp build` builds both host binaries. `perf` dispatches to `csp-iperf`; put
+`perf` before its options. It uses the node's existing ping service and does
+not change clocks or firmware configuration. The source address defaults to
+30 (`--src-addr`), baud to 115200. The source must be unused and the link must
+have only one host reader.
+
+The offered rate is CSP bytes/second, including the CSP header/checksum but
+excluding KISS framing. Replies must match both addresses, ports, a random
+run ID, sequence and the full expected payload. RTT uses host monotonic time.
+JSON reports unique replies, final loss, duplicate/reordered/late replies and
+RTT. Silence and trailing loss count as loss; a reordered reply within its
+deadline recovers its gap. The run ends after the sending duration and reply
+drain, exiting 2 on any loss. Invalid rates fail before the device is opened.
+
+TX byte rate uses the sending window; RX rates include the final drain and
+its duration is reported as `elapsed_seconds`. Actual rate can be lower than
+the offered rate. Native PTYs verify protocol behavior, not physical capacity.
+Use 64-byte packets for the smoke test; larger sizes must fit the node's CSP
+buffers. `--reply-size` is for a separately configured CSP 1 echo server;
+K-FSW's standard ping echoes the original size. CAN/ZMQ remain CSP 1 only.
+See `_agents/csp-iperf.md` for validation notes and
+`tests/hil/diagnostics/README.md` for the bench fixture in the application
+checkout.
 
 ## Remote text logs and discovery
 
