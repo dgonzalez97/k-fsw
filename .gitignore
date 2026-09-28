@@ -6,3 +6,6 @@ bench.env
 # Python bytecode from the ground tools
 __pycache__/
 *.pyc
+
+# Output from direct Twister runs
+twister-out*/
