@@ -11,7 +11,7 @@ From the workspace root:
 
 ```bash
 git -C k-fsw status -sb
-git -C k-fsw switch main
+git -C k-fsw switch develop
 git -C k-fsw pull --ff-only
 . .venv/bin/activate
 west manifest --validate
@@ -22,6 +22,10 @@ Dependencies normally end up detached at their manifest SHA. Create a branch
 before committing changes in one.
 
 ## Branches and commits
+
+Push changes to `develop`, directly or through a feature PR. Update `main`
+only by merging reviewed release changes; do not push commits directly to it.
+Keep unreleased work on `develop`.
 
 Use `<type>/<issue>-<slug>`, or `<type>/<slug>` when no issue exists.
 
@@ -168,8 +172,9 @@ Use `build/nucleo_l496zg/zephyr/zephyr.elf` and check that build's
 
 ## Documentation
 
-Edit guides under `docs/` and document public C APIs in their headers. Keep instructions short: command, expected result, then limits
-that affect its use. Link to upstream references for general RTOS and
+Edit guides under `docs/` and document public C APIs in their headers.
+Use short descriptions of what the code does. For procedures, give the command,
+expected result and limits that affect its use. Link to upstream references for general RTOS and
 protocol background.
 
 From the workspace root:
