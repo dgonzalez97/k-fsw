@@ -347,7 +347,8 @@ Paths must start with `/` and can't contain `..` or empty components.
 | `cmd <name>` | `[arguments]` | Run a command on this node |
 | `cmd <node> <name>` | `[arguments]` | Run a command on another node over CSP |
 | `cmd retry <node> <name>` | `[arguments]` | Reserve a ticket and retry lost exchanges within this invocation |
-| `cmd <node> ground_wtd` | `KFSWWSFK` | Feed the ground watchdog over CSP (ID 16) |
+| `cmd <node> ground_wtd` | `KFSWWSFK` | Feed the ground watchdog and return countdown/timeout (ID 16) |
+| `cmd [node] ground_wtd` | `get` | Read countdown/timeout without feeding |
 | `cmd journal_stats` | none | Persistent journal status |
 | `cmd journal_tail` | `<age>` | Committed event fields and payload; newest is 0 |
 | `cmd journal_time` | `<age>` | Sequence, event uptime and writer UTC |

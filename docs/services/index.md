@@ -556,12 +556,17 @@ possible; a composition that cannot afford that leaves the service out.
 
 `ground_wtd` restarts its countdown only on CSP command 16 with the exact text
 `KFSWWSFK`. Any subsystem may send it. Ping, telemetry, parameter traffic and
-local commands do not count. The timeout is at least five days (432000 seconds).
+local feed attempts do not count. The timeout is 2 hours to 5 days
+(7200–432000 seconds), with a 24-hour default (86400 seconds).
 
 From another node's console, feed node 2:
 
 ```text
 cmd 2 ground_wtd KFSWWSFK
+ground_wtd node=2: OK ground_wtd_cnt=86400 ground_wtd_timeout=86400
+
+cmd 2 ground_wtd get
+ground_wtd node=2: OK ground_wtd_cnt=86390 ground_wtd_timeout=86400
 ```
 
 Both nodes need `CONFIG_KFSW_GNDWDT` and `CONFIG_KFSW_COMMAND_CSP`. The command
@@ -569,17 +574,27 @@ uses port 11 by default. The magic word checks intent; it is not authentication.
 A repeated legacy request feeds again. With `cmd retry`, a duplicate ticket
 returns the saved result without feeding again.
 
-Table 35 keeps its existing names:
+`get` reads the countdown without feeding, remotely or with `cmd ground_wtd get`
+on the local console. Successful feeds return the same values as the parameters.
+Without the parameter service, a feed replies `ground_wtd restarted`; `get` still
+reads the service state.
+
+Table 35 exposes:
 
 | Parameter | Access | Meaning |
 | --- | --- | --- |
 | `gndwdt_enabled` | rw | Whether the countdown is armed |
-| `gndwdt_timeout_s` | rw | Timeout in seconds; minimum and default 432000 |
+| `ground_wtd_timeout` | rw | Timeout in seconds, 7200–432000; default 86400 |
+| `ground_wtd_cnt` | r | Seconds remaining; zero when stopped, expired or waiting to reset |
 | `gndwdt_since_s` | r | Seconds since startup or the last valid feed |
 | `gndwdt_contacts` | r | Valid feed commands accepted |
 | `gndwdt_expiries` | r | Times the timeout passed |
 | `gndwdt_last_node` | r | Sender of the last valid feed |
 | `gndwdt_running` | r | Whether the service was started |
+
+Set the timeout with `param set ground_wtd_timeout 86400` locally or
+`param set 2 ground_wtd_timeout 86400` remotely. The timeout keeps wire ID
+`35:0x04`; its former name was `gndwdt_timeout_s`. The countdown uses `35:0x18`.
 
 `gndwdt show`, `gndwdt on`, `gndwdt off` and `gndwdt timeout <seconds>` remain
 available locally. Changing the timeout or re-enabling the watchdog does not
