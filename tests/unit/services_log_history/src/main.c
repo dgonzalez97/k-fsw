@@ -8,6 +8,8 @@
 #include <kfsw/services/log.h>
 #include <kfsw/services/log_history.h>
 
+#include "log_history_internal.h"
+
 static bool force_overwrite;
 int __real_kfsw_log_history_get(uint64_t sequence, struct kfsw_log_record *record);
 int __wrap_kfsw_log_history_get(uint64_t sequence, struct kfsw_log_record *record)
@@ -259,6 +261,111 @@ static void *setup(void)
 	zassert_ok(kfsw_log_history_server_start());
 #endif
 	return NULL;
+}
+
+static struct kfsw_log_retained_header retained(uint64_t next_sequence)
+{
+	struct kfsw_log_retained_header header = {
+		.magic = KFSW_LOG_RETAINED_MAGIC,
+		.version = KFSW_LOG_RETAINED_VERSION,
+		.depth = CONFIG_KFSW_LOG_HISTORY_DEPTH,
+		.record_size = sizeof(struct kfsw_log_record),
+		.next_sequence = next_sequence,
+	};
+
+	header.crc = kfsw_log_history_header_crc(&header);
+	return header;
+}
+
+/* Leave a ring every slot of which agrees with its index, for what runs next. */
+static void restart_clean(void)
+{
+	struct kfsw_log_retained_header header = {0};
+
+	kfsw_log_history_install_retained(&header);
+	for (unsigned int i = 0; i < CONFIG_KFSW_LOG_HISTORY_DEPTH; i++) {
+		kfsw_log_warning("clean %u", i);
+	}
+}
+
+ZTEST(log_history, test_retained_ring_continues_where_it_left_off)
+{
+	struct kfsw_log_history_window bounds;
+	struct kfsw_log_record record;
+	struct kfsw_log_retained_header header;
+
+	kfsw_log_warning("before the reset");
+	bounds = window();
+	header = retained(bounds.end);
+
+	/* The records are still in RAM; the reset only cleared .bss. */
+	kfsw_log_history_install_retained(&header);
+	zassert_ok(kfsw_log_history_get(bounds.end - 1U, &record));
+	zassert_equal(strcmp(record.text, "before the reset"), 0);
+	zassert_equal(window().end, bounds.end);
+
+	kfsw_log_warning("after the reset");
+	zassert_ok(kfsw_log_history_get(bounds.end, &record));
+	zassert_equal(record.sequence, bounds.end);
+	zassert_equal(strcmp(record.text, "after the reset"), 0);
+	restart_clean();
+}
+
+ZTEST(log_history, test_retained_ring_that_does_not_belong_starts_clean)
+{
+	struct kfsw_log_retained_header rejected[6];
+	struct kfsw_log_record record;
+
+	kfsw_log_warning("before the reset");
+	rejected[0] = retained(window().end);
+	rejected[0].magic = 0U;
+	rejected[1] = retained(window().end);
+	rejected[1].version = KFSW_LOG_RETAINED_VERSION + 1U;
+	rejected[2] = retained(window().end);
+	rejected[2].depth = CONFIG_KFSW_LOG_HISTORY_DEPTH + 1U;
+	rejected[3] = retained(window().end);
+	rejected[3].record_size = sizeof(struct kfsw_log_record) - 1U;
+	rejected[4] = retained(0U);
+	/* Valid in every field, but one bit of the header did not survive. */
+	rejected[5] = retained(window().end);
+	rejected[5].crc ^= 1U;
+
+	for (size_t i = 0; i < ARRAY_SIZE(rejected); i++) {
+		struct kfsw_log_history_window bounds;
+
+		kfsw_log_history_install_retained(&rejected[i]);
+		bounds = window();
+		zassert_equal(bounds.end, 1U, "entry %zu was accepted", i);
+		zassert_equal(bounds.first, 1U);
+		zassert_equal(bounds.overwritten, 0U);
+		zassert_equal(kfsw_log_history_get(1U, &record), -ENOENT);
+	}
+	restart_clean();
+}
+
+ZTEST(log_history, test_retained_slot_that_disagrees_is_not_served)
+{
+	struct kfsw_log_history_window bounds;
+	struct kfsw_log_record record;
+	struct kfsw_log_retained_header header;
+
+	kfsw_log_warning("before the reset");
+	bounds = window();
+
+	/* The header survived a further run whose records did not. */
+	header = retained(bounds.end + CONFIG_KFSW_LOG_HISTORY_DEPTH);
+	kfsw_log_history_install_retained(&header);
+	bounds = window();
+	zassert_equal(bounds.end - bounds.first, CONFIG_KFSW_LOG_HISTORY_DEPTH);
+	for (uint64_t sequence = bounds.first; sequence < bounds.end; sequence++) {
+		zassert_equal(kfsw_log_history_get(sequence, &record), -ENOENT);
+	}
+
+	/* A fresh record is served from the same ring. */
+	kfsw_log_warning("after the reset");
+	zassert_ok(kfsw_log_history_get(bounds.end, &record));
+	zassert_equal(strcmp(record.text, "after the reset"), 0);
+	restart_clean();
 }
 
 ZTEST_SUITE(log_history, NULL, setup, before, NULL, NULL);

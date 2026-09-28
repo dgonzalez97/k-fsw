@@ -169,8 +169,16 @@ Remote records carry at most 190 text bytes to fit encrypted radio links;
 longer records set the truncation flag. Local history keeps up to 191 bytes.
 It is enabled in the Linux composition. Other CSP compositions can use
 `config/profiles/log-history.conf`. Start the server after the CSP router.
-Reads do not remove records or write flash. History and sequences restart
-on reboot. UTC is not required.
+Reads do not remove records or write flash. UTC is not required.
+
+`CONFIG_KFSW_LOG_HISTORY_RETAINED`, on by default, keeps the ring outside
+`.bss` so a reset that preserves RAM leaves the messages that explain it
+readable, and sequence numbers continue rather than restarting. The ring
+carries a magic, a version, the depth, the record size and a CRC32, all
+checked on first use; a ring that does not belong to the running image
+starts clean, and a single record whose slot disagrees reads as missing.
+A power cycle clears RAM, so nothing is retained across one. Set the option
+to `n` for a ring that always starts empty.
 
 The host `csp-kiss logs` command reads a bounded window and saves JSON lines;
 see [remote diagnostics](../communications/index.md#remote-text-logs-and-discovery).
