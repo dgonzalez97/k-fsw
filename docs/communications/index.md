@@ -130,7 +130,7 @@ show the counters since boot.
 ## Counters
 
 `csp interfaces` shows what each link carried. `csp counters` shows libcsp's
-own error counters, which are the first thing to read when a link misbehaves:
+error counters:
 
 | Counter | Raised when |
 | --- | --- |
@@ -273,7 +273,7 @@ the KISS link adds its own checksum. One request is served per connection.
 | Request (12 bytes) | version u8 = 1, minimum severity u8, count u16 (1 to 32), nonce u64 |
 | Reply header (10 bytes) | version u8 = 1, type u8, echoed nonce u64 |
 | Start, type 0 (34 bytes total) | header, first sequence u64, exclusive end sequence u64, overwritten count u64 |
-| Record, type 1 (30 to 221 bytes total) | header, sequence u64, uptime_ms u64, module u8, severity u8, truncated u8 (0/1), text length u8, text bytes |
+| Record, type 1 (30 to 220 bytes total) | header, sequence u64, uptime_ms u64, module u8, severity u8, truncated u8 (0/1), text length u8, up to 190 text bytes |
 | End, type 2 (13 bytes total) | header, status u8, sent record count u16 |
 
 End statuses: 0 finished, 1 a requested record was overwritten, 2 no packet
@@ -333,9 +333,8 @@ the parser's limit.
 
 ## KISS
 
-A UART carries bytes, not packets. KISS framing marks where each packet starts
-and ends and escapes reserved bytes, and the decoder passes complete packets
-to the router. KISS doesn't guarantee delivery or ordering; K-FSW uses CSP
+KISS frames CSP packets on a UART, escapes reserved bytes and passes decoded
+packets to the router. KISS doesn't guarantee delivery or ordering; K-FSW uses CSP
 CRC32 to detect corruption and RDP for file transfers.
 
 - KFSW-Linux uses libcsp's Zephyr USART driver on a native_sim PTY.
@@ -354,9 +353,8 @@ profiles use 500 kbit/s.
 
 ### A bus without hardware
 
-`vcan` is a kernel interface that carries CAN frames between processes on one
-host, so two Linux nodes reach each other over CSP with no controller, no
-transceiver and no wiring:
+`vcan` carries CAN frames between processes on one host. To test two Linux
+nodes without hardware:
 
 ```bash
 sudo k-fsw/tests/vcan-up.sh

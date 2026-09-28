@@ -6,7 +6,7 @@
 
 /**
  * @file ../kfsw-platform/include/kfsw/platform/storage.h
- * @brief LittleFS storage lifecycle and capacity API.
+ * @brief LittleFS setup, mount and capacity API.
  * @ingroup kfsw_platform_storage
  */
 
@@ -18,13 +18,13 @@
 
 /**
  * @file ../kfsw-comms/include/kfsw/comms/csp.h
- * @brief CSP lifecycle, route, interface, and ping API.
+ * @brief CSP setup, routes, interfaces and ping.
  * @ingroup kfsw_comms_csp
  */
 
 /**
  * @file ../kfsw-comms/include/kfsw/comms/uart.h
- * @brief Dedicated UART/KISS status and verification API.
+ * @brief UART/KISS status and peer tests.
  * @ingroup kfsw_comms_uart
  */
 

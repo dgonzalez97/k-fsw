@@ -14,7 +14,7 @@ static int handler(const struct kfsw_command_arg *args, size_t count,
 		   const struct kfsw_command_source *source, struct kfsw_command_result *out)
 {
 	ARG_UNUSED(count);
-	ARG_UNUSED(source);
+	zassert_true(source->via_csp);
 	invoked++;
 	out->status = args[0].value.u32 == 7U ? KFSW_COMMAND_OK : KFSW_COMMAND_FAILED;
 	strcpy(out->detail, "called");

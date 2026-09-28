@@ -76,7 +76,7 @@ Run `csp ping 16` from the operator node. The
 [ground guide](docs/ground/index.md) covers the configuration and the
 other ground roles.
 
-### Settings and configuration, across all nodes
+### Parameters
 
 `param tables` lists local tables; `param table <id>` prints one.
 Use `param tablelist <node>` to inspect another node.
@@ -88,7 +88,7 @@ Remote access uses [Space Inventor's libparam](https://github.com/spaceinventor/
 ### Files
 
 Uploads and downloads check size and CRC32 before committing the file.
-CSP/RDP has retransmission as an option.
+RDP handles retransmission.
 
 ![A file sent and fetched back](docs/media/file-transfer.gif)
 
@@ -144,8 +144,8 @@ cd ground-station/yamcs
 ./mvnw yamcs:run
 ```
 
-The host bridge pulls CSP parameters and forwards them to Yamcs. Report
-definitions generate both the node configuration and the mission database.
+The host bridge pulls housekeeping samples over CSP and forwards them to Yamcs.
+Report definitions generate both the node configuration and the mission database.
 Configure housekeeping through K-FSW commands.
 
 The [ground guide](docs/ground/index.md) has a working demo.
@@ -165,8 +165,8 @@ The pipeline runs:
 | `ROBOT / dry-run + software` | Every suite parses; the software-tagged cases run |
 | `DOCS / Doxygen` | The documentation builds and the API is documented |
 
-The unit suites cover each layer on its own; the integration scripts go the
-other way, booting an application image and talking to it through a ground node.
+Unit tests cover individual components. Integration tests boot application
+images and connect them through CSP.
 
 [Coverage](https://dgonzalez97.github.io/k-fsw/coverage/)
 
@@ -179,7 +179,7 @@ and records the results in an HTML report.
 
 | Suite | Needs | Covers |
 | --- | --- | --- |
-| `boot`, `uart` | Nucleo | Boot, reset cause, shell and CSP over the debug UART |
+| `boot`, `uart` | Nucleo | Boot, reset cause, ST-LINK shell and CSP over USART3 |
 | `param-tables` | Nucleo | Every table present and addressed, with the right write modes |
 | `can` | Nucleo + CAN adapter | CSP over CAN: ping, identity, remote settings and malformed requests |
 | `holybro` | Nucleo + radio pair | CSP, files, commands and events across the link |
@@ -189,8 +189,6 @@ Cases needing hardware are tagged, so the same files run in CI without
 hardware and on the bench with it. See the [testing guide](docs/testing/index.md).
 
 ![Hardware test suite running](docs/media/hardware-test-robot.gif)
-
-And the report it leaves behind:
 
 ![Robot report from a physical run](docs/media/hil-robot-report.png)
 

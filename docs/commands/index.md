@@ -347,6 +347,8 @@ Paths must start with `/` and can't contain `..` or empty components.
 | `cmd <name>` | `[arguments]` | Run a command on this node |
 | `cmd <node> <name>` | `[arguments]` | Run a command on another node over CSP |
 | `cmd retry <node> <name>` | `[arguments]` | Reserve a ticket and retry lost exchanges within this invocation |
+| `cmd <node> ground_wtd` | `KFSWWSFK` | Feed the ground watchdog and return countdown/timeout (ID 16) |
+| `cmd [node] ground_wtd` | `get` | Read countdown/timeout without feeding |
 | `cmd journal_stats` | none | Persistent journal status |
 | `cmd journal_tail` | `<age>` | Committed event fields and payload; newest is 0 |
 | `cmd journal_time` | `<age>` | Sequence, event uptime and writer UTC |
@@ -436,7 +438,7 @@ fwu flash <node>         ask a node to boot the image it received
 ```
 
 `send` and `flash` need `CONFIG_KFSW_FWU_LITE_CSP`. `fwu send` reports how many
-blocks had to be resent; a growing number means the link is getting worse.
+blocks had to be resent. Check link counters if retries increase.
 
 After a transfer, check `swap_scheduled` in `fwu status`. If it is not set,
 MCUboot has nothing to swap and boots the old image. See
@@ -476,7 +478,7 @@ The raw mask is printed as well because several causes can be latched at once;
 Ordinary commands are not retried. `cmd retry` uses a ticket to suppress
 duplicates within that invocation when `CONFIG_KFSW_COMMAND_RETRY` is enabled.
 A new invocation is a new operation. A timeout can mean the reply was lost
-after the command ran, so check the state before sending it again. Wait for `@READY`,
-send one command, check its output and wait for the prompt before the next
-one. Don't rely on the spacing of shell output; use the C APIs or the CSP
-services when a script needs a stable format.
+after the command ran, so check the state before sending it again.
+
+Wait for `@READY`, then send one command at a time and wait for the prompt.
+Use the C APIs or CSP services when a script needs a stable format.

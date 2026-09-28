@@ -9,11 +9,9 @@ and print the result.
 
 ## Communications
 
-The application sets the Kconfig values and the devicetree UARTs, then starts
-the router from `kfsw-comms`. One chosen UART gives one interface named `KISS`
-with a default route. A multi-link overlay declares several named UART/KISS
-interfaces and a route table, which libcsp parses; the application doesn't
-pick routes itself.
+Kconfig selects the links; devicetree selects their devices. The application
+starts the `kfsw-comms` router. A single UART uses `KISS` with a default route.
+Multiple interfaces need named UARTs and a route table.
 
 ## Storage
 
@@ -40,10 +38,8 @@ their own temporary flash files.
 
 ## Persistent parameters
 
-With parameters and storage enabled, the snapshot is restored after the tables
-are registered and before the CSP server starts, so a remote reader never sees
-a value that is about to change. A missing or invalid snapshot leaves the
-compiled defaults and startup continues.
+The snapshot is restored after table registration, before the CSP server
+starts. A missing or invalid snapshot leaves the compiled defaults.
 
 `/kfsw/params/parameters.dat` holds the persistent values with a versioned
 header and a CRC32. A save writes and syncs `parameters.tmp` and renames it
@@ -79,9 +75,6 @@ ftp 7 ls /flash
 `ftp generate <path> <bytes>` creates a test file and
 `ftp verify <first> <second>` compares two local files.
 
-Protocol version 1 uses paths of up to 96 bytes and 192-byte chunks. PUT and
-GET check the size and CRC32, and the receiver renames the synced `.part` file
-only after the check. A successful PUT replaces an existing file and a failed
-one leaves it unchanged. The server handles one request at a time and answers
-`busy` to the rest. Transfers can't be resumed, and the protocol is not
-compatible with other FTP or TFTP implementations.
+Transfers check size and CRC32 before replacing a file. The server handles one
+transfer at a time; others get `busy`. See the
+[service guide](../docs/services/index.md#file-transfer) for protocol limits.

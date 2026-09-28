@@ -29,11 +29,10 @@ failures=N` means some services failed to start. `@READY` marks the end of
 startup; release builds set the version and source commit explicitly, see
 @ref development.
 
-### What was compiled into an image
+### Build revisions
 
-`boot_image` carries `git describe` of `k-fsw` alone, so two images built from
-the same tag with different dependency pins report the same version. The image
-also carries the short revision of every repository that went into it:
+`boot_image` identifies the `k-fsw` revision. `boot_revisions` also lists the
+platform, services, communications and modules revisions used in the build:
 
 ```text
 kfsw:~$ version
@@ -41,10 +40,8 @@ K-FSW: v1.0.1-26-g1ba9630
 Revisions: app:1ba96309fb plat:31818d2c37 svc:919c4c43ba comms:d35abd4986 mod:b476a0c9ed
 ```
 
-The same string is `boot_revisions` in table 32, so a ground station reads it
-like any other parameter. A repository that had uncommitted changes when it was
-built gets a trailing `+`, which is how a bench image is told apart from a
-built one.
+Read `boot_revisions` from table 32. A trailing `+` marks a repository with
+uncommitted changes at build time.
 
 ## Housekeeping
 
@@ -84,8 +81,8 @@ event record. There are no loops or jumps.
 
 `wait-until <unix-seconds> <late-tolerance-seconds>` waits on the existing UTC
 clock. For example, `wait-until 1900000002 1` permits a step at that UTC second
-or up to one second late. The clock must already be valid; use the ordinary
-clock set/get commands. No time synchronization is started by a procedure.
+or up to one second late. Set the clock before starting the procedure; it does
+not synchronize time.
 The target range is 1..2147483647, matching the current CSP clock.
 
 The initial wait and late tolerance must not exceed `CONFIG_KFSW_FBO_WAIT_MAX_S`
@@ -94,8 +91,8 @@ line due or too late; a backward step keeps waiting, with a monotonic deadline
 of at most the configured maximum from entry. An unset/failed clock aborts the
 line, including if it becomes unset while waiting. `fbo stop` wakes the wait
 immediately; it cannot be bypassed by `on-error continue`. Other errors follow
-the procedure's usual `on-error` policy. This is a cancellable procedure wait,
-not a hard real-time scheduler or a schedule that survives restart.
+the procedure's `on-error` policy. Execution time is not guaranteed, and
+pending waits are lost at restart.
 
 ## Persistent event journal
 
@@ -114,9 +111,9 @@ cmd 2 journal_tail 0
 Age 0 is the newest committed record. `journal_tail` returns boot identity,
 source, event ID, severity and the original payload in hex. `journal_time`
 returns the journal sequence, original event uptime in microseconds, UTC and
-its validity. UTC is sampled by the writer, not in the event callback; uptime
-is the event's timestamp. Ages move as records arrive. To line up separate responses, read
-`journal_time` before and after the tail and check the sequence.
+its validity. Uptime is captured with the event; UTC is sampled by the writer.
+New records shift the ages. Read `journal_time` before and after the tail and
+check that the sequence is unchanged.
 The C read API returns all fields from one record. Reads do not consume data.
 
 The writer wakes every `CONFIG_KFSW_JOURNAL_FLUSH_MS` (1000 ms by default),
@@ -138,7 +135,7 @@ checksums and incomplete trailing data, and resumes after the largest valid
 sequence. It never reformats a corrupt or incompatible header. Capacity is
 part of the header: changing it requires an explicit migration/new journal.
 Boot identities advance from retained history and restart at one on a new
-volume. Do not treat them as globally unique identifiers.
+volume; they are unique only within that history.
 
 Write failures retain one pending record and retry its slot after rescanning,
 so a failed sync does not create two journal entries. Subsequent events can
@@ -164,7 +161,7 @@ stays intact for scripts. `log_color` turns colour off.
 (32 records by default, configurable from 1 to 128). `log history` prints up
 to 32 records locally. Each has a sequence, uptime in milliseconds, module,
 severity and up to 191 text bytes; longer messages are marked truncated.
-The existing compile-time and runtime filters apply before retention.
+Log filters apply before retention.
 Zephyr logs, driver output and shell responses are not captured.
 
 `CONFIG_KFSW_LOG_HISTORY_CSP` serves the history on CSP port 16 by default.
@@ -188,6 +185,10 @@ defines its own table, with the storage, validators and change callbacks. The
 application passes the enabled tables to `kfsw_param_init()`, which checks
 them and builds a sorted index. Persistence and the CSP adapter use the same
 index.
+
+Local writes call `validate` before updating storage, then call `changed`.
+A rejected local write keeps the previous value. Change callbacks run after
+the write and cannot reject it.
 
 ```text
 KFSW_PARAM              local tables and API
@@ -272,14 +273,11 @@ Reads and writes use caller buffers; nothing is allocated.
 
 ### Sampled values
 
-A definition can have a `sample` callback that refreshes the value just before
-it is read. The CSP server calls it before answering a remote read as well.
-Sampling runs under the table lock, so the callback must not call the
-parameter API.
+`sample` refreshes a value before a local or remote read. It runs under the
+table lock and must not call the parameter API.
 
-A remote write to a sampled parameter is applied from the stored value
-(`kfsw_param_read_stored_entry()`) without sampling again, so the new value is
-not overwritten.
+Remote writes use `kfsw_param_read_stored_entry()` to skip sampling, which
+would otherwise overwrite the incoming value before `changed` applies it.
 
 ### Console echo and colour
 
@@ -471,13 +469,14 @@ ground   ID 2, port 11  found by ID
 
 Commands are registered at build time as sets and the registry is fixed at
 startup. Duplicate IDs or names, missing handlers and too many arguments are
-rejected. Handlers run on the command thread, one at a time, never in a CSP
-receive context.
+rejected. Handlers run in the caller's thread under the command mutex. Remote
+requests use the command server thread; local calls use the shell or calling
+thread. Handlers do not run on the CSP router thread.
 
-A legacy version 1 message has a 12-byte big-endian header (version, opcode, status, argument
-count, command ID, request ID and payload size) followed by type-length-value
-arguments. Every length is checked before use, and a message always fits one
-CSP packet.
+A version 1 message has a 12-byte big-endian header: version, opcode, status,
+argument count, command ID, request ID and payload size. Type-length-value
+arguments follow the header. Every length is checked before use, and a message
+always fits one CSP packet.
 
 There is no authentication. The request carries the source node and an
 authentication flag that is always false. See @ref kfsw_services_command.
@@ -491,9 +490,9 @@ not commands.
 
 `CONFIG_KFSW_COMMAND_RETRY` adds `cmd retry <node> <name> [arguments]`.
 It is enabled in the Linux image. Both peers must support it and have working
-entropy. A protected invocation first reserves a ticket, then executes it;
-up to three attempts per phase reuse the same request bytes. An older peer
-fails the protected call; the client never falls back to legacy on its own.
+entropy. An invocation first reserves a ticket, then executes it;
+up to three attempts per phase reuse the same request bytes. An unsupported
+peer causes the call to fail. There is no fallback to the legacy protocol.
 
 Version 2 adds an eight-byte token to the header (20 bytes total), preserving
 argument encoding. Opcodes 3/4 prepare and return a ticket; opcode 5 executes
@@ -506,8 +505,8 @@ extending its deadline. A repeated execute returns the recorded result.
 The default cache holds eight reservations/results for 60 seconds from
 reservation. New calls get BUSY when all slots are live. Expired or unknown
 tickets get UNAVAILABLE and cannot execute. A server restart discards all
-tickets. A failed entropy read prevents allocation. Tickets suppress duplicates. They are not authentication, and they do not
-make an effect happen exactly once.
+tickets. A failed entropy read prevents allocation. Tickets suppress duplicates
+within their lifetime; they provide no authentication or guarantee across resets.
 
 Typing the command again starts a new operation. If all result attempts fail,
 or a handler resets the node, the outcome can remain unknown; inspect the
@@ -521,7 +520,7 @@ The resource monitor periodically reads the kernel's thread list and records
 stack use. Threads need no registration. Check both the percentage used and
 the bytes left, under the workload the node will run.
 
-Table 36 carries what it found:
+Table 36 exposes the measurements:
 
 | Parameter | Access | Meaning |
 | --- | --- | --- |
@@ -535,74 +534,84 @@ Table 36 carries what it found:
 | `stack_threads` | r | Threads the last sweep could read |
 | `stack_worst_thread` | r | Thread holding the highest stack use |
 
-An event is raised when a sweep first reaches the alert level, and not again
-until a later sweep is back below it, so a node that stays busy does not fill
-the ring with the same record.
+An event is raised when stack use reaches the alert threshold. Another alert
+requires a sweep below the threshold first.
 
 From the shell: `resmon show`, `resmon sample` to sweep now, and
 `resmon alert <percent>`.
 
-The figures are real on an MCU target. On the Linux target a thread runs on a
-host stack and the declared one is ignored, so what it reports there exercises
-the sweep, the counters and the event without measuring anything; read those
-numbers as a check that the service works, not as headroom.
+MCU targets measure the configured thread stacks. Native simulation uses host
+stacks, so its reported values do not measure stack headroom.
 
 `KFSW_RESMON` selects `INIT_STACKS`, `THREAD_STACK_INFO`, `THREAD_MONITOR` and
-`THREAD_NAME`. Stacks are filled with a known value when a thread is created
-and the kernel keeps its thread list, which is what makes the measurement
-possible; a composition that cannot afford that leaves the service out.
+`THREAD_NAME`. Measurements use the initial stack fill and the kernel thread
+list. Disable the service if the target cannot afford that overhead.
 
 ## Ground watchdog
 
-A node can be running, healthy by its own measure, and still unreachable: a
-route that no longer resolves, a link left in the wrong configuration, a
-service that stopped answering. Health monitoring cannot see any of that,
-because every component inside the node is reporting normally.
+`ground_wtd` restarts its countdown only on CSP command 16 with the exact text
+`KFSWWSFK`. Any subsystem may send it. Ping, telemetry, parameter traffic and
+local feed attempts do not count. The timeout is 2 hours to 5 days
+(7200–432000 seconds), with a 24-hour default (86400 seconds).
 
-The ground watchdog resets the node when it hears nothing from anyone. Contact
-is any packet the CSP router accepts from another node, counted through a hook
-in `kfsw-comms`, so no service has to report anything and a packet to any port
-holds the countdown open. Packets this node sends to itself do not count.
+From another node's console, feed node 2:
 
 ```text
-packet from another node -> router -> contact -> countdown restarts
-no packet for gndwdt_timeout_s   ->   event, log line, then a reset
+cmd 2 ground_wtd KFSWWSFK
+ground_wtd node=2: OK ground_wtd_cnt=86400 ground_wtd_timeout=86400
+
+cmd 2 ground_wtd get
+ground_wtd node=2: OK ground_wtd_cnt=86390 ground_wtd_timeout=86400
 ```
 
-Table 35 carries the timer:
+Both nodes need `CONFIG_KFSW_GNDWDT` and `CONFIG_KFSW_COMMAND_CSP`. The command
+uses port 11 by default. The magic word checks intent; it is not authentication.
+A repeated legacy request feeds again. With `cmd retry`, a duplicate ticket
+returns the saved result without feeding again.
+
+`get` reads the countdown without feeding, remotely or with `cmd ground_wtd get`
+on the local console. Successful feeds return the same values as the parameters.
+Without the parameter service, a feed replies `ground_wtd restarted`; `get` still
+reads the service state.
+
+Table 35 exposes:
 
 | Parameter | Access | Meaning |
 | --- | --- | --- |
 | `gndwdt_enabled` | rw | Whether the countdown is armed |
-| `gndwdt_timeout_s` | rw | Silence allowed, at least five days; default 432000 seconds |
-| `gndwdt_since_s` | r | Seconds since the last contact |
-| `gndwdt_contacts` | r | Packets counted as contact |
+| `ground_wtd_timeout` | rw | Timeout in seconds, 7200–432000; default 86400 |
+| `ground_wtd_cnt` | r | Seconds remaining; zero when stopped, expired or waiting to reset |
+| `gndwdt_since_s` | r | Seconds since startup or the last valid feed |
+| `gndwdt_contacts` | r | Valid feed commands accepted |
 | `gndwdt_expiries` | r | Times the timeout passed |
-| `gndwdt_last_node` | r | Node of the most recent contact |
+| `gndwdt_last_node` | r | Sender of the last valid feed |
 | `gndwdt_running` | r | Whether the service was started |
 
-Writing `gndwdt_timeout_s` restarts the countdown, so raising it never resets a
-node for silence it has already been through.
-`CONFIG_KFSW_GNDWDT_TIMEOUT_MIN_S` can raise the floor above five days.
-Build-time and runtime values below that floor are rejected.
+Set the timeout with `param set ground_wtd_timeout 86400` locally or
+`param set 2 ground_wtd_timeout 86400` remotely. The timeout keeps wire ID
+`35:0x04`; its former name was `gndwdt_timeout_s`. The countdown uses `35:0x18`.
 
-From the shell: `gndwdt show`, `gndwdt on`, `gndwdt off`,
-`gndwdt timeout <seconds>` and `gndwdt contact`, which records contact without
-a packet so a bench can hold the countdown open.
+`gndwdt show`, `gndwdt on`, `gndwdt off` and `gndwdt timeout <seconds>` remain
+available locally. Changing the timeout or re-enabling the watchdog does not
+restart its countdown. A node re-enabled after its deadline can reset at the
+next check. Send a valid feed first. A reset already queued is not cancelled.
+
+TODO: define the second watchdog's feed source and timeout. Keep it separate
+from `ground_wtd`; ordinary incoming traffic must not feed the ground watchdog.
+The existing hardware watchdog and component health checks are unchanged.
 
 ## Event record
 
 `CONFIG_KFSW_EVENT` keeps events in a RAM ring. Each event has an ID, a
-monotonic timestamp, a sequence number, a severity and a small payload. Logs
-are for the console; events are for results you want to read later.
+monotonic timestamp, a sequence number, a severity and a small payload. Event
+IDs and payloads can be decoded without parsing console text.
 
 ```text
 log    "FTP put node=2 destination=/uplink/test.txt: PASS bytes=256 crc32=0ce9d363"
 event  source=ftp id=1 payload={node:2, bytes:256, crc32:0x0ce9d363}
 ```
 
-Events are small enough to downlink, a gap in the sequence shows lost records,
-and rewording a log message doesn't break ground tools.
+Sequence gaps identify missing events.
 
 IDs and payload layouts are declared in each producer's public header. Boot
 records the reset cause, the command service records every dispatch, and file

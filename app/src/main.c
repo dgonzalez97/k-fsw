@@ -86,18 +86,6 @@
 #endif
 #endif
 
-#if CONFIG_KFSW_GNDWDT && CONFIG_KFSW_CSP
-/* A packet from any other node counts as contact. Runs on the router thread. */
-static void gndwdt_inbound_packet(uint16_t source_node, uint8_t destination_port)
-{
-	ARG_UNUSED(destination_port);
-
-	if (source_node != CONFIG_KFSW_CSP_ADDRESS) {
-		kfsw_gndwdt_contact(source_node);
-	}
-}
-#endif
-
 int main(void)
 {
 	uint32_t startup_failures = 0;
@@ -256,6 +244,9 @@ int main(void)
 #if CONFIG_KFSW_COMMAND
 	const struct kfsw_command_definition_set *const command_sets[] = {
 		&kfsw_app_command_definitions,
+#if CONFIG_KFSW_GNDWDT
+		&kfsw_gndwdt_command_definitions,
+#endif
 	};
 
 	result = kfsw_command_init(command_sets, ARRAY_SIZE(command_sets));
@@ -449,9 +440,6 @@ int main(void)
 #endif
 
 #if CONFIG_KFSW_GNDWDT
-#if CONFIG_KFSW_CSP
-	kfsw_csp_set_inbound_hook(gndwdt_inbound_packet);
-#endif
 	result = kfsw_gndwdt_start();
 	if (result != 0) {
 		startup_failures++;

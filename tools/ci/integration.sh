@@ -32,6 +32,12 @@ echo "INTEGRATION: ground tools and HK capture/replay"
 diagnostics_output="$(mktemp -d /tmp/kfsw-diagnostics.XXXXXX)/run"
 "$kfsw_python" "$KFSW_REPO_DIR/tests/diagnostics-smoke.py" \
 	--executable "$KFSW_REPO_DIR/../build/linux/zephyr/zephyr.exe" --output "$diagnostics_output"
+echo "INTEGRATION: explicit ground watchdog command"
+gndwdt_output="$(mktemp -d /tmp/kfsw-gndwdt.XXXXXX)"
+"$kfsw_python" "$KFSW_REPO_DIR/tests/gndwdt-smoke.py" \
+	--executable "$KFSW_REPO_DIR/../build/linux/zephyr/zephyr.exe" \
+	--output "$gndwdt_output/run"
+rm -rf -- "$gndwdt_output"
 echo "INTEGRATION: shell and local PARAM"
 "$KFSW_REPO_DIR/tests/shell-smoke.sh"
 

@@ -6,6 +6,18 @@ tests:
       - services
       - gndwdt
     platform_allow:
+      - native_sim/native
       - native_sim/native/64
     integration_platforms:
+      - native_sim/native
+      - native_sim/native/64
+  kfsw.services.gndwdt.parameters:
+    tags: [unit, services, gndwdt]
+    extra_configs:
+      - CONFIG_KFSW_PARAM=y
+    platform_allow:
+      - native_sim/native
+      - native_sim/native/64
+    integration_platforms:
+      - native_sim/native
       - native_sim/native/64
