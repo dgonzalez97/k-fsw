@@ -25,7 +25,10 @@ before committing changes in one.
 
 Push changes to `develop`, directly or through a feature PR. Update `main`
 only by merging reviewed release changes; do not push commits directly to it.
-Tag the release merge commit on `main`. Keep unreleased work on `develop`.
+Wait for all required CI/CD checks to pass on the exact release merge commit
+before tagging it. A passing parent or branch build is not enough. Fix failed
+checks through `develop` and merge the correction before releasing.
+Keep unreleased work on `develop`; do not move published tags.
 
 Use `<type>/<issue>-<slug>`, or `<type>/<slug>` when no issue exists.
 
