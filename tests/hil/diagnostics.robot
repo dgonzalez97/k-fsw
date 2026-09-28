@@ -3,7 +3,7 @@ Documentation    HK capture/replay, remote text logs and CSP 2 discovery/interfa
 Resource         resources/common.resource
 
 *** Variables ***
-${DIAGNOSTICS_PYTHON}    ${KFSW_REPO_DIR}/../.venv/bin/python
+${DIAGNOSTICS_PYTHON}    ${KFSW_PYTHON}
 ${DIAGNOSTICS_SCRIPT}    ${KFSW_REPO_DIR}/tests/diagnostics-smoke.py
 ${CSP_TOOL}              %{KFSW_CSP_TOOLS_TEST_BINARY=}
 ${BENCH_SHELL}           %{KFSW_DIAGNOSTICS_SHELL=}

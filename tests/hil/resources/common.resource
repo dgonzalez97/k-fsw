@@ -4,6 +4,7 @@ Library    Process
 
 *** Variables ***
 ${KFSW_REPO_DIR}      %{KFSW_REPO_DIR}
+${KFSW_PYTHON}        ${{__import__('sys').executable}}
 ${DEBUG_SERIAL}       %{KFSW_DEBUG_SERIAL=/dev/ttyACM0}
 ${FTDI_DEVICE}        %{KFSW_FTDI_DEVICE=}
 ${HOLYBRO_RADIO}      %{KGROUND_HOLYBRO_DEVICE=}

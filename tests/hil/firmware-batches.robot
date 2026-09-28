@@ -12,7 +12,7 @@ ${BATCH_BAUD}     %{KFSW_DIAGNOSTICS_BAUD=115200}
 Command Retries Execute Once Despite Lost Replies
     [Tags]    software    firmware-batches    command-retry
     ${result}=    Run Process
-    ...    ${KFSW_REPO_DIR}/../.venv/bin/python    ${KFSW_REPO_DIR}/tests/command-retry-smoke.py
+    ...    ${KFSW_PYTHON}    ${KFSW_REPO_DIR}/tests/command-retry-smoke.py
     ...    --executable    ${KFSW_REPO_DIR}/../build/linux/zephyr/zephyr.exe
     ...    --output    ${OUTPUT DIR}/command-retry-native
     ...    stderr=STDOUT    timeout=45
@@ -22,7 +22,7 @@ Board Rejects Duplicate Command Execution
     [Tags]    physical    firmware-batches    command-retry
     Skip If    not $BATCH_SHELL or not $BATCH_KISS    Set explicit shell and KISS devices.
     ${result}=    Run Process
-    ...    ${KFSW_REPO_DIR}/../.venv/bin/python    ${KFSW_REPO_DIR}/tests/command-retry-smoke.py
+    ...    ${KFSW_PYTHON}    ${KFSW_REPO_DIR}/tests/command-retry-smoke.py
     ...    --serial    ${BATCH_SHELL}    --kiss-device    ${BATCH_KISS}
     ...    --node    ${BATCH_NODE}    --baud    ${BATCH_BAUD}
     ...    --output    ${OUTPUT DIR}/command-retry-board
@@ -32,7 +32,7 @@ Board Rejects Duplicate Command Execution
 UTC Procedures Run And Cancel On Linux
     [Tags]    software    firmware-batches    fbo-utc
     ${result}=    Run Process
-    ...    ${KFSW_REPO_DIR}/../.venv/bin/python    ${KFSW_REPO_DIR}/tests/fbo-utc-smoke.py
+    ...    ${KFSW_PYTHON}    ${KFSW_REPO_DIR}/tests/fbo-utc-smoke.py
     ...    --executable    ${KFSW_REPO_DIR}/../build/linux/zephyr/zephyr.exe
     ...    --output    ${OUTPUT DIR}/fbo-utc-native
     ...    stderr=STDOUT    timeout=45
@@ -42,7 +42,7 @@ UTC Procedures Run And Cancel On A Dedicated Board
     [Tags]    physical    firmware-batches    fbo-utc
     Skip If    not $BATCH_SHELL    Set an explicit dedicated bench console.
     ${result}=    Run Process
-    ...    ${KFSW_REPO_DIR}/../.venv/bin/python    ${KFSW_REPO_DIR}/tests/fbo-utc-smoke.py
+    ...    ${KFSW_PYTHON}    ${KFSW_REPO_DIR}/tests/fbo-utc-smoke.py
     ...    --serial    ${BATCH_SHELL}    --output    ${OUTPUT DIR}/fbo-utc-board
     ...    stderr=STDOUT    timeout=45
     HIL Command Should Pass    ${result}    FBO UTC SMOKE RESULT: PASS
@@ -50,7 +50,7 @@ UTC Procedures Run And Cancel On A Dedicated Board
 Journal Retains Events Across Linux Process Restarts
     [Tags]    software    firmware-batches    journal
     ${result}=    Run Process
-    ...    ${KFSW_REPO_DIR}/../.venv/bin/python    ${KFSW_REPO_DIR}/tests/journal-smoke.py
+    ...    ${KFSW_PYTHON}    ${KFSW_REPO_DIR}/tests/journal-smoke.py
     ...    --executable    ${KFSW_REPO_DIR}/../build/linux/zephyr/zephyr.exe
     ...    --output    ${OUTPUT DIR}/journal-native
     ...    stderr=STDOUT    timeout=45
@@ -60,7 +60,7 @@ Board Commits And Returns An Important Event
     [Tags]    physical    firmware-batches    journal
     Skip If    not $BATCH_SHELL or not $BATCH_KISS    Set explicit shell and KISS devices.
     ${result}=    Run Process
-    ...    ${KFSW_REPO_DIR}/../.venv/bin/python    ${KFSW_REPO_DIR}/tests/journal-smoke.py
+    ...    ${KFSW_PYTHON}    ${KFSW_REPO_DIR}/tests/journal-smoke.py
     ...    --serial    ${BATCH_SHELL}    --kiss-device    ${BATCH_KISS}
     ...    --node    ${BATCH_NODE}    --baud    ${BATCH_BAUD}
     ...    --output    ${OUTPUT DIR}/journal-board
