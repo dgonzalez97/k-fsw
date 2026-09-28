@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# Bring up a virtual CAN interface for the software CAN tests. Needs root;
-# everything else runs as a normal user. Nothing physical is involved: vcan is
-# a kernel interface that carries frames between processes on this host.
+# Bring up vcan for software CAN tests. This setup needs root; the tests do not.
 set -euo pipefail
 
 interface="${1:-vcan0}"

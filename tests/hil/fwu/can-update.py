@@ -101,14 +101,7 @@ def remote_revision(ground):
 
 
 def check_link(ground, board, attempts=3):
-    """Ping both ways, retrying the ground's first attempt.
-
-    A ground node that has just started has not yet put anything on the bus,
-    and its first ping can be lost while the interface settles: the same ping
-    succeeds a second later. Failing the whole acceptance on it reports a link
-    fault that is not there, so the first direction is retried and only a
-    repeated failure is believed.
-    """
+    """Ping both ways, allowing startup retries from ground to flight."""
     for attempt in range(attempts):
         try:
             ground.run(f"csp ping {FLIGHT}", f"CSP ping {FLIGHT}: success")

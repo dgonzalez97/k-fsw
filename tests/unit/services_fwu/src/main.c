@@ -137,9 +137,7 @@ ZTEST(services_fwu, test_write_offset_skips_a_whole_sector)
 
 ZTEST(services_fwu, test_max_size_reserves_the_offset_and_the_trailer)
 {
-	/* The usable image is the partition less the swap offset at the front
-	 * and the bootloader's trailer at the back. Getting this wrong lets a
-	 * maximum-sized image overwrite the metadata that says it is there.
+	/* The size limit must reserve both the swap offset and bootloader trailer.
 	 */
 	uint32_t expected = FWU_PARTITION_SIZE - 4096U - 4096U;
 
@@ -404,10 +402,7 @@ ZTEST(services_fwu, test_a_new_transfer_can_follow_a_failure)
 
 ZTEST(services_fwu, test_a_single_byte_image_is_accepted)
 {
-	/* One byte is smaller than any flash write block, so it exists only in
-	 * the stream buffer until the flush at finish. If the flush were
-	 * missed, the slot would be left erased and the bootloader would find
-	 * nothing.
+	/* A one-byte image stays buffered until finish; verify that finish flushes it.
 	 */
 	uint32_t crc = crc32_ieee(test_image, 1U);
 	uint8_t readback[4];

@@ -5,7 +5,7 @@ get_filename_component(KFSW_WORKSPACE_ROOT
     ABSOLUTE
 )
 
-# Keep the west-managed module composition explicit for every build.
+# Select the west modules used by this application.
 list(APPEND ZEPHYR_EXTRA_MODULES
     "${KFSW_WORKSPACE_ROOT}/kfsw-platform"
     "${KFSW_WORKSPACE_ROOT}/kfsw-comms/third_party/libcsp"

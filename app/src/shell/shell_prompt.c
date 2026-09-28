@@ -21,8 +21,7 @@ void kfsw_shell_prompt_apply(void)
 		return;
 	}
 
-	/* The reset sits after the prompt's own trailing space, so the prompt
-	 * text stays one contiguous run for anything matching on it.
+	/* Keep the prompt text contiguous for console parsers.
 	 */
 	(void)snprintk(colored_prompt, sizeof(colored_prompt), "%s%s%s", KFSW_PROMPT_JADE,
 		       CONFIG_SHELL_PROMPT_UART, KFSW_PROMPT_RESET);

@@ -119,7 +119,7 @@ ZTEST(kfsw_hk_collector, test_nothing_is_collected_until_the_node_knows_the_time
 	zassert_equal(depth, 0U, "the ring filled while the clock was missing");
 }
 
-/* By hand it still works, and the sample says it has no time. */
+/* Manual collection must set the missing-clock flag. */
 ZTEST(kfsw_hk_collector, test_collecting_by_hand_works_without_a_clock)
 {
 	struct kfsw_hk_sample sample;
@@ -132,7 +132,7 @@ ZTEST(kfsw_hk_collector, test_collecting_by_hand_works_without_a_clock)
 	zassert_equal(sample.seconds, 0U, "an unset clock produced a timestamp");
 }
 
-/* And once the time arrives, the schedule starts on its own. */
+/* Setting the clock must start periodic collection. */
 ZTEST(kfsw_hk_collector, test_the_schedule_starts_when_the_clock_arrives)
 {
 	uint32_t before;

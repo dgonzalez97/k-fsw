@@ -311,7 +311,7 @@ ZTEST(kfsw_ftp_server, test_listing_something_that_is_not_there_says_so)
 			  "a directory that does not exist was listed");
 }
 
-/* A download answers with what it is about to send before it sends it. */
+/* GET_INFO must precede the file data. */
 ZTEST(kfsw_ftp_server, test_a_download_announces_the_file_first)
 {
 	write_file(KFSW_FTP_STORAGE_ROOT "/download.bin", "hello ftp");

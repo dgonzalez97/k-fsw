@@ -51,8 +51,7 @@ KFSW_TWISTER_OUT_DIR="$twister_out_dir" \
 
 mv "$twister_out_dir/coverage" "$html_dir"
 
-# gcovr writes an index and exits 0 even when it measured nothing, so a written
-# report is not evidence of a measured one.
+# gcovr can exit successfully with no coverage data; check the totals.
 summary="$twister_out_dir/coverage_summary.json"
 measured="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["line_total"])' \
 	"$summary" 2>/dev/null || echo 0)"

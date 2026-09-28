@@ -1,8 +1,6 @@
 /* The repository layout, rendered to SVG by tools/docs/diagrams.sh.
  *
- * Colours are given for both themes by using mid-tones that hold on a white
- * page and a dark one, since GitHub picks the reader's theme and an SVG cannot
- * ask which it got.
+ * Colours must remain legible on light and dark backgrounds.
  */
 digraph kfsw {
 	bgcolor="transparent";

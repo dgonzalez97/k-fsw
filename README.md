@@ -152,41 +152,18 @@ The [ground guide](docs/ground/index.md) has a working demo.
 
 ## Testing
 
-The pipeline runs:
+CI builds Linux and NUCLEO and runs unit, integration, Robot, memory, quality,
+and documentation checks. From the workspace root:
 
-| Job | What it checks |
-| --- | --- |
-| `BUILD / linux`, `BUILD / nucleo_l496zg` | Both full targets build, plus a CSP-disabled composition |
-| `QUALITY` | clang-format and cppcheck over the sources |
-| `UNIT / Twister` | Component tests on native simulation |
-| `INTEGRATION / software` | Smoke scripts driving full images |
-| `MEMORY / Valgrind` | The hosted image under Valgrind |
-| `UNDEFINED / UBSan` | Unit suites with undefined-behaviour checks |
-| `ROBOT / dry-run + software` | Every suite parses; the software-tagged cases run |
-| `DOCS / Doxygen` | The documentation builds and the API is documented |
+```bash
+./k-fsw/tools/ci/all.sh
+```
 
-Unit tests cover individual components. Integration tests boot application
-images and connect them through CSP.
+Bench tests cover CAN, radio, parameters and firmware updates. Robot drives
+the console and records the results; hardware cases are excluded from CI.
 
+[Test commands and bench setup](docs/testing/index.md) |
 [Coverage](https://dgonzalez97.github.io/k-fsw/coverage/)
-
-### Hardware in the loop
-
-[Robot Framework](https://robotframework.org/) drives the physical suites
-through [robot-terminal-runner](https://github.com/dgonzalez97/robot-terminal-runner),
-a submodule under `tests/platform/`. It sends shell commands through tmux
-and records the results in an HTML report.
-
-| Suite | Needs | Covers |
-| --- | --- | --- |
-| `boot`, `uart` | Nucleo | Boot, reset cause, ST-LINK shell and CSP over USART3 |
-| `param-tables` | Nucleo | Every table present and addressed, with the right write modes |
-| `can` | Nucleo + CAN adapter | CSP over CAN: ping, identity, remote settings and malformed requests |
-| `holybro` | Nucleo + radio pair | CSP, files, commands and events across the link |
-| `fwu` | Nucleo + CAN adapter | FTP and FWU lite uploads, slot readbacks, rollback and confirmation |
-
-Cases needing hardware are tagged, so the same files run in CI without
-hardware and on the bench with it. See the [testing guide](docs/testing/index.md).
 
 ![Hardware test suite running](docs/media/hardware-test-robot.gif)
 

@@ -108,9 +108,7 @@ int __wrap_kfsw_ftp_link_receive(struct kfsw_ftp_link *link, struct kfsw_ftp_lin
 		return link_fake.scripted_result[link_fake.received++];
 	}
 	frame->message = link_fake.scripted[link_fake.received++];
-	/* A cooperative peer answers the request it was sent. Reading the id
-	 * back from the request removes any need for a test to know what the
-	 * client allocated.
+	/* Echo the client's request ID unless the test overrides it.
 	 */
 	frame->message.request_id = (link_fake.force_request_id != 0U)
 					    ? link_fake.force_request_id
@@ -217,7 +215,7 @@ ZTEST(kfsw_ftp_client_link, test_a_connection_that_will_not_open_is_reported)
 	zassert_equal(link_fake.sends, 0U, "the client sent over a connection it never opened");
 }
 
-/* The happy path, so the refusals below are known to be refusals. */
+/* Check a valid request before the rejection cases. */
 ZTEST(kfsw_ftp_client_link, test_a_directory_request_is_sent_and_answered)
 {
 	peer_will_reply(KFSW_FTP_OP_MKDIR_RESPONSE, KFSW_FTP_STATUS_OK);
@@ -390,7 +388,7 @@ ZTEST(kfsw_ftp_client_link, test_a_peer_that_refuses_an_upload_is_believed)
 	zassert_true(link_fake.closes > 0U, "a refused upload left the connection open");
 }
 
-/* Ready, but answering a question nobody asked. */
+/* PUT_READY with the wrong request ID. */
 ZTEST(kfsw_ftp_client_link, test_an_upload_answered_with_the_wrong_opcode_is_refused)
 {
 	struct kfsw_ftp_transfer_result outcome;

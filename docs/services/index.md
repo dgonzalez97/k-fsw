@@ -211,7 +211,7 @@ bands:
 | 1-24 | Application, platform and comms |
 | 25-49 | Services, one table each |
 | 50-99 | Modules |
-| 100-255 | Free for mission payloads |
+| 100-255 | Reserved; rejected by the current registry |
 
 On the wire the table is the high byte and the offset the low byte. Offsets
 are unique inside a table. Names are unique on the node and up to

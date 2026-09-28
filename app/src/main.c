@@ -199,8 +199,7 @@ int main(void)
 			kfsw_log_info("Persistent parameters restored");
 		}
 #endif
-		/* Applied once the snapshot is restored and before anything talks to
-		 * the outside.
+		/* Apply restored settings before starting network services.
 		 */
 		/* After the snapshot, so the count continues from the saved value. */
 		kfsw_boot_count_restart();
@@ -448,8 +447,7 @@ int main(void)
 #endif
 
 #if CONFIG_KFSW_HEALTH
-	/* The application thread reports to health. Services can join when they
-	 * have something to report.
+	/* Register the application thread with health supervision.
 	 */
 	uint8_t health_handle = 0U;
 	bool health_watching = false;
@@ -478,7 +476,7 @@ int main(void)
 #endif
 
 #if CONFIG_KFSW_LASTWORDS
-	/* Armed before the services start. -ENOTSUP means the SoC has no detector. */
+	/* Start supply monitoring. -ENOTSUP means no detector is available. */
 	result = kfsw_lastwords_watch_supply();
 	if (result == 0) {
 		kfsw_log_info("Watching the supply");

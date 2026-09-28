@@ -155,13 +155,10 @@ def crc32(data):
 
 
 def build_request(source, destination, sport, report, count, first_age):
-    """One request packet, framed exactly as libcsp would put it on the wire.
+    """Frame one request with the CSP CRC32C and the outer KISS CRC32C.
 
-    Two CRC32s, which is not a mistake. The housekeeping socket asks for
-    CSP_O_CRC32, so csp_send appends one; then the KISS interface appends
-    another over what it was handed. Both cover the payload only, because the
-    header is prepended after they are computed. Both are stripped on the way
-    back up, so a reply that survives has been checked twice.
+    libcsp computes both before prepending the CSP header. The outer checksum
+    also covers the inner checksum. Receive handling verifies and removes both.
     """
     payload = struct.pack(">BBBH", HK_PROTOCOL_VERSION, report, count, first_age)
     payload += crc32(payload)
@@ -170,7 +167,7 @@ def build_request(source, destination, sport, report, count, first_age):
 
 
 def decode_hk_frame(frame, node):
-    """Return the housekeeping sample in a CSP frame, whoever it was sent to.
+    """Extract an HK sample regardless of its destination address.
 
     Frames are matched by their source port, so replies to other requests and
     beacons are recorded too.

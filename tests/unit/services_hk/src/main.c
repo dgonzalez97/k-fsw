@@ -82,7 +82,7 @@ static void hk_before(void *fixture)
 
 ZTEST_SUITE(kfsw_hk, NULL, hk_setup, hk_before, NULL, NULL);
 
-/* A report has to be refused when it is defined, not discovered mid-pass. */
+/* Reject invalid parameters when the report is defined. */
 ZTEST(kfsw_hk, test_definition_naming_nothing_is_refused)
 {
 	const struct kfsw_hk_entry entries[] = {
@@ -95,7 +95,7 @@ ZTEST(kfsw_hk, test_definition_naming_nothing_is_refused)
 	zassert_equal(kfsw_hk_collect(0U), -ENOENT, "the refused report was left defined");
 }
 
-/* And the report that was working must survive the attempt. */
+/* A rejected definition must preserve the previous report. */
 ZTEST(kfsw_hk, test_a_refused_definition_leaves_the_previous_one)
 {
 	const struct kfsw_hk_entry good[] = {
@@ -164,7 +164,7 @@ ZTEST(kfsw_hk, test_a_sample_carries_the_values_at_their_declared_widths)
 	zassert_equal(sample.data[8], 3U, "the header disagrees with the value count");
 }
 
-/* A sampled parameter must be as fresh here as it is for an operator. */
+/* Collection must call the parameter sample callback. */
 ZTEST(kfsw_hk, test_collection_samples_rather_than_reading_stale_storage)
 {
 	const struct kfsw_hk_entry entries[] = {
