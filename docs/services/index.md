@@ -82,6 +82,72 @@ noop
 `if-event <source> <id> skip` skips the next line unless that event is in the
 event record. There are no loops or jumps.
 
+`wait-until <unix-seconds> <late-tolerance-seconds>` waits on the existing UTC
+clock. For example, `wait-until 1900000002 1` permits a step at that UTC second
+or up to one second late. The clock must already be valid; use the ordinary
+clock set/get commands. No time synchronization is started by a procedure.
+The target range is 1..2147483647, matching the current CSP clock.
+
+The initial wait and late tolerance must not exceed `CONFIG_KFSW_FBO_WAIT_MAX_S`
+(default 600 seconds). UTC is checked every 100 ms. A forward step may make the
+line due or too late; a backward step keeps waiting, with a monotonic deadline
+of at most the configured maximum from entry. An unset/failed clock aborts the
+line, including if it becomes unset while waiting. `fbo stop` wakes the wait
+immediately; it cannot be bypassed by `on-error continue`. Other errors follow
+the procedure's usual `on-error` policy. This is a cancellable procedure wait,
+not a hard real-time scheduler or a schedule that survives restart.
+
+## Persistent event journal
+
+`CONFIG_KFSW_JOURNAL` adds a fixed-size journal to the existing storage volume.
+The Linux image enables it. Boot/reset reports are always selected; other
+events must meet `CONFIG_KFSW_JOURNAL_MIN_SEVERITY` (warning by default).
+Text logging and the existing RAM event ring remain separate.
+
+```text
+cmd journal_stats
+cmd journal_tail 0
+cmd journal_time 0
+cmd 2 journal_tail 0
+```
+
+Age 0 is the newest committed record. `journal_tail` returns boot identity,
+source, event ID, severity and the original payload in hex. `journal_time`
+returns the journal sequence, original event uptime in microseconds, UTC and
+its validity. UTC is sampled by the writer, not in the event callback; uptime
+is the event's timestamp. Ages move as records arrive. To line up separate responses, read
+`journal_time` before and after the tail and check the sequence.
+The C read API returns all fields from one record. Reads do not consume data.
+
+The writer wakes every `CONFIG_KFSW_JOURNAL_FLUSH_MS` (1000 ms by default),
+draining at most the configured queue depth (16) per batch. Each record is
+written and synced on the worker. No filesystem or wall-clock driver calls
+run in the emitter/ISR. A full queue drops incoming events and increments
+`drop`. Boot-ready and retained-lastwords reports are queued once per boot;
+a failed queue insertion permits a later attempt. Repeated start calls do
+not allocate another boot identity or start another writer.
+
+The default file `/kfsw/journal.bin` retains 128 records and occupies at most
+9232 bytes on the volume: a 16-byte header plus 128 checksummed 72-byte slots.
+Filesystem metadata, copy-on-write space and flash wear are additional. The
+queue and one pending record are RAM-only. Adjust severity and flush interval
+for the expected event rate. Bulk text belongs in the console log.
+
+Restart recovery validates the header and each slot, skips records with bad
+checksums and incomplete trailing data, and resumes after the largest valid
+sequence. It never reformats a corrupt or incompatible header. Capacity is
+part of the header: changing it requires an explicit migration/new journal.
+Boot identities advance from retained history and restart at one on a new
+volume. Do not treat them as globally unique identifiers.
+
+Write failures retain one pending record and retry its slot after rescanning,
+so a failed sync does not create two journal entries. Subsequent events can
+fill the queue and be dropped. `journal_stats` exposes queue depth, drops,
+write errors, damaged slots found in the latest recovery, readiness and the
+last error. Records still queued, failed or in progress can be lost at power
+failure. Native fault tests cover these policies; physical power-cut
+qualification remains pending.
+
 ## Logging
 
 Messages have four levels: DEBUG, INFO, WARNING and ERROR.
@@ -404,7 +470,7 @@ startup. Duplicate IDs or names, missing handlers and too many arguments are
 rejected. Handlers run on the command thread, one at a time, never in a CSP
 receive context.
 
-A message has a 12-byte big-endian header (version, opcode, status, argument
+A legacy version 1 message has a 12-byte big-endian header (version, opcode, status, argument
 count, command ID, request ID and payload size) followed by type-length-value
 arguments. Every length is checked before use, and a message always fits one
 CSP packet.
@@ -413,9 +479,37 @@ There is no authentication. The request carries the source node and an
 authentication flag that is always false. See @ref kfsw_services_command.
 
 A handler runs to completion and returns a status and an optional short text.
-Requests are not deduplicated, so check the node state before sending a
-command again after a lost reply. Remote parameters use the parameter service,
+Legacy requests are not deduplicated, so check the node state before sending
+a command again after a lost reply. Remote parameters use the parameter service,
 not commands.
+
+### Ticketed retries
+
+`CONFIG_KFSW_COMMAND_RETRY` adds `cmd retry <node> <name> [arguments]`.
+It is enabled in the Linux image. Both peers must support it and have working
+entropy. A protected invocation first reserves a ticket, then executes it;
+up to three attempts per phase reuse the same request bytes. An older peer
+fails the protected call; the client never falls back to legacy on its own.
+
+Version 2 adds an eight-byte token to the header (20 bytes total), preserving
+argument encoding. Opcodes 3/4 prepare and return a ticket; opcode 5 executes
+it, and opcode 2 returns the result. Prepare carries a random client nonce;
+execute carries the returned random server ticket. The cache matches source
+node, ticket, command ID, request ID, argument count and the entire payload.
+A repeated prepare within its lifetime returns the same ticket without
+extending its deadline. A repeated execute returns the recorded result.
+
+The default cache holds eight reservations/results for 60 seconds from
+reservation. New calls get BUSY when all slots are live. Expired or unknown
+tickets get UNAVAILABLE and cannot execute. A server restart discards all
+tickets. A failed entropy read prevents allocation. Tickets suppress duplicates. They are not authentication, and they do not
+make an effect happen exactly once.
+
+Typing the command again starts a new operation. If all result attempts fail,
+or a handler resets the node, the outcome can remain unknown; inspect the
+node before starting another operation. Handlers still run synchronously and
+need their own execution bounds. Ordinary `cmd <node> ...` keeps its one-shot
+legacy behavior. Changing clocks does not affect ticket lifetimes.
 
 ## Resource monitor
 

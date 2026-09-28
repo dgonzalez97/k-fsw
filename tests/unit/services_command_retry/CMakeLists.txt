@@ -11,10 +11,9 @@ list(APPEND ZEPHYR_EXTRA_MODULES
 )
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(kfsw_services_fbo_tests LANGUAGES C)
+project(kfsw_command_retry_tests LANGUAGES C)
 
 target_sources(app PRIVATE src/main.c)
 target_link_libraries(app PRIVATE kfsw::services)
 
-zephyr_link_libraries(-Wl,--wrap=fs_read -Wl,--wrap=fs_stat -Wl,--wrap=kfsw_fbo_clock_seconds
-    -Wl,--wrap=kfsw_time_monotonic_ms)
+target_include_directories(app PRIVATE "${KFSW_WORKSPACE_ROOT}/kfsw-services/src/command")

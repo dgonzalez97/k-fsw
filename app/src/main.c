@@ -30,6 +30,9 @@
 #if CONFIG_KFSW_LASTWORDS
 #include <kfsw/platform/lastwords.h>
 #endif
+#if CONFIG_KFSW_JOURNAL
+#include <kfsw/services/journal.h>
+#endif
 #include <kfsw/services/boot.h>
 #if CONFIG_KFSW_COMMAND
 #include <kfsw/services/command.h>
@@ -499,6 +502,14 @@ int main(void)
 #if CONFIG_KFSW_CSP && CONFIG_BOARD_NATIVE_SIM
 	/* After every subsystem is up, because they reset the wall clock. */
 	(void)kfsw_clock_from_host();
+#endif
+
+#if CONFIG_KFSW_JOURNAL
+	result = kfsw_journal_start();
+	if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Journal unavailable; writer will retry: %d", result);
+	}
 #endif
 
 	printk("@SERVICES %s failures=%u\n", startup_failures == 0U ? "ok" : "degraded",
