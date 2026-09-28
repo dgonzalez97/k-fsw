@@ -15,6 +15,9 @@
 #include <kfsw/services/boot.h>
 #endif
 #include <kfsw/services/log.h>
+#if CONFIG_KFSW_JOURNAL
+#include <kfsw/services/journal.h>
+#endif
 
 #if CONFIG_KFSW_PARAM
 #include "../parameters/tables.h"
@@ -45,6 +48,9 @@
 #define KFSW_COMMAND_ID_HK_DEFINE 6U
 #define KFSW_COMMAND_ID_HK_PERIOD 7U
 #define KFSW_COMMAND_ID_HK_CLEAR 8U
+#define KFSW_COMMAND_ID_JOURNAL_STATS 9U
+#define KFSW_COMMAND_ID_JOURNAL_TAIL 10U
+#define KFSW_COMMAND_ID_JOURNAL_TIME 11U
 
 /* Give the reply time to leave before the reset takes the link down. */
 #define KFSW_COMMAND_REBOOT_DELAY_MS 500U
@@ -333,7 +339,102 @@ static const enum kfsw_command_type hk_period_args[] = {KFSW_COMMAND_TYPE_U32,
 static const enum kfsw_command_type hk_clear_args[] = {KFSW_COMMAND_TYPE_U32};
 #endif /* CONFIG_KFSW_HK */
 
+#if CONFIG_KFSW_JOURNAL
+static int command_journal_stats(const struct kfsw_command_arg *args, size_t count,
+				 const struct kfsw_command_source *source,
+				 struct kfsw_command_result *result)
+{
+	struct kfsw_journal_stats stats;
+
+	ARG_UNUSED(args);
+	ARG_UNUSED(count);
+	ARG_UNUSED(source);
+	kfsw_journal_get_stats(&stats);
+	result->status = KFSW_COMMAND_OK;
+	(void)snprintf(result->detail, sizeof(result->detail),
+		       "held=%u queued=%u drop=%u err=%u bad=%u ready=%u last=%d", stats.held,
+		       stats.queued, stats.dropped, stats.errors, stats.corrupt, stats.ready,
+		       stats.last_error);
+	return 0;
+}
+
+static int journal_record(const struct kfsw_command_arg *args, struct kfsw_journal_record *record,
+			  struct kfsw_command_result *result)
+{
+	int outcome = (args[0].value.u32 <= UINT16_MAX)
+			      ? kfsw_journal_get((uint16_t)args[0].value.u32, record)
+			      : -EINVAL;
+
+	result->status = outcome == 0 ? KFSW_COMMAND_OK : KFSW_COMMAND_UNAVAILABLE;
+	if (outcome != 0) {
+		(void)snprintf(result->detail, sizeof(result->detail), "journal read: %d", outcome);
+	}
+	return outcome;
+}
+
+static int command_journal_tail(const struct kfsw_command_arg *args, size_t count,
+				const struct kfsw_command_source *source,
+				struct kfsw_command_result *result)
+{
+	struct kfsw_journal_record record;
+	static const char hex[] = "0123456789abcdef";
+	char data[KFSW_EVENT_MAX_PAYLOAD_SIZE * 2U + 1U];
+
+	ARG_UNUSED(count);
+	ARG_UNUSED(source);
+	if (journal_record(args, &record, result) != 0) {
+		return 0;
+	}
+	for (size_t i = 0; i < record.event.payload_size; i++) {
+		data[2U * i] = hex[record.event.payload[i] >> 4];
+		data[2U * i + 1U] = hex[record.event.payload[i] & 15U];
+	}
+	data[2U * record.event.payload_size] = '\0';
+	(void)snprintf(result->detail, sizeof(result->detail),
+		       "boot=%" PRIu64 " src=%u id=%u sev=%u data=%s", record.boot,
+		       record.event.source, record.event.id, record.event.severity, data);
+	return 0;
+}
+
+static int command_journal_time(const struct kfsw_command_arg *args, size_t count,
+				const struct kfsw_command_source *source,
+				struct kfsw_command_result *result)
+{
+	struct kfsw_journal_record record;
+
+	ARG_UNUSED(count);
+	ARG_UNUSED(source);
+	if (journal_record(args, &record, result) == 0) {
+		(void)snprintf(result->detail, sizeof(result->detail),
+			       "seq=%" PRIu64 " up_us=%" PRIu64 " utc=%" PRId64 " valid=%u",
+			       record.sequence, record.event.monotonic_us, record.utc_seconds,
+			       record.utc_valid);
+	}
+	return 0;
+}
+
+static const enum kfsw_command_type journal_age[] = {KFSW_COMMAND_TYPE_U32};
+#endif
+
 static const struct kfsw_command_definition app_commands[] = {
+#if CONFIG_KFSW_JOURNAL
+	{.id = KFSW_COMMAND_ID_JOURNAL_STATS,
+	 .name = "journal_stats",
+	 .help = "Read persistent journal status.",
+	 .handler = command_journal_stats},
+	{.id = KFSW_COMMAND_ID_JOURNAL_TAIL,
+	 .name = "journal_tail",
+	 .arg_count = 1U,
+	 .arg_types = journal_age,
+	 .help = "Read a journal event by age, newest is 0.",
+	 .handler = command_journal_tail},
+	{.id = KFSW_COMMAND_ID_JOURNAL_TIME,
+	 .name = "journal_time",
+	 .arg_count = 1U,
+	 .arg_types = journal_age,
+	 .help = "Read a journal event's sequence and time by age.",
+	 .handler = command_journal_time},
+#endif
 	{
 		.id = KFSW_COMMAND_ID_NOOP,
 		.name = "noop",
