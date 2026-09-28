@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
-"""Write a host file into a native_sim node's LittleFS partition.
+"""Stage a host file in a stopped native_sim node's LittleFS partition.
 
-A native_sim node's flash is a host file, so a file such as a firmware image can
-be placed in its filesystem before it boots instead of being transferred.
-
-The LittleFS geometry must match the one Zephyr mounts, or the node won't mount
-the partition.
+The flash geometry must match the node's devicetree.
 """
 
 import argparse

@@ -34,7 +34,7 @@ static void sample_csp_buf_free(void *value)
 #if CONFIG_KFSW_CSP
 	struct kfsw_csp_info info;
 
-	/* Free CSP buffers; zero means the node can't answer. */
+	/* Current number of free CSP packet buffers. */
 	kfsw_csp_get_info(&info);
 	*(uint16_t *)value = (uint16_t)info.free_buffers;
 #else

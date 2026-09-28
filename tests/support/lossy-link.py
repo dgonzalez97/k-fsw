@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""Forward bytes between two serial endpoints and drop some of them.
-
-Every so often a run of bytes is dropped, which the receiver sees as a lost
-packet, so a transfer's recovery can be tested.
+"""Forward serial traffic and drop byte bursts to test transfer recovery.
 """
 
 import argparse

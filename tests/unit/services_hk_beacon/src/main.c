@@ -278,7 +278,7 @@ ZTEST(kfsw_hk_beacon, test_it_speaks_again_once_the_pool_recovers)
 	zassert_equal(sent.sends, 1U, "the beacon stayed quiet after the pool recovered");
 }
 
-/* A report nobody has collected has nothing to announce. */
+/* An empty report must not send a beacon. */
 ZTEST(kfsw_hk_beacon, test_a_report_with_no_sample_says_nothing)
 {
 	zassert_ok(kfsw_hk_set_beacon(0U, 5U, CONFIG_KFSW_HK_BEACON_FLOOR_MS),
@@ -289,7 +289,7 @@ ZTEST(kfsw_hk_beacon, test_a_report_with_no_sample_says_nothing)
 	zassert_equal(sent.sends, 0U, "a report with no sample transmitted anyway");
 }
 
-/* The interval is an interval, not a lower bound checked once. */
+/* Check that the beacon period is enforced after every send. */
 ZTEST(kfsw_hk_beacon, test_the_interval_is_kept_between_beacons)
 {
 	define_and_collect(0U);

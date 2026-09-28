@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Software round trip of one file between the two configured ground roles.
-# kfsw-ops (node 19) uploads test.txt to kfsw-gnd-uhf (node 16), reads its
-# metadata back, downloads it again, and compares the two local copies.
+# Upload firmware from node 19 to node 16 through the reserved FTP path.
 
 KGROUND_TEST="$(readlink -f "${BASH_SOURCE[0]}")"
 KGROUND_TESTS_DIR="$(dirname "$KGROUND_TEST")"
@@ -89,7 +87,7 @@ cp "$KGROUND_REPO_DIR/ground-station/nodes/kfsw-gnd-uhf.env" \
 	"$station_dir/nodes/kfsw-gnd-uhf.env"
 cp "$KGROUND_REPO_DIR/ground-station/nodes/kfsw-ops.env" \
 	"$station_dir/nodes/kfsw-ops.env"
-# Both nodes have the update service. This test uses the direct upload path.
+# Both nodes enable the update service and FTP firmware upload.
 fwu_kconfig='CONFIG_KFSW_FWU=y
 CONFIG_KFSW_FWU_MCUBOOT=n
 CONFIG_KFSW_FWU_SLOT_OFFSET_SECTORS=1

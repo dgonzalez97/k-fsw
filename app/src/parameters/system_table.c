@@ -27,7 +27,7 @@ static uint16_t system_app_report_ms = KFSW_APP_REPORT_MS_DEFAULT;
 /* 0000 by default. */
 static char system_reboot_pin[KFSW_SYSTEM_REBOOT_PIN_SIZE] = "0000";
 
-/* A PIN that can't be typed would make the node impossible to restart. */
+/* Reject PIN characters the console cannot send. */
 static int validate_reboot_pin(const char *text)
 {
 	size_t length = strlen(text);

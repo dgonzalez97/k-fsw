@@ -173,9 +173,7 @@ write_ground_config()
 			printf 'CONFIG_KFSW_CSP_ROUTE_TABLE="%s"\n' "$ground_routes"
 		fi
 		if [[ -n "${KFSW_EXTRA_KCONFIG:-}" ]]; then
-			# Verbatim passthrough from the node's env file, so a
-			# station can compose a service the base profile does not
-			# carry without a profile per combination.
+			# Pass through extra Kconfig settings from the node file.
 			printf '%s\n' "$KFSW_EXTRA_KCONFIG"
 		fi
 		if [[ "$ground_radio_uhf" == "holybro" ]]; then
@@ -197,10 +195,7 @@ build_ground_node()
 
 	echo "K-GROUND BUILD: role=$ground_role node=$ground_node peer=$ground_peer"
 
-	# A node that needs a devicetree change, such as enabling the host CAN
-	# device, names an overlay in its env file. Passed through the same way
-	# KFSW_EXTRA_KCONFIG is, so a station can compose one without a profile
-	# per combination.
+	# Add the overlay selected by the node file.
 	local overlay="${KFSW_EXTRA_OVERLAY:-}"
 	if [[ -n "$overlay" ]]; then
 		[[ "$overlay" = /* ]] || overlay="$KGROUND_REPO_DIR/$overlay"

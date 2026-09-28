@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
-"""Turn a housekeeping report definition into the two things that must agree.
+"""Generate HK commands and a Yamcs database from one report definition.
 
-Housekeeping keeps parameter names off the wire: a sample is values back to
-back in the order the report was defined, and nothing in the frame says what
-they are. That is the right trade for a radio and the wrong one for a person,
-so the definition has to live somewhere on the ground.
-
-This is that somewhere. `define` prints the command that tells a node what to
-collect, `xtce` writes the mission database Yamcs decodes it with, and `check`
-proves the file still matches what the node actually registers.
+`define` prints the node command, `xtce` writes the mission database, and
+`check` compares the definition with a captured parameter list. The definition
+sets the field order and widths; sample frames carry no parameter names.
 """
 
 import argparse
@@ -22,13 +17,10 @@ import yaml
 XTCE_NS = "http://www.omg.org/spec/XTCE/20180204"
 XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
 
-# Envelope the bridge adds before the node's frame. Yamcs reads an 8-byte time
-# and a 4-byte count at fixed offsets, so each sample keeps its own time.
+# Bridge envelope: 8-byte Unix timestamp and 4-byte sequence number.
 ENVELOPE_BYTES = 12
 
-# Widths must match entry_width() in kfsw-services/src/hk/hk.c. A report is
-# packed from the declared type, not from the value, so every sample of a
-# report has the same layout.
+# Widths must match entry_width() in kfsw-services/src/hk/hk.c.
 TYPES = {
     "u8": (8, False),
     "u16": (16, False),

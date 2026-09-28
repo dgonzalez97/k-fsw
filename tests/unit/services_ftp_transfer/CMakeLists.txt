@@ -19,9 +19,7 @@ target_sources(app PRIVATE src/main.c)
 target_include_directories(app PRIVATE "${KFSW_WORKSPACE_ROOT}/kfsw-services/src/ftp")
 target_link_libraries(app PRIVATE kfsw::services kfsw::comms)
 
-# ftp_link.h is the transport seam the transfer engine speaks through, so
-# wrapping it drives the loops from the host: a peer that stops answering, a
-# frame that replays an offset, a send that fails halfway.
+# Wrap ftp_link.h calls to test timeouts, repeated offsets and failed sends.
 zephyr_link_libraries(
     -Wl,--wrap=kfsw_ftp_link_send
     -Wl,--wrap=kfsw_ftp_link_receive

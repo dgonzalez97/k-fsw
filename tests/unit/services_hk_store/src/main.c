@@ -106,7 +106,7 @@ static void store_before(void *fixture)
 
 ZTEST_SUITE(kfsw_hk_store, NULL, store_setup, store_before, NULL, NULL);
 
-/* A store on a report nobody defined has no record size to work from. */
+/* An undefined report has no record size. */
 ZTEST(kfsw_hk_store, test_a_store_needs_a_report_first)
 {
 	zassert_not_equal(kfsw_hk_set_store(0U, CONFIG_KFSW_HK_STORE_FLOOR_MS), 0,
@@ -268,14 +268,14 @@ ZTEST(kfsw_hk_store, test_turning_it_off_keeps_what_was_written)
 	zassert_equal(file_size(STORE_PATH), before,
 		      "turning the store off discarded the samples it had captured");
 
-	/* Stopped means stopped: nothing more is written. */
+	/* Stopping must prevent further writes. */
 	for (int i = 0; i < 3; i++) {
 		zassert_ok(kfsw_hk_collect(0U), "the report collected nothing");
 	}
 	zassert_equal(file_size(STORE_PATH), before, "a store that was turned off wrote again");
 }
 
-/* And discarding is available, as its own request. */
+/* Clearing also deletes the file. */
 ZTEST(kfsw_hk_store, test_clearing_the_store_removes_the_file)
 {
 	define_report(0U);

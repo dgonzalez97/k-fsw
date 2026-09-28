@@ -7,12 +7,8 @@
 #include <kfsw/services/resmon.h>
 
 /*
- * These tests run on the POSIX architecture, where a thread runs on a host
- * stack and the declared one is ignored, so the percentages a sweep reports
- * are not real headroom. What is checked here is the contract: the sweep reads
- * the thread list, the numbers stay inside their bounds, the threshold is
- * enforced, and a crossing is counted once. The measurement itself is only
- * meaningful on an MCU target.
+ * Native threads use host stacks, so these tests cover enumeration, bounds
+ * and threshold crossings. Measure stack headroom on the MCU.
  */
 
 static void reset_service(void *fixture)
