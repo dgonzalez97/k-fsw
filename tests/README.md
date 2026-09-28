@@ -22,7 +22,7 @@ Run them from the west workspace root:
   `build/valgrind/`.
 - `tools/ci/integration.sh` builds the flight, ground and three-node routing
   images and runs the shell, CSP, parameter, persistence, storage, FTP,
-  multi-KISS, housekeeping and k-ground scripts.
+  multi-KISS, housekeeping, ground watchdog and k-ground scripts.
 - `tools/ci/robot.sh` checks every Robot suite and runs the cases that are not
   tagged `physical`.
 - `tools/ci/all.sh` runs all of these plus the build, quality and

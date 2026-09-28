@@ -64,19 +64,7 @@ static int cmd_gndwdt_timeout(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
-/* Records contact without a packet, so a bench can hold the countdown open. */
-static int cmd_gndwdt_contact(const struct shell *sh, size_t argc, char **argv)
-{
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-
-	kfsw_gndwdt_contact(0U);
-	shell_print(sh, "Ground watchdog contact recorded");
-	return 0;
-}
-
 SHELL_STATIC_SUBCMD_SET_CREATE(gndwdt_commands,
-	SHELL_CMD_ARG(contact, NULL, "Record contact now.", cmd_gndwdt_contact, 1, 0),
 	SHELL_CMD_ARG(off, NULL, "Disarm the countdown.", cmd_gndwdt_arm, 1, 0),
 	SHELL_CMD_ARG(on, NULL, "Arm the countdown.", cmd_gndwdt_arm, 1, 0),
 	SHELL_CMD_ARG(show, NULL, "Show the countdown and its counters.", cmd_gndwdt_show, 1, 0),

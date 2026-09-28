@@ -554,41 +554,41 @@ possible; a composition that cannot afford that leaves the service out.
 
 ## Ground watchdog
 
-A node can be running, healthy by its own measure, and still unreachable: a
-route that no longer resolves, a link left in the wrong configuration, a
-service that stopped answering. Health monitoring cannot see any of that,
-because every component inside the node is reporting normally.
+`ground_wtd` restarts its countdown only on CSP command 16 with the exact text
+`KFSWWSFK`. Any subsystem may send it. Ping, telemetry, parameter traffic and
+local commands do not count. The timeout is at least five days (432000 seconds).
 
-The ground watchdog resets the node when it hears nothing from anyone. Contact
-is any packet the CSP router accepts from another node, counted through a hook
-in `kfsw-comms`, so no service has to report anything and a packet to any port
-holds the countdown open. Packets this node sends to itself do not count.
+From another node's console, feed node 2:
 
 ```text
-packet from another node -> router -> contact -> countdown restarts
-no packet for gndwdt_timeout_s   ->   event, log line, then a reset
+cmd 2 ground_wtd KFSWWSFK
 ```
 
-Table 35 carries the timer:
+Both nodes need `CONFIG_KFSW_GNDWDT` and `CONFIG_KFSW_COMMAND_CSP`. The command
+uses port 11 by default. The magic word checks intent; it is not authentication.
+A repeated legacy request feeds again. With `cmd retry`, a duplicate ticket
+returns the saved result without feeding again.
+
+Table 35 keeps its existing names:
 
 | Parameter | Access | Meaning |
 | --- | --- | --- |
 | `gndwdt_enabled` | rw | Whether the countdown is armed |
-| `gndwdt_timeout_s` | rw | Silence allowed, at least five days; default 432000 seconds |
-| `gndwdt_since_s` | r | Seconds since the last contact |
-| `gndwdt_contacts` | r | Packets counted as contact |
+| `gndwdt_timeout_s` | rw | Timeout in seconds; minimum and default 432000 |
+| `gndwdt_since_s` | r | Seconds since startup or the last valid feed |
+| `gndwdt_contacts` | r | Valid feed commands accepted |
 | `gndwdt_expiries` | r | Times the timeout passed |
-| `gndwdt_last_node` | r | Node of the most recent contact |
+| `gndwdt_last_node` | r | Sender of the last valid feed |
 | `gndwdt_running` | r | Whether the service was started |
 
-Writing `gndwdt_timeout_s` restarts the countdown, so raising it never resets a
-node for silence it has already been through.
-`CONFIG_KFSW_GNDWDT_TIMEOUT_MIN_S` can raise the floor above five days.
-Build-time and runtime values below that floor are rejected.
+`gndwdt show`, `gndwdt on`, `gndwdt off` and `gndwdt timeout <seconds>` remain
+available locally. Changing the timeout or re-enabling the watchdog does not
+restart its countdown. A node re-enabled after its deadline can reset at the
+next check. Send a valid feed first. A reset already queued is not cancelled.
 
-From the shell: `gndwdt show`, `gndwdt on`, `gndwdt off`,
-`gndwdt timeout <seconds>` and `gndwdt contact`, which records contact without
-a packet so a bench can hold the countdown open.
+TODO: define the second watchdog's feed source and timeout. Keep it separate
+from `ground_wtd`; ordinary incoming traffic must not feed the ground watchdog.
+The existing hardware watchdog and component health checks are unchanged.
 
 ## Event record
 
