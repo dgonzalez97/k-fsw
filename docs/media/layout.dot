@@ -15,7 +15,7 @@ digraph kfsw {
 	app [label=<<b>k-fsw</b><br/>composition, targets, tools, tests, docs>,
 	     fillcolor="#294c69", fontcolor="#ffffff", color="#294c69"];
 
-	modules  [label=<<b>kfsw-modules</b><br/>radio, GNSS, sensors, I/O>];
+	modules  [label=<<b>kfsw-modules</b><br/>radio, temperature, buttons, LEDs>];
 	services [label=<<b>kfsw-services</b><br/>log, param, files, events,<br/>commands, health, update>];
 	comms    [label=<<b>kfsw-comms</b><br/>CSP, routing, KISS, CAN>];
 	platform [label=<<b>kfsw-platform</b><br/>time, storage, reset cause,<br/>watchdog>];

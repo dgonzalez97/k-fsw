@@ -38,15 +38,15 @@ A module defines one device or subsystem: its interface, state, parameters,
 and tests. The parameter core does not need to change.
 
 Examples in [`kfsw-modules`](https://github.com/dgonzalez97/kfsw-modules):
-a UHF radio, and a small worked example using LEDs and buttons of development boards.
+a UHF radio, board buttons and LEDs, and an MCU temperature sensor.
 
 ## Services
 
 - **Parameters:** named values with validation, remote access, callbacks and optional persistence.
 - **CSP:** communications router, with routes selecting UART/KISS or CAN links.
-- **Files:** upload and download with CRC32 and RDP and a complete file system creating tool.
+- **Files:** upload, download, list and create directories, with CRC32 and RDP.
 - **Firmware update:** binaries over FTP, with MCUboot test,
-  confirm, and rollback, or a simple direct block upload FWU over a csp line that doesnt need a file system.
+  confirm, and rollback. FWU lite sends blocks over CSP without a filesystem.
 - **Commands and events:** a shell and remote commanding.
 - **Health:** component deadlines, control and watchdog.
 - **Housekeeping:** collect groups of parameters and forward telemetry to Yamcs.
@@ -94,20 +94,21 @@ CSP/RDP has retransmission as an option.
 
 ### Firmware update
 
-Send, verify, flash, reboot, confirm. MCUboot, FTP for binaries to a specific flash directory or FWU lite for direct downloads. The direct block protocol separates upload from
-`fwu flash`.
+Send a signed image over FTP or FWU lite, boot it, then confirm it. FTP uploads
+to `/firmware.bin` schedule a test boot after verification. FWU lite
+separates upload from `fwu flash`.
 
-A optional read only recovery image can be set as well. See the [update guide](docs/fwu/README.md).
+Golden-image selection is not implemented. See the [update guide](docs/fwu/README.md).
 
 ![Firmware update over a radio link](docs/media/firmware-update-over-radio.gif)
 
 ## Hardware
 
-NUCLEO-L496ZG is the current MCU reference. Test-bench cover
+NUCLEO-L496ZG is the current MCU reference. Bench tests cover
 parameters, files, commands, events, CAN, housekeeping, and firmware updates.
 See [targets](docs/targets/index.md).
 
-[Project status](docs/status/index.md) records the tested configurations and the TO Do list.
+[Project status](docs/status/index.md) records tested configurations and limits.
 
 ## Targets
 
@@ -165,7 +166,7 @@ The pipeline runs:
 | `DOCS / Doxygen` | The documentation builds and the API is documented |
 
 The unit suites cover each layer on its own; the integration scripts go the
-other way, booting a real image and talking to it through a ground node like a real satellite DITL.
+other way, booting an application image and talking to it through a ground node.
 
 [Coverage](https://dgonzalez97.github.io/k-fsw/coverage/)
 
@@ -174,15 +175,15 @@ other way, booting a real image and talking to it through a ground node like a r
 [Robot Framework](https://robotframework.org/) drives the physical suites
 through [robot-terminal-runner](https://github.com/dgonzalez97/robot-terminal-runner),
 a submodule under `tests/platform/`. It sends shell commands through tmux
-and records the results in html format to easily identify which command failed.
+and records the results in an HTML report.
 
 | Suite | Needs | Covers |
 | --- | --- | --- |
 | `boot`, `uart` | Nucleo | Boot, reset cause, shell and CSP over the debug UART |
 | `param-tables` | Nucleo | Every table present and addressed, with the right write modes |
-| `can` | Nucleo + CAN adapter | CSP over CAN: ping, identity and remote settings and fuzzy testing |
+| `can` | Nucleo + CAN adapter | CSP over CAN: ping, identity, remote settings and malformed requests |
 | `holybro` | Nucleo + radio pair | CSP, files, commands and events across the link |
-| `fwu` | Nucleo + CAN adapter | FTP and FWU lite uploads, slot readbacks, rollback and confirmation, so firmware update is never broken |
+| `fwu` | Nucleo + CAN adapter | FTP and FWU lite uploads, slot readbacks, rollback and confirmation |
 
 Cases needing hardware are tagged, so the same files run in CI without
 hardware and on the bench with it. See the [testing guide](docs/testing/index.md).

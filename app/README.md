@@ -29,10 +29,10 @@ alignment. K-FSW uses the last 64 KiB (32 pages) for the filesystem:
 | `0x00000000` | 960 KiB | Application |
 | `0x000F0000` | 64 KiB | LittleFS |
 
-That is enough for parameter snapshots, transferred files and housekeeping
-data, and the application is well below 960 KiB. The MCUboot layout splits the
-start of flash into a boot partition and two image slots but keeps the storage
-partition where it is, so the filesystem survives the change.
+Parameter snapshots, transferred files and housekeeping share those 64 KiB.
+Check free space and the image size for the selected composition. The MCUboot
+layout splits the start of flash into a boot partition and two image slots
+but keeps the storage partition at the same address.
 
 KFSW-Linux uses the same LittleFS code on native_sim's simulated flash.
 `tools/run-linux.sh` keeps a flash file in the build directory, and tests use
