@@ -20,7 +20,7 @@ native flash file are kept there. The fixture creates its own Linux process.
 For the later bench run, use a test image with HK, parameter tables 1 and 3,
 valid wall time, a KISS link and `config/profiles/log-history.conf`. Use the
 default log level (info), module levels, and a history depth of 32. Addresses
-100 and 101 must be unused; source address 16 belongs to the host. The fixture
+100 and 101 must be unused; source address 16 is the host's. The fixture
 emits 39 log-test messages, overwriting the older RAM log history. It also
 replaces report definitions 0
 and 1, enables their periods/beacons, then disables their periods/beacons on
@@ -41,7 +41,7 @@ KFSW_ROBOT_OUT_DIR="$PWD/../build/robot/diagnostics-bench-1" \
 ```
 
 The ping issued during passive capture has no answering ground node and times
-out deliberately; its outgoing packet is what the PCAP check inspects. A
+out on purpose; its outgoing packet is what the PCAP check inspects. A
 missing interface also times out because CMP has no not-found reply.
 
 For host protocol fault tests without a node:
