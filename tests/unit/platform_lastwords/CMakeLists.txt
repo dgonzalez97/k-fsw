@@ -14,3 +14,4 @@ project(kfsw_platform_lastwords_tests LANGUAGES C)
 
 target_sources(app PRIVATE src/main.c)
 target_link_libraries(app PRIVATE kfsw::platform)
+zephyr_link_libraries(-Wl,--wrap=crc32_ieee)

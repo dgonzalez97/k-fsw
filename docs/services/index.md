@@ -167,7 +167,9 @@ severity and up to 191 text bytes; longer messages are marked truncated.
 The existing compile-time and runtime filters apply before retention.
 Zephyr logs, driver output and shell responses are not captured.
 
-`CONFIG_KFSW_LOG_HISTORY_CSP` serves the same history on CSP port 16 by default.
+`CONFIG_KFSW_LOG_HISTORY_CSP` serves the history on CSP port 16 by default.
+Remote records carry at most 190 text bytes to fit encrypted radio links;
+longer records set the truncation flag. Local history keeps up to 191 bytes.
 It is enabled in the Linux composition. Other CSP compositions can use
 `config/profiles/log-history.conf`. Start the server after the CSP router.
 Reads do not remove records or write flash. History and sequences restart
@@ -572,7 +574,7 @@ Table 35 carries the timer:
 | Parameter | Access | Meaning |
 | --- | --- | --- |
 | `gndwdt_enabled` | rw | Whether the countdown is armed |
-| `gndwdt_timeout_s` | rw | Silence allowed, one day by default |
+| `gndwdt_timeout_s` | rw | Silence allowed, at least five days; default 432000 seconds |
 | `gndwdt_since_s` | r | Seconds since the last contact |
 | `gndwdt_contacts` | r | Packets counted as contact |
 | `gndwdt_expiries` | r | Times the timeout passed |
@@ -581,9 +583,8 @@ Table 35 carries the timer:
 
 Writing `gndwdt_timeout_s` restarts the countdown, so raising it never resets a
 node for silence it has already been through.
-`CONFIG_KFSW_GNDWDT_TIMEOUT_MIN_S` is a floor on what an operator can write,
-which keeps a mistyped value from putting a node into a reset loop that takes a
-pass to notice.
+`CONFIG_KFSW_GNDWDT_TIMEOUT_MIN_S` can raise the floor above five days.
+Build-time and runtime values below that floor are rejected.
 
 From the shell: `gndwdt show`, `gndwdt on`, `gndwdt off`,
 `gndwdt timeout <seconds>` and `gndwdt contact`, which records contact without

@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Software round trip of one file between the two configured ground roles.
-# kfsw-ops (node 19) uploads test.txt to kfsw-gnd-uhf (node 16), reads its
-# metadata back, downloads it again, and compares the two local copies.
+# Upload a firmware image from node 19 to node 16, verify it, then request a swap.
 
 KGROUND_TEST="$(readlink -f "${BASH_SOURCE[0]}")"
 KGROUND_TESTS_DIR="$(dirname "$KGROUND_TEST")"
@@ -144,6 +142,10 @@ wait_for_output "$work_dir/node16.log" "@READY " "$node16_pid" || \
 	fail "node 16 did not report readiness"
 wait_for_output "$work_dir/node19.log" "@READY " "$node19_pid" || \
 	fail "node 19 did not report readiness"
+for node in 16 19; do
+	grep -Fq '@SERVICES degraded' "$work_dir/node$node.log" && \
+		fail "node $node started with a failed service"
+done
 wait_for_output "$work_dir/node16.log" \
 	"uart_1 connected to pseudotty: " "$node16_pid" || \
 	fail "node 16 did not expose its CSP UART"

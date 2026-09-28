@@ -10,6 +10,13 @@
 #define TIMEOUT_MS (CONFIG_KFSW_GNDWDT_TIMEOUT_S * 1000U)
 #define PAST_TIMEOUT_MS (TIMEOUT_MS + 300U)
 
+static uint64_t now_ms;
+
+uint64_t __wrap_kfsw_time_monotonic_ms(void)
+{
+	return now_ms;
+}
+
 static void stop_service(void *fixture)
 {
 	ARG_UNUSED(fixture);
@@ -33,7 +40,7 @@ ZTEST(services_gndwdt, test_stopped_service_never_expires)
 	kfsw_gndwdt_get_status(&after);
 	zassert_equal(after.contacts, before.contacts);
 
-	k_sleep(K_MSEC(PAST_TIMEOUT_MS));
+	now_ms += PAST_TIMEOUT_MS;
 	zassert_equal(kfsw_gndwdt_evaluate(), 0);
 }
 
@@ -45,7 +52,7 @@ ZTEST(services_gndwdt, test_contact_holds_the_countdown_open)
 	zassert_equal(kfsw_gndwdt_start(), -EALREADY);
 
 	for (int repeat = 0; repeat < 3; repeat++) {
-		k_sleep(K_MSEC(TIMEOUT_MS / 2U));
+		now_ms += TIMEOUT_MS / 2U;
 		kfsw_gndwdt_contact(7U);
 		zassert_equal(kfsw_gndwdt_evaluate(), 0);
 	}
@@ -67,7 +74,7 @@ ZTEST(services_gndwdt, test_silence_expires_once_per_timeout)
 	kfsw_gndwdt_contact(7U);
 	kfsw_gndwdt_get_status(&before);
 
-	k_sleep(K_MSEC(PAST_TIMEOUT_MS));
+	now_ms += PAST_TIMEOUT_MS;
 	zassert_equal(kfsw_gndwdt_evaluate(), -ETIMEDOUT);
 
 	/* The countdown restarts, so the next check is not overdue again. */
@@ -84,7 +91,7 @@ ZTEST(services_gndwdt, test_disarmed_service_never_expires)
 	zassert_equal(kfsw_gndwdt_start(), 0);
 	kfsw_gndwdt_set_enabled(false);
 
-	k_sleep(K_MSEC(PAST_TIMEOUT_MS));
+	now_ms += PAST_TIMEOUT_MS;
 	zassert_equal(kfsw_gndwdt_evaluate(), 0);
 
 	kfsw_gndwdt_get_status(&status);
@@ -102,6 +109,7 @@ ZTEST(services_gndwdt, test_timeout_bounds_are_enforced)
 
 	zassert_equal(kfsw_gndwdt_start(), 0);
 
+	zassert_equal(kfsw_gndwdt_set_timeout_s(432000U - 1U), -ERANGE);
 	zassert_equal(kfsw_gndwdt_set_timeout_s(CONFIG_KFSW_GNDWDT_TIMEOUT_MIN_S - 1U), -ERANGE);
 	zassert_equal(kfsw_gndwdt_set_timeout_s(CONFIG_KFSW_GNDWDT_TIMEOUT_MAX_S + 1U), -ERANGE);
 

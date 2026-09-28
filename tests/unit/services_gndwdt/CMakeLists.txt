@@ -11,6 +11,7 @@ list(APPEND ZEPHYR_EXTRA_MODULES
 )
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+zephyr_link_libraries(-Wl,--wrap=kfsw_time_monotonic_ms)
 project(kfsw_services_gndwdt_tests LANGUAGES C)
 
 target_sources(app PRIVATE src/main.c)

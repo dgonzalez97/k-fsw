@@ -15,6 +15,10 @@ static size_t control_count;
 static uint8_t random_byte;
 static int save_error, random_error;
 static psa_key_id_t test_master;
+static bool pause_save;
+static K_SEM_DEFINE(save_entered, 0, 1);
+static K_SEM_DEFINE(save_release, 0, 1);
+static K_SEM_DEFINE(packet_done, 0, 1);
 
 int __wrap_kfsw_uart_codec_register(const char *name, const struct kfsw_uart_codec *value)
 {
@@ -43,6 +47,10 @@ int __wrap_radio_crypto_store_load(struct radio_crypto_settings *settings)
 
 int __wrap_radio_crypto_store_save(const struct radio_crypto_settings *settings)
 {
+	if (pause_save) {
+		k_sem_give(&save_entered);
+		k_sem_take(&save_release, K_FOREVER);
+	}
 	if (save_error == 0) {
 		stored = *settings;
 	}
@@ -242,6 +250,13 @@ ZTEST(radio_crypto, test_both_directions_and_replayed_reply)
 	zassert_equal(size, 4);
 	zassert_mem_equal(plain, "test", 4);
 	psa_destroy_key(key);
+	/* 220 application bytes plus the inner CSP CRC fit exactly. */
+	packet.length = 224U;
+	memset(packet.data, 'x', packet.length);
+	zassert_ok(codec->encode(&packet));
+	zassert_equal(packet.length, 252U);
+	packet.length = 225U;
+	zassert_equal(codec->encode(&packet), -EMSGSIZE);
 	packet.length = CSP_BUFFER_SIZE;
 	zassert_equal(codec->encode(&packet), -EMSGSIZE);
 }
@@ -292,6 +307,53 @@ ZTEST(radio_crypto, test_disable_and_one_way_policy)
 	zassert_true(codec->decode(&packet) < 0);
 	radio_crypto_set_enable(&disabled);
 	zassert_ok(codec->decode(&packet));
+}
+
+static K_THREAD_STACK_DEFINE(save_stack, 4096);
+static K_THREAD_STACK_DEFINE(packet_stack, 2048);
+static struct k_thread save_thread, packet_thread;
+static int packet_result;
+
+static void save_worker(void *a, void *b, void *c)
+{
+	ARG_UNUSED(a);
+	ARG_UNUSED(b);
+	ARG_UNUSED(c);
+	union kfsw_param_scalar enabled = {.u8 = 1};
+	radio_crypto_set_tx(&enabled);
+}
+
+static void packet_worker(void *a, void *b, void *c)
+{
+	ARG_UNUSED(a);
+	ARG_UNUSED(b);
+	ARG_UNUSED(c);
+	csp_packet_t packet = {.length = 4};
+	packet_result = codec->encode(&packet);
+	k_sem_give(&packet_done);
+}
+
+ZTEST(radio_crypto, test_packets_do_not_wait_for_settings_storage)
+{
+	union kfsw_param_scalar disabled = {.u8 = 0};
+	struct kfsw_radio_crypto_info info;
+
+	radio_crypto_set_tx(&disabled);
+	pause_save = true;
+	k_thread_create(&save_thread, save_stack, K_THREAD_STACK_SIZEOF(save_stack), save_worker,
+			NULL, NULL, NULL, 5, 0, K_NO_WAIT);
+	zassert_ok(k_sem_take(&save_entered, K_SECONDS(1)));
+	k_thread_create(&packet_thread, packet_stack, K_THREAD_STACK_SIZEOF(packet_stack),
+			packet_worker, NULL, NULL, NULL, 5, 0, K_NO_WAIT);
+	int completed = k_sem_take(&packet_done, K_MSEC(100));
+	k_sem_give(&save_release);
+	zassert_ok(k_thread_join(&save_thread, K_SECONDS(1)));
+	zassert_ok(k_thread_join(&packet_thread, K_SECONDS(1)));
+	pause_save = false;
+	zassert_ok(completed, "packet waited for settings storage");
+	zassert_ok(packet_result, "old TX policy must remain active until saved");
+	kfsw_radio_uhf_crypto_get(&info);
+	zassert_true(info.encrypt_tx);
 }
 
 ZTEST(radio_crypto, test_entropy_failure_does_not_start_session)

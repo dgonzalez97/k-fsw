@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# The ground watchdog on the Linux target: contact holds the countdown open,
-# and silence past the timeout resets the node. A reset on native_sim stops
-# the process, which is what this watches for.
+# Check the five-day floor and contact reporting on the Linux target.
+# Unit tests advance a fake clock to cover expiry without waiting five days.
 set -Eeuo pipefail
 
 KFSW_GNDWDT_TEST="$(readlink -f "${BASH_SOURCE[0]}")"
@@ -15,7 +14,7 @@ work_dir="$(mktemp -d /tmp/kfsw-gndwdt-smoke.XXXXXX)"
 node_pid=""
 
 # Matches CONFIG_KFSW_GNDWDT_TIMEOUT_S in tests/config/linux-gndwdt.conf.
-timeout_s=3
+timeout_s=432000
 
 cleanup()
 {
@@ -53,12 +52,10 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-if [[ ! -x "$executable" ]]; then
-	echo "GNDWDT SMOKE: building the node"
-	KFSW_BUILD_DIR="$build_dir" \
-		KFSW_EXTRA_CONF_FILE="$KFSW_TESTS_DIR/config/linux-gndwdt.conf" \
-		"$KFSW_REPO_DIR/tools/build.sh" linux
-fi
+echo "GNDWDT SMOKE: building the node"
+KFSW_BUILD_DIR="$build_dir" \
+	KFSW_EXTRA_CONF_FILE="$KFSW_TESTS_DIR/config/linux-gndwdt.conf" \
+	"$KFSW_REPO_DIR/tools/build.sh" linux
 
 mkfifo "$work_dir/node.in"
 exec 3<>"$work_dir/node.in"
@@ -86,17 +83,8 @@ done
 printf '%s\n' 'gndwdt show' >&3
 wait_for_output "contacts: 6" || fail "recorded contact was not counted"
 
-# Now go quiet. The node has to notice and reset itself. A reset on native_sim
-# re-runs the image in place rather than ending the process, so the evidence is
-# a second boot reporting a software reset.
-wait_for_output "Ground watchdog: no contact for $timeout_s s; resetting" || \
-	fail "the ground watchdog did not report the timeout"
-
-wait_for_output "reset_cause=software" || \
-	fail "the node did not come back from a software reset"
-
-boots="$(grep -c '@BOOT ' "$work_dir/node.log")"
-(( boots >= 2 )) || fail "expected a second boot after the reset, saw $boots"
+printf '%s\n' 'gndwdt timeout 431999' >&3
+wait_for_output 'Timeout refused:' || fail "a timeout below five days was accepted"
 
 cat "$work_dir/node.log"
 echo "GNDWDT RESULT: PASS"

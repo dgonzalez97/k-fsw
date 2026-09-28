@@ -185,6 +185,38 @@ ZTEST(log_history, test_csp_filtered_read_and_completion)
 	(void)csp_close(connection);
 }
 
+ZTEST(log_history, test_csp_long_records_fit_encrypted_link)
+{
+	const size_t lengths[] = {190U, 191U, 220U};
+	char text[221];
+	struct kfsw_log_record retained;
+
+	memset(text, 'x', sizeof(text));
+	for (size_t i = 0; i < ARRAY_SIZE(lengths); i++) {
+		uint64_t sequence = window().end;
+		csp_conn_t *connection;
+		csp_packet_t *packet;
+
+		kfsw_log_error("%.*s", (int)lengths[i], text);
+		connection = query(3U, 1U, 12U);
+		packet = reply(connection, 0U);
+		csp_buffer_free(packet);
+		packet = reply(connection, 1U);
+		zassert_equal(packet->length, 220U);
+		zassert_equal(packet->data[28], lengths[i] > 190U ? 1U : 0U);
+		zassert_equal(packet->data[29], 190U);
+		zassert_mem_equal(&packet->data[30], text, 190U);
+		csp_buffer_free(packet);
+		packet = reply(connection, 2U);
+		zassert_equal(packet->data[10], 0U);
+		zassert_equal(sys_get_be16(&packet->data[11]), 1U);
+		csp_buffer_free(packet);
+		(void)csp_close(connection);
+		zassert_ok(kfsw_log_history_get(sequence, &retained));
+		zassert_equal(strlen(retained.text), MIN(lengths[i], KFSW_LOG_TEXT_SIZE - 1U));
+	}
+}
+
 ZTEST(log_history, test_csp_overwrite_reported)
 {
 	csp_conn_t *connection;

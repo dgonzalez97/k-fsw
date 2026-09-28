@@ -4,6 +4,36 @@
 
 #include <kfsw/platform/lastwords.h>
 
+static bool interrupt_write;
+uint32_t __real_crc32_ieee(const uint8_t *data, size_t size);
+
+uint32_t __wrap_crc32_ieee(const uint8_t *data, size_t size)
+{
+	if (interrupt_write) {
+		struct kfsw_lastwords value;
+
+		interrupt_write = false;
+		kfsw_lastwords_write(KFSW_LASTWORDS_FATAL, 99U, 88U, 77U);
+		zassert_false(kfsw_lastwords_take(&value));
+		zassert_false(kfsw_lastwords_withdraw(KFSW_LASTWORDS_COMMANDED));
+	}
+	return __real_crc32_ieee(data, size);
+}
+
+ZTEST(kfsw_platform_lastwords, test_nested_operations_leave_one_complete_note)
+{
+	struct kfsw_lastwords value;
+
+	interrupt_write = true;
+	kfsw_lastwords_write(KFSW_LASTWORDS_COMMANDED, 1U, 2U, 3U);
+	zassert_false(interrupt_write);
+	zassert_true(kfsw_lastwords_take(&value));
+	zassert_equal(value.reason, KFSW_LASTWORDS_COMMANDED);
+	zassert_equal(value.detail, 1U);
+	zassert_equal(value.uptime_ms, 2U);
+	zassert_equal(value.boot_count, 3U);
+}
+
 /* The note is in RAM start-up doesn't clear, so each case clears it for the next. */
 static void clear_record(void)
 {
