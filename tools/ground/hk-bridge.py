@@ -21,12 +21,14 @@ or the radio on the bench:
 
 import argparse
 import collections
+import contextlib
+import json
+import math
 import socket
 import struct
 import sys
 import time
 
-import serial
 
 # KISS, as libcsp frames it: a start, the escaped frame, and an end.
 FEND = 0xC0
@@ -45,6 +47,8 @@ HK_PORT = 14
 HK_PROTOCOL_VERSION = 1
 HK_HEADER_BYTES = 10
 HK_FLAG_INCOMPLETE = 0x01
+HK_SAMPLE_MAX = 240
+CAPTURE_LINE_MAX = 1024
 
 # Envelope added before the node's frame: 8 bytes of Unix milliseconds and 4 of
 # sequence, the sizes Yamcs reads. Keep in step with ENVELOPE_BYTES in
@@ -66,7 +70,7 @@ def kiss_encode(frame):
 
 
 class KissReader:
-    """Reassemble KISS frames from a byte stream."""
+    """Reassemble bounded KISS data frames; discard damaged frames to FEND."""
 
     def __init__(self):
         self._frame = bytearray()
@@ -78,7 +82,7 @@ class KissReader:
         frames = []
         for byte in data:
             if byte == FEND:
-                if self._started and self._frame:
+                if self._started and self._frame and not self._escaped:
                     frames.append(bytes(self._frame))
                 self._frame.clear()
                 self._started = True
@@ -88,16 +92,23 @@ class KissReader:
             if not self._started:
                 continue
             if self._skip_type_byte:
-                # The TNC command byte, which libcsp always sends as data.
                 self._skip_type_byte = False
+                self._started = byte == TNC_DATA
                 continue
             if self._escaped:
+                if byte not in (TFEND, TFESC):
+                    self._started = False
+                    self._frame.clear()
+                    continue
                 self._frame.append(FEND if byte == TFEND else FESC)
                 self._escaped = False
             elif byte == FESC:
                 self._escaped = True
             else:
                 self._frame.append(byte)
+            if len(self._frame) > CSP_HEADER_BYTES + HK_SAMPLE_MAX + 8:
+                self._started = False
+                self._frame.clear()
         return frames
 
 
@@ -172,6 +183,9 @@ def decode_hk_frame(frame, node):
         # Not housekeeping, or not the node being watched. Not a fault.
         return None, None
 
+    if header["flags"] not in (0, CSP_FCRC32):
+        return None, "unsupported CSP flags"
+
     body = frame[CSP_HEADER_BYTES:]
     if body[-4:] != crc32(body[:-4]):
         return None, "KISS CRC32 mismatch"
@@ -182,8 +196,10 @@ def decode_hk_frame(frame, node):
             return None, "CSP CRC32 mismatch"
         body = body[:-4]
 
-    if len(body) < HK_HEADER_BYTES:
-        return None, "frame shorter than a housekeeping header"
+    try:
+        validate_sample(body)
+    except ValueError as error:
+        return None, str(error)
     return body, None
 
 
@@ -204,84 +220,181 @@ def envelope(sample, host_time_ms):
     return ENVELOPE.pack(when, sequence) + sample
 
 
-def collect(link, reader, args, sport, count, ask):
-    """Read housekeeping off the link for a while, having asked for it or not.
+def validate_sample(sample):
+    if not HK_HEADER_BYTES <= len(sample) <= HK_SAMPLE_MAX:
+        raise ValueError("invalid housekeeping sample length")
+    version, report, _sequence, seconds, count, flags = struct.unpack_from(">BBHIBB", sample)
+    if version != HK_PROTOCOL_VERSION or report >= 16:
+        raise ValueError("unsupported housekeeping version or report")
+    if not 1 <= count <= 64 or flags & ~3:
+        raise ValueError("invalid housekeeping count or flags")
+    if len(sample) < HK_HEADER_BYTES + count:
+        raise ValueError("truncated housekeeping values")
+    if bool(flags & 2) != (seconds == 0):
+        raise ValueError("inconsistent housekeeping clock flag")
 
-    Asking is optional because the decoding is not: a frame is recognised by
-    being housekeeping, so the same loop serves a poller and a listener. A
-    listener adds nothing to the link, which is the whole reason to prefer one
-    when something else is already asking.
-    """
+
+def collect(link, reader, args, sport, count, ask):
+    """Yield received samples; only this request's distinct replies count."""
     if ask:
-        link.reset_input_buffer()
         link.write(build_request(args.source, args.node, sport, args.report, count, 0))
         link.flush()
-
-    samples = []
+    matched = set()
     deadline = time.monotonic() + args.timeout
     while time.monotonic() < deadline:
-        # A poller stops as soon as it has what it asked for. A listener has
-        # asked for nothing, so it reads until its window closes.
-        if ask and len(samples) >= count:
+        if ask and len(matched) >= count:
             break
-        data = link.read(link.in_waiting or 1)
-        if not data:
-            continue
+        data = link.read(min(link.in_waiting or 1, 4096))
         for frame in reader.feed(data):
             sample, problem = decode_hk_frame(frame, args.node)
             if problem:
                 print(f"dropped a frame: {problem}", file=sys.stderr)
             elif sample:
-                samples.append(sample)
-    return samples
+                header = parse_csp_header(frame)
+                matching = (header["destination"] == args.source
+                            and header["dport"] == sport and sample[1] == args.report)
+                if ask and matching:
+                    matched.add(sample)
+                yield sample, int(time.time() * 1000), matching
+    if ask and len(matched) < count:
+        raise TimeoutError(f"received {len(matched)} of {count} requested samples")
+
+
+class RecentSamples:
+    """Keep exact duplicates for at most 60 seconds and 1024 records."""
+
+    def __init__(self):
+        self._seen = collections.OrderedDict()
+
+    def accept(self, node, sample, now):
+        while self._seen and now - next(iter(self._seen.values())) >= 60:
+            self._seen.popitem(last=False)
+        key = (node, sample)
+        if key in self._seen:
+            return False
+        self._seen[key] = now
+        if len(self._seen) > 1024:
+            self._seen.popitem(last=False)
+        return True
+
+
+def capture_record(node, sample, received_ms):
+    return {"version": 1, "node": node, "received_ms": received_ms, "sample": sample.hex()}
+
+
+def read_capture(stream):
+    line_number = 0
+    while line := stream.readline(CAPTURE_LINE_MAX + 1):
+        line_number += 1
+        try:
+            if len(line) > CAPTURE_LINE_MAX or not line.endswith("\n"):
+                raise ValueError("oversized or truncated record")
+            record = json.loads(line)
+            if not isinstance(record, dict) or set(record) != {
+                    "version", "node", "received_ms", "sample"}:
+                raise ValueError("invalid capture fields")
+            if type(record["version"]) is not int or record["version"] != 1:
+                raise ValueError("unsupported capture version")
+            if type(record["node"]) is not int or not 0 <= record["node"] <= 16383:
+                raise ValueError("invalid source node")
+            if (type(record["received_ms"]) is not int
+                    or not 0 <= record["received_ms"] < 2**64):
+                raise ValueError("invalid receipt time")
+            if not isinstance(record["sample"], str):
+                raise ValueError("sample must be hexadecimal text")
+            sample = bytes.fromhex(record["sample"])
+            validate_sample(sample)
+        except (ValueError, TypeError) as error:
+            raise ValueError(f"capture line {line_number}: {error}") from error
+        yield record["node"], sample, record["received_ms"]
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--device", required=True, help="serial device or pseudo-terminal")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--device", help="serial device or native_sim pseudo-terminal")
+    source.add_argument("--replay", help="replay a capture without opening a device")
+    parser.add_argument("--capture", help="write accepted samples to a new JSONL file")
     parser.add_argument("--baud", type=int, default=115200)
-    parser.add_argument("--node", type=int, required=True, help="CSP address of the node to ask")
-    parser.add_argument("--source", type=int, default=16, help="our own CSP address")
-    parser.add_argument("--sport", type=int, default=40, help="CSP source port to listen on")
+    parser.add_argument("--node", type=int, help="CSP address to watch or poll")
+    parser.add_argument("--source", type=int, default=16)
+    parser.add_argument("--sport", type=int, default=40)
     parser.add_argument("--report", type=int, default=0)
-    parser.add_argument("--count", type=int, default=1, help="samples per request")
-    parser.add_argument("--interval", type=float, default=5.0, help="seconds between requests")
-    parser.add_argument("--timeout", type=float, default=2.0, help="seconds to wait for replies")
-    parser.add_argument("--once", action="store_true", help="one request, then stop")
-    parser.add_argument("--listen", action="store_true",
-                        help="never ask; record the housekeeping that already crosses the link")
+    parser.add_argument("--count", type=int, default=1)
+    parser.add_argument("--interval", type=float, default=5.0)
+    parser.add_argument("--timeout", type=float, default=2.0)
+    parser.add_argument("--once", action="store_true")
+    parser.add_argument("--listen", action="store_true", help="receive without transmitting")
     parser.add_argument("--yamcs", default="127.0.0.1:10015",
-                        help="host:port of the Yamcs UDP link, or 'none' to only print")
+                        help="host:port of the UDP link, or 'none'")
     args = parser.parse_args()
+    if args.replay and (args.capture or args.listen or args.node is not None):
+        parser.error("--replay cannot be combined with --capture, --listen or --node")
+    if args.device and (args.node is None or not 0 <= args.node <= 16383):
+        parser.error("--device requires --node in 0..16383")
+    if not (0 <= args.source <= 16383 and 16 <= args.sport <= 63
+            and 0 <= args.report < 16 and 1 <= args.count <= 255 and args.baud > 0):
+        parser.error("invalid address, port, report, count or baud rate")
+    if (not math.isfinite(args.timeout) or not 0 < args.timeout <= 3600
+            or not math.isfinite(args.interval) or not 0 <= args.interval <= 3600):
+        parser.error("timeout must be in (0,3600], interval in [0,3600]")
 
-    sink = None
-    if args.yamcs != "none":
-        host, _, port = args.yamcs.partition(":")
-        sink = (socket.socket(socket.AF_INET, socket.SOCK_DGRAM), (host, int(port)))
+    with contextlib.ExitStack() as stack:
+        sink = None
+        if args.yamcs != "none":
+            host, separator, port = args.yamcs.rpartition(":")
+            if not separator or not host or not port.isdigit() or not 1 <= int(port) <= 65535:
+                parser.error("--yamcs must be host:port or none")
+            sink = (stack.enter_context(socket.socket(socket.AF_INET, socket.SOCK_DGRAM)),
+                    (host, int(port)))
+        capture = stack.enter_context(open(args.capture, "x", encoding="utf-8")) if args.capture else None
 
-    reader = KissReader()
-    # Only recent sequence numbers are kept; they wrap at 65536 anyway.
-    seen = collections.deque(maxlen=1024)
-    with serial.Serial(args.device, args.baud, timeout=0.1) as link:
+        def forward(sample, received_ms):
+            print(describe(sample), flush=True)
+            if sink:
+                sink[0].sendto(envelope(sample, received_ms), sink[1])
+            else:
+                print(f"  {sample.hex()}", flush=True)
+
+        if args.replay:
+            stream = stack.enter_context(open(args.replay, encoding="utf-8"))
+            for _node, sample, received_ms in read_capture(stream):
+                forward(sample, received_ms)
+            return 0
+
+        import serial
+        link = stack.enter_context(serial.Serial(args.device, args.baud, timeout=min(0.1, args.timeout),
+                                                  write_timeout=args.timeout, exclusive=True))
+        reader = KissReader()
+        recent = RecentSamples()
+        sport = args.sport
         while True:
-            samples = collect(link, reader, args, args.sport, args.count, not args.listen)
-            if not samples and not args.listen:
-                print("no reply", file=sys.stderr)
-            for sample in samples:
-                sequence = struct.unpack_from(">H", sample, 2)[0]
-                if sequence in seen:
-                    continue
-                seen.append(sequence)
-                print(describe(sample))
-                if sink:
-                    sink[0].sendto(envelope(sample, int(time.time() * 1000)), sink[1])
-                else:
-                    print(f"  {sample.hex()}")
+            failed = False
+            try:
+                for sample, received_ms, _matching in collect(
+                        link, reader, args, sport, args.count, not args.listen):
+                    if not recent.accept(args.node, sample, time.monotonic()):
+                        continue
+                    if capture:
+                        capture.write(json.dumps(capture_record(args.node, sample, received_ms)) + "\n")
+                        capture.flush()
+                    forward(sample, received_ms)
+            except TimeoutError as error:
+                print(f"no reply: {error}", file=sys.stderr)
+                failed = True
             if args.once:
-                return 0
-            time.sleep(args.interval)
+                return 1 if failed else 0
+            if not args.listen:
+                sport = 16 + (sport - 15) % 48
+                time.sleep(args.interval)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.exit(130)
+    except (OSError, ValueError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        sys.exit(1)

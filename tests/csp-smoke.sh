@@ -146,9 +146,13 @@ printf '%s\n' \
 	'csp counters' \
 	'csp counters clear' \
 	'csp interfaces' \
+	'csp ifstat 2 KISS' \
+	'csp ifstat 2 LOOP' \
+	'csp ifstat 2 missing' \
 	'csp routes' \
 	'csp ping 2' \
 	$'csp p\t 2' \
+	'csp ifstat 2 KISS' \
 	'param list 2' \
 	'param get 2 test_u32' \
 	'param set 2 test_u32 1234' \
@@ -325,6 +329,10 @@ node1_expected=(
     "routes"
     "last_can_error=0 (none)"
     "CSP counters cleared"
+    "CSP ifstat node=2 interface=KISS tx="
+    "CSP ifstat node=2 interface=LOOP tx="
+    "CSP ifstat node=2 interface=missing: failed ("
+    "autherr=0 frame=0 txbytes="
 )
 
 for expected in "${node1_expected[@]}"; do
@@ -332,6 +340,17 @@ for expected in "${node1_expected[@]}"; do
         fail "node 1 shell output is missing: $expected"
     fi
 done
+
+python3 - "$work_dir/node1.log" <<'PYTEST'
+import re
+import sys
+from pathlib import Path
+rows = re.findall(r'CSP ifstat node=2 interface=KISS tx=(\d+) rx=(\d+)',
+                  Path(sys.argv[1]).read_text())
+assert len(rows) >= 2, rows
+first, last = tuple(map(int, rows[0])), tuple(map(int, rows[-1]))
+assert last[0] > first[0] and last[1] > first[1], rows
+PYTEST
 
 cat "$work_dir/node1.log"
 cat "$work_dir/node2.log"

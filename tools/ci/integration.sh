@@ -10,12 +10,28 @@ if ! command -v socat >/dev/null 2>&1; then
 	exit 1
 fi
 
+# A workspace checkout keeps its tools in .venv; hosted CI installs them into
+# the job's own Python instead.
+kfsw_python="${KFSW_PYTHON:-}"
+if [[ -z "$kfsw_python" ]]; then
+	if [[ -x "$KFSW_REPO_DIR/../.venv/bin/python" ]]; then
+		kfsw_python="$KFSW_REPO_DIR/../.venv/bin/python"
+	else
+		kfsw_python="python3"
+	fi
+fi
+
 # Include the temperature example so the Yamcs bridge has a report to pull.
 # native_sim has no sensor, so it reports the reserved value.
 KFSW_EXTRA_CONF_FILE="$KFSW_REPO_DIR/tests/config/param-fixtures.conf;$KFSW_REPO_DIR/config/profiles/linux-temperature.conf" \
 	"$KFSW_CI_DIR/build.sh" linux
 KFSW_PRISTINE=always "$KFSW_REPO_DIR/tests/build-linux-node2.sh"
 
+echo "INTEGRATION: ground tools and HK capture/replay"
+"$kfsw_python" -m unittest discover -s "$KFSW_REPO_DIR/tests/ground" -v
+diagnostics_output="$(mktemp -d /tmp/kfsw-diagnostics.XXXXXX)/run"
+"$kfsw_python" "$KFSW_REPO_DIR/tests/diagnostics-smoke.py" \
+	--executable "$KFSW_REPO_DIR/../build/linux/zephyr/zephyr.exe" --output "$diagnostics_output"
 echo "INTEGRATION: shell and local PARAM"
 "$KFSW_REPO_DIR/tests/shell-smoke.sh"
 

@@ -135,6 +135,33 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
+static int cmd_csp_ifstat(const struct shell *sh, size_t argc, char **argv)
+{
+	struct kfsw_csp_interface_stats stats;
+	int parse_error = 0;
+	unsigned long node = shell_strtoul(argv[1], 10, &parse_error);
+	int result;
+
+	ARG_UNUSED(argc);
+	if ((parse_error != 0) || (node > 16383U)) {
+		shell_error(sh, "CSP node must be in range 0..16383");
+		return -EINVAL;
+	}
+	result = kfsw_csp_interface_stats_read((uint16_t)node, argv[2], KFSW_CSP_PING_TIMEOUT_MS,
+					       &stats);
+	if (result != 0) {
+		shell_error(sh, "CSP ifstat node=%lu interface=%s: failed (%d)", node, argv[2],
+			    result);
+		return result;
+	}
+	shell_print(sh, "CSP ifstat node=%lu interface=%s tx=%u rx=%u txerr=%u rxerr=%u drop=%u",
+		    node, stats.name, stats.tx_packets, stats.rx_packets, stats.tx_errors,
+		    stats.rx_errors, stats.dropped_packets);
+	shell_print(sh, "autherr=%u frame=%u txbytes=%u rxbytes=%u irq=%u", stats.auth_errors,
+		    stats.frame_errors, stats.tx_bytes, stats.rx_bytes, stats.interrupts);
+	return 0;
+}
+
 static int cmd_csp_counters(const struct shell *sh, size_t argc, char **argv)
 {
 	struct kfsw_csp_counters counters;
@@ -345,6 +372,8 @@ static int cmd_csp_clock(const struct shell *sh, size_t argc, char **argv)
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(csp_commands,
+	SHELL_CMD_ARG(ifstat, NULL, "Read remote counters: ifstat <node> <interface>.",
+		      cmd_csp_ifstat, 3, 0),
 	SHELL_CMD_ARG(clock, NULL,
 		      "Time: clock, clock set <utc>, clock <node>, clock <node> sync.",
 		      cmd_csp_clock, 1, 2),
