@@ -24,7 +24,7 @@ def main():
         subprocess.run([sys.executable, str(ROOT / 'tools/ground/stage-file.py'),
                         '--flash', str(flash), '--offset', '0xfc000', '--size', '0x40000',
                         str(ROOT / 'tests/procedures/utc-wait.txt'), '/ftp/procedures/utc-wait.txt'],
-                       check=True, capture_output=True, text=True, timeout=10)
+                       check=True, text=True, timeout=10)
     fixture = NativeNode(args.executable, args.output / 'node', flash) if args.executable else BenchNode(args.serial, None, args.output / 'node')
     with fixture as node:
         original = node.command('csp clock', r'clock: ([^\r\n]+)')[1]
