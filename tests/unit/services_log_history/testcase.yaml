@@ -1,0 +1,9 @@
+common:
+  tags: [unit, services, log]
+  platform_allow: [native_sim/native/64]
+  integration_platforms: [native_sim/native/64]
+tests:
+  kfsw.services.log_history: {}
+  kfsw.services.log_history.local:
+    extra_configs:
+      - CONFIG_KFSW_LOG_HISTORY_CSP=n

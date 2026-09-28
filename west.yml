@@ -1,5 +1,6 @@
 manifest:
   version: "1.2"
+  group-filter: [-host-tools]
 
   remotes:
     - name: zephyrproject
@@ -9,6 +10,12 @@ manifest:
       url-base: https://github.com/dgonzalez97
 
   projects:
+    - name: kfsw-csp-tools
+      remote: kfsw
+      revision: a905a30c23a271b4d81a3961c3a24f4e46ce1b68
+      path: tools/kfsw-csp-tools
+      groups: [host-tools]
+
     - name: zephyr
       remote: zephyrproject
       revision: v4.4.0
@@ -22,12 +29,12 @@ manifest:
 
     - name: kfsw-services
       remote: kfsw
-      revision: 9fc6e87ae028ae1a947aee5ea1ec7de18c939934
+      revision: b03c78af06bed6b0e6b1b6b6498fe25c6f70acf4
       path: kfsw-services
 
     - name: kfsw-comms
       remote: kfsw
-      revision: d35abd4986507613224c76402774781e49cf533d
+      revision: 06b4bec390eb3af12c0bbe809ff608253a4c2206
       path: kfsw-comms
 
     - name: kfsw-modules

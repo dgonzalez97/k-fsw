@@ -62,6 +62,9 @@
 #endif
 #define KFSW_LOG_MODULE KFSW_LOG_MODULE_APP
 #include <kfsw/services/log.h>
+#if CONFIG_KFSW_LOG_HISTORY_CSP
+#include <kfsw/services/log_history.h>
+#endif
 #if CONFIG_KFSW_PARAM
 #include <kfsw/services/parameter.h>
 #if CONFIG_KFSW_PARAM_TEST_DEFINITIONS
@@ -317,6 +320,16 @@ int main(void)
 #endif
 		}
 	}
+
+#if CONFIG_KFSW_LOG_HISTORY_CSP
+	if (csp_started) {
+		result = kfsw_log_history_server_start();
+		if (result != 0) {
+			startup_failures++;
+			kfsw_log_error("Failed to start log history server: %d", result);
+		}
+	}
+#endif
 
 #if CONFIG_KFSW_FWU_FILES
 	result = kfsw_fwu_files_mount();

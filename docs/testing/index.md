@@ -18,6 +18,23 @@ For a focused native suite:
 ./k-fsw/tools/ci/unit.sh -s kfsw.services.fwu
 ```
 
+## Linux diagnostics
+
+The normal integration workflow includes the Python ground-tool tests and the
+HK capture/replay fixture. To include the optional CSP tools fork, from `k-fsw`:
+
+```bash
+tools/kfsw-linux build
+tools/kfsw-linux csp-tools build
+tools/kfsw-linux diagnostics ../build/diagnostics/run-1
+```
+
+Use a new output directory. The fixture starts its own native node and keeps
+its console, flash file, captures and replay checks there. Focused tests are
+`tests/ground/` and Twister suite `kfsw.comms.ifstats`. Robot's `diagnostics`
+suite also has software cases and a physical case; the latter remains pending.
+See `tests/hil/diagnostics/README.md` for explicit bench inputs and side effects.
+
 ## Bench tests
 
 Physical tests are opt-in. Check the board, wiring, bitrate, and power before

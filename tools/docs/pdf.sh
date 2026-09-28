@@ -53,6 +53,11 @@ manual_sources=(
 	"$KFSW_REPO_DIR/docs/status/index.md"
 )
 
+resource_path="$KFSW_REPO_DIR/docs"
+for input in "${manual_sources[@]}"; do
+	resource_path+=":$(dirname "$input")"
+done
+
 for input in "${manual_sources[@]}" \
 	"$KFSW_PDF_SOURCE_DIR/guide.css" \
 	"$KFSW_PDF_SOURCE_DIR/links.lua"; do
@@ -76,7 +81,7 @@ pandoc \
 	--file-scope \
 	--standalone \
 	--self-contained \
-	--resource-path="$KFSW_REPO_DIR/docs" \
+	--resource-path="$resource_path" \
 	--number-sections \
 	--toc \
 	--toc-depth=2 \

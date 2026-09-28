@@ -145,25 +145,142 @@ so read them as an indication. `csp counters clear` zeroes them before a run.
 Parameter table 4 carries the same values, so a ground station reads them like
 any other parameter.
 
+## Remote interface counters
+
+`csp ifstat 2 KISS` reads a named interface on node 2 through CSP management.
+It reports packet and byte counts, transmit/receive errors, drops, authentication
+and framing errors, and the driver's interrupt count. `csp interfaces` still
+lists this node's interfaces; the remote name must be known beforehand.
+
+The query has a one-second timeout. An unknown interface also times out because
+CMP has no not-found reply. Counts can wrap and change while read, and the
+query itself contributes traffic. Parameter table 4 continues to expose the
+aggregate counters.
+
 ## Capturing traffic
 
-Counters say that something went wrong; a capture says what. The bench uses
-[kfsw-csp-tools](https://github.com/dgonzalez97/kfsw-csp-tools), a fork of
-Daniel Estevez's `csp-tools`:
+[kfsw-csp-tools](https://github.com/dgonzalez97/kfsw-csp-tools) is an optional
+host dependency pinned in `west.yml`. Its CAN/ZMQ transports, `cspdump` and
+`csp-ping-server` use CSP 1. Their four-byte headers and original Wireshark
+dissector do not match K-FSW's CSP 2 configuration. The adapted `csp-iperf`
+also supports CSP 2 over KISS.
 
-| Tool | Use |
+The fork's `csp-kiss` entry point supports CSP 2 directly on the native Linux
+PTY or a serial KISS link. It implements ping, CMP interface statistics,
+node discovery, remote log retrieval and passive capture.
+
+From `k-fsw`, with Rust 1.88 or newer installed:
+
+```bash
+west update kfsw-csp-tools
+./tools/kfsw-linux csp build
+./tools/kfsw-linux run
+```
+
+Use the `uart_1 connected to pseudotty` path printed by that node in another
+terminal. One program uses that PTY at a time:
+
+```bash
+./tools/kfsw-linux csp --device /dev/pts/7 ping --node 1 --count 5
+./tools/kfsw-linux csp --device /dev/pts/7 ifstat --node 1 --interface KISS
+./tools/kfsw-linux csp --device /dev/pts/7 dump --seconds 10 --pcap-file traffic.pcap
+```
+
+The source address defaults to 16; `--baud` defaults to 115200. Both KISS and
+CSP CRC32C checks are verified. An unanswered ping or interface query fails.
+A capture sends nothing and records packets transmitted by the node, such as
+HK beacons or pings issued from its shell. It fails if no packets arrive.
+
+PCAP uses LINKTYPE_USER0 (147), with the original six-byte CSP 2 header and
+payload, including any CSP checksum. Only KISS framing and its outer checksum
+are removed. The old CSP 1/ZMQ dissector does not decode this format. Output
+files must be new. Host-tool builds are separate from firmware builds, and
+normal west updates leave the `host-tools` group disabled.
+
+## Echo throughput and RTT
+
+```bash
+./tools/kfsw-linux csp perf --device /dev/pts/7 --dest-addr 1 \
+  --packet-size 64 --tx-rate 640 --duration 10 --reply-timeout 1 --json
+```
+
+`csp build` builds both host binaries. `perf` dispatches to `csp-iperf`; put
+`perf` before its options. It uses the node's existing ping service and does
+not change clocks or firmware configuration. The source address defaults to
+30 (`--src-addr`), baud to 115200. The source must be unused and the link must
+have only one host reader.
+
+The offered rate is CSP bytes/second, including the CSP header/checksum but
+excluding KISS framing. Replies must match both addresses, ports, a random
+run ID, sequence and the full expected payload. RTT uses host monotonic time.
+JSON reports unique replies, final loss, duplicate/reordered/late replies and
+RTT. Silence and trailing loss count as loss; a reordered reply within its
+deadline recovers its gap. The run ends after the sending duration and reply
+drain, exiting 2 on any loss. Invalid rates fail before the device is opened.
+
+TX byte rate uses the sending window; RX rates include the final drain and
+its duration is reported as `elapsed_seconds`. Actual rate can be lower than
+the offered rate. Native PTYs verify protocol behavior, not physical capacity.
+Use 64-byte packets for the smoke test; larger sizes must fit the node's CSP
+buffers. `--reply-size` is for a separately configured CSP 1 echo server;
+K-FSW's standard ping echoes the original size. CAN/ZMQ remain CSP 1 only.
+See `_agents/csp-iperf.md` for validation notes and
+`tests/hil/diagnostics/README.md` for the bench fixture in the application
+checkout.
+
+## Remote text logs and discovery
+
+```bash
+./tools/kfsw-linux csp --device /dev/pts/7 logs --node 1 --output logs.jsonl
+./tools/kfsw-linux csp --device /dev/pts/7 logs --node 1 --count 16 --min-level 2
+./tools/kfsw-linux csp --device /dev/pts/7 discover --nodes 1,2 --output nodes.jsonl
+./tools/kfsw-linux csp --device /dev/pts/7 --source 100 discover --range 1:16 --budget-ms 5000
+```
+
+`logs` considers the latest 1 to 32 retained records, then filters by severity
+(0 debug, 1 info, 2 warning, 3 error). JSONL contains a start record, log
+records and an end record with `complete: true` only after all expected
+replies arrive. `text_hex` preserves the original bytes; `text` replaces
+invalid UTF-8 with replacement characters. Output files must be new, and
+each record is flushed. A failed transfer keeps partial output and exits
+nonzero. An absent end record also means incomplete output. The global
+`--timeout-ms` is the budget for the entire log transfer; raise it for slow
+links. Use `--port` inside `logs` when the node's log port differs from 13.
+
+`discover` queries explicit unicast addresses or an inclusive range, up to
+64 addresses. It pings each node and then asks for CMP identity. It reports
+`identified`, `reachable` without a valid identity, `no_reply`, `invalid_ping`,
+or `not_queried` when the overall budget expires. An unanswered node is an
+inventory result; an unfinished inventory exits nonzero. Its final summary
+states whether every requested node was queried. `--timeout-ms` bounds each
+exchange and `--budget-ms` bounds the whole inventory. Ctrl-C stops either
+command; flushed records remain, without a successful completion marker.
+
+The source address defaults to 16 and must not be included in the requested
+nodes. Address 16383 is excluded. `discover` observes nodes reachable through
+configured CSP routes; it does not implement ARP, build a routing topology,
+or detect duplicate addresses. Queries use the existing ping and CMP services
+and make no configuration or clock changes.
+
+### Log history wire format
+
+All integers below are big endian. Requests and replies require CSP CRC32C;
+the KISS link adds its own checksum. One request is served per connection.
+
+| Message | Fields, in order |
 | --- | --- |
-| `cspdump` | Read packets from a CAN interface or a ZMQ socket and write a pcap |
-| `csp-iperf` | Send packets and measure throughput, round trip time and losses |
-| `csp-ping-server` | Answer those packets when the far end is not a K-FSW node |
+| Request (12 bytes) | version u8 = 1, minimum severity u8, count u16 (1 to 32), nonce u64 |
+| Reply header (10 bytes) | version u8 = 1, type u8, echoed nonce u64 |
+| Start, type 0 (34 bytes total) | header, first sequence u64, exclusive end sequence u64, overwritten count u64 |
+| Record, type 1 (30 to 221 bytes total) | header, sequence u64, uptime_ms u64, module u8, severity u8, truncated u8 (0/1), text length u8, text bytes |
+| End, type 2 (13 bytes total) | header, status u8, sent record count u16 |
 
-It also carries a Wireshark dissector for CSP over ZMQ, so a capture opens with
-the fields named. On the CAN bench, point `cspdump` at the same SocketCAN
-interface the Linux node uses and the capture covers both directions.
-
-K-FSW answers the CSP ping service itself, so `csp-iperf` measures a link
-against the flight image with nothing added to it. The tools are Rust programs
-that run on the bench host. No build, test or release artifact depends on them.
+End statuses: 0 finished, 1 a requested record was overwritten, 2 no packet
+buffer for a record. Invalid requests receive no response. An exhausted packet
+pool can also prevent start/end transmission, resulting in a client timeout.
+The nonce distinguishes separate reads; it is not authentication. Module IDs
+use `enum kfsw_log_module` from the services API. Reads do not generate a log
+message themselves.
 
 ## Test topologies
 
