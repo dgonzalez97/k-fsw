@@ -320,8 +320,9 @@ the node's shell prints for the same sample.
 
 ## Radio
 
-Only one process opens each physical interface. `kfsw-gnd-uhf` opens the
-Holybro serial device, and the other ground roles reach it over CSP.
+Only one process opens each physical interface. A serial bridge connects the
+`kfsw-gnd-uhf` KISS PTY to the Holybro device; other ground roles reach the
+gateway over CSP. See the Holybro fixture below for the bridge command.
 
 ```text
 tests/hil/radio-uhf/

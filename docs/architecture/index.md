@@ -21,7 +21,7 @@ arguments, call a public API and print the result.
 Zephyr supplies the kernel, drivers, filesystem integration, shell, and build
 tools. [libcsp](https://github.com/libcsp/libcsp) supplies the network stack;
 [libparam](https://github.com/spaceinventor/libparam) supplies the remote
-parameter codec. Their source and licences stay upstream.
+parameter codec. The manifest pins K-FSW forks; each keeps its upstream licence.
 
 ## Dependencies
 

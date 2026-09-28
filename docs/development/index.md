@@ -107,9 +107,8 @@ it from the declared remote.
 ## Forked dependencies
 
 `libcsp` and `libparam` are pinned to K-FSW forks, `dgonzalez97/kfsw-libcsp`
-and `dgonzalez97/kfsw-libparam`, on their `kfsw` branches. Each fork has a
-`KFSW.md` listing what differs from upstream. `kfsw-libparam` lists nothing and
-exists so the pin cannot move.
+and `dgonzalez97/kfsw-libparam`. Check `west.yml` for the exact revisions and
+each fork's `KFSW.md` for its changes from upstream.
 
 Carry a change as one commit with its reason in the message, rebase the branch
 onto upstream instead of merging upstream into it, and move the `west.yml`

@@ -207,8 +207,8 @@ exchanges, bad payloads and timeouts:
 ```
 
 The raw peer polls USART3, so at 57600 baud printing or sleeping while bytes
-arrive can overrun it. The K-FSW UART receive path is interrupt driven and
-doesn't have this problem.
+arrive can overrun it. K-FSW receives in the UART interrupt handler; check its
+error and drop counters under load too.
 
 ## CSP/KISS
 
@@ -242,8 +242,8 @@ frame is a lost sample, and the sequence numbers show which one.
 
 ## Results
 
-On 30 August 2026 this bench passed the raw test and the CSP/KISS test,
-including remote parameters. The devices were:
+The recorded bench run passed the raw test and the CSP/KISS test, including
+remote parameters. Its source revision was not recorded here. The devices were:
 
 | Function | USB identity | Device |
 | --- | --- | --- |

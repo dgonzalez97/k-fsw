@@ -41,6 +41,8 @@ service:
 | `fwu` | `CONFIG_KFSW_FWU` |
 | `watchdog` | `CONFIG_KFSW_WATCHDOG` |
 | `health` | `CONFIG_KFSW_HEALTH` |
+| `gndwdt` | `CONFIG_KFSW_GNDWDT` |
+| `resmon` | `CONFIG_KFSW_RESMON` |
 | `uhf` | `CONFIG_KFSW_RADIO_UHF_SHELL` |
 | `temp` | `CONFIG_KFSW_TEMP_EXAMPLE_SHELL` |
 | `boton_test`, `test` | `CONFIG_KFSW_BOTON_TEST_SHELL` |
@@ -195,7 +197,9 @@ kfsw:~$ param table 2 32
 32  0x38  last_uptime_ms   u32  r  5427214
 ```
 
-All three at zero means the node lost power.
+All three at zero means no valid reset note was found. Power loss is one
+possible cause; a reset before a note was written gives the same result.
+Check the hardware reset cause as well.
 
 ## UART/KISS
 
@@ -365,8 +369,9 @@ info node=2: OK uptime_ms=4140 storage=ready free_bytes=12288
 
 The name is looked up in the local registry before the request is sent, so
 both nodes need the same command IDs. `[mutating]` commands change the node.
-Remote commands need `CONFIG_KFSW_COMMAND_CSP` (port 11). There is no
-authentication.
+Remote commands need `CONFIG_KFSW_COMMAND_CSP` (port 11). The command service
+does not authenticate callers. Radio encryption can protect that link;
+other interfaces need their own access policy.
 
 ## Events
 
@@ -468,8 +473,10 @@ The raw mask is printed as well because several causes can be latched at once;
 
 ## Scripts
 
-Commands are not retried. A timeout can mean the reply was lost after the
-command ran, so check the state before sending it again. Wait for `@READY`,
+Ordinary commands are not retried. `cmd retry` uses a ticket to suppress
+duplicates within that invocation when `CONFIG_KFSW_COMMAND_RETRY` is enabled.
+A new invocation is a new operation. A timeout can mean the reply was lost
+after the command ran, so check the state before sending it again. Wait for `@READY`,
 send one command, check its output and wait for the prompt before the next
 one. Don't rely on the spacing of shell output; use the C APIs or the CSP
 services when a script needs a stable format.

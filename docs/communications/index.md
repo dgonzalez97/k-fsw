@@ -122,9 +122,10 @@ Services never read UART bytes.
 5. Bind the ping handler.
 6. Start the router thread, which calls `csp_route_work()`.
 
-Services bind their ports after `kfsw_csp_init()` and before
-`kfsw_csp_start()`. The API gives the state, interfaces, routes, free buffers
-and ping. `csp interfaces` and `uart info` show the counters since boot.
+Services bind their ports after `kfsw_csp_init()`. The application starts
+the router before starting its remote services. The API gives the state,
+interfaces, routes, free buffers and ping. `csp interfaces` and `uart info`
+show the counters since boot.
 
 ## Counters
 
@@ -225,8 +226,7 @@ the offered rate. Native PTYs verify the protocol; only a real link shows its ca
 Use 64-byte packets for the smoke test; larger sizes must fit the node's CSP
 buffers. `--reply-size` is for a separately configured CSP 1 echo server;
 K-FSW's standard ping echoes the original size. CAN/ZMQ remain CSP 1 only.
-See `_agents/csp-iperf.md` for validation notes and
-`tests/hil/diagnostics/README.md` for the bench fixture in the application
+The bench fixture is in `tests/hil/diagnostics/README.md` in the application
 checkout.
 
 ## Remote text logs and discovery

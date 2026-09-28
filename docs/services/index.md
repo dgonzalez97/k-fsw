@@ -234,6 +234,8 @@ registration.
 | 32 | service | `boot` | `kfsw-services/src/boot-parameters/` |
 | 33 | service | `hk` | `kfsw-services/src/hk-parameters/` |
 | 34 | service | `fbo` | `kfsw-services/src/fbo-parameters/` |
+| 35 | service | `gndwdt` | `kfsw-services/src/gndwdt-parameters/` |
+| 36 | service | `resmon` | `kfsw-services/src/resmon-parameters/` |
 | 50 | module | `radio_uhf` | `kfsw-modules/radio-uhf/parameters/` |
 | 51 | module | `temp_example` | `kfsw-modules/temperature-sensor-example/parameters/` |
 | 67 | module | `hw_test` | `kfsw-modules/boton-test/` |
@@ -513,14 +515,9 @@ legacy behavior. Changing clocks does not affect ticket lifetimes.
 
 ## Resource monitor
 
-A thread that runs out of stack fails in a way that is hard to read afterwards,
-and the numbers were only reachable from a bench probe. The resource monitor
-walks the kernel's thread list on a period and records how much stack each one
-has left, so nothing has to be instrumented or registered.
-
-Use is a percentage of each thread's own stack. Bytes alone say nothing across
-threads sized differently: the idle thread sits near its limit by design, while
-a worker with a kilobyte spare may be the one about to fail.
+The resource monitor periodically reads the kernel's thread list and records
+stack use. Threads need no registration. Check both the percentage used and
+the bytes left, under the workload the node will run.
 
 Table 36 carries what it found:
 

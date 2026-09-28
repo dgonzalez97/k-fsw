@@ -5,7 +5,7 @@ role, its CSP address and its peer. There are no drivers or services here.
 
 | Role | CSP node | Use |
 | --- | --- | --- |
-| `kfsw-gnd-uhf` | 16 | Opens the Holybro UHF radio |
+| `kfsw-gnd-uhf` | 16 | UHF gateway; bridge its KISS PTY to the Holybro radio |
 | `kfsw-gnd-uhf-bench` | 16 | UHF gateway routed to flight node 2 |
 | `kfsw-gnd-can` | 16 | Reaches a flight node over CAN |
 | `kfsw-ops` | 19 | Operator shell |
