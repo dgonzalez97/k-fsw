@@ -489,7 +489,7 @@ not commands.
 It is enabled in the Linux image. Both peers must support it and have working
 entropy. A protected invocation first reserves a ticket, then executes it;
 up to three attempts per phase reuse the same request bytes. An older peer
-fails the protected call; the client never silently falls back to legacy.
+fails the protected call; the client never falls back to legacy on its own.
 
 Version 2 adds an eight-byte token to the header (20 bytes total), preserving
 argument encoding. Opcodes 3/4 prepare and return a ticket; opcode 5 executes
