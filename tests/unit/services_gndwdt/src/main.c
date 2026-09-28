@@ -1,5 +1,7 @@
 #include <errno.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 
 #include <zephyr/kernel.h>
 #include <zephyr/ztest.h>
@@ -19,6 +21,11 @@ static void *setup(void)
 	const struct kfsw_command_definition_set *sets[] = {&kfsw_gndwdt_command_definitions};
 
 	zassert_ok(kfsw_command_init(sets, ARRAY_SIZE(sets)));
+#if CONFIG_KFSW_PARAM
+	const struct kfsw_param_definition_set *params[] = {&kfsw_gndwdt_param_definitions};
+
+	zassert_ok(kfsw_param_init(params, ARRAY_SIZE(params)));
+#endif
 	return NULL;
 }
 
@@ -46,6 +53,19 @@ static void feed(uint16_t node, const char *word, bool via_csp, enum kfsw_comman
 
 	(void)kfsw_command_invoke_id(KFSW_COMMAND_ID_GROUND_WTD, &arg, 1U, &source, &result);
 	zassert_equal(result.status, expected);
+	if (expected == KFSW_COMMAND_OK) {
+#if CONFIG_KFSW_PARAM
+		struct kfsw_gndwdt_status status;
+		char reply[KFSW_COMMAND_MAX_DETAIL_SIZE];
+
+		kfsw_gndwdt_get_status(&status);
+		(void)snprintf(reply, sizeof(reply), "ground_wtd_cnt=%u ground_wtd_timeout=%u",
+			       status.remaining_s, status.timeout_s);
+		zassert_equal(strcmp(result.detail, reply), 0);
+#else
+		zassert_equal(strcmp(result.detail, "ground_wtd restarted"), 0);
+#endif
+	}
 }
 
 ZTEST(services_gndwdt, test_stopped_service_rejects_feed)
@@ -147,10 +167,12 @@ ZTEST(services_gndwdt, test_disarming_and_configuration_do_not_feed)
 ZTEST(services_gndwdt, test_timeout_bounds_are_enforced)
 {
 	zassert_ok(kfsw_gndwdt_start());
-	zassert_equal(kfsw_gndwdt_set_timeout_s(432000U - 1U), -ERANGE);
+	zassert_equal(kfsw_gndwdt_set_timeout_s(7200U - 1U), -ERANGE);
 	zassert_equal(kfsw_gndwdt_set_timeout_s(CONFIG_KFSW_GNDWDT_TIMEOUT_MIN_S - 1U), -ERANGE);
 	zassert_equal(kfsw_gndwdt_set_timeout_s(CONFIG_KFSW_GNDWDT_TIMEOUT_MAX_S + 1U), -ERANGE);
-	zassert_ok(kfsw_gndwdt_set_timeout_s(CONFIG_KFSW_GNDWDT_TIMEOUT_MAX_S));
+	zassert_ok(kfsw_gndwdt_set_timeout_s(7200U));
+	zassert_ok(kfsw_gndwdt_set_timeout_s(432000U));
+	zassert_equal(kfsw_gndwdt_set_timeout_s(432001U), -ERANGE);
 }
 
 ZTEST(services_gndwdt, test_elapsed_time_survives_32_bit_wrap)
@@ -178,5 +200,59 @@ ZTEST(services_gndwdt, test_stop_and_status_are_safe)
 	zassert_equal(kfsw_gndwdt_stop(), -EALREADY);
 	kfsw_gndwdt_get_status(NULL);
 }
+
+ZTEST(services_gndwdt, test_get_counts_down_without_feeding)
+{
+	const struct kfsw_command_arg arg = {.type = KFSW_COMMAND_TYPE_TEXT, .value.text = "get"};
+	const struct kfsw_command_source source = {.node = 16U, .via_csp = true};
+	struct kfsw_command_result result;
+	struct kfsw_gndwdt_status before;
+	struct kfsw_gndwdt_status after;
+
+	zassert_ok(kfsw_gndwdt_set_timeout_s(7200U));
+	zassert_ok(kfsw_gndwdt_start());
+	kfsw_gndwdt_get_status(&before);
+	now_ms += 1000U;
+	zassert_ok(kfsw_command_invoke("ground_wtd", &arg, 1U, &result));
+	zassert_equal(strcmp(result.detail, "ground_wtd_cnt=7199 ground_wtd_timeout=7200"), 0);
+	now_ms += 7199U * 1000U;
+	zassert_ok(kfsw_command_invoke_id(KFSW_COMMAND_ID_GROUND_WTD, &arg, 1U, &source, &result));
+	zassert_equal(strcmp(result.detail, "ground_wtd_cnt=0 ground_wtd_timeout=7200"), 0);
+	kfsw_gndwdt_get_status(&after);
+	zassert_equal(after.contacts, before.contacts);
+	zassert_equal(after.last_node, before.last_node);
+	zassert_equal(kfsw_gndwdt_evaluate(), -ETIMEDOUT);
+}
+
+#if CONFIG_KFSW_PARAM
+ZTEST(services_gndwdt, test_parameters_match_reply_and_validate_writes)
+{
+	struct kfsw_param_value value = {.type = KFSW_PARAM_U32, .size = sizeof(uint32_t)};
+	const uint32_t invalid[] = {0U, 7199U, 432001U, UINT32_MAX};
+
+	zassert_ok(kfsw_gndwdt_start());
+	for (size_t i = 0; i < ARRAY_SIZE(invalid); i++) {
+		value.scalar.u32 = invalid[i];
+		zassert_equal(kfsw_param_set("ground_wtd_timeout", &value), -ERANGE);
+	}
+	value.scalar.u32 = 7200U;
+	zassert_ok(kfsw_param_set("ground_wtd_timeout", &value));
+	feed(2U, "KFSWWSFK", true, KFSW_COMMAND_OK);
+	zassert_ok(kfsw_param_get("ground_wtd_timeout", &value));
+	zassert_equal(value.scalar.u32, 7200U);
+	zassert_ok(kfsw_param_get("ground_wtd_cnt", &value));
+	zassert_equal(value.scalar.u32, 7200U);
+	zassert_equal(kfsw_param_set("ground_wtd_cnt", &value), -EACCES);
+	now_ms += 123000U;
+	zassert_ok(kfsw_param_get("ground_wtd_cnt", &value));
+	zassert_equal(value.scalar.u32, 7077U);
+	value.scalar.u32 = 432000U;
+	zassert_ok(kfsw_param_set("ground_wtd_timeout", &value));
+	zassert_ok(kfsw_param_get_by_id((35U << 8) | 0x04U, &value));
+	zassert_equal(value.scalar.u32, 432000U);
+	zassert_ok(kfsw_param_get_by_id((35U << 8) | 0x18U, &value));
+	zassert_equal(value.scalar.u32, 432000U - 123U);
+}
+#endif
 
 ZTEST_SUITE(services_gndwdt, NULL, setup, before, after, NULL);

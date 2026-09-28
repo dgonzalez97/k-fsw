@@ -24,7 +24,8 @@ static int cmd_gndwdt_show(const struct shell *sh, size_t argc, char **argv)
 
 	kfsw_gndwdt_get_status(&status);
 	shell_print(sh, "state: %s", state_name(&status));
-	shell_print(sh, "timeout_s: %u", status.timeout_s);
+	shell_print(sh, "ground_wtd_timeout: %u", status.timeout_s);
+	shell_print(sh, "ground_wtd_cnt: %u", status.remaining_s);
 	shell_print(sh, "since_contact_s: %u", status.since_contact_s);
 	shell_print(sh, "contacts: %u last_node: %u", status.contacts, status.last_node);
 	shell_print(sh, "expiries: %u", status.expiries);

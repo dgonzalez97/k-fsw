@@ -34,8 +34,10 @@ def main():
     parser.add_argument('--output', required=True)
     args = parser.parse_args()
     with NativeNode(args.executable, args.output) as node:
-        assert node.parameter('gndwdt_timeout_s') == 432000
-        node.command('gndwdt timeout 431999', 'Timeout refused:')
+        assert node.parameter('ground_wtd_timeout') == 86400
+        node.command('gndwdt timeout 7199', 'Timeout refused:')
+        node.command('gndwdt timeout 432001', 'Timeout refused:')
+        node.command('param set ground_wtd_timeout 7200', 'ground_wtd_timeout = 7200')
         node.command('cmd ground_wtd KFSWWSFK', 'ground_wtd node=0: denied')
         node.command('gndwdt contact', 'Subcommands:')
         with serial.Serial(node.device, 115200, timeout=.02, write_timeout=1) as port:
@@ -48,14 +50,25 @@ def main():
                 assert exchange(port, request(word))[2] == status
             assert node.parameter('gndwdt_contacts') == count
             for source in (2, 16):
-                assert exchange(port, request(), source=source)[2] == 0
+                reply = exchange(port, request(), source=source)
+                assert reply[2] == 0
+                assert reply[12:] == b'ground_wtd_cnt=7200 ground_wtd_timeout=7200'
                 count += 1
                 assert node.parameter('gndwdt_contacts') == count
                 assert node.parameter('gndwdt_last_node') == source
+            assert node.parameter('ground_wtd_cnt') <= 7200
             time.sleep(2)
+            before_get = node.parameter('ground_wtd_cnt')
+            reply = exchange(port, request(b'get'))
+            assert reply[2] == 0
+            remaining = int(reply[12:].split()[0].split(b'=')[1])
+            assert 0 < remaining <= before_get <= 7198
+            assert reply[12:].endswith(b'ground_wtd_timeout=7200')
+            assert node.parameter('gndwdt_contacts') == count
+            node.command('cmd ground_wtd get', r'ground_wtd_cnt=\d+ ground_wtd_timeout=7200')
             since = node.parameter('gndwdt_since_s')
             assert since >= 2
-            node.command('gndwdt timeout 432000', 'Ground watchdog timeout_s: 432000')
+            node.command('gndwdt timeout 7200', 'Ground watchdog timeout_s: 7200')
             node.command('gndwdt on', 'Ground watchdog on')
             assert node.parameter('gndwdt_since_s') >= since
 
@@ -70,6 +83,7 @@ def main():
             assert reply[2] == 0
             assert exchange(port, execute) == reply
             assert node.parameter('gndwdt_contacts') == count + 1
+            assert reply[20:] == b'ground_wtd_cnt=7200 ground_wtd_timeout=7200'
     print('GNDWDT RESULT: PASS')
 
 
