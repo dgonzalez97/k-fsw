@@ -123,12 +123,6 @@ git -C k-fsw submodule update --init --recursive
 dependency on a detached `HEAD` at the manifest commit. That is normal. Commit
 or stash your work in the dependencies first.
 
-If the shell says `west: command not found`, activate `.venv` or run:
-
-```bash
-./.venv/bin/west update
-```
-
 ## First KFSW-Linux build
 
 ```bash
@@ -295,13 +289,13 @@ While working, run the checks that cover your change:
 ./k-fsw/tools/ci/docs.sh
 ```
 
-Before opening a pull request, run all of them:
+To run the full software sequence:
 
 ```bash
 ./k-fsw/tools/ci/all.sh
 ```
 
-This doesn't use any hardware. See @ref testing for the hardware tests.
+See @ref testing for focused checks and bench tests.
 
 ## Build the documentation
 

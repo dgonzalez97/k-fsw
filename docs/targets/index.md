@@ -2,7 +2,7 @@
 
 [TOC]
 
-## Boards and targets
+## Supported targets
 
 A Zephyr board selects the SoC, devices and flash runner. A K-FSW target adds
 the application configuration and tool defaults under `config/targets/`; for
@@ -33,9 +33,8 @@ table are shell only.
 ## KFSW-Linux
 
 KFSW-Linux is the application built for Zephyr's 64-bit native simulator. It
-compiles the same sources as the NUCLEO build, on simulated devices. It is the
-quickest target to test on, but it says nothing about MCU timing, electrical
-behaviour, interrupt load or flash wear.
+compiles the same sources as the NUCLEO build, on simulated devices. Use it for
+software tests; measure timing, interrupt load and flash behaviour on the MCU.
 
 ```bash
 ./k-fsw/tools/kfsw-linux build
@@ -145,7 +144,7 @@ Sysbuild overrides settings placed in a fragment on the bootloader image.
 
 ### Watchdog
 
-The watchdog is also not in the default image:
+The hardware watchdog needs this profile:
 
 ```bash
 KFSW_EXTRA_CONF_FILE="$PWD/k-fsw/config/profiles/nucleo-watchdog.conf" \

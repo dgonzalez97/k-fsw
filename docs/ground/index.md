@@ -18,9 +18,8 @@ build options.
 These are the reference settings. CSP v2 addresses are 14 bits, so the
 launcher accepts ground nodes from 16 to 16383 and peers from 1 to 16383.
 
-The role, name, prompt, address, peer, radio and build directory come from the
-node file. `status` shows them, and `uhf status` is there when the radio module
-is built in:
+The node file sets the role, name, prompt, address, peer, radio and build
+directory. Use `status` for node identity and `uhf status` for radio settings:
 
 ```text
 kfsw-gnd-uhf# status
@@ -168,10 +167,6 @@ FTP list: PASS entries=1
 browser and archive. Its configuration is the `ground-station/yamcs`
 submodule.
 
-```bash
-cd k-fsw/ground-station/yamcs && ./mvnw yamcs:run    # http://localhost:8090
-```
-
 Nodes answer housekeeping requests, so the bridge polls them:
 
 ```bash
@@ -191,8 +186,8 @@ hk beacon 0 1 5000      # report 0, to node 1, every five seconds
 hk beacon 0 1 0         # stop
 ```
 
-A beacon is the same frame a request gets, sent from the same port, so the
-bridge only has to stop polling:
+Beacons use the same frame format as polled samples. Receive them without
+polling:
 
 ```bash
 ./k-fsw/tools/ground/hk-bridge.py --device /dev/pts/7 --node 1 --listen
@@ -312,8 +307,7 @@ Each UDP datagram has a 12-byte header followed by the frame from the node:
 12  ...  housekeeping frame
 ```
 
-Yamcs reads the time and sequence with these sizes, so each sample keeps its
-own time when several are pulled at once.
+The bridge sends one datagram per sample, preserving its timestamp.
 
 `tests/hk-yamcs-smoke.sh` checks that the bytes the bridge receives match what
 the node's shell prints for the same sample.

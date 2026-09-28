@@ -81,8 +81,8 @@ event record. There are no loops or jumps.
 
 `wait-until <unix-seconds> <late-tolerance-seconds>` waits on the existing UTC
 clock. For example, `wait-until 1900000002 1` permits a step at that UTC second
-or up to one second late. The clock must already be valid; use the ordinary
-clock set/get commands. No time synchronization is started by a procedure.
+or up to one second late. Set the clock before starting the procedure; it does
+not synchronize time.
 The target range is 1..2147483647, matching the current CSP clock.
 
 The initial wait and late tolerance must not exceed `CONFIG_KFSW_FBO_WAIT_MAX_S`
@@ -161,7 +161,7 @@ stays intact for scripts. `log_color` turns colour off.
 (32 records by default, configurable from 1 to 128). `log history` prints up
 to 32 records locally. Each has a sequence, uptime in milliseconds, module,
 severity and up to 191 text bytes; longer messages are marked truncated.
-The existing compile-time and runtime filters apply before retention.
+Log filters apply before retention.
 Zephyr logs, driver output and shell responses are not captured.
 
 `CONFIG_KFSW_LOG_HISTORY_CSP` serves the history on CSP port 16 by default.
@@ -276,9 +276,8 @@ Reads and writes use caller buffers; nothing is allocated.
 `sample` refreshes a value before a local or remote read. It runs under the
 table lock and must not call the parameter API.
 
-Remote write handling uses `kfsw_param_read_stored_entry()` to read the incoming
-value without sampling. Resampling would overwrite that value before the
-change callback applies it.
+Remote writes use `kfsw_param_read_stored_entry()` to skip sampling, which
+would otherwise overwrite the incoming value before `changed` applies it.
 
 ### Console echo and colour
 
@@ -470,13 +469,14 @@ ground   ID 2, port 11  found by ID
 
 Commands are registered at build time as sets and the registry is fixed at
 startup. Duplicate IDs or names, missing handlers and too many arguments are
-rejected. Handlers run on the command thread, one at a time, never in a CSP
-receive context.
+rejected. Handlers run in the caller's thread under the command mutex. Remote
+requests use the command server thread; local calls use the shell or calling
+thread. Handlers do not run on the CSP router thread.
 
-A legacy version 1 message has a 12-byte big-endian header (version, opcode, status, argument
-count, command ID, request ID and payload size) followed by type-length-value
-arguments. Every length is checked before use, and a message always fits one
-CSP packet.
+A version 1 message has a 12-byte big-endian header: version, opcode, status,
+argument count, command ID, request ID and payload size. Type-length-value
+arguments follow the header. Every length is checked before use, and a message
+always fits one CSP packet.
 
 There is no authentication. The request carries the source node and an
 authentication flag that is always false. See @ref kfsw_services_command.
@@ -490,7 +490,7 @@ not commands.
 
 `CONFIG_KFSW_COMMAND_RETRY` adds `cmd retry <node> <name> [arguments]`.
 It is enabled in the Linux image. Both peers must support it and have working
-entropy. A protected invocation first reserves a ticket, then executes it;
+entropy. An invocation first reserves a ticket, then executes it;
 up to three attempts per phase reuse the same request bytes. An unsupported
 peer causes the call to fail. There is no fallback to the legacy protocol.
 
@@ -603,16 +603,15 @@ The existing hardware watchdog and component health checks are unchanged.
 ## Event record
 
 `CONFIG_KFSW_EVENT` keeps events in a RAM ring. Each event has an ID, a
-monotonic timestamp, a sequence number, a severity and a small payload. Logs
-are for the console; events are for results you want to read later.
+monotonic timestamp, a sequence number, a severity and a small payload. Event
+IDs and payloads can be decoded without parsing console text.
 
 ```text
 log    "FTP put node=2 destination=/uplink/test.txt: PASS bytes=256 crc32=0ce9d363"
 event  source=ftp id=1 payload={node:2, bytes:256, crc32:0x0ce9d363}
 ```
 
-Sequence gaps identify missing events. Ground tools decode event IDs and
-payloads independently of console log text.
+Sequence gaps identify missing events.
 
 IDs and payload layouts are declared in each producer's public header. Boot
 records the reset cause, the command service records every dispatch, and file

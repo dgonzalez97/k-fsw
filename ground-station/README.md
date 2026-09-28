@@ -10,7 +10,7 @@ role, its CSP address and its peer. There are no drivers or services here.
 | `kfsw-gnd-can` | 16 | Reaches a flight node over CAN |
 | `kfsw-ops` | 19 | Operator shell |
 
-## yamcs
+## Yamcs
 
 `yamcs/` is a submodule with the
 [mission control configuration](https://github.com/dgonzalez97/kfsw-yamcs),

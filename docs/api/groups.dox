@@ -1,6 +1,6 @@
 /**
  * @defgroup kfsw_platform K-FSW Platform
- * @brief Zephyr-backed platform lifecycle and hardware capabilities.
+ * @brief Time, storage, reset and watchdog support over Zephyr.
  *
  * Platform APIs used by the services and the application. This is not a HAL.
  *
@@ -13,7 +13,7 @@
  *
  * @defgroup kfsw_platform_storage Storage
  * @ingroup kfsw_platform
- * @brief LittleFS backend lifecycle and capacity reporting.
+ * @brief LittleFS setup, mount and capacity.
  *
  * Initialize with kfsw_storage_init(), mount with kfsw_storage_mount(), and
  * query state with kfsw_storage_get_info(). Services use Zephyr filesystem
@@ -40,21 +40,21 @@
  *
  * @defgroup kfsw_comms_uart UART / KISS
  * @ingroup kfsw_comms
- * @brief Independently configured UART transports and end-to-end test support.
+ * @brief UART/KISS configuration, counters and peer tests.
  *
  * kfsw_uart_visit() reports every configured interface and its counters;
  * kfsw_uart_test_peer() verifies and reports the UART selected for a node.
  *
  * @defgroup kfsw_services K-FSW Services
- * @brief Reusable software services composed by the K-FSW application.
+ * @brief Services selected and started by the application.
  *
  * @defgroup kfsw_services_boot Boot
  * @ingroup kfsw_services
- * @brief Stable boot and readiness markers for operators and automation.
+ * @brief Boot and readiness markers.
  *
  * @defgroup kfsw_services_logging Logging
  * @ingroup kfsw_services
- * @brief Runtime log filtering and compile-time-aware logging calls.
+ * @brief Console logging with build-time and runtime filters.
  *
  * @defgroup kfsw_services_param Parameters
  * @ingroup kfsw_services
@@ -100,7 +100,7 @@
  * increases. The record does not survive a reset.
  *
  * @defgroup kfsw_modules K-FSW Modules
- * @brief Compile-time-selected device and subsystem behavior.
+ * @brief Device and subsystem modules selected at build time.
  *
  * Each module has its own state, typed interface and parameter table. The
  * application selects the modules and binds the hardware in devicetree.
