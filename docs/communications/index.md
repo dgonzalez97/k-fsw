@@ -178,7 +178,7 @@ west update kfsw-csp-tools
 ```
 
 Use the `uart_1 connected to pseudotty` path printed by that node in another
-terminal. One program owns that PTY at a time:
+terminal. One program uses that PTY at a time:
 
 ```bash
 ./tools/kfsw-linux csp --device /dev/pts/7 ping --node 1 --count 5
@@ -237,7 +237,7 @@ checkout.
 ./tools/kfsw-linux csp --device /dev/pts/7 --source 100 discover --range 1:16 --budget-ms 5000
 ```
 
-`logs` considers the latest 1–32 retained records, then filters by severity
+`logs` considers the latest 1 to 32 retained records, then filters by severity
 (0 debug, 1 info, 2 warning, 3 error). JSONL contains a start record, log
 records and an end record with `complete: true` only after all expected
 replies arrive. `text_hex` preserves the original bytes; `text` replaces
@@ -269,10 +269,10 @@ the KISS link adds its own checksum. One request is served per connection.
 
 | Message | Fields, in order |
 | --- | --- |
-| Request (12 bytes) | version u8 = 1, minimum severity u8, count u16 (1–32), nonce u64 |
+| Request (12 bytes) | version u8 = 1, minimum severity u8, count u16 (1 to 32), nonce u64 |
 | Reply header (10 bytes) | version u8 = 1, type u8, echoed nonce u64 |
 | Start, type 0 (34 bytes total) | header, first sequence u64, exclusive end sequence u64, overwritten count u64 |
-| Record, type 1 (30–221 bytes total) | header, sequence u64, uptime_ms u64, module u8, severity u8, truncated u8 (0/1), text length u8, text bytes |
+| Record, type 1 (30 to 221 bytes total) | header, sequence u64, uptime_ms u64, module u8, severity u8, truncated u8 (0/1), text length u8, text bytes |
 | End, type 2 (13 bytes total) | header, status u8, sent record count u16 |
 
 End statuses: 0 finished, 1 a requested record was overwritten, 2 no packet
