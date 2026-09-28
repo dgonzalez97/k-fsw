@@ -144,7 +144,7 @@ ZTEST(journal_store, test_bad_crc_skips_only_damaged_slot)
 	zassert_equal(record.event.id, 0);
 }
 
-ZTEST(journal_store, test_bad_header_is_not_silently_reformatted)
+ZTEST(journal_store, test_bad_header_is_kept_not_reformatted)
 {
 	struct fs_dirent before;
 	struct fs_dirent after;
