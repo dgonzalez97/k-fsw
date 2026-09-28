@@ -2,7 +2,7 @@
 
 Run native cases with `tests/hil/run.sh --include firmware-batchesANDsoftware`
 and a new `KFSW_ROBOT_OUT_DIR`. Build `tools/kfsw-linux build` first. Each case
-owns its native node, private flash and PTY.
+has its own native node, private flash and PTY.
 
 Physical cases are prepared, not executed in this session. They require a
 dedicated image with the selected feature, an idle command service and explicit
@@ -40,7 +40,7 @@ local commands and CSP, including its original time, and a new boot identity.
 The physical `journalANDphysical` case requires `CONFIG_KFSW_JOURNAL=y` and
 storage. It adds an unknown-command event and checks local/CSP retrieval. It
 does not reset or power-cycle the board. For the later persistence check, save
-the returned `boot=N`, deliberately reset the dedicated bench image, and run
+the returned `boot=N`, reset the dedicated bench image on purpose, and run
 `tests/journal-smoke.py` with the explicit `--serial`, `--kiss-device`, `--node`
 and `--expected-previous-boot N` arguments and a new output directory. Qualify
 power cuts during record writes and filesystem sync separately. The fixture
