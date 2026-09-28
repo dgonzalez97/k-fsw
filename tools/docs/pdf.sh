@@ -80,7 +80,7 @@ pandoc \
 	--from markdown-citations \
 	--file-scope \
 	--standalone \
-	--self-contained \
+	--embed-resources \
 	--resource-path="$resource_path" \
 	--number-sections \
 	--toc \
@@ -93,6 +93,8 @@ pandoc \
 	--metadata date="$guide_date" \
 	--output "$guide_html" \
 	"${manual_sources[@]}"
+
+"$pdf_python" "$KFSW_DOCS_TOOLS_DIR/check-links.py" "$guide_html"
 
 echo "PDF: WeasyPrint $("$pdf_python" -c 'import weasyprint; print(weasyprint.__version__)')"
 "$pdf_python" -m weasyprint "$guide_html" "$KFSW_PDF_OUTPUT"

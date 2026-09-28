@@ -17,38 +17,40 @@ local references = {
   kfsw_services = { "generated services API reference", nil },
 }
 
-local current_chapter = "guide"
-
-function Header(element)
-  if element.level == 1 then
-    current_chapter = element.identifier
-
-    if element.identifier == "k-fsw" then
-      element.content = { pandoc.Str("Overview") }
-    end
-  elseif element.identifier ~= "" then
-    element.identifier = current_chapter .. "-" .. element.identifier
-  end
-
-  return element
-end
-
 function Pandoc(document)
-  local blocks = pandoc.List()
-  local remove_next_list = false
+  local identifiers = {}
+  local chapters = {}
+  local chapter = "guide"
 
-  for _, block in ipairs(document.blocks) do
-    if block.t == "Header" and block.identifier == "k-fsw-documentation" then
-      remove_next_list = true
-    elseif remove_next_list and block.t == "BulletList" then
-      remove_next_list = false
+  -- Pandoc prefixes IDs with the input filename under --file-scope.
+  document = document:walk({ Header = function(header)
+    local original = header.identifier
+    local short = original:match(".*__(.+)$") or original
+    if header.level == 1 then
+      chapter = short
+      local file = original:match("^(.*)__[^_].*$")
+      if file then identifiers[file] = chapter end
+      chapters[chapter] = chapter
+      header.identifier = chapter
     else
-      blocks:insert(block)
+      header.identifier = chapter .. "-" .. short
     end
-  end
+    identifiers[original] = header.identifier
+    return header
+  end })
 
-  document.blocks = blocks
-  return document
+  return document:walk({ Link = function(link)
+    local fragment = link.target:match("^#(.+)$")
+    if fragment then
+      link.target = "#" .. (identifiers[fragment] or fragment)
+    elseif not link.target:match("^%a[%w+.-]*:") then
+      local folder, anchor = link.target:match("([^/]+)/index%.md#?(.*)$")
+      if folder and chapters[folder] then
+        link.target = "#" .. folder .. (anchor ~= "" and "-" .. anchor or "")
+      end
+    end
+    return link
+  end })
 end
 
 local function reference_inline(label, target)

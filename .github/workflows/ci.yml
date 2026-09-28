@@ -199,7 +199,13 @@ jobs:
       - name: Set up the workspace
         uses: ./k-fsw/.github/actions/workspace
         with:
-          packages: doxygen
+          packages: doxygen pandoc libpango-1.0-0 libpangoft2-1.0-0
+          requirements: k-fsw/docs/pdf/requirements.txt
 
       - name: Build and validate SDK documentation
         run: ./k-fsw/tools/ci/docs.sh
+
+      - name: Check printable guide links and render PDF
+        run: |
+          python -m unittest discover -s k-fsw/tests/docs -v
+          ./k-fsw/tools/docs/pdf.sh
