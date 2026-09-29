@@ -356,6 +356,9 @@ Paths must start with `/` and can't contain `..` or empty components.
 ```text
 kfsw:~$ cmd list
  ID NAME         ARGS   DESCRIPTION
+  9 journal_stats 0 args Read persistent journal status.
+ 10 journal_tail 1 arg  Read a journal event by age, newest is 0.
+ 11 journal_time 1 arg  Read a journal event's sequence and time by age.
   1 noop         0 args Round trip with no effect.
   2 info         0 args Report uptime and storage state.
   4 event_stats  0 args Report event record counters.
@@ -364,10 +367,29 @@ kfsw:~$ cmd list
   7 hk_period    2 args Collect repeatedly: hk_period <report> <ms>, 0 to stop.
   8 hk_clear     1 arg  Forget a report: hk_clear <report>.
   3 reboot       1 arg  [mutating] Reset this node after a short delay: reboot <pin>.
+ 16 ground_wtd   1 arg  [mutating] Ground watchdog: get, or KFSWWSFK to feed over CSP.
 
 kfsw:~$ cmd 2 info
 info node=2: OK uptime_ms=4140 storage=ready free_bytes=12288
 ```
+
+The order is registration order, not ID order.
+
+### Identifier allocation
+
+An ID is part of the wire contract: two nodes must agree on it, so an ID is
+never reused for a different command. Composition commands are defined in
+`app/src/commands/command_definitions.c`; a command that belongs to a service
+is defined by that service and carries its ID in its own header.
+
+| ID | Command | Defined in |
+| --- | --- | --- |
+| 1 to 3 | `noop`, `info`, `reboot` | `k-fsw` composition |
+| 4, 5 | `event_stats`, `event_tail` | `k-fsw` composition |
+| 6 to 8 | `hk_define`, `hk_period`, `hk_clear` | `k-fsw` composition |
+| 9 to 11 | `journal_stats`, `journal_tail`, `journal_time` | `k-fsw` composition |
+| 12 to 15 | free | — |
+| 16 | `ground_wtd` | `kfsw-services`, `gndwdt.h` |
 
 The name is looked up in the local registry before the request is sent, so
 both nodes need the same command IDs. `[mutating]` commands change the node.

@@ -540,6 +540,7 @@ Table 36 exposes the measurements:
 | `stack_sweeps` | r | Sweeps completed |
 | `stack_alerts` | r | Times a sweep first found a thread at the alert level |
 | `stack_threads` | r | Threads the last sweep could read |
+| `stack_running` | r | Whether the periodic sweep is running |
 | `stack_worst_thread` | r | Thread holding the highest stack use |
 
 An event is raised when stack use reaches the alert threshold. Another alert
