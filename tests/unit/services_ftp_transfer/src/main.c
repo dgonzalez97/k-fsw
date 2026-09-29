@@ -25,6 +25,9 @@ DEFINE_FFF_GLOBALS;
 #define STORAGE_PARTITION_NODE DT_CHOSEN(kfsw_storage_partition)
 #define TEST_SINK_PATH KFSW_FTP_STORAGE_ROOT "/transfer.part"
 #define TEST_SOURCE_PATH KFSW_FTP_STORAGE_ROOT "/transfer.src"
+/* TEST_SINK_PATH is this target's partial, which is what resume reads. */
+#define TEST_TARGET_PATH KFSW_FTP_STORAGE_ROOT "/transfer"
+#define TEST_NOTE_PATH KFSW_FTP_STORAGE_ROOT "/transfer.part.map"
 #define TEST_REQUEST_ID 0x51EDU
 
 FAKE_VALUE_FUNC(int, __wrap_kfsw_ftp_link_send, struct kfsw_ftp_link *,
@@ -123,6 +126,8 @@ static void reset_transfer(void *fixture)
 	__wrap_kfsw_ftp_link_receive_fake.custom_fake = deliver_scripted;
 	(void)fs_unlink(TEST_SINK_PATH);
 	(void)fs_unlink(TEST_SOURCE_PATH);
+	(void)fs_unlink(TEST_TARGET_PATH);
+	(void)fs_unlink(TEST_NOTE_PATH);
 }
 
 ZTEST_SUITE(services_ftp_transfer, NULL, transfer_setup, reset_transfer, NULL, NULL);
@@ -151,6 +156,123 @@ ZTEST(services_ftp_transfer, test_receive_writes_every_chunk_and_checksums_them)
 		      "the running checksum should cover the bytes that arrived");
 	zassert_ok(fs_stat(TEST_SINK_PATH, &info));
 	zassert_equal((uint32_t)info.size, total, "the file should hold what was received");
+}
+
+/*
+ * The story resume exists for: a pass ends mid-upload, and the next one sends
+ * only what is missing.
+ */
+ZTEST(services_ftp_transfer, test_an_interrupted_upload_is_continued_from_its_partial)
+{
+	const uint32_t chunk = (uint32_t)sizeof(payload[0]);
+	const uint32_t total = 3U * chunk;
+	uint32_t whole_crc = 0U;
+	uint32_t resume_offset = 0U;
+	uint32_t resume_crc = 0U;
+	struct fs_dirent info;
+
+	for (size_t index = 0U; index < 3U; index++) {
+		whole_crc = crc32_ieee_update(whole_crc, payload[index], chunk);
+	}
+
+	/* The first attempt: one chunk arrives, then the link stops. */
+	transfer.total_size = total;
+	transfer.crc32 = whole_crc;
+	scripted[0] = good_message(0U, 0U, total, whole_crc);
+	scripted_result[1] = -ETIMEDOUT;
+	scripted[2] = good_message(chunk, 1U, total, whole_crc);
+	scripted[3] = good_message(2U * chunk, 2U, total, whole_crc);
+	scripted_count = 4U;
+
+	zassert_ok(kfsw_ftp_partial_note_write(TEST_TARGET_PATH, total, whole_crc));
+	zassert_ok(kfsw_ftp_transfer_open_sink(&transfer, TEST_SINK_PATH));
+	zassert_equal(kfsw_ftp_transfer_receive(&transfer), -ETIMEDOUT);
+	zassert_equal(
+		kfsw_ftp_transfer_finish(&transfer, TEST_TARGET_PATH, TEST_SINK_PATH, -ETIMEDOUT),
+		-ETIMEDOUT);
+
+	/* The partial survived the failure, and the target was not created. */
+	zassert_ok(fs_stat(TEST_SINK_PATH, &info));
+	zassert_equal((uint32_t)info.size, chunk);
+	zassert_equal(fs_stat(TEST_TARGET_PATH, &info), -ENOENT);
+
+	zassert_ok(kfsw_ftp_partial_resume_point(TEST_TARGET_PATH, &workspace, total, whole_crc,
+						 &resume_offset, &resume_crc));
+	zassert_equal(resume_offset, chunk, "the partial's own size is the resume point");
+	zassert_equal(resume_crc, crc32_ieee(payload[0], chunk));
+
+	/* The second attempt starts where the first stopped. The script continues
+	 * from where the first attempt left it, so the partial is left alone.
+	 */
+	memset(&transfer, 0, sizeof(transfer));
+	transfer.link = &link_stub;
+	transfer.workspace = &workspace;
+	transfer.request_id = TEST_REQUEST_ID;
+	transfer.data_opcode = KFSW_FTP_OP_PUT_DATA;
+	transfer.total_size = total;
+	transfer.crc32 = whole_crc;
+	transfer.offset = resume_offset;
+	transfer.actual_crc32 = resume_crc;
+
+	zassert_ok(kfsw_ftp_transfer_open_sink(&transfer, TEST_SINK_PATH));
+	zassert_ok(kfsw_ftp_transfer_receive(&transfer));
+	zassert_equal(transfer.offset, total);
+	zassert_equal(transfer.actual_crc32, whole_crc,
+		      "the checksum must cover the bytes from both attempts");
+	zassert_ok(kfsw_ftp_transfer_finish(&transfer, TEST_TARGET_PATH, TEST_SINK_PATH, 0));
+
+	/* Committed whole, and nothing left behind. */
+	zassert_ok(fs_stat(TEST_TARGET_PATH, &info));
+	zassert_equal((uint32_t)info.size, total);
+	zassert_equal(fs_stat(TEST_SINK_PATH, &info), -ENOENT);
+	zassert_equal(fs_stat(TEST_NOTE_PATH, &info), -ENOENT);
+}
+
+ZTEST(services_ftp_transfer, test_a_partial_of_another_file_is_not_continued)
+{
+	const uint32_t chunk = (uint32_t)sizeof(payload[0]);
+	const uint32_t total = 2U * chunk;
+	uint32_t offset = UINT32_MAX;
+	uint32_t crc = UINT32_MAX;
+
+	/* No note at all. */
+	zassert_ok(kfsw_ftp_partial_resume_point(TEST_TARGET_PATH, &workspace, total, 0x1234U,
+						 &offset, &crc));
+	zassert_equal(offset, 0U);
+	zassert_equal(crc, 0U);
+
+	/* A partial exists and its note is valid, but for a different file. */
+	transfer.total_size = total;
+	scripted[0] = good_message(0U, 0U, total, 0U);
+	scripted_count = 1U;
+	zassert_ok(kfsw_ftp_partial_note_write(TEST_TARGET_PATH, total, 0x1234U));
+	zassert_ok(kfsw_ftp_transfer_open_sink(&transfer, TEST_SINK_PATH));
+	/* One chunk of two, so the script runs dry and the partial stays partial. */
+	zassert_equal(kfsw_ftp_transfer_receive(&transfer), -ENODATA);
+	zassert_ok(fs_close(&transfer.file));
+
+	zassert_ok(kfsw_ftp_partial_resume_point(TEST_TARGET_PATH, &workspace, total, 0x4321U,
+						 &offset, &crc));
+	zassert_equal(offset, 0U, "a different checksum means a different file");
+	zassert_ok(kfsw_ftp_partial_resume_point(TEST_TARGET_PATH, &workspace, total + 1U, 0x1234U,
+						 &offset, &crc));
+	zassert_equal(offset, 0U, "a different size means a different file");
+
+	/* Matching again, and then with the note damaged. */
+	zassert_ok(kfsw_ftp_partial_resume_point(TEST_TARGET_PATH, &workspace, total, 0x1234U,
+						 &offset, &crc));
+	zassert_equal(offset, chunk);
+
+	struct fs_file_t note;
+	uint8_t damaged = 0xFFU;
+
+	fs_file_t_init(&note);
+	zassert_ok(fs_open(&note, TEST_NOTE_PATH, FS_O_WRITE));
+	zassert_equal(fs_write(&note, &damaged, sizeof(damaged)), (ssize_t)sizeof(damaged));
+	zassert_ok(fs_close(&note));
+	zassert_ok(kfsw_ftp_partial_resume_point(TEST_TARGET_PATH, &workspace, total, 0x1234U,
+						 &offset, &crc));
+	zassert_equal(offset, 0U, "a note that does not check out is not trusted");
 }
 
 ZTEST(services_ftp_transfer, test_every_received_frame_is_released_exactly_once)

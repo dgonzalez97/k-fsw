@@ -130,6 +130,21 @@ void __wrap_kfsw_ftp_link_release(struct kfsw_ftp_link_frame *frame)
 	frame->buffer = NULL;
 }
 
+/* Queue one reply, with a field the plain helper leaves zero. */
+static void peer_will_reply_with_offset(uint8_t opcode, uint8_t status, uint32_t offset,
+					uint32_t total_size)
+{
+	struct kfsw_ftp_message *reply = &link_fake.scripted[link_fake.scripted_count];
+
+	memset(reply, 0, sizeof(*reply));
+	reply->opcode = opcode;
+	reply->status = status;
+	reply->offset = offset;
+	reply->total_size = total_size;
+	link_fake.scripted_result[link_fake.scripted_count] = 0;
+	link_fake.scripted_count++;
+}
+
 /* Queue one reply. The request ID is copied from the client's request. */
 static void peer_will_reply(uint8_t opcode, uint8_t status)
 {
@@ -347,6 +362,38 @@ static void write_local_file(const char *virtual_path, size_t size)
 		zassert_equal(fs_write(&file, &byte, 1), 1, "the upload fixture was not written");
 	}
 	zassert_ok(fs_close(&file), "the upload fixture would not close");
+}
+
+/*
+ * An empty file has nothing to send and still has to be created, so a ready
+ * reply whose offset equals the size is correct rather than nonsense. The
+ * integration suite caught this; the test keeps it caught.
+ */
+ZTEST(kfsw_ftp_client_link, test_an_empty_file_is_uploaded)
+{
+	struct kfsw_ftp_transfer_result result = {0};
+
+	write_local_file("/empty.bin", 0U);
+	peer_will_reply_with_offset(KFSW_FTP_OP_PUT_READY, KFSW_FTP_STATUS_OK, 0U, 0U);
+	peer_will_reply_with_offset(KFSW_FTP_OP_PUT_RESULT, KFSW_FTP_STATUS_OK, 0U, 0U);
+
+	zassert_ok(kfsw_ftp_put(PEER_NODE, "/empty.bin", "/empty.bin", &result),
+		   "an empty upload was refused");
+	zassert_equal(result.bytes, 0U);
+	zassert_equal(link_fake.sent[0].flags, KFSW_FTP_FLAG_RESUME,
+		      "the client should always offer to continue");
+}
+
+/* A start past the end would leave the transfer unable to finish. */
+ZTEST(kfsw_ftp_client_link, test_a_start_offset_past_the_end_is_refused)
+{
+	struct kfsw_ftp_transfer_result result = {0};
+
+	write_local_file("/short.bin", 8U);
+	peer_will_reply_with_offset(KFSW_FTP_OP_PUT_READY, KFSW_FTP_STATUS_OK, 9U, 8U);
+
+	zassert_equal(kfsw_ftp_put(PEER_NODE, "/short.bin", "/short.bin", &result), -EBADMSG,
+		      "an impossible start offset was accepted");
 }
 
 ZTEST(kfsw_ftp_client_link, test_an_upload_with_nowhere_to_report_is_refused)
