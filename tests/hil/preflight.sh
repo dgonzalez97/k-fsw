@@ -22,8 +22,15 @@ found_debug=""
 found_second_serial=""
 found_radio=""
 found_can=""
+can_down=""
+serial_without_driver=""
 have_robot=""
 have_terminal=""
+
+# USB identities that carry a serial bridge for the CSP UART or a radio. A board
+# running K-FSW also appears as a serial device, and taking one for the other
+# sends a fixture at the wrong end of the bench.
+SERIAL_BRIDGE_IDS=("0403" "10c4" "1a86" "067b")
 
 usb_id_of() {
 	local device="$1" properties
@@ -57,12 +64,33 @@ discover_serial() {
 			[[ -z "$found_debug" ]] && found_debug="${stable:-$device}"
 			continue
 		fi
-		# Anything else that speaks serial can carry the CSP UART or a radio.
-		# They are the same kind of device, so the shape depends on wiring and
-		# a person has to say which is which.
-		if [[ -z "$found_second_serial" ]]; then
-			found_second_serial="${stable:-$device}"
-		fi
+		# Only a serial bridge can carry the CSP UART or a radio. Another board
+		# running K-FSW is also a serial device and must not be taken for one.
+		for vendor in "${SERIAL_BRIDGE_IDS[@]}"; do
+			if [[ "$id" == "$vendor:"* && -z "$found_second_serial" ]]; then
+				found_second_serial="${stable:-$device}"
+			fi
+		done
+	done
+
+	# A bridge the kernel has not bound has no port, so discovery above cannot
+	# see it at all. Say so rather than leaving a blank.
+	local usb_device vendor_file id
+	for usb_device in /sys/bus/usb/devices/[0-9]*-[0-9]*; do
+		vendor_file="$usb_device/idVendor"
+		[[ -r "$vendor_file" ]] || continue
+		id="$(cat "$vendor_file" 2>/dev/null):$(cat "$usb_device/idProduct" 2>/dev/null)"
+		for vendor in "${SERIAL_BRIDGE_IDS[@]}"; do
+			if [[ "$id" == "$vendor:"* ]]; then
+				local interface bound=""
+				for interface in "$usb_device":*; do
+					[[ -e "$interface/driver" ]] && bound="yes"
+				done
+				if [[ -z "$bound" ]]; then
+					serial_without_driver="${serial_without_driver}${serial_without_driver:+, }$id"
+				fi
+			fi
+		done
 	done
 
 	# An explicit setting always wins over discovery.
@@ -87,20 +115,27 @@ discover_can() {
 		fi
 		return 0
 	fi
+	# A real bus first. One that exists but is down is the common case on a
+	# fresh boot, and saying so is more use than falling back to a virtual one.
 	while read -r name; do
 		[[ -z "$name" ]] && continue
 		if ip link show "$name" 2>/dev/null | grep -q 'state UP'; then
 			found_can="$name"
 			return 0
 		fi
+		can_down="${can_down}${can_down:+, }$name"
 	done < <(ip -brief link show type can 2>/dev/null | awk '{print $1}')
+	if [[ -n "$can_down" ]]; then
+		return 0
+	fi
 	while read -r name; do
 		[[ -z "$name" ]] && continue
 		if ip link show "$name" 2>/dev/null | grep -q 'state UP\|state UNKNOWN'; then
-			found_can="$name"
+			found_can="$name (virtual; no board on it)"
 			return 0
 		fi
 	done < <(ip -brief link show type vcan 2>/dev/null | awk '{print $1}')
+	return 0
 }
 
 discover_host() {
@@ -121,7 +156,7 @@ shape_is_possible() {
 	terminal) [[ -n "$have_robot" && -n "$have_terminal" ]] ;;
 	board) [[ -n "$have_robot" && -n "$found_debug" ]] ;;
 	board-uart) [[ -n "$have_robot" && -n "$found_debug" && -n "$found_second_serial" ]] ;;
-	board-can) [[ -n "$have_robot" && -n "$found_debug" && -n "$found_can" ]] ;;
+	board-can) [[ -n "$have_robot" && -n "$found_debug" && -n "$found_can" && "$found_can" != *virtual* ]] ;;
 	radio) [[ -n "$have_robot" && -n "$found_debug" && -n "${found_radio:-$found_second_serial}" ]] ;;
 	*) return 1 ;;
 	esac
@@ -142,7 +177,13 @@ missing_for() {
 	esac
 	case "$shape" in
 	board-uart) [[ -z "$found_second_serial" ]] && missing+=("a second serial adapter") ;;
-	board-can) [[ -z "$found_can" ]] && missing+=("a CAN interface that is up") ;;
+	board-can)
+		if [[ -n "$can_down" ]]; then
+			missing+=("$can_down brought up: sudo ip link set $can_down up type can bitrate 500000")
+		elif [[ -z "$found_can" || "$found_can" == *virtual* ]]; then
+			missing+=("a CAN interface with a board on it")
+		fi
+		;;
 	radio) [[ -z "${found_radio:-$found_second_serial}" ]] && missing+=("a radio on a serial port") ;;
 	esac
 
@@ -157,10 +198,18 @@ report() {
 	printf '  %-22s %s\n' "debug UART" "${found_debug:-not found}"
 	printf '  %-22s %s\n' "second serial" "${found_second_serial:-not found}"
 	printf '  %-22s %s\n' "radio serial" "${found_radio:-not set; say which serial port it is}"
-	printf '  %-22s %s\n' "CAN interface" "${found_can:-none up}"
+	printf '  %-22s %s\n' "CAN interface" "${found_can:-${can_down:+$can_down (down)}}"
+	printf '  %-22s %s\n' "" "${found_can:-${can_down:-none at all}}" >/dev/null
 	printf '  %-22s %s\n' "Robot Framework" "${have_robot:-missing}"
 	printf '  %-22s %s\n' "terminal runner" "${have_terminal:-missing}"
 	echo
+
+	if [[ -n "$serial_without_driver" ]]; then
+		echo "  A serial bridge is attached but the kernel has not bound it:"
+		echo "  $serial_without_driver. Without a driver it has no port."
+		echo "  This kernel builds ftdi_sio as a module: sudo modprobe ftdi_sio"
+		echo
+	fi
 
 	if [[ -n "$found_debug" && "$found_debug" != /dev/serial/by-id/* ]]; then
 		echo "  Note: $found_debug is not a /dev/serial/by-id path. Those move"
@@ -184,6 +233,17 @@ report() {
 discover_serial
 discover_can
 discover_host
+
+# Emit what a caller should export, so a fixture reaches the device that was
+# discovered instead of whichever one enumerated first.
+if [[ "${1:-}" == "--export" ]]; then
+	[[ -n "$found_debug" ]] && printf 'KFSW_DEBUG_SERIAL=%s\n' "$found_debug"
+	[[ -n "$found_second_serial" ]] && printf 'KFSW_FTDI_DEVICE=%s\n' "$found_second_serial"
+	[[ -n "$found_radio" ]] && printf 'KFSW_RADIO_SERIAL=%s\n' "$found_radio"
+	[[ -n "$found_can" && "$found_can" != *virtual* ]] &&
+		printf 'KFSW_CAN_INTERFACE=%s\n' "$found_can"
+	exit 0
+fi
 
 if [[ $# -gt 0 ]]; then
 	kfsw_shape_needs "$1" >/dev/null || {

@@ -51,6 +51,16 @@ if [[ $# -gt 0 && "$1" != -* ]]; then
 	echo "ROBOT: needs: $(kfsw_shape_needs "$shape")"
 	if [[ -x "$KFSW_HIL_DIR/preflight.sh" ]]; then
 		"$KFSW_HIL_DIR/preflight.sh" "$shape" || exit 1
+		# Point the fixtures at the devices that were found. A bench with two
+		# boards on it has more than one /dev/ttyACM, and the lower number is
+		# not the one under test.
+		while IFS='=' read -r variable value; do
+			[[ -z "$variable" ]] && continue
+			if [[ -z "${!variable:-}" ]]; then
+				export "$variable=$value"
+				echo "ROBOT: $variable=$value"
+			fi
+		done < <("$KFSW_HIL_DIR/preflight.sh" --export)
 	fi
 elif [[ $# -eq 0 ]]; then
 	# Running every suite on a desk that cannot serve them wastes bench time,

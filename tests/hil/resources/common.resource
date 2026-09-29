@@ -5,7 +5,10 @@ Library    Process
 *** Variables ***
 ${KFSW_REPO_DIR}      %{KFSW_REPO_DIR}
 ${KFSW_PYTHON}        ${{__import__('sys').executable}}
-${DEBUG_SERIAL}       %{KFSW_DEBUG_SERIAL=/dev/ttyACM0}
+# No numbered default: /dev/ttyACM0 is whichever board enumerated first, which
+# on a bench with two of them is not the one under test. run.sh sets this from
+# what preflight.sh discovered.
+${DEBUG_SERIAL}       %{KFSW_DEBUG_SERIAL=}
 ${FTDI_DEVICE}        %{KFSW_FTDI_DEVICE=}
 ${HOLYBRO_RADIO}      %{KGROUND_HOLYBRO_DEVICE=}
 
