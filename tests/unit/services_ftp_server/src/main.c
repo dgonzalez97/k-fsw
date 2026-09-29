@@ -232,11 +232,7 @@ ZTEST(kfsw_ftp_server, test_uploading_into_the_read_only_root_is_refused)
 			  "a file was accepted into the read-only root");
 }
 
-/*
- * The wire half of resume: the server reads the note beside the partial and
- * tells the client where to pick up. The engine half is covered in
- * services_ftp_transfer.
- */
+/* The wire half of resume; the engine half is in services_ftp_transfer. */
 ZTEST(kfsw_ftp_server, test_an_upload_is_offered_the_partial_it_left_behind)
 {
 	static const char partial[] = "half";
@@ -284,7 +280,7 @@ ZTEST(kfsw_ftp_server, test_an_upload_without_the_resume_flag_starts_over)
 		      "an upload that did not ask must start at 0");
 }
 
-/* An unknown flag is still refused, so the field stays a contract. */
+/* An unknown flag is still refused. */
 ZTEST(kfsw_ftp_server, test_an_upload_with_an_unknown_flag_is_refused)
 {
 	given_request(KFSW_FTP_OP_PUT_REQUEST, "/flagged.bin");

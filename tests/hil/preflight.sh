@@ -64,8 +64,7 @@ discover_serial() {
 			[[ -z "$found_debug" ]] && found_debug="${stable:-$device}"
 			continue
 		fi
-		# Only a serial bridge can carry the CSP UART or a radio. Another board
-		# running K-FSW is also a serial device and must not be taken for one.
+		# Only a bridge can carry the CSP UART or a radio.
 		for vendor in "${SERIAL_BRIDGE_IDS[@]}"; do
 			if [[ "$id" == "$vendor:"* && -z "$found_second_serial" ]]; then
 				found_second_serial="${stable:-$device}"
@@ -73,8 +72,7 @@ discover_serial() {
 		done
 	done
 
-	# A bridge the kernel has not bound has no port, so discovery above cannot
-	# see it at all. Say so rather than leaving a blank.
+	# A bridge with no driver has no port, so the loop above cannot see it.
 	local usb_device vendor_file id
 	for usb_device in /sys/bus/usb/devices/[0-9]*-[0-9]*; do
 		vendor_file="$usb_device/idVendor"
@@ -115,8 +113,7 @@ discover_can() {
 		fi
 		return 0
 	fi
-	# A real bus first. One that exists but is down is the common case on a
-	# fresh boot, and saying so is more use than falling back to a virtual one.
+	# A real bus first, and one that is down is worth naming as down.
 	while read -r name; do
 		[[ -z "$name" ]] && continue
 		if ip link show "$name" 2>/dev/null | grep -q 'state UP'; then
@@ -234,8 +231,7 @@ discover_serial
 discover_can
 discover_host
 
-# Emit what a caller should export, so a fixture reaches the device that was
-# discovered instead of whichever one enumerated first.
+# What a caller should export, so a fixture reaches the device that was found.
 if [[ "${1:-}" == "--export" ]]; then
 	[[ -n "$found_debug" ]] && printf 'KFSW_DEBUG_SERIAL=%s\n' "$found_debug"
 	[[ -n "$found_second_serial" ]] && printf 'KFSW_FTDI_DEVICE=%s\n' "$found_second_serial"

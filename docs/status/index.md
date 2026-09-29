@@ -10,14 +10,16 @@ under `tests/hil/`; use @ref testing to find the relevant fixture.
 
 | Area | Recorded coverage | Limits |
 | --- | --- | --- |
-| CAN | `54ac87f`: NUCLEO ping, identity, and parameters | External transceiver and termination required |
+| CAN | `e21233f`: NUCLEO ping with `rtt_ms=50`, identity, and remote parameters, 1743 frames with no bus errors | External transceiver and termination required; the board has no transceiver |
 | Holybro | Bidirectional CSP, remote parameters, file round trips | No RF range or endurance qualification |
 | Radio encryption | Native peers: AES-256-GCM, key changes, plaintext refusal, replay rejection | Encrypted Holybro acceptance pending |
 | Firmware update | `db64963`: radio upload, boot, and confirmation | Signature checked by MCUboot; golden-image selection absent |
-| CAN firmware update | `fwu-can-checked`: FTP and FWU lite uploads, both slot readbacks, rollback, confirmation, and PARAM reads | NUCLEO at 500 kbit/s; bench image and configuration recorded by the fixture |
+| CAN firmware update | `e21233f`: FTP and FWU lite uploads, both slot readbacks, a trial reverted without confirmation, then confirmed and rebooted | NUCLEO at 500 kbit/s; the acceptance leaves the board on the candidate, so the baseline is reinstalled between runs |
 | Housekeeping | `54ac87f`: collection, radio retrieval, and Yamcs archive | Measurements cover one report and bench |
 | Watchdog and health | Reset after starving the watchdog; runs with healthy and overdue components | STM32 watchdog cannot be disarmed once started |
 | Persistence | Parameter snapshots preserved across MCUboot swaps | Configuration migration needs release-specific checks |
+| Reset diagnostics | `e21233f`: the note says the reset was commanded and carries the previous uptime, the restart is counted, and the retained log ring continues its numbering with records from before the reset still readable | A power cycle clears RAM, so nothing is retained across one |
+| Procedures | `e21233f` on the hosted target: `on-error` continue and stop, the `if-event` skip guard, `wait`, `stop` cancelling a wait, a missing procedure refused, and the line counters | Not yet run on a board |
 | Button and LEDs | Debounce, press counts, and observed LED operation | Optional profile |
 | FRDM-K64F / Pico W | Boot and shell commands | Services disabled in bring-up profiles |
 

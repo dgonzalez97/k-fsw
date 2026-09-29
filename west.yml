@@ -29,17 +29,17 @@ manifest:
 
     - name: kfsw-services
       remote: kfsw
-      revision: cd2ee59d8e390330a75818e9f924584df218ed98
+      revision: 39c4f545d516251bde4bc41bffb2384da74aafc0
       path: kfsw-services
 
     - name: kfsw-comms
       remote: kfsw
-      revision: 89cd108201d47fcc3888aea74689fbcf6a210a1a
+      revision: 15142d37c8c129bd0aa90011f365dc3ae8796b69
       path: kfsw-comms
 
     - name: kfsw-modules
       remote: kfsw
-      revision: 39569c21818253b833ed85fe2603c7bb7b412f59
+      revision: e6d01d2afaf0e3daab765fac22ef598773935d93
       path: kfsw-modules
 
     - name: libcsp

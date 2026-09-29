@@ -158,10 +158,7 @@ ZTEST(services_ftp_transfer, test_receive_writes_every_chunk_and_checksums_them)
 	zassert_equal((uint32_t)info.size, total, "the file should hold what was received");
 }
 
-/*
- * The story resume exists for: a pass ends mid-upload, and the next one sends
- * only what is missing.
- */
+/* A pass ends mid-upload; the next one sends only what is missing. */
 ZTEST(services_ftp_transfer, test_an_interrupted_upload_is_continued_from_its_partial)
 {
 	const uint32_t chunk = (uint32_t)sizeof(payload[0]);

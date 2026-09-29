@@ -76,9 +76,7 @@ static void release_in_work(struct k_work *work)
 
 K_WORK_DEFINE(release_work, release_in_work);
 
-/* One test, because the module state is a single global that walks
- * UNCONFIGURED, CONFIGURED, RUNNING, STARVED and never walks back.
- */
+/* One test: the module state is a single global and never walks back. */
 ZTEST(platform_watchdog_device, test_handover_drains_the_preempted_keepalive)
 {
 	struct kfsw_platform_watchdog_info info;
@@ -87,9 +85,7 @@ ZTEST(platform_watchdog_device, test_handover_drains_the_preempted_keepalive)
 
 	zassert_equal(kfsw_platform_watchdog_configured_timeout_ms(), 300U);
 
-	/* Nothing works before the device is claimed, and nothing pretends a
-	 * feed has happened.
-	 */
+	/* Nothing works before the device is claimed. */
 	zassert_equal(kfsw_platform_watchdog_start(), -EINVAL);
 	zassert_equal(kfsw_platform_watchdog_feed(), -EINVAL);
 	zassert_equal(kfsw_platform_watchdog_release(), -EINVAL);

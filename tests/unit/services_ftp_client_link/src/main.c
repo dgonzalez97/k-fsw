@@ -366,8 +366,7 @@ static void write_local_file(const char *virtual_path, size_t size)
 
 /*
  * An empty file has nothing to send and still has to be created, so a ready
- * reply whose offset equals the size is correct rather than nonsense. The
- * integration suite caught this; the test keeps it caught.
+ * reply whose offset equals the size is correct rather than nonsense.
  */
 ZTEST(kfsw_ftp_client_link, test_an_empty_file_is_uploaded)
 {
