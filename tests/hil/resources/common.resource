@@ -62,6 +62,15 @@ Run Clock Smoke
     ...    stderr=STDOUT
     RETURN    ${result}
 
+Run Diagnostics Reset Smoke
+    ${result}=    Run Process
+    ...    ${KFSW_REPO_DIR}/tests/hil/stm32/nucleo-l496zg/diagnostics-reset-smoke.sh
+    ...    --serial
+    ...    ${DEBUG_SERIAL}
+    ...    stdout=PIPE
+    ...    stderr=STDOUT
+    RETURN    ${result}
+
 Run Holybro CSP KISS Smoke
     ${result}=    Run Process
     ...    ${KFSW_REPO_DIR}/tests/hil/radio-uhf/holybro/csp-kiss-smoke.sh

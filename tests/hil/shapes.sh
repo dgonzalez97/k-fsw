@@ -25,7 +25,7 @@ kfsw_shape_covers() {
 	case "$1" in
 	software) echo "every scenario that needs no hardware" ;;
 	terminal) echo "operator-style shell sessions against the Linux image" ;;
-	board) echo "boot and readiness, the clock across a reset, parameter tables" ;;
+	board) echo "boot and readiness, the clock and the reset note across a reset, parameter tables" ;;
 	board-uart) echo "CSP over the physical UART, telemetry capture, the echo benchmark, command retries" ;;
 	board-can) echo "CSP over CAN, and firmware update over CAN with both slots read back" ;;
 	radio) echo "the raw and CSP links, firmware update over the radio, beacons" ;;

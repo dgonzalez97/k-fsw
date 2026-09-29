@@ -58,7 +58,7 @@ adapter. So the runner takes a shape name.
 | --- | --- | --- |
 | `software` | nothing; this is what software CI runs | every scenario that needs no hardware |
 | `terminal` | tmux and the `robot-terminal-runner` submodule | operator-style shell sessions |
-| `board` | a NUCLEO-L496ZG on its ST-LINK debug UART | boot and readiness, the clock across a reset, parameter tables |
+| `board` | a NUCLEO-L496ZG on its ST-LINK debug UART | boot and readiness, the clock across a reset, what a reset leaves behind, parameter tables |
 | `board-uart` | the board, plus a second serial adapter on the CSP UART | CSP over the physical UART, telemetry capture, the echo benchmark, command retries |
 | `board-can` | the board with a CAN transceiver, plus a host CAN adapter | CSP over CAN, firmware update over CAN with both slots read back |
 | `radio` | a pair of Holybro radios | the raw and CSP links, firmware update over the radio, beacons |
