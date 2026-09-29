@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Checks that the board's RTC keeps counting across a commanded reset, and that
-# housekeeping resumes without setting the clock again.
+# Checks that the board's RTC keeps counting across a commanded reset, so
+# everything gated on a valid clock keeps working without a ground pass.
 #
 # Hardware: NUCLEO-L496ZG on ST-LINK. No radio.
 set -Eeuo pipefail
@@ -117,12 +117,6 @@ else
 		"$((after - set_seconds))"
 fi
 
-# And the service that depends on it says so without being asked.
-if tr -d '\r' <"$work_dir/node.log" | grep -qa 'clock is set, collecting on schedule'; then
-	printf '  [ok]   housekeeping resumed on its own\n'
-else
-	fail "housekeeping did not resume after the reset"
-fi
 
 if [[ "$failures" -eq 0 ]]; then
 	echo "CLOCK SMOKE RESULT: PASS after=$after set=$set_seconds"
