@@ -191,6 +191,93 @@ Check navigation, images, tables, and links in HTML and PDF. Keep generated
 output out of Git. Update @ref project_status from source and recorded
 test results when capabilities change.
 
+## Bench gate before a tag
+
+Software CI says the code builds and behaves in simulation. It cannot say the
+board keeps a log across a reset, answers over CAN, or comes back from an
+interrupted update. A tag claims all of it, so the bench runs first.
+
+Run it in this order. Each step is cheap compared to the one below it, and a
+failure early usually explains the ones after.
+
+| Step | Command | Needs |
+| --- | --- | --- |
+| 1 | `tools/ci/all.sh` | nothing; this is what CI runs |
+| 2 | `tests/hil/preflight.sh` | nothing; says what the bench can serve |
+| 3 | `tests/hil/run.sh board` | the board on its ST-LINK |
+| 4 | `tests/hil/run.sh board-uart` | a serial bridge on the CSP UART |
+| 5 | `tests/hil/run.sh board-can` | a CAN transceiver and a host adapter |
+| 6 | `tests/hil/run.sh radio` | the radio pair |
+| 7 | firmware update over CAN, below | a backup, and MCUboot on the board |
+
+Record which steps ran, which were skipped for want of hardware, and the exact
+output of each. A step nobody ran is not a step that passed, and the tag notes
+say which is which.
+
+### Preconditions that nothing checks for you
+
+Every one of these has cost a bench session at least once.
+
+- **Export the devices.** `run.sh <shape>` does it from `preflight.sh`. Calling a
+  fixture directly does not, and the numbered `/dev/ttyACM*` you get by default
+  is whichever board enumerated first.
+- **Flash the image the fixture expects.** `can.robot` runs the CAN fixture with
+  `--no-build`, so it tests whatever is already on the board. Build and flash it
+  first, or run the fixture without Robot so it builds.
+- **Clear the CAN error counters.** They saturate and stay saturated. The CAN
+  fixture refuses to start unless the interface is `ERROR-ACTIVE`, and one of its
+  assertions wants the counters at zero, so a bus that misbehaved earlier fails a
+  run that is otherwise clean. Bring it up again:
+  `sudo tests/hil/stm32/nucleo-l496zg/can-up.sh 500000 normal`
+- **One ground profile per build directory.** `tools/k-ground` keys its build
+  directory on the node number, and `kfsw-gnd-can`, `kfsw-gnd-uhf` and
+  `kfsw-gnd-uhf-bench` are all node 16. Building one leaves its configuration
+  where the next expects its own. Remove `build/k-ground/node-16` when switching
+  between CAN and radio work.
+- **A serial bridge needs its driver.** On a kernel that builds `ftdi_sio` as a
+  module it has to be loaded, and a module whose BTF does not validate has to have
+  that section stripped before it will load.
+
+### Firmware update over CAN
+
+This one changes the board: it installs MCUboot and moves the application into a
+signed slot. Back the board up first, and keep the backup until the tag is out.
+
+```bash
+OCD=$ZEPHYR_SDK_INSTALL_DIR/hosttools/sysroots/x86_64-pokysdk-linux/usr/bin/openocd
+S=$ZEPHYR_SDK_INSTALL_DIR/hosttools/sysroots/x86_64-pokysdk-linux/usr/share/openocd/scripts
+$OCD -s $S -f ../zephyr/boards/st/nucleo_l496zg/support/openocd.cfg \
+  -c init -c "reset halt" \
+  -c "dump_image board-backup.bin 0x08000000 0x100000" \
+  -c "reset run" -c shutdown
+sha256sum board-backup.bin > board-backup.sha256
+```
+
+That is the whole 1 MB, so it covers the application, the golden region at
+`0x080c0000` and LittleFS at `0x080f0000` without having to reason about which
+matters. Restore it the same way with `flash write_image erase`.
+
+Program only the bootloader and the image slots. Do not pass `--erase` to
+`west flash`: the openocd runner has `stm32l4x mass_erase 0` configured as its
+erase command, which takes the golden region and LittleFS with it.
+
+Then follow `tests/hil/fwu/README.md`, which builds the ground node and the two
+signed images, installs the baseline, and runs the acceptance.
+
+The acceptance is not repeatable on its own: it leaves the board running the
+candidate, and a second run refuses because the candidate and running revisions
+must differ. Reinstall and confirm the baseline between runs.
+
+Robot runs the same acceptance when both images are named:
+
+```bash
+export KFSW_FWU_CAN_GROUND=$B/ground/zephyr/zephyr.exe
+export KFSW_FWU_CAN_IMAGE=$B/after/app/zephyr/zephyr.signed.bin
+tests/hil/run.sh board-can
+```
+
+Without them that case is skipped, and a skip is not a pass.
+
 ## Release builds
 
 `tools/release.py` checks the source and signing inputs, builds twice, and
