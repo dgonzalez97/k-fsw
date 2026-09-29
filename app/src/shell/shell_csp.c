@@ -1,8 +1,9 @@
 #include <errno.h>
-#include <time.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <zephyr/shell/shell.h>
 #include <zephyr/shell/shell_string_conv.h>
@@ -21,7 +22,8 @@ static void print_clock(const struct shell *sh, const char *label,
 {
 	struct tm broken = {0};
 	time_t seconds = (time_t)clock->seconds;
-	char text[32];
+	/* Wide enough for any int the fields could hold, not just a real date. */
+	char text[72];
 
 	if (!kfsw_csp_clock_is_set(clock)) {
 		/* Print the raw reading as well. */
@@ -30,7 +32,12 @@ static void print_clock(const struct shell *sh, const char *label,
 	}
 
 	(void)gmtime_r(&seconds, &broken);
-	(void)strftime(text, sizeof(text), "%Y-%m-%d %H:%M:%S", &broken);
+	/* Written out rather than through strftime, which costs 6.5 KB of flash
+	 * with its tables for one fixed format.
+	 */
+	(void)snprintf(text, sizeof(text), "%04d-%02d-%02d %02d:%02d:%02d", broken.tm_year + 1900,
+		       broken.tm_mon + 1, broken.tm_mday, broken.tm_hour, broken.tm_min,
+		       broken.tm_sec);
 	shell_print(sh, "%s: %s UTC (%" PRId32 ".%09" PRIu32 ")", label, text, clock->seconds,
 		    clock->nanoseconds);
 }
