@@ -15,7 +15,9 @@ CAN Update Keeps Both Images Readable
     ...    reverts a trial, then confirms and reboots the candidate.
     [Tags]    physical    nucleo    can    fwu    ftp
     Skip If    not $FWU_CAN_GROUND or not $FWU_CAN_IMAGE    Prebuilt CAN images not configured
-    ${result}=    Run Process    python3
+    # The interpreter matters: the fixture spawns a helper that needs littlefs,
+    # which only the workspace environment has.
+    ${result}=    Run Process    ${KFSW_PYTHON}
     ...    ${KFSW_REPO_DIR}/tests/hil/fwu/can-update.py
     ...    --ground    ${FWU_CAN_GROUND}
     ...    --image    ${FWU_CAN_IMAGE}
