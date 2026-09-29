@@ -69,9 +69,8 @@ done
 
 if [[ "$do_flash" -eq 1 ]]; then
 	banner "Build"
+	# The watchdog is in the NUCLEO profile; nothing to layer.
 	KFSW_BUILD_DIR="$build_dir" \
-		KFSW_EXTRA_CONF_FILE="$KFSW_REPO_DIR/config/profiles/nucleo-watchdog.conf" \
-		KFSW_EXTRA_DTC_OVERLAY_FILE="$KFSW_REPO_DIR/config/profiles/nucleo-watchdog.overlay" \
 		"$KFSW_TOOLS_DIR/build.sh" nucleo_l496zg >"$work_dir/build.log" 2>&1 || \
 		fail "the watchdog profile did not build"
 fi

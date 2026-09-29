@@ -103,8 +103,9 @@ KFSW_EXTRA_DTC_OVERLAY_FILE="$PWD/k-fsw/config/profiles/nucleo-clock.overlay" \
 
 ### Last words
 
-`config/profiles/nucleo-lastwords.conf` keeps a short note across a restart and
-watches the supply voltage, so a node can report why it went down.
+The image keeps a short note across a restart and watches the supply voltage, so
+a node can report why it went down. `param get last_reason`, `last_detail` and
+`last_uptime_ms` read it, and the note is cleared once reported.
 
 ### MCUboot
 
@@ -144,17 +145,12 @@ Sysbuild overrides settings placed in a fragment on the bootloader image.
 
 ### Watchdog
 
-The hardware watchdog needs this profile:
-
-```bash
-KFSW_EXTRA_CONF_FILE="$PWD/k-fsw/config/profiles/nucleo-watchdog.conf" \
-KFSW_EXTRA_DTC_OVERLAY_FILE="$PWD/k-fsw/config/profiles/nucleo-watchdog.overlay" \
-  ./k-fsw/tools/build.sh nucleo_l496zg
-```
-
-The profile uses an 8000 ms timeout. The overlay binds the independent
-watchdog to `kfsw,watchdog`, because the board's `watchdog0` alias is the window
-watchdog, which resets when it is fed too early and has a much shorter timeout.
+The hardware watchdog is in the default image, with an 8000 ms timeout, armed at
+start. A watchdog that waits for a ground command does not cover a hang before
+the first pass, and the STM32 independent watchdog cannot be disarmed once
+started. The overlay binds it to `kfsw,watchdog`, because the board's
+`watchdog0` alias is the window watchdog, which resets when it is fed too early
+and has a much shorter timeout.
 The independent watchdog runs from the low-speed oscillator, goes up to about
 32 s and keeps running in most low-power states.
 

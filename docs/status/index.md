@@ -24,19 +24,25 @@ under `tests/hil/`; use @ref testing to find the relevant fixture.
 ## Flash and RAM budget
 
 Measured on `nucleo_l496zg`, the reference MCU composition, with
-`size -A build/nucleo_l496zg/zephyr/zephyr.elf`. Record these again after any
-change that is meant to move them.
+`size -A build/nucleo_l496zg/zephyr/zephyr.elf` for the sections and
+`readelf -lW` for what is actually loaded. Record these again after any change
+that is meant to move them.
 
 | Section | Bytes |
 | --- | --- |
-| `text` | 138,628 |
-| `rodata` | 47,968 |
+| `text` | 147,488 |
+| `rodata` | 53,024 |
 | `data` | 1,139 |
-| `bss` | 46,408 |
-| `noinit` | 98,636 |
+| `bss` | 47,203 |
+| `noinit` | 107,208 |
 
-That is 192,164 bytes of the 983,040-byte flash region, and 146,183 bytes of
+That is 206,452 bytes of the 983,040-byte flash region, and 155,550 bytes of
 the 327,680-byte RAM.
+
+The September size work took `text` down to 138,628 bytes; composing the
+diagnostics layer - last words, the retained log ring, the hardware watchdog and
+health - spent 8,860 of that back, which is the trade the budget exists to make
+visible.
 
 Levers, each measured on its own against that image:
 
