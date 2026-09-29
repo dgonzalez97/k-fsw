@@ -215,12 +215,14 @@ static void format_param_value(char *text, size_t size, const struct kfsw_param_
 	case KFSW_PARAM_X64:
 		(void)snprintf(text, size, "0x%016" PRIx64, value->scalar.u64);
 		break;
+#if CONFIG_KFSW_PARAM_FLOAT
 	case KFSW_PARAM_FLOAT:
 		(void)snprintf(text, size, "%.6g", (double)value->scalar.f32);
 		break;
 	case KFSW_PARAM_DOUBLE:
 		(void)snprintf(text, size, "%.12g", value->scalar.f64);
 		break;
+#endif
 	case KFSW_PARAM_STRING:
 		/* Quoted so trailing spaces and empty values are visible. */
 		(void)snprintf(text, size, "\"%s\"", value->text);
@@ -289,12 +291,14 @@ static int parse_param_value(const char *text, struct kfsw_param_value *value)
 			return -EINVAL;
 		}
 		break;
+#if CONFIG_KFSW_PARAM_FLOAT
 	case KFSW_PARAM_FLOAT:
 		value->scalar.f32 = strtof(text, &end);
 		return ((errno == 0) && (end != text) && (*end == '\0')) ? 0 : -EINVAL;
 	case KFSW_PARAM_DOUBLE:
 		value->scalar.f64 = strtod(text, &end);
 		return ((errno == 0) && (end != text) && (*end == '\0')) ? 0 : -EINVAL;
+#endif
 	case KFSW_PARAM_STRING: {
 		size_t length = 0U;
 

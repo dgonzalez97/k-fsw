@@ -29,13 +29,13 @@ change that is meant to move them.
 
 | Section | Bytes |
 | --- | --- |
-| `text` | 145,316 |
-| `rodata` | 48,796 |
+| `text` | 138,628 |
+| `rodata` | 47,968 |
 | `data` | 1,139 |
 | `bss` | 46,408 |
 | `noinit` | 98,636 |
 
-That is 199,680 bytes of the 983,040-byte flash region, and 146,183 bytes of
+That is 192,164 bytes of the 983,040-byte flash region, and 146,183 bytes of
 the 327,680-byte RAM.
 
 Levers, each measured on its own against that image:
@@ -43,7 +43,7 @@ Levers, each measured on its own against that image:
 | Lever | Bytes of `text` | State |
 | --- | --- | --- |
 | Format the UTC clock directly instead of through `strftime` | 6,528 | taken |
-| `CONFIG_CBPRINTF_FP_SUPPORT=n` with `CONFIG_PICOLIBC_IO_FLOAT=n` | 4,388 | available; no parameter table declares a float, but the service selects float support unconditionally |
+| `CONFIG_KFSW_PARAM_FLOAT=n`, which drops float `printf` and the shell's own conversions | 6,688 | taken on both reference profiles; a table that declares a float is refused while it is off |
 | `CONFIG_ASSERT_VERBOSE=n` | 7,748 | available; kept on while bench work is ahead, because it drops the file and line behind every assertion |
 | `CONFIG_LTO=y` | not measurable | unavailable: it needs `ISR_TABLES_LOCAL_DECLARATION`, which conflicts with shared interrupts in this composition |
 | Log identifiers instead of format strings | 4,160 | design change; also reduces downlink bytes now that logs are read remotely |
