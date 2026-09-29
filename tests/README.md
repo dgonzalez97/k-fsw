@@ -42,19 +42,43 @@ pip install -r ./k-fsw/tests/hil/requirements.txt
 ./k-fsw/tests/hil/run.sh --dryrun
 ```
 
-Run all the software scenarios:
+### Bench shapes
+
+What can run depends on what is on the desk, and tags alone do not say: the
+`nucleo` tag also sits on tests that need a CAN transceiver or a second serial
+adapter. So the runner takes a shape name.
+
+```bash
+./k-fsw/tests/hil/run.sh              # the shapes, and which this bench can run
+./k-fsw/tests/hil/preflight.sh        # the same report on its own
+./k-fsw/tests/hil/run.sh board        # run one shape
+```
+
+| Shape | Needs | Covers |
+| --- | --- | --- |
+| `software` | nothing; this is what software CI runs | every scenario that needs no hardware |
+| `terminal` | tmux and the `robot-terminal-runner` submodule | operator-style shell sessions |
+| `board` | a NUCLEO-L496ZG on its ST-LINK debug UART | boot and readiness, the clock across a reset, parameter tables |
+| `board-uart` | the board, plus a second serial adapter on the CSP UART | CSP over the physical UART, telemetry capture, the echo benchmark, command retries |
+| `board-can` | the board with a CAN transceiver, plus a host CAN adapter | CSP over CAN, firmware update over CAN with both slots read back |
+| `radio` | a pair of Holybro radios | the raw and CSP links, firmware update over the radio, beacons |
+
+The shapes partition the physical scenarios exactly: each one belongs to a
+single shape. `run.sh <shape>` refuses when the bench cannot serve it, and says
+what is missing, rather than starting and failing partway.
+
+Anything beginning with a dash is still passed to Robot unchanged, which is what
+CI and the one-off runs below do.
 
 ```bash
 ./k-fsw/tests/hil/run.sh --exclude physical
-```
-
-Run the hardware smoke suite with explicit device paths:
-
-```bash
 KFSW_DEBUG_SERIAL=/dev/serial/by-id/usb-STLINK_DEVICE-if02 \
 KFSW_FTDI_DEVICE=/dev/serial/by-id/usb-FTDI_DEVICE-if00-port0 \
 ./k-fsw/tests/hil/run.sh --include smoke
 ```
+
+Device paths must be `/dev/serial/by-id/...`; the numbered `/dev/ttyACM*` paths
+move between boots. `preflight.sh` says so when it finds one.
 
 `boot.robot` checks `@BOOT` and `@READY` with `hil-smoke.sh`. `uart.robot`
 checks the shell, `status`, CSP ping in both directions and the UART test with
