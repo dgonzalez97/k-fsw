@@ -1,0 +1,33 @@
+# Shared with tests/unit/app_csp_liveness, which builds the probe without the
+# rest of the composition and needs the same defaults and ranges.
+
+config KFSW_CSP_LIVENESS
+	bool "Watch the CSP router with health"
+	depends on KFSW_HEALTH
+	default y
+	help
+	  The application loop reporting to health only proves the scheduler
+	  runs. This carries a packet to this node's own address on a period and
+	  reports only when it arrives, so a router or connection pool that has
+	  stopped serving stops the watchdog being fed.
+
+if KFSW_CSP_LIVENESS
+
+config KFSW_CSP_LIVENESS_PERIOD_MS
+	int "How often the probe runs, in milliseconds"
+	default 2000
+	range 20 60000
+
+config KFSW_CSP_LIVENESS_TIMEOUT_MS
+	int "How long the probe waits for its own reply, in milliseconds"
+	default 500
+	range 5 10000
+
+config KFSW_CSP_LIVENESS_DEADLINE_MS
+	int "Health deadline for the probe, in milliseconds"
+	default 8000
+	range 100 120000
+	help
+	  Several periods, so one lost probe on a busy node does not reset it.
+
+endif # KFSW_CSP_LIVENESS

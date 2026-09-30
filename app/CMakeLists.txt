@@ -156,6 +156,8 @@ if(CONFIG_KFSW_DEBUG_SHELL)
     )
 endif()
 
+target_sources_ifdef(CONFIG_KFSW_CSP_LIVENESS app PRIVATE src/csp_liveness.c)
+
 target_sources_ifdef(CONFIG_KFSW_HK app PRIVATE src/hk_entries.c)
 
 target_include_directories(app PRIVATE src)

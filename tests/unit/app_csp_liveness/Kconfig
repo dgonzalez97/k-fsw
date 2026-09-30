@@ -1,0 +1,3 @@
+source "$(APPLICATION_SOURCE_DIR)/../../../app/Kconfig.csp_liveness"
+
+source "Kconfig.zephyr"

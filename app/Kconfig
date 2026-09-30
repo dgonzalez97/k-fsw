@@ -39,6 +39,8 @@ config KFSW_PARAM_TEST_DEFINITIONS
 	  software and physical test configurations; normal application
 	  compositions contain no test parameters.
 
+rsource "Kconfig.csp_liveness"
+
 config KFSW_HIL_PROBES
 	bool "Bench timing and interrupted-update probes"
 	depends on KFSW_DEBUG_SHELL && KFSW_HK && KFSW_PARAM && KFSW_FWU

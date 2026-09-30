@@ -39,6 +39,9 @@
 
 #include "commands/command_definitions.h"
 #endif
+#if CONFIG_KFSW_CSP_LIVENESS
+#include "csp_liveness.h"
+#endif
 #if CONFIG_KFSW_EVENT
 #include <kfsw/services/event.h>
 #endif
@@ -476,6 +479,14 @@ int main(void)
 	} else {
 		health_watching = true;
 	}
+
+#if CONFIG_KFSW_CSP_LIVENESS
+	result = kfsw_csp_liveness_start();
+	if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Failed to watch the CSP router for health: %d", result);
+	}
+#endif
 
 	/* Health takes over feeding, so start it after the watchdog is armed. */
 	result = kfsw_health_start();
