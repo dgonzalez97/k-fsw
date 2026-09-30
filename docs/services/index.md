@@ -5,8 +5,8 @@
 ## Services
 
 `kfsw-services` provides boot markers, logging, parameters, persistence,
-files, commands, events, health, housekeeping, file based operations, and
-firmware updates. The application selects and starts them.
+uploadable tables, files, commands, events, health, housekeeping, file based
+operations, and firmware updates. The application selects and starts them.
 
 Storage is in `kfsw-platform`. Network services use the router and interfaces
 in `kfsw-comms`. For housekeeping and Yamcs, see @ref ground. For uploads and
@@ -362,6 +362,48 @@ defaults stay, and startup continues. The filesystem is not reformatted.
 A save writes and syncs the temporary file and then renames it over the active
 file. If a step fails, the temporary file is removed and the previous snapshot
 stays. The CRC catches corruption; it is not authentication.
+
+## Parameter tables as files
+
+A snapshot is written by the node, covers every persistent value across all
+tables, and is adopted at boot. A table file is the other direction: written on
+the ground, addressing one table, and adopted when an operator says so. Both use
+the same value encoding, so one decoder reads either.
+
+```text
+  ground            node
+  edit a file  ->   ftp put   ->  table check <path>   nothing applied yet
+                                  table load  <path>   all of it, or none
+                                  table revert         the replaced values back
+```
+
+The file has a 20-byte header (magic `KTBL`, version 1, payload size, entry
+count, the table identifier and a CRC32) and then one entry per value: the
+offset within the table, the type code, the length and the big-endian value.
+`CONFIG_KFSW_TABLE_MAX_ENTRIES` caps how many entries a file may carry, and sets
+the read buffer and the number of replaced values held for a revert.
+
+A load is refused whole. Before anything is written the service checks the
+header and the CRC, then every entry: the offset has to name a parameter in that
+table, the type code has to be the one that parameter is written as, the length
+has to match it, the parameter must not be read-only, the same offset must not
+appear twice, and the parameter's own range check has to pass. The first entry
+that fails stops the load and is reported by position, offset and errno, so an
+operator knows which line of the file to fix. Nothing is applied, so a file with
+one bad value leaves the table exactly as it was.
+
+A successful load keeps the values it replaced, and `table revert` puts them
+back. Only the most recent load can be undone, and only once; there is no stack
+of loads. The held values do not survive a reset, so a load that needs to outlive
+one is followed by `param save`.
+
+`table dump <table> <path>` writes what is running as a file, so the usual way
+to change a table is to fetch that, edit one value on the ground and upload it
+back rather than composing a file from the manual. Read-only parameters and
+types no file carries are left out, because a load could not write them anyway.
+
+Table 37 reports the state, the last file, and the load, rejection and revert
+counters.
 
 ## Storage
 

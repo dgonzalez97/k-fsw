@@ -33,6 +33,9 @@
 #if CONFIG_KFSW_JOURNAL
 #include <kfsw/services/journal.h>
 #endif
+#if CONFIG_KFSW_TABLE
+#include <kfsw/services/table.h>
+#endif
 #include <kfsw/services/boot.h>
 #if CONFIG_KFSW_COMMAND
 #include <kfsw/services/command.h>
@@ -171,6 +174,9 @@ int main(void)
 #endif
 #if CONFIG_KFSW_HEALTH
 		&kfsw_health_param_definitions,
+#endif
+#if CONFIG_KFSW_TABLE
+		&kfsw_table_param_definitions,
 #endif
 #if CONFIG_KFSW_RADIO_UHF
 		&kfsw_radio_uhf_param_definitions,

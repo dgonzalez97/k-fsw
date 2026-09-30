@@ -154,6 +154,9 @@ if(CONFIG_KFSW_DEBUG_SHELL)
     target_sources_ifdef(CONFIG_KFSW_HEALTH app PRIVATE
         src/shell/shell_health.c
     )
+    target_sources_ifdef(CONFIG_KFSW_TABLE app PRIVATE
+        src/shell/shell_table.c
+    )
 endif()
 
 target_sources_ifdef(CONFIG_KFSW_CSP_LIVENESS app PRIVATE src/csp_liveness.c)
