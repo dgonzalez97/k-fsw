@@ -40,6 +40,25 @@ See `tests/hil/diagnostics/README.md` for explicit bench inputs and side effects
 Physical tests are opt-in. Check the board, wiring, bitrate, and power before
 running a fixture; some fixtures flash or reboot the target.
 
+Ask the bench what it can serve before flashing anything:
+
+```bash
+./k-fsw/tests/hil/preflight.sh
+```
+
+It reports the debug UART, a second serial adapter, a radio port, a CAN
+interface that is up, and which of the six bench shapes can run. Then run one
+shape rather than every suite:
+
+```bash
+./k-fsw/tests/hil/run.sh board
+```
+
+The shapes are `software`, `terminal`, `board`, `board-uart`, `board-can` and
+`radio`; `tests/README.md` says what each needs and covers. A shape that the
+bench cannot serve is refused with the reason, instead of starting and failing
+partway through.
+
 | Check | Procedure |
 | --- | --- |
 | CAN firmware upload, slot readback, rollback, confirmation | `tests/hil/fwu/README.md` |

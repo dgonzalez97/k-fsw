@@ -1,0 +1,10 @@
+---
+common:
+  tags: [unit, services, param]
+  platform_allow: [native_sim/native/64]
+  integration_platforms: [native_sim/native/64]
+tests:
+  kfsw.services.param_float: {}
+  kfsw.services.param_float.disabled:
+    extra_configs:
+      - CONFIG_KFSW_PARAM_FLOAT=n

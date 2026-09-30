@@ -232,6 +232,68 @@ ZTEST(kfsw_ftp_server, test_uploading_into_the_read_only_root_is_refused)
 			  "a file was accepted into the read-only root");
 }
 
+/* The wire half of resume; the engine half is in services_ftp_transfer. */
+ZTEST(kfsw_ftp_server, test_an_upload_is_offered_the_partial_it_left_behind)
+{
+	static const char partial[] = "half";
+	const uint32_t total = 16U;
+	const uint32_t whole_crc = 0xC0FFEEU;
+
+	write_file(KFSW_FTP_STORAGE_ROOT "/resume.bin.part", partial);
+	zassert_ok(
+		kfsw_ftp_partial_note_write(KFSW_FTP_STORAGE_ROOT "/resume.bin", total, whole_crc));
+
+	given_request(KFSW_FTP_OP_PUT_REQUEST, "/resume.bin");
+	link_fake.request.total_size = total;
+	link_fake.request.crc32 = whole_crc;
+	link_fake.request.flags = KFSW_FTP_FLAG_RESUME;
+
+	serve();
+
+	zassert_true(link_fake.sends >= 1U, "the upload was not answered");
+	zassert_equal(link_fake.response[0].opcode, KFSW_FTP_OP_PUT_READY);
+	zassert_equal(link_fake.response[0].status, KFSW_FTP_STATUS_OK);
+	zassert_equal(link_fake.response[0].offset, (uint32_t)(sizeof(partial) - 1U),
+		      "the ready reply should name the bytes already held");
+}
+
+/* A client that does not ask for it gets the original behaviour. */
+ZTEST(kfsw_ftp_server, test_an_upload_without_the_resume_flag_starts_over)
+{
+	static const char partial[] = "half";
+	const uint32_t total = 16U;
+	const uint32_t whole_crc = 0xC0FFEEU;
+
+	write_file(KFSW_FTP_STORAGE_ROOT "/plain.bin.part", partial);
+	zassert_ok(
+		kfsw_ftp_partial_note_write(KFSW_FTP_STORAGE_ROOT "/plain.bin", total, whole_crc));
+
+	given_request(KFSW_FTP_OP_PUT_REQUEST, "/plain.bin");
+	link_fake.request.total_size = total;
+	link_fake.request.crc32 = whole_crc;
+
+	serve();
+
+	zassert_true(link_fake.sends >= 1U, "the upload was not answered");
+	zassert_equal(link_fake.response[0].opcode, KFSW_FTP_OP_PUT_READY);
+	zassert_equal(link_fake.response[0].offset, 0U,
+		      "an upload that did not ask must start at 0");
+}
+
+/* An unknown flag is still refused. */
+ZTEST(kfsw_ftp_server, test_an_upload_with_an_unknown_flag_is_refused)
+{
+	given_request(KFSW_FTP_OP_PUT_REQUEST, "/flagged.bin");
+	link_fake.request.total_size = 4U;
+	link_fake.request.flags = 0x80U;
+
+	serve();
+
+	zassert_equal(link_fake.sends, 1U, "the upload produced no answer");
+	zassert_equal(link_fake.response[0].opcode, KFSW_FTP_OP_PUT_RESULT);
+	zassert_not_equal(link_fake.response[0].status, KFSW_FTP_STATUS_OK);
+}
+
 /* Reading it is allowed. */
 ZTEST(kfsw_ftp_server, test_the_read_only_root_can_still_be_read)
 {

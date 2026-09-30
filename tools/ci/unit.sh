@@ -15,6 +15,7 @@ west twister \
 	--inline-logs \
 	--outdir "$twister_out_dir" \
 	--platform native_sim/native/64 \
+	--platform native_sim/native \
 	--testsuite-root "$KFSW_REPO_DIR/tests/unit" \
 	--testsuite-root "$KFSW_ROOT/kfsw-modules/tests" \
 	"$@"

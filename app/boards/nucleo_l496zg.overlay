@@ -5,7 +5,15 @@
 		kfsw,storage-partition = &kfsw_storage_partition;
 		/* The RTC counter is not cleared by a reset. */
 		kfsw,rtc = &rtc;
+		/* watchdog0 names the window watchdog. The independent one has a
+		 * longer timeout and runs in most low-power states.
+		 */
+		kfsw,watchdog = &iwdg;
 	};
+};
+
+&iwdg {
+	status = "okay";
 };
 
 /* Dedicated CSP/KISS UART. The debug shell remains on LPUART1 PG7/PG8. */

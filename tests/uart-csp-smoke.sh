@@ -85,17 +85,25 @@ wait_for_output()
 	return 1
 }
 
-is_ft232rl()
+# The single-channel FTDI UART bridges this bench uses. Named rather than
+# accepting any 0403 device, because a multi-channel or JTAG part on the same
+# vendor ID is not a plain UART and would fail further in.
+KFSW_FTDI_UART_MODELS=(6001 6015 6014)
+
+is_ftdi_uart()
 {
 	local device="$1"
-	local properties
+	local properties model
 
 	command -v udevadm >/dev/null 2>&1 || return 1
 	properties="$(udevadm info --query=property --name "$device" 2>/dev/null)" || \
 		return 1
 
-	grep -Fqx 'ID_VENDOR_ID=0403' <<<"$properties" &&
-		grep -Fqx 'ID_MODEL_ID=6001' <<<"$properties"
+	grep -Fqx 'ID_VENDOR_ID=0403' <<<"$properties" || return 1
+	for model in "${KFSW_FTDI_UART_MODELS[@]}"; do
+		grep -Fqx "ID_MODEL_ID=$model" <<<"$properties" && return 0
+	done
+	return 1
 }
 
 is_stlink_vcp()
@@ -136,7 +144,7 @@ discover_ftdi()
 
 	for candidate in /dev/serial/by-id/* /dev/ttyUSB*; do
 		[[ -e "$candidate" ]] || continue
-		is_ft232rl "$candidate" && matches+=("$candidate")
+		is_ftdi_uart "$candidate" && matches+=("$candidate")
 	done
 
 	if [[ ${#matches[@]} -eq 0 ]]; then
@@ -177,12 +185,14 @@ if [[ "$(readlink -f "$ftdi_device")" == "$(readlink -f "$debug_serial")" ]]; th
 	fail "CSP UART and debug UART resolve to the same device"
 fi
 
-[[ "$debug_serial" == /dev/ttyACM* ]] || \
-	fail "the debug shell must use an ST-LINK /dev/ttyACM* device"
+# Resolved, not literal: a /dev/serial/by-id path is the one the project asks
+# for, and it is a link to the ttyACM the ST-LINK presents.
+[[ "$(readlink -f "$debug_serial")" == /dev/ttyACM* ]] || \
+	fail "the debug shell must resolve to an ST-LINK /dev/ttyACM* device"
 [[ "$(readlink -f "$ftdi_device")" == /dev/ttyUSB* ]] || \
 	fail "the CSP UART must resolve to an FTDI /dev/ttyUSB* device"
-is_ft232rl "$ftdi_device" || \
-	fail "$ftdi_device is not identified by udev as an FT232R device"
+is_ftdi_uart "$ftdi_device" || \
+	fail "$ftdi_device is not identified by udev as an FTDI UART bridge"
 is_stlink_vcp "$debug_serial" || \
 	fail "$debug_serial is not identified by udev as an ST-LINK VCP"
 

@@ -169,8 +169,16 @@ Remote records carry at most 190 text bytes to fit encrypted radio links;
 longer records set the truncation flag. Local history keeps up to 191 bytes.
 It is enabled in the Linux composition. Other CSP compositions can use
 `config/profiles/log-history.conf`. Start the server after the CSP router.
-Reads do not remove records or write flash. History and sequences restart
-on reboot. UTC is not required.
+Reads do not remove records or write flash. UTC is not required.
+
+`CONFIG_KFSW_LOG_HISTORY_RETAINED`, on by default, keeps the ring outside
+`.bss` so a reset that preserves RAM leaves the messages that explain it
+readable, and sequence numbers continue rather than restarting. The ring
+carries a magic, a version, the depth, the record size and a CRC32, all
+checked on first use; a ring that does not belong to the running image
+starts clean, and a single record whose slot disagrees reads as missing.
+A power cycle clears RAM, so nothing is retained across one. Set the option
+to `n` for a ring that always starts empty.
 
 The host `csp-kiss logs` command reads a bounded window and saves JSON lines;
 see [remote diagnostics](../communications/index.md#remote-text-logs-and-discovery).
@@ -436,17 +444,42 @@ and IEEE CRC32, and the receiver checks both before it commits the file.
 
 ```text
 client                              server
-PUT (path, size, CRC32)       ->
-                              <-    PUT_READY
-DATA (offset 0)               ->
-DATA (next offset)            ->    writes <path>.part
-                              <-    PUT_RESULT after sync, check and rename
+PUT (path, size, CRC32, resume)  ->
+                                 <- PUT_READY (offset to start from)
+DATA (that offset)               ->
+DATA (next offset)               -> writes <path>.part
+                                 <- PUT_RESULT after sync, check and rename
 ```
 
 A download is the same in the other direction: GET, GET_INFO, DATA and
 GET_RESULT. The receiving side always writes `<path>.part`, syncs it, checks
-it and renames it. A failed transfer removes the partial file and leaves an
-existing file alone.
+it and renames it. An existing file is left alone until the rename.
+
+### Resuming an upload
+
+An upload interrupted by a lost link continues on the next attempt, without an
+operator asking. Uploading the same file again is the whole interface.
+
+The server keeps `<path>.part` after an interruption instead of deleting it, and
+records what it is going to become in `<path>.part.map`: a magic, a version, the
+intended size and CRC32, and a CRC32 over those fields. On the next upload of
+the same path it reads that note, and continues only when the size and CRC32
+match the new request. A note for a different version of the file is ignored and
+the partial is overwritten, so an upload never wastes a pass discovering at the
+end that it joined two different files.
+
+The resume point is the partial's own size, not a number from the note, because a
+reset can leave the note ahead of what reached flash. The CRC32 of those bytes is
+recomputed before the transfer continues, and the final check still covers the
+whole file, so a resumed upload is verified exactly like a fresh one.
+
+Chunks arrive strictly in order, so the note holds no chunk map. `PUT_READY`
+carries the offset to start from, and a client that does not set the resume flag
+in its request gets the original behaviour: the partial is discarded and the
+upload starts at zero.
+
+A partial for a file that is never uploaded again stays on disk until that path
+is uploaded or deleted.
 
 The server has one acceptor and one worker and answers `busy` to a second
 connection. Client calls share one static workspace behind a mutex. Each
@@ -532,6 +565,7 @@ Table 36 exposes the measurements:
 | `stack_sweeps` | r | Sweeps completed |
 | `stack_alerts` | r | Times a sweep first found a thread at the alert level |
 | `stack_threads` | r | Threads the last sweep could read |
+| `stack_running` | r | Whether the periodic sweep is running |
 | `stack_worst_thread` | r | Thread holding the highest stack use |
 
 An event is raised when stack use reaches the alert threshold. Another alert

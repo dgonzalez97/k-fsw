@@ -188,7 +188,11 @@ int main(void)
 	} else {
 		kfsw_log_info("Parameter table initialized");
 #if CONFIG_KFSW_PARAM_PERSISTENCE
+		bool had_snapshot;
+
 		result = kfsw_param_persist_load();
+		had_snapshot = (result == 0);
+
 		if (result == -ENOENT) {
 			kfsw_log_info("No parameter snapshot; using compiled defaults");
 		} else if (result != 0) {
@@ -203,6 +207,19 @@ int main(void)
 		 */
 		/* After the snapshot, so the count continues from the saved value. */
 		kfsw_boot_count_restart();
+#if CONFIG_KFSW_PARAM_PERSISTENCE
+		/* Written back or the count never leaves RAM and every boot reads
+		 * the saved value plus one. Only when a snapshot was already there,
+		 * so a cleared one stays cleared and the node keeps its defaults.
+		 */
+		if (had_snapshot) {
+			result = kfsw_param_persist_save();
+			if (result != 0) {
+				startup_failures++;
+				kfsw_log_error("Could not record the restart count (%d)", result);
+			}
+		}
+#endif
 
 		if (kfsw_system_boot_delay_ms() != 0U) {
 			kfsw_log_info("Delaying service start by %u ms",

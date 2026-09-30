@@ -21,3 +21,14 @@ tests:
     integration_platforms:
       - native_sim/native
       - native_sim/native/64
+  kfsw.services.gndwdt.events:
+    tags: [unit, services, gndwdt]
+    extra_configs:
+      - CONFIG_KFSW_PARAM=y
+      - CONFIG_KFSW_EVENT=y
+    platform_allow:
+      - native_sim/native
+      - native_sim/native/64
+    integration_platforms:
+      - native_sim/native
+      - native_sim/native/64

@@ -11,7 +11,6 @@ set -euo pipefail
 KFSW_TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../tools" && pwd)"
 source "$KFSW_TOOLS_DIR/_common.sh" nucleo_l496zg
 
-PROFILES="$KFSW_REPO_DIR/config/profiles"
 debug_serial="${KFSW_DEBUG_SERIAL:-${KFSW_SERIAL:-}}"
 build_dir="$KFSW_ROOT/build/hil/health/nucleo_l496zg"
 work_dir="$(mktemp -d)"
@@ -84,9 +83,8 @@ done
 
 if [[ "$do_flash" -eq 1 ]]; then
 	banner "Build"
+	# The watchdog and health are in the NUCLEO profile; nothing to layer.
 	KFSW_BUILD_DIR="$build_dir" \
-		KFSW_EXTRA_CONF_FILE="$PROFILES/nucleo-watchdog.conf;$PROFILES/nucleo-health.conf" \
-		KFSW_EXTRA_DTC_OVERLAY_FILE="$PROFILES/nucleo-watchdog.overlay" \
 		"$KFSW_TOOLS_DIR/build.sh" nucleo_l496zg >"$work_dir/build.log" 2>&1 || \
 		abort "the health composition did not build"
 fi

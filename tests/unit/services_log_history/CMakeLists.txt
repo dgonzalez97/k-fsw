@@ -9,5 +9,6 @@ list(APPEND ZEPHYR_EXTRA_MODULES
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(kfsw_log_history_tests LANGUAGES C)
 target_sources(app PRIVATE src/main.c)
+target_include_directories(app PRIVATE ${KFSW_WORKSPACE_ROOT}/kfsw-services/src)
 target_link_libraries(app PRIVATE kfsw::services kfsw::comms)
 zephyr_link_libraries(-Wl,--wrap=kfsw_log_history_get)

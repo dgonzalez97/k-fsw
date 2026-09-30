@@ -4,9 +4,15 @@
 #include <string.h>
 
 #include <zephyr/kernel.h>
+#include <zephyr/sys/atomic.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/reboot.h>
 #include <zephyr/ztest.h>
 
 #include <kfsw/services/gndwdt.h>
+#if CONFIG_KFSW_EVENT
+#include <kfsw/services/event.h>
+#endif
 
 #define TIMEOUT_MS (CONFIG_KFSW_GNDWDT_TIMEOUT_S * 1000ULL)
 static uint64_t now_ms;
@@ -14,6 +20,24 @@ static uint64_t now_ms;
 uint64_t __wrap_kfsw_time_monotonic_ms(void)
 {
 	return now_ms;
+}
+
+static atomic_t reboots;
+static int reboot_type = -1;
+K_SEM_DEFINE(reboot_seen, 0, 1);
+
+/* The real call never returns, so this one parks the thread it runs on instead
+ * of returning into a caller that has no code after the call. Only the reset
+ * work uses that queue here, and the tests that run after it call the service
+ * directly.
+ */
+FUNC_NORETURN void __wrap_sys_reboot(int type)
+{
+	reboot_type = type;
+	atomic_inc(&reboots);
+	k_sem_give(&reboot_seen);
+	k_sleep(K_FOREVER);
+	CODE_UNREACHABLE;
 }
 
 static void *setup(void)
@@ -254,5 +278,50 @@ ZTEST(services_gndwdt, test_parameters_match_reply_and_validate_writes)
 	zassert_equal(value.scalar.u32, 432000U - 123U);
 }
 #endif
+
+ZTEST(services_gndwdt, test_expiry_resets_the_node_once)
+{
+	struct kfsw_gndwdt_status before;
+	struct kfsw_gndwdt_status after;
+
+	zassert_ok(kfsw_gndwdt_start());
+	kfsw_gndwdt_get_status(&before);
+	now_ms += TIMEOUT_MS;
+
+	/* The service's own worker reaches the decision. Nothing else in the
+	 * suite runs it, so the whole reset path hangs off this sleep.
+	 */
+	k_sleep(K_MSEC(CONFIG_KFSW_GNDWDT_CHECK_MS + CONFIG_KFSW_GNDWDT_RESET_DELAY_MS));
+	kfsw_gndwdt_get_status(&after);
+	zassert_equal(after.expiries, before.expiries + 1U);
+	zassert_equal(after.remaining_s, 0U);
+
+#if CONFIG_KFSW_EVENT
+	{
+		struct kfsw_event_record record;
+
+		/* The operator learns the reason from the ring, not the console. */
+		zassert_ok(kfsw_event_get(0U, &record));
+		zassert_equal(record.source, KFSW_EVENT_SOURCE_GNDWDT);
+		zassert_equal(record.id, KFSW_EVENT_GNDWDT_EXPIRED);
+		zassert_equal(record.severity, KFSW_EVENT_CRITICAL);
+		zassert_equal(record.payload_size, 4U);
+		zassert_equal(sys_get_be32(record.payload), CONFIG_KFSW_GNDWDT_TIMEOUT_S);
+	}
+#endif
+
+	/* A feed arriving after the decision does not call it off, and the
+	 * decision is not counted a second time.
+	 */
+	feed(16U, "KFSWWSFK", true, KFSW_COMMAND_UNAVAILABLE);
+	zassert_ok(kfsw_gndwdt_evaluate());
+	kfsw_gndwdt_get_status(&after);
+	zassert_equal(after.expiries, before.expiries + 1U);
+	zassert_equal(after.contacts, before.contacts);
+
+	zassert_ok(k_sem_take(&reboot_seen, K_SECONDS(5)));
+	zassert_equal(reboot_type, SYS_REBOOT_COLD);
+	zassert_equal(atomic_get(&reboots), 1);
+}
 
 ZTEST_SUITE(services_gndwdt, NULL, setup, before, after, NULL);
