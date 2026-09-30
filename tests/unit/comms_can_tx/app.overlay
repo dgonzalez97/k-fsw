@@ -1,0 +1,14 @@
+/*
+ * A controller that accepts a frame and never reports it sent, which is what a
+ * real one does while it retries a frame no other node acknowledges.
+ */
+/ {
+	fake_can: fake_can {
+		compatible = "zephyr,fake-can";
+		status = "okay";
+	};
+
+	chosen {
+		kfsw,csp-can = &fake_can;
+	};
+};
