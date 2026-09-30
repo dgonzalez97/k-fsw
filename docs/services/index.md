@@ -58,6 +58,51 @@ fails, the shell says the change is only in RAM; retry with `hk save`. A
 rejected settings file is kept until a save replaces it. Restoring settings
 keeps the existing sample files and their sequence numbers.
 
+### Reading stored samples back
+
+`hk store <report> <ms>` keeps samples in `/kfsw/hk/report<N>.bin`, a ring of
+fixed-size slots where each record is the frame itself: version, report,
+sequence, collection time, entry count, flags and the values. So a stored record
+needs no decoding to be served again, and `hk stored <report>` prints it exactly
+as `hk get` prints a live one.
+
+The record count is what the ring holds, not what was ever collected. Once the
+file is full the oldest slot is overwritten, and the readable window is the last
+`CONFIG_KFSW_HK_STORE_CAPACITY` sequence numbers.
+
+A filter narrows what is read or extracted. Each part is optional and a zero
+means no bound:
+
+| Filter | Selects |
+| --- | --- |
+| `from=<seq>` | records at or after that sequence |
+| `to=<seq>` | records at or before it |
+| `since=<seconds>` | records collected at or after that time |
+| `until=<seconds>` | records collected at or before it |
+| `skip=<flags>` | leaves out records carrying any of those flags |
+
+Sequence numbers wrap at 16 bits, so a window is compared as a signed
+difference and a range across the wrap still selects what it should.
+
+`hk extract <report> <path> [filters]` writes the selected records to a file for
+downlink. It has a 20-byte header (magic `KHKD`, version, report, record size,
+record count, the first and last sequence, and a CRC32 over the whole file with
+those four bytes zeroed), then the records unchanged, so the ground decodes them
+with the report definition it already has. The file is written beside the target
+and renamed over it, so an interrupted extract leaves the previous one.
+
+Written under `/kfsw/hk` it is downloadable straight away, because file transfer
+already serves that directory read-only:
+
+```bash
+hk extract 0 /kfsw/hk/pass.bin since=1790744000
+ftp get 1 /hk/pass.bin ./pass.bin
+```
+
+An extract counts the selection before writing and refuses with `-EAGAIN` if the
+ring moved between the two passes, rather than leaving a file whose header
+disagrees with its records.
+
 ## File based operations
 
 `fbo run <name>` runs the commands in a procedure file, `fbo stop` ends the

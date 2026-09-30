@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Checks the housekeeping sample file store: a too-short interval is refused,
-# an accepted one creates a file, the file can be read but not written over file
-# transfer, and redefining the report removes it.
+# an accepted one creates a file, the samples can be read back and extracted as
+# a dataset, the file can be read but not written over file transfer, and
+# redefining the report removes it.
 
 set -euo pipefail
 
@@ -38,6 +39,10 @@ expect()
 	printf 'hk store 0 500\n'
 	printf 'hk store 0 10000\n'
 	sleep 22
+	printf 'hk stored 0\n'
+	printf 'hk extract 0 /kfsw/hk/dataset.bin\n'
+	printf 'hk stored 0 from=1 to=1\n'
+	printf 'hk stored 0 from=900\n'
 	printf 'ftp ls 1 /hk\n'
 	printf 'ftp mkdir 1 /hk/evil\n'
 	printf 'hk define 0 1:0\n'
@@ -57,6 +62,11 @@ echo "HK STORE SMOKE"
 expect 'store for report 0: -34' 'an interval below the floor is refused'
 expect 'report 0 stores every 10000 ms' 'an interval at the floor is accepted'
 expect 'report0.bin' 'the samples reach a file'
+expect 'held: seq' 'the stored window can be read back'
+expect 'Extracted' 'the selected samples become a dataset file'
+expect 'dataset.bin' 'the dataset is where file transfer can fetch it'
+expect 'selected: 1' 'a one-sequence window selects one sample'
+expect 'selected: 0' 'a window past the end selects nothing'
 # -30 is -EROFS: /hk is served read-only.
 expect 'path=/hk/evil: FAIL (-30)' 'the ground cannot write under /hk'
 
