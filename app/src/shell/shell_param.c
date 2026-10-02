@@ -655,35 +655,21 @@ static int cmd_param_table(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
-/*
- * The tables a node has, without values. Remote tables show their number and band.
- */
-static int cmd_param_tablelist(const struct shell *sh, size_t argc, char **argv)
+#if CONFIG_KFSW_PARAM_CSP
+/* Table names are not sent over the link, so a remote node's tables show id and band. */
+static int print_remote_tables(const struct shell *sh, const char *node_text)
 {
-	struct param_list_context context = {.shell = sh, .local = true};
+	struct param_list_context context = {.shell = sh, .local = false};
+	uint16_t node;
 	int result;
 
-#if CONFIG_KFSW_PARAM_CSP
-	if (argc == 1U) {
-		result = kfsw_param_visit(tally_table, &context);
-	} else {
-		uint16_t node;
-
-		result = parse_param_node(sh, argv[1], &node);
-		if (result != 0) {
-			return result;
-		}
-		context.local = false;
-		result = kfsw_param_remote_visit(node, tally_table, &context);
-	}
-#else
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-	result = kfsw_param_visit(tally_table, &context);
-#endif
-
+	result = parse_param_node(sh, node_text, &node);
 	if (result != 0) {
-		shell_error(sh, "parameter tablelist failed (%d)", result);
+		return result;
+	}
+	result = kfsw_param_remote_visit(node, tally_table, &context);
+	if (result != 0) {
+		shell_error(sh, "parameter tables failed (%d)", result);
 		return result;
 	}
 
@@ -699,6 +685,7 @@ static int cmd_param_tablelist(const struct shell *sh, size_t argc, char **argv)
 	}
 	return 0;
 }
+#endif
 
 static int cmd_param_tables(const struct shell *sh, size_t argc, char **argv)
 {
@@ -709,7 +696,13 @@ static int cmd_param_tables(const struct shell *sh, size_t argc, char **argv)
 	};
 	int result;
 
+#if CONFIG_KFSW_PARAM_CSP
+	if (argc == 2U) {
+		return print_remote_tables(sh, argv[1]);
+	}
+#else
 	ARG_UNUSED(argc);
+#endif
 	ARG_UNUSED(argv);
 
 #if CONFIG_KFSW_PARAM_PERSISTENCE
@@ -863,9 +856,10 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 #endif
 	SHELL_CMD_ARG(list, NULL,
 #if CONFIG_KFSW_PARAM_CSP
-		      "List local or remote parameters: list [node].", cmd_param_list, 1, 1),
+		      "Every parameter of a node, with its value: list [node].", cmd_param_list,
+		      1, 1),
 #else
-		      "List local parameters.", cmd_param_list, 1, 0),
+		      "Every parameter, with its value.", cmd_param_list, 1, 0),
 #endif
 #if CONFIG_KFSW_PARAM_PERSISTENCE
 	SHELL_CMD_ARG(persist, NULL,
@@ -881,19 +875,19 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 #endif
 	SHELL_CMD_ARG(table, NULL,
 #if CONFIG_KFSW_PARAM_CSP
-		      "Show one table: table [node] <table>.", cmd_param_table, 2, 1),
+		      "The parameters of one table, with values: table [node] <id>.",
+		      cmd_param_table, 2, 1),
 #else
-		      "Show one table: table <table>.", cmd_param_table, 2, 0),
+		      "The parameters of one table, with values: table <id>.", cmd_param_table,
+		      2, 0),
 #endif
-	SHELL_CMD_ARG(tablelist, NULL,
+	SHELL_CMD_ARG(tables, NULL,
 #if CONFIG_KFSW_PARAM_CSP
-		      "Summarise the tables a node carries: tablelist [node].",
-		      cmd_param_tablelist, 1, 1),
+		      "The tables a node carries, without values: tables [node].",
+		      cmd_param_tables, 1, 1),
 #else
-		      "Summarise the local tables.", cmd_param_tablelist, 1, 0),
+		      "The tables, without values.", cmd_param_tables, 1, 0),
 #endif
-	SHELL_CMD_ARG(tables, NULL, "List registered local tables with their names.",
-		      cmd_param_tables, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(param, &param_commands, "K-FSW parameter commands.", NULL);

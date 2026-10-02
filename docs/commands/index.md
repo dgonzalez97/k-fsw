@@ -216,12 +216,14 @@ packets leave on USART3; don't connect the shell terminal to the CSP UART.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `param tables` | none | Local tables with ID, band, size and saved values |
-| `param tablelist` | `[node]` | Tables of a node |
-| `param list` | `[node]` | All parameters |
-| `param table` | `[node] <table>` | One table |
+| `param tables` | `[node]` | The tables a node carries, without values |
+| `param table` | `[node] <id>` | The parameters of one table, with values |
+| `param list` | `[node]` | Every parameter of a node, with values |
 | `param get` | `[node] <name>` | Read a value |
 | `param set` | `[node] <name> <value>` | Write a value |
+
+Three views of the same parameters, from the widest to the most detailed:
+`tables` says which tables exist, `table` shows one, `list` shows them all.
 
 ```text
 kfsw:~$ param tables

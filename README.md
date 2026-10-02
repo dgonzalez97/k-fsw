@@ -78,8 +78,9 @@ other ground roles.
 
 ### Parameters
 
-`param tables` lists local tables; `param table <id>` prints one.
-Use `param tablelist <node>` to inspect another node.
+`param tables` lists the tables, `param table <id>` prints one with its values
+and `param list` prints every parameter. Put a node number first to ask
+another node: `param tables 2`.
 
 Remote access uses [Space Inventor's libparam](https://github.com/spaceinventor/libparam).
 

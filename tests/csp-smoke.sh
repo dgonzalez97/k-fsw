@@ -160,7 +160,7 @@ printf '%s\n' \
 	$'pa\t g\t 2 test_u32' \
 	'param set 2 log_level 3' \
 	'param get 2 log_level' \
-	'param tablelist 2' \
+	'param tables 2' \
 	'param table 2 32' \
 	'param table 2 1' \
 	'param get 2 uid' \
