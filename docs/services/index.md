@@ -1,4 +1,4 @@
-# Services and storage {#services}
+# Services {#services}
 
 [TOC]
 
@@ -6,7 +6,9 @@
 
 `kfsw-services` provides boot markers, logging, parameters, persistence,
 uploadable tables, files, commands, events, health, housekeeping, file based
-operations, and firmware updates. The application selects and starts them.
+operations, and firmware updates. The application selects and starts them. The
+[kfsw-services README](https://github.com/dgonzalez97/kfsw-services#readme)
+lists each one with the Kconfig option that turns it on.
 
 Storage is in `kfsw-platform`. Network services use the router and interfaces
 in `kfsw-comms`. For housekeeping and Yamcs, see @ref ground. For uploads and
@@ -816,3 +818,17 @@ spinlock, so it can be called from any context.
 
 Read another node's events with `cmd <node> event_stats` and
 `cmd <node> event_tail <age>`. The ring does not survive a reset.
+
+## Modules
+
+`kfsw-modules` holds the code for a specific device or subsystem, built on
+these services. Each module has its own parameter table, in the 50 to 99 band.
+
+| Module | Table | What it is |
+| --- | --- | --- |
+| `radio-uhf` | 50 | Holybro SiK UHF radio: identity, status and optional link encryption |
+| `temperature-sensor-example` | 51 | The MCU's die temperature, sampled on a work queue; the module to copy |
+| `boton-test` | 67 | A board button and three LEDs, for bench tests |
+
+The [kfsw-modules README](https://github.com/dgonzalez97/kfsw-modules#readme)
+says how a module is laid out and how to add one.
