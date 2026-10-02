@@ -70,7 +70,7 @@ fi
 cat "$capture_file"
 
 expected_output=(
-	"  status   : Show basic K-FSW runtime status."
+	"  status   : Show K-FSW status, here or on a node: status [node]."
 	"  storage  : K-FSW filesystem storage commands."
     '@BOOT '
     '@READY '
@@ -82,7 +82,7 @@ expected_output=(
 	'csp      : K-FSW CSP commands.'
 	'ftp      : K-FSW file transfer:'
 	'param    : K-FSW parameter commands.'
-	'status   : Show basic K-FSW runtime status.'
+	'status   : Show K-FSW status, here or on a node: status [node].'
 	'storage  : K-FSW filesystem storage commands.'
 	'version  : Show K-FSW build information.'
     'K-FSW status'

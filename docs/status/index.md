@@ -63,8 +63,8 @@ Levers, each measured on its own against that image:
 - Routes are fixed once the CSP router starts. There is no automatic failover.
 - Optional radio encryption authenticates packets and rejects wire replays.
   Other links need their own access policy. Legacy commands can run twice if
-  resent. `cmd retry` suppresses duplicates within one invocation; starting it
-  again is a new operation.
+  resent. A request sent with `--retry` suppresses duplicates within one
+  invocation; starting it again is a new operation.
 - The ordinary event ring and retained reset notes are held in RAM. The
   optional persistent journal stores boot reports and selected important
   events; queued records can be lost on power failure. Native restart and

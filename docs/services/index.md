@@ -160,17 +160,17 @@ events must meet `CONFIG_KFSW_JOURNAL_MIN_SEVERITY` (warning by default).
 Text logging and the existing RAM event ring remain separate.
 
 ```text
-cmd journal_stats
-cmd journal_tail 0
-cmd journal_time 0
-cmd 2 journal_tail 0
+journal stats
+journal tail 0
+journal time 0
+journal tail 2 0
 ```
 
-Age 0 is the newest committed record. `journal_tail` returns boot identity,
-source, event ID, severity and the original payload in hex. `journal_time`
+Age 0 is the newest committed record. `journal tail` returns boot identity,
+source, event ID, severity and the original payload in hex. `journal time`
 returns the journal sequence, original event uptime in microseconds, UTC and
 its validity. Uptime is captured with the event; UTC is sampled by the writer.
-New records shift the ages. Read `journal_time` before and after the tail and
+New records shift the ages. Read `journal time` before and after the tail and
 check that the sequence is unchanged.
 The C read API returns all fields from one record. Reads do not consume data.
 
@@ -625,16 +625,21 @@ space and the link.
 
 ## Command service
 
-`CONFIG_KFSW_COMMAND` enables the command registry used by the `cmd` shell
-command and by remote callers on CSP port 11. A command has a name, a numeric
-ID, up to four typed arguments and a result.
+`CONFIG_KFSW_COMMAND` enables the command registry used by the shell groups
+and by remote callers on CSP port 11. A command has a name, a numeric ID, up to
+four typed arguments and a result.
 
 ```text
-shell    cmd info       found by name
+shell    status 2       finds info by name, asks node 2
 ground   ID 2, port 11  found by ID
              |
    same definition, validation and handler
 ```
+
+There is no shell command that runs any command by name. Each one is reached
+from the group an operator looks in, `status`, `event`, `journal`, `hk`,
+`reboot` or `gndwdt`, so a new command that operators run also needs its place
+in a group.
 
 Commands are registered at build time as sets and the registry is fixed at
 startup. Duplicate IDs or names, missing handlers and too many arguments are
@@ -657,7 +662,8 @@ not commands.
 
 ### Ticketed retries
 
-`CONFIG_KFSW_COMMAND_RETRY` adds `cmd retry <node> <name> [arguments]`.
+`CONFIG_KFSW_COMMAND_RETRY` lets a remote request end in `--retry`, for example
+`csp reboot 2 0000 --retry`.
 It is enabled in the Linux image. Both peers must support it and have working
 entropy. An invocation first reserves a ticket, then executes it;
 up to three attempts per phase reuse the same request bytes. An unsupported
@@ -665,7 +671,7 @@ peer causes the call to fail. There is no fallback to the legacy protocol.
 
 Typing the command again starts a new operation. If all result attempts fail,
 or a handler resets the node, the outcome can remain unknown; inspect the
-node before starting another operation. Ordinary `cmd <node> ...` keeps its
+node before starting another operation. A request without `--retry` keeps its
 one-shot behaviour.
 
 The node keeps eight tickets for 60 seconds by default. New calls get BUSY when
@@ -773,12 +779,12 @@ ground_wtd_cnt: 86390
 ground_wtd_timeout: 86400
 ```
 
-A node does not feed itself: `gndwdt feed` refuses its own address. The same
-exchange is `cmd 2 ground_wtd KFSWWSFK` and `cmd 2 ground_wtd get`, which is
-what a ground tool sends. Both nodes need `CONFIG_KFSW_GNDWDT` and
+A node does not feed itself: `gndwdt feed` refuses its own address. Underneath
+it is command 16, `ground_wtd`, with `KFSWWSFK` or `get`, which is what a ground
+tool sends. Both nodes need `CONFIG_KFSW_GNDWDT` and
 `CONFIG_KFSW_COMMAND_CSP`. The command uses port 11 by default. The magic word
 checks intent; it is not authentication. A repeated legacy request feeds again.
-With `cmd retry`, a duplicate ticket returns the saved result without feeding
+With a ticketed request, a duplicate returns the saved result without feeding
 again.
 
 A ground station built with `tools/k-ground` carries the service so it can feed
@@ -829,8 +835,8 @@ The ring size is set in Kconfig. When it is full the oldest record is
 overwritten and `events_overwritten` increases. Recording takes a short
 spinlock, so it can be called from any context.
 
-Read another node's events with `cmd <node> event_stats` and
-`cmd <node> event_tail <age>`. The ring does not survive a reset.
+Read another node's events with `event stats <node>` and
+`event tail <node> <age>`. The ring does not survive a reset.
 
 ## Modules
 

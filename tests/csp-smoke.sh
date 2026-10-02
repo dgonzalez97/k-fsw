@@ -192,13 +192,13 @@ printf '%s\n' \
 	'ftp verify /build/large.bin /build/large-returned.bin' \
 	'ftp get 2 /flash/missing.bin /build/missing.bin' \
 	'ftp stat 2 ../params/parameters.dat' \
-	'cmd list' \
-	'cmd noop' \
-	'cmd 1 noop' \
 	'csp ping 1' \
-	'cmd 2 noop' \
-	'cmd 2 info' \
-	'cmd 2 bogus' \
+	'status 2' \
+	'event stats 2' \
+	'event tail 2 0' \
+	'event tail 2 999' \
+	'journal stats 2' \
+	'status 16383' \
 	'csp ping 2' \
 	'param get 2 test_u32' \
 	'csp info' \
@@ -273,14 +273,15 @@ wait_for_output "$work_dir/node1.log" \
 	"$node1_pid" || fail "FTP path traversal was not rejected"
 
 node1_expected=(
-    "noop node=0: OK noop from node 0"
-    # Addressed to this node, so it runs locally. Source node 0 means it did not
-    # arrive over CSP.
-    "noop node=1: OK noop from node 0"
     "CSP ping 1: success"
-    "noop node=2: OK noop from node 1"
-    "info node=2: OK uptime_ms="
-    "unknown command 'bogus'"
+    # Remote commands answer one field per line, after the node they came from.
+    "node: 2"
+    "free_bytes: "
+    "recorded: "
+    "data: "
+    "event_tail: failed, no record at age 999"
+    "ready: 1"
+    "Node must be 1..16382: 16383"
     "CSP node: 1"
     "hostname: kfsw-1"
     "date: "

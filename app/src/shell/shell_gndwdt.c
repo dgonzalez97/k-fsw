@@ -4,9 +4,10 @@
 #include <string.h>
 
 #include <zephyr/shell/shell.h>
-#include <zephyr/shell/shell_string_conv.h>
 
 #include <kfsw/services/gndwdt.h>
+
+#include "shell_command.h"
 
 static const char *state_name(const struct kfsw_gndwdt_status *status)
 {
@@ -17,49 +18,13 @@ static const char *state_name(const struct kfsw_gndwdt_status *status)
 }
 
 #if CONFIG_KFSW_COMMAND_CSP
-static int parse_node(const struct shell *sh, const char *text, uint16_t *node)
-{
-	unsigned long parsed;
-	int parse_error = 0;
-
-	/* 16383 is the CSP v2 broadcast address: a feed goes to one node. */
-	parsed = shell_strtoul(text, 10, &parse_error);
-	if ((parse_error != 0) || (parsed == 0U) || (parsed >= 16383U)) {
-		shell_error(sh, "Node must be 1..16382: %s", text);
-		return -EINVAL;
-	}
-	*node = (uint16_t)parsed;
-	return 0;
-}
-
-/* The reply detail is "key=value ..."; print one field per line like the local show. */
-static void print_reply_fields(const struct shell *sh, const char *detail)
-{
-	char fields[KFSW_COMMAND_MAX_DETAIL_SIZE];
-	char *saved = NULL;
-
-	(void)strncpy(fields, detail, sizeof(fields) - 1U);
-	fields[sizeof(fields) - 1U] = '\0';
-	for (char *field = strtok_r(fields, " ", &saved); field != NULL;
-	     field = strtok_r(NULL, " ", &saved)) {
-		char *value = strchr(field, '=');
-
-		if (value == NULL) {
-			shell_print(sh, "%s", field);
-			continue;
-		}
-		*value = '\0';
-		shell_print(sh, "%s: %s", field, value + 1);
-	}
-}
-
 static int remote(const struct shell *sh, const char *node_text, bool feed)
 {
 	struct kfsw_command_result result;
 	uint16_t node;
 	int outcome;
 
-	outcome = parse_node(sh, node_text, &node);
+	outcome = kfsw_shell_parse_node(sh, node_text, &node);
 	if (outcome != 0) {
 		return outcome;
 	}
@@ -81,7 +46,7 @@ static int remote(const struct shell *sh, const char *node_text, bool feed)
 	if (feed) {
 		shell_print(sh, "fed: yes");
 	}
-	print_reply_fields(sh, result.detail);
+	kfsw_shell_print_fields(sh, result.detail);
 	return 0;
 }
 

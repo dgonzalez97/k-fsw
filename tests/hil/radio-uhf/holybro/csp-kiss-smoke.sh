@@ -358,34 +358,25 @@ fi
 # Commanding and the event record across the radio, and a node reaching itself.
 printf '%s\n' \
 	'csp ping 16' \
-	'cmd 16 noop' \
-	'cmd list' \
-	'cmd 2 noop' \
-	'cmd 2 info' \
-	'cmd 2 event_stats' \
-	'cmd 2 event_tail 0' \
-	'cmd 2 bogus' >&3
+	'status 2' \
+	'event stats 2' \
+	'event tail 2 0' \
+	'event tail 2 999' >&3
 
 # Node 16 pinging itself needs no link, so no round-trip time is printed.
 wait_for_output "$work_dir/ground.log" "CSP ping 16: success" \
 	"$ground_pid" || fail "the ground node did not answer for itself"
-# Addressed to this node, so it runs locally. Source node 0 means it did not
-# arrive over CSP.
-wait_for_output "$work_dir/ground.log" "noop node=16: OK noop from node 0" \
-	"$ground_pid" || fail "a self-addressed command was not run locally"
-wait_for_output "$work_dir/ground.log" "noop node=2: OK noop from node 16" \
-	"$ground_pid" || fail "NUCLEO node 2 did not answer a command over Holybro"
-wait_for_output "$work_dir/ground.log" "info node=2: OK uptime_ms=" "$ground_pid" || \
-	fail "NUCLEO node 2 did not report info over Holybro"
-wait_for_output "$work_dir/ground.log" "event_stats node=2: OK held=" "$ground_pid" || \
+wait_for_output "$work_dir/ground.log" "free_bytes: " "$ground_pid" || \
+	fail "NUCLEO node 2 did not report its status over Holybro"
+wait_for_output "$work_dir/ground.log" "rejected: " "$ground_pid" || \
 	fail "NUCLEO node 2 did not report event counters over Holybro"
-wait_for_output "$work_dir/ground.log" "event_tail node=2: OK seq=" "$ground_pid" || \
+wait_for_output "$work_dir/ground.log" "data: " "$ground_pid" || \
 	fail "NUCLEO node 2 did not return a recorded event over Holybro"
-wait_for_output "$work_dir/ground.log" "unknown command 'bogus'" "$ground_pid" || \
-	fail "an unknown command was not rejected"
+wait_for_output "$work_dir/ground.log" "no record at age 999" "$ground_pid" || \
+	fail "a record that does not exist was not refused"
 
 # The flight node records the commands it served.
-printf '%s\r\n' 'event stats' 'cmd 2 event_stats' >"$debug_serial"
+printf '%s\r\n' 'event stats' >"$debug_serial"
 wait_for_output "$work_dir/nucleo.log" "recorded: " "$debug_capture_pid" || \
 	fail "NUCLEO did not report its event counters"
 

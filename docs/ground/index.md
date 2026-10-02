@@ -278,19 +278,21 @@ If nothing arrives, look at the frames with `--yamcs none`, check that
 
 ### Commanding
 
-Yamcs only records telemetry. Housekeeping is configured with K-FSW commands;
-`hk_define`, `hk_period` and `hk_clear` work over CSP/KISS or CAN:
+Yamcs only records telemetry. Housekeeping is configured from a ground shell
+with the node first; `hk define`, `hk period` and `hk clear` work over CSP/KISS
+or CAN:
 
 ```text
-kfsw-ops# cmd 2 hk_define 0 "51:0x00 51:0x10 3:0x00"
-hk_define node=2: OK report 0 defines 3 values
+kfsw-ops# hk define 2 0 51:0x00 51:0x10 3:0x00
+node: 2
+report 0 defines 3 values
 ```
 
 ### Report definitions
 
 Housekeeping frames carry the values in report order, without names.
 `hk-report.py` generates the node command and the Yamcs XTCE database from one
-YAML file:
+YAML file. Put the node number after `hk define` to send it from the ground:
 
 ```bash
 report=k-fsw/ground-station/reports/nucleo-temperature.yaml

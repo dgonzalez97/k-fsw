@@ -1,5 +1,7 @@
 #include <errno.h>
+#include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -11,6 +13,11 @@
 #include <kfsw/services/parameter.h>
 
 #include "hk_entries.h"
+#if CONFIG_KFSW_COMMAND_CSP
+#include <kfsw/services/command.h>
+
+#include "shell_command.h"
+#endif
 
 static int setting_result(const struct shell *sh, int result)
 {
@@ -46,12 +53,74 @@ static int parse_entry(const struct shell *sh, const char *text, struct kfsw_hk_
 	return 0;
 }
 
+#if CONFIG_KFSW_COMMAND_CSP
+/*
+ * A leading node sends the setting to that node, as in "param set [node]".
+ * With --retry last, the request carries a ticket.
+ */
+static bool names_node(size_t argc, char **argv, size_t local_argc)
+{
+	if ((argc > 1U) && (strcmp(argv[argc - 1U], "--retry") == 0)) {
+		argc--;
+	}
+	return argc > local_argc;
+}
+
+static int run_remote(const struct shell *sh, const char *command, size_t argc, char **argv)
+{
+	uint16_t node;
+	int result = kfsw_shell_parse_node(sh, argv[1], &node);
+
+	return (result != 0) ? result
+			     : kfsw_shell_run_command(sh, node, command, argc - 2U, &argv[2]);
+}
+
+/* hk_define carries the entries as one text argument. */
+static int define_remote(const struct shell *sh, size_t argc, char **argv)
+{
+	static char entries[KFSW_COMMAND_MAX_TEXT_SIZE + 1U];
+	char *args[3] = {argv[2], entries, "--retry"};
+	size_t last = argc;
+	size_t used = 0U;
+	uint16_t node;
+	int result;
+
+	result = kfsw_shell_parse_node(sh, argv[1], &node);
+	if (result != 0) {
+		return result;
+	}
+	if (strcmp(argv[argc - 1U], "--retry") == 0) {
+		last--;
+	}
+	entries[0] = '\0';
+	for (size_t index = 3U; index < last; index++) {
+		int written = snprintf(&entries[used], sizeof(entries) - used, "%s%s",
+				       (used == 0U) ? "" : " ", argv[index]);
+
+		if ((written < 0) || ((size_t)written >= (sizeof(entries) - used))) {
+			shell_error(sh, "Entries are longer than %u bytes",
+				    KFSW_COMMAND_MAX_TEXT_SIZE);
+			return -E2BIG;
+		}
+		used += (size_t)written;
+	}
+	return kfsw_shell_run_command(sh, node, "hk_define", (last < argc) ? 3U : 2U, args);
+}
+#endif
+
 static int cmd_hk_define(const struct shell *sh, size_t argc, char **argv)
 {
 	struct kfsw_hk_entry entries[CONFIG_KFSW_HK_ENTRIES];
 	uint32_t report;
 	size_t count = argc - 2U;
 	int result;
+
+#if CONFIG_KFSW_COMMAND_CSP
+	/* Entries hold a ':', so a plain number after the report names a node. */
+	if ((argc > 3U) && (strchr(argv[2], ':') == NULL)) {
+		return define_remote(sh, argc, argv);
+	}
+#endif
 
 	result = parse_u32(sh, argv[1], &report, "report");
 	if (result != 0) {
@@ -87,7 +156,13 @@ static int cmd_hk_clear(const struct shell *sh, size_t argc, char **argv)
 	uint32_t report;
 	int result;
 
+#if CONFIG_KFSW_COMMAND_CSP
+	if (names_node(argc, argv, 2U)) {
+		return run_remote(sh, "hk_clear", argc, argv);
+	}
+#else
 	ARG_UNUSED(argc);
+#endif
 	result = parse_u32(sh, argv[1], &report, "report");
 	if (result != 0) {
 		return result;
@@ -248,7 +323,13 @@ static int cmd_hk_period(const struct shell *sh, size_t argc, char **argv)
 	uint32_t period;
 	int result;
 
+#if CONFIG_KFSW_COMMAND_CSP
+	if (names_node(argc, argv, 3U)) {
+		return run_remote(sh, "hk_period", argc, argv);
+	}
+#else
 	ARG_UNUSED(argc);
+#endif
 	result = parse_u32(sh, argv[1], &report, "report");
 	if (result != 0) {
 		return result;
@@ -509,14 +590,26 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 #if CONFIG_KFSW_HK_PERSISTENCE
 	SHELL_CMD_ARG(save, NULL, "Save settings; replace a rejected snapshot.", cmd_hk_save, 1, 0),
 #endif
+#if CONFIG_KFSW_COMMAND_CSP
+	SHELL_CMD_ARG(define, NULL,
+		      "Name what a report collects: define [node] <report> [node:]table:offset ...",
+		      cmd_hk_define, 3, CONFIG_KFSW_HK_ENTRIES + 2),
+	SHELL_CMD_ARG(clear, NULL, "Forget a report: clear [node] <report>.", cmd_hk_clear, 2, 2),
+#else
 	SHELL_CMD_ARG(define, NULL, "Name what a report collects: define <report> [node:]table:offset ...",
 		      cmd_hk_define, 3, CONFIG_KFSW_HK_ENTRIES),
 	SHELL_CMD_ARG(clear, NULL, "Forget a report: clear <report>.", cmd_hk_clear, 2, 0),
+#endif
 	SHELL_CMD_ARG(show, NULL, "Show the reports and the counters.", cmd_hk_show, 1, 0),
 	SHELL_CMD_ARG(collect, NULL, "Collect now: collect <report>.", cmd_hk_collect, 2, 0),
 	SHELL_CMD_ARG(get, NULL, "Read samples back: get <report> [count].", cmd_hk_get, 2, 1),
+#if CONFIG_KFSW_COMMAND_CSP
+	SHELL_CMD_ARG(period, NULL, "Collect repeatedly: period [node] <report> <ms>, 0 to stop.",
+		      cmd_hk_period, 3, 2),
+#else
 	SHELL_CMD_ARG(period, NULL, "Collect repeatedly: period <report> <ms>, 0 to stop.",
 		      cmd_hk_period, 3, 0),
+#endif
 #if CONFIG_KFSW_HK_STORE
 	SHELL_CMD_ARG(store, NULL, "Keep samples in a file: store <report> <ms>, 0 to stop.",
 		      cmd_hk_store, 3, 0),
