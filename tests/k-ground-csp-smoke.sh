@@ -157,7 +157,16 @@ wait_for_output "$work_dir/node16.log" "CSP ping 19: success" \
 wait_for_output "$work_dir/node19.log" "CSP ping 16: success" \
 	"$node19_pid" || fail "node 19 could not ping node 16"
 
+# The ops node feeds the gateway's ground watchdog; it cannot feed its own.
+printf '%s\n' 'gndwdt feed 16' 'gndwdt show 16' 'gndwdt feed 19' >&4
+wait_for_output "$work_dir/node19.log" "is this node" "$node19_pid" || \
+	fail "node 19 fed its own ground watchdog"
+printf '%s\n' 'gndwdt show' >&3
+wait_for_output "$work_dir/node16.log" "last_node: 19" "$node16_pid" || \
+	fail "node 16 did not record the feed from node 19"
+
 node16_expected=(
+	"contacts: 1 last_node: 19"
 	"Role: kfsw-gnd-uhf"
 	"Name: kfsw-gnd-uhf"
 	"CSP node: 16"
@@ -169,6 +178,9 @@ node16_expected=(
 	"kfsw-gnd-uhf# "
 )
 node19_expected=(
+	"fed: yes"
+	"ground_wtd_timeout: 86400"
+	"Node 19 is this node"
 	"Role: kfsw-ops"
 	"Name: kfsw-ops"
 	"CSP node: 19"
