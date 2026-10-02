@@ -24,6 +24,8 @@ node 2.
 
 | Port | Service | Option |
 | --- | --- | --- |
+| 0 | CSP management (CMP), which answers `csp ident` and `csp ifstat` | libcsp |
+| 1 | Ping | libcsp |
 | 9 | File transfer | `KFSW_FTP_CSP_PORT` |
 | 10 | libparam values | `KFSW_PARAM_PORT` |
 | 11 | Commands | `KFSW_COMMAND_CSP_PORT` |
@@ -32,8 +34,8 @@ node 2.
 | 14 | Housekeeping | `KFSW_HK_CSP_PORT` |
 | 16 | Log history | `KFSW_LOG_HISTORY_PORT` |
 
-Port 0 is libcsp's management service and port 1 its ping. Both ends of a link
-must use the same port numbers.
+Every node serves ports 0 and 1; libcsp's ports 2 to 6 are not served. Both
+ends of a link must use the same port numbers.
 
 **Packet.** A CSP header (addresses, ports and flags such as CRC32 or RDP) and
 a payload. Packets come from a fixed buffer pool and stay datagrams, also with
@@ -342,16 +344,20 @@ CRC32 to detect corruption and RDP for file transfers.
   KISS decoder, which avoids overruns.
 
 The reference profiles use 115200 8N1 and the Holybro profiles 57600. See the
-[libcsp KISS interface](https://github.com/libcsp/libcsp/blob/develop/include/csp/interfaces/csp_if_kiss.h).
+[KISS interface](https://github.com/dgonzalez97/kfsw-libcsp/blob/kfsw/include/csp/interfaces/csp_if_kiss.h)
+in the libcsp fork the build uses.
 
 ## CAN
 
-CAN uses libcsp's CFP interface on the controller chosen with `kfsw,csp-can`.
+CAN uses libcsp's CAN interface on the controller chosen with `kfsw,csp-can`.
+K-FSW runs CSP v2, so frames use CFP2, the CAN Fragmentation Protocol for
+14-bit addresses; its fields are the `CFP2_*` definitions in
+[csp_if_can.h](https://github.com/dgonzalez97/kfsw-libcsp/blob/kfsw/include/csp/interfaces/csp_if_can.h).
 The NUCLEO uses CAN1 on PD0/PD1 with an external transceiver, and a Linux node
 uses a SocketCAN interface. Both ends of the bus need the same bitrate; the
 profiles use 500 kbit/s.
 
-### A bus without hardware
+### Virtual CAN on Linux
 
 `vcan` carries CAN frames between processes on one host. To test two Linux
 nodes without hardware:
