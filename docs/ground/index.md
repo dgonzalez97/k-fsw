@@ -11,12 +11,23 @@ build options.
 | Role | CSP address | Use |
 | --- | --- | --- |
 | `kfsw-gnd-uhf` | 16 | Opens the UHF radio for the ground network |
-| `kfsw-gnd-uhf-bench` | 16 | The same, routed to flight node 2 on the radio bench |
 | `kfsw-gnd-can` | 16 | Reaches a flight node over a SocketCAN interface |
 | `kfsw-ops` | 19 | Operator shell; doesn't open the radio |
 
-These are the reference settings. CSP v2 addresses are 14 bits, so the
-launcher accepts ground nodes from 16 to 16383 and peers from 1 to 16383.
+These are the reference settings. Each node file sets two addresses:
+
+- `KFSW_CSP_NODE` is the node's own CSP address. Flight nodes use 1 to 15 and
+  ground nodes start at 16, so the two never collide; `tools/k-ground`
+  refuses a ground node below 16. CSP v2 addresses are 14 bits, so the
+  launcher accepts up to 16383.
+- `KFSW_CSP_PEER` is the node at the other end of the serial link, the one
+  `uart test` pings when given no node. It is not a route: where packets go is
+  the route table, `KFSW_CSP_ROUTES`.
+
+A bench usually needs its own variant of a role, for example the UHF gateway
+routed to flight node 2. Copy the role to a file ending in `-bench.env`, such
+as `kfsw-gnd-uhf-bench.env`; git ignores those, so device paths and bench
+routes stay on the machine they belong to.
 
 The node file sets the role, name, prompt, address, peer, radio and build
 directory. Use `status` for node identity and `uhf status` for radio settings:
@@ -72,19 +83,15 @@ ground-station/
 |-- reports/
 `-- nodes/
     |-- kfsw-gnd-can.env
-    |-- kfsw-gnd-uhf-bench.env
     |-- kfsw-gnd-uhf.env
     `-- kfsw-ops.env
 ```
 
-A node file is a shell environment file:
-
-```text
-KFSW_ROLE=kfsw-gnd-uhf
-KFSW_CSP_NODE=16
-KFSW_CSP_PEER=19
-KFSW_RADIO_UHF=holybro
-```
+A node file is a shell environment file; see
+[kfsw-gnd-uhf.env](https://github.com/dgonzalez97/k-fsw/blob/main/ground-station/nodes/kfsw-gnd-uhf.env)
+for the gateway and
+[kfsw-gnd-can.env](https://github.com/dgonzalez97/k-fsw/blob/main/ground-station/nodes/kfsw-gnd-can.env)
+for one that adds Kconfig and an overlay.
 
 `KFSW_CSP_ROUTES` sets a route table, for example `'2/14 KISS'`.
 `tools/k-ground` checks it and writes it to `CONFIG_KFSW_CSP_ROUTE_TABLE`;

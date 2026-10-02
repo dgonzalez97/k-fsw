@@ -230,8 +230,8 @@ Every one of these has cost a bench session at least once.
   run that is otherwise clean. Bring it up again:
   `sudo tests/hil/stm32/nucleo-l496zg/can-up.sh 500000 normal`
 - **One ground profile per build directory.** `tools/k-ground` keys its build
-  directory on the node number, and `kfsw-gnd-can`, `kfsw-gnd-uhf` and
-  `kfsw-gnd-uhf-bench` are all node 16. Building one leaves its configuration
+  directory on the node number, and `kfsw-gnd-can`, `kfsw-gnd-uhf` and a local
+  `-bench.env` variant are all node 16. Building one leaves its configuration
   where the next expects its own. Remove `build/k-ground/node-16` when switching
   between CAN and radio work.
 - **A serial bridge needs its driver.** On a kernel that builds `ftdi_sio` as a
