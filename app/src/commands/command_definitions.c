@@ -192,8 +192,9 @@ static int command_event_tail(const struct kfsw_command_arg *args, size_t arg_co
 	}
 	payload_text[record.payload_size * 2U] = '\0';
 
-	(void)snprintf(result->detail, sizeof(result->detail), "seq=%u t=%ums %s/%u sev=%u %s",
-		       record.sequence, (unsigned int)(record.monotonic_us / 1000U),
+	(void)snprintf(result->detail, sizeof(result->detail),
+		       "seq=%u t_ms=%u src=%s id=%u sev=%u data=%s", record.sequence,
+		       (unsigned int)(record.monotonic_us / 1000U),
 		       kfsw_event_source_name((enum kfsw_event_source)record.source), record.id,
 		       record.severity, payload_text);
 	result->status = KFSW_COMMAND_OK;
