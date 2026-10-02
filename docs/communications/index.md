@@ -24,6 +24,8 @@ node 2.
 
 | Port | Service | Option |
 | --- | --- | --- |
+| 0 | CSP management (CMP), which answers `csp ident` and `csp ifstat` | libcsp |
+| 1 | Ping | libcsp |
 | 9 | File transfer | `KFSW_FTP_CSP_PORT` |
 | 10 | libparam values | `KFSW_PARAM_PORT` |
 | 11 | Commands | `KFSW_COMMAND_CSP_PORT` |
@@ -32,8 +34,8 @@ node 2.
 | 14 | Housekeeping | `KFSW_HK_CSP_PORT` |
 | 16 | Log history | `KFSW_LOG_HISTORY_PORT` |
 
-Port 0 is libcsp's management service and port 1 its ping. Both ends of a link
-must use the same port numbers.
+Every node serves ports 0 and 1; libcsp's ports 2 to 6 are not served. Both
+ends of a link must use the same port numbers.
 
 **Packet.** A CSP header (addresses, ports and flags such as CRC32 or RDP) and
 a payload. Packets come from a fixed buffer pool and stay datagrams, also with
@@ -50,9 +52,10 @@ and framing state.
 The longest matching prefix wins. The router delivers packets for the local
 node and forwards the rest.
 
-A single-interface composition without a route table gets
-`0/0 -> KISS direct`: every other node is reached over that serial link.
-Compositions with more than one interface need a route table. Routes are fixed
+A composition names its routes with `CONFIG_KFSW_CSP_ROUTE_TABLE`. The Linux
+and NUCLEO images use `0/0 KISS`: every other node is reached over the serial
+link. Without a table the node loads `0/0 LOOP` and reaches only itself, so a
+link is never picked by whichever interface came up first. Routes are fixed
 once the router starts.
 
 More detail is in the libcsp
@@ -110,6 +113,43 @@ UART
 
 On receive, the router hands the packet to the service bound to its port.
 Services never read UART bytes.
+
+## RDP
+
+RDP is libcsp's reliable datagram transport: connection setup, a window,
+acknowledgements, retransmission, reordering and flow control. Data still moves
+as CSP datagrams; it is not TCP.
+
+```text
+FTP client                          FTP server
+connect                       ->
+                              <-    confirm
+PUT metadata, seq=N           ->
+                              <-    ACK N
+file chunk, seq=N+1           ->    (lost)
+file chunk, seq=N+1, resent   ->
+                              <-    ACK N+1
+                              <-    result and file CRC
+close                         ->
+```
+
+FTP doesn't retry on top of RDP. It adds the offsets, sizes, file CRC and
+temporary file that RDP can't check. See the
+[libcsp RDP section](https://github.com/libcsp/libcsp/blob/develop/doc/protocolstack.md#rdp).
+
+## Packet buffers
+
+libcsp uses preallocated buffers:
+
+- a packet from a receive call has to be freed or passed to a send or reply
+  call;
+- a packet passed to a send call is freed by libcsp, also when sending fails,
+  so don't free or reuse it;
+- an interface passes complete packets to the router queue;
+- when the pool or a queue is full, the allocation fails or the packet is
+  dropped and counted.
+
+To retry, build a new packet.
 
 ## Startup
 
@@ -342,16 +382,20 @@ CRC32 to detect corruption and RDP for file transfers.
   KISS decoder, which avoids overruns.
 
 The reference profiles use 115200 8N1 and the Holybro profiles 57600. See the
-[libcsp KISS interface](https://github.com/libcsp/libcsp/blob/develop/include/csp/interfaces/csp_if_kiss.h).
+[KISS interface](https://github.com/dgonzalez97/kfsw-libcsp/blob/kfsw/include/csp/interfaces/csp_if_kiss.h)
+in the libcsp fork the build uses.
 
 ## CAN
 
-CAN uses libcsp's CFP interface on the controller chosen with `kfsw,csp-can`.
+CAN uses libcsp's CAN interface on the controller chosen with `kfsw,csp-can`.
+K-FSW runs CSP v2, so frames use CFP2, the CAN Fragmentation Protocol for
+14-bit addresses; its fields are the `CFP2_*` definitions in
+[csp_if_can.h](https://github.com/dgonzalez97/kfsw-libcsp/blob/kfsw/include/csp/interfaces/csp_if_can.h).
 The NUCLEO uses CAN1 on PD0/PD1 with an external transceiver, and a Linux node
 uses a SocketCAN interface. Both ends of the bus need the same bitrate; the
 profiles use 500 kbit/s.
 
-### A bus without hardware
+### Virtual CAN on Linux
 
 `vcan` carries CAN frames between processes on one host. To test two Linux
 nodes without hardware:
@@ -389,43 +433,6 @@ through an FTDI TTL-232R-3V3 on USART3, with the ST-LINK console connected
 too. It flashes the board, checks both serial connections, pings both ways,
 runs `uart test`, checks storage, transfers 4 KiB and 16 KiB files, reads a
 remote parameter and checks the KISS counters.
-
-## RDP
-
-RDP is libcsp's reliable datagram transport: connection setup, a window,
-acknowledgements, retransmission, reordering and flow control. Data still moves
-as CSP datagrams; it is not TCP.
-
-```text
-FTP client                          FTP server
-connect                       ->
-                              <-    confirm
-PUT metadata, seq=N           ->
-                              <-    ACK N
-file chunk, seq=N+1           ->    (lost)
-file chunk, seq=N+1, resent   ->
-                              <-    ACK N+1
-                              <-    result and file CRC
-close                         ->
-```
-
-FTP doesn't retry on top of RDP. It adds the offsets, sizes, file CRC and
-temporary file that RDP can't check. See the
-[libcsp RDP section](https://github.com/libcsp/libcsp/blob/develop/doc/protocolstack.md#rdp).
-
-## Packet buffers
-
-libcsp uses preallocated buffers:
-
-- a packet from a receive call has to be freed or passed to a send or reply
-  call;
-- a packet passed to a send call is freed by libcsp, also when sending fails,
-  so don't free or reuse it;
-- an interface passes complete packets to the router queue;
-- when the pool or a queue is full, the allocation fails or the packet is
-  dropped and counted.
-
-To retry, build a new packet.
 
 ## Security
 

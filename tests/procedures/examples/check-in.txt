@@ -1,0 +1,6 @@
+# A pass check-in: how the node is, then what it recorded.
+# Stop at the first command that fails, so a bad answer is not buried.
+on-error stop
+info
+event_stats
+journal_stats

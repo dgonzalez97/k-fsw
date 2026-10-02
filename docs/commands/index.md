@@ -12,7 +12,9 @@ kfsw:~$ status
 
 Wait for `@READY` before using services. `help` lists the commands in the
 build and `<command> -h` shows the syntax. Tab completes command and
-subcommand names, but not arguments such as a node or a path. A command with
+subcommand names, but not arguments such as a node or a path. When more than
+one name fits, Tab lists them one per line with their help, the same way
+`<command> -h` does. A command with
 the wrong number of arguments prints its usage:
 
 ```text
@@ -76,8 +78,8 @@ time is in `csp clock`.
 
 `log history` shows up to 32 recent retained messages when
 `CONFIG_KFSW_LOG_HISTORY` is enabled. It includes sequence, uptime, module,
-level and truncation status. To retrieve them over CSP, use the host
-`csp-kiss logs` command described in [communications](../communications/index.md#remote-text-logs-and-discovery).
+level and truncation status. To read them over CSP from the host, use
+`./tools/kfsw-linux csp ... logs`, described in [communications](../communications/index.md#remote-text-logs-and-discovery).
 
 ## UHF radio
 
@@ -134,7 +136,7 @@ and its read counters.
 | `csp ifstat` | `<node> <interface>` | Remote interface packet/byte/error counters |
 | `csp routes` | none | Route table |
 | `csp ping` | `[node]` | Ping with CRC32 and a one-second timeout |
-| `csp debug` | `[on\|off]` | Print every packet in and out |
+| `csp debug` | `[on\|off]` | Log every packet in and out |
 | `csp clock` | `[set <utc>]` or `<node> [sync]` | Read or set wall time |
 | `csp reboot` | `<node> <pin>` | Restart a node |
 
@@ -145,16 +147,16 @@ kfsw:~$ csp ping 2
 CSP ping 2: success, rtt_ms=...
 ```
 
-`csp debug on` prints each packet's source and destination node and port,
-priority, flags, size and interface. It is off by default and only affects the
-node where it is turned on.
+`csp debug on` logs each packet's source and destination node and port,
+priority, flags, size and interface, so the trace also lands in `log history`.
+It is off by default and only affects the node where it is turned on.
 
 ```text
 kfsw:~$ csp debug on
 CSP packet trace: on
 kfsw:~$ csp ping 2
-[DEBUG] OUT: S 33, D 2, Dp 1, Sp 17, Pr 2, Fl 0x01, Sz 10 VIA: CAN (2), Tms 51060
-[DEBUG] INP: S 2, D 33, Dp 17, Sp 1, Pr 2, Fl 0x01, Sz 14 VIA: CAN, Tms 51120
+[INFO] OUT: S 33, D 2, Dp 1, Sp 17, Pr 2, Fl 0x01, Sz 10 VIA: CAN (2), Tms 51060
+[INFO] INP: S 2, D 33, Dp 17, Sp 1, Pr 2, Fl 0x01, Sz 14 VIA: CAN, Tms 51120
 CSP ping 2: success, rtt_ms=60
 ```
 
@@ -349,8 +351,8 @@ Paths must start with `/` and can't contain `..` or empty components.
 | `cmd <name>` | `[arguments]` | Run a command on this node |
 | `cmd <node> <name>` | `[arguments]` | Run a command on another node over CSP |
 | `cmd retry <node> <name>` | `[arguments]` | Reserve a ticket and retry lost exchanges within this invocation |
-| `cmd <node> ground_wtd` | `KFSWWSFK` | Feed the ground watchdog and return countdown/timeout (ID 16) |
-| `cmd [node] ground_wtd` | `get` | Read countdown/timeout without feeding |
+| `cmd <node> ground_wtd` | `KFSWWSFK` | Feed the ground watchdog; `gndwdt feed <node>` does the same |
+| `cmd [node] ground_wtd` | `get` | Read countdown/timeout without feeding; `gndwdt show <node>` |
 | `cmd journal_stats` | none | Persistent journal status |
 | `cmd journal_tail` | `<age>` | Committed event fields and payload; newest is 0 |
 | `cmd journal_time` | `<age>` | Sequence, event uptime and writer UTC |
@@ -376,10 +378,12 @@ info node=2: OK uptime_ms=4140 storage=ready free_bytes=12288
 
 The order is registration order. The IDs are in the table below.
 
-### Identifier allocation
+### Identifiers
 
-An ID is part of the wire contract: two nodes must agree on it, so an ID is
-never reused for a different command. Composition commands are defined in
+Four kinds of number are part of the wire contract: two nodes must agree on
+each, and none is reused for something else once it has been given out.
+
+**Command IDs.** Composition commands are defined in
 `app/src/commands/command_definitions.c`; a command that belongs to a service
 is defined by that service and carries its ID in its own header.
 
@@ -391,6 +395,21 @@ is defined by that service and carries its ID in its own header.
 | 9 to 11 | `journal_stats`, `journal_tail`, `journal_time` | `k-fsw` composition |
 | 12 to 15 | free | — |
 | 16 | `ground_wtd` | `kfsw-services`, `gndwdt.h` |
+
+**CSP ports.** 0 is management (CMP) and 1 ping, both from libcsp. K-FSW
+serves 9 file transfer, 10 parameter values, 11 commands, 12 parameter
+descriptors, 13 FWU lite, 14 housekeeping, 15 housekeeping beacons on the
+receiving node, and 16 log history. Each has a Kconfig option; see
+@ref communications.
+
+**Parameter tables.** 1 to 24 are core (1 `board`, 2 `system`, 3
+`telemetry`, 4 `csp`, 5 `storage`), 25 to 49 services (25 `log` through 36
+`resmon`, listed by `param tables`) and 50 to 99 modules (50 `radio-uhf`, 51
+`temp_example`, 67 `hw_test`).
+
+**Node addresses.** CSP v2 addresses are 1 to 16383. Flight nodes use 1 to
+15; ground roles start at 16, which `tools/k-ground` enforces. The reference
+ground station uses 16 for the gateway and 19 for the operator node.
 
 The name is looked up in the local registry before the request is sent, so
 both nodes need the same command IDs. `reboot` and `ground_wtd` change the node.
@@ -468,6 +487,16 @@ MCUboot has nothing to swap and boots the old image. See
 @ref firmware_update.
 
 ## Watchdog and health
+
+What each of the three watchdogs proves, and what feeds it, is in
+@ref services, under Watchdogs.
+
+```text
+gndwdt show [node]                 ground watchdog countdown, here or on a node
+gndwdt feed <node>                 feed another node's ground watchdog
+gndwdt on | off                    arm or disarm the local countdown
+gndwdt timeout <seconds>           silence allowed before a reset
+```
 
 ```text
 watchdog status                    configuration and activity

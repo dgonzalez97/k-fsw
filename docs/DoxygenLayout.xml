@@ -8,7 +8,7 @@
     </tab>
     <tab type="usergroup" visible="yes" url="commands.html" title="Reference">
       <tab type="user" visible="yes" url="commands.html" title="Shell commands"/>
-      <tab type="user" visible="yes" url="services.html" title="Services and storage"/>
+      <tab type="user" visible="yes" url="services.html" title="Services"/>
       <tab type="user" visible="yes" url="communications.html" title="CSP and links"/>
       <tab type="user" visible="yes" url="firmware_update.html" title="Firmware update"/>
     </tab>

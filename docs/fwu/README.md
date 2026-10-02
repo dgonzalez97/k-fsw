@@ -52,25 +52,6 @@ Successful completion checks the IEEE CRC32, flushes the image to flash and
 schedules a trial boot. Read it back through `/boot/firmware_2.bin` before
 resetting the board.
 
-## FWU lite upload
-
-FWU lite accepts a node file, or a host file on builds with
-`CONFIG_KFSW_FWU_LITE_HOST_FILES`. Use an absolute host path outside `/kfsw/`:
-
-```text
-fwu send 2 /path/to/zephyr.signed.bin
-ftp get 2 /boot/firmware_2.bin /build/candidate.bin
-fwu flash 2
-```
-
-`fwu send` checks and flushes the image without scheduling a boot. The receiver
-reports `verified`. `fwu flash` schedules the trial and changes it to `ready`.
-Both upload paths leave the same slot file available for readback.
-
-Blocks carry an IEEE CRC32. Lost replies are retried; all blocks except the
-last must have the configured size. Both ends need the same
-`CONFIG_KFSW_FWU_LITE_BLOCK_SIZE`. RDP is optional and off by default.
-
 ## Boot, check, confirm
 
 On the flight console:
@@ -94,28 +75,17 @@ while MCUboot needs the secondary image for trial rollback.
 
 ## CAN profile
 
-Combine the MCUboot, update and CAN profiles for the NUCLEO. FWU lite is optional.
-Use the same signing key as the installed bootloader.
+The NUCLEO updates over CAN with the MCUboot, update and CAN profiles combined,
+and FWU lite if wanted. The exact build, signed with the same key as the
+installed bootloader, and the upload, readback, revert and confirmation tests
+are in [tests/hil/fwu/README.md](https://github.com/dgonzalez97/k-fsw/blob/main/tests/hil/fwu/README.md). The image to
+send is `build/<target>/app/zephyr/zephyr.signed.bin`.
 
-```bash
-cd /path/to/k-fsw-workspace
-source .venv/bin/activate
-P="$PWD/k-fsw/config/profiles"
-
-KFSW_SYSBUILD=1 \
-KFSW_MCUBOOT_KEY="$HOME/.config/kfsw/mcuboot-signing-key.pem" \
-KFSW_EXTRA_CONF_FILE="$P/nucleo-mcuboot.conf;$P/nucleo-mcuboot-fwu.conf;$P/nucleo-mcuboot-fwu-lite.conf;$P/nucleo-can.conf" \
-KFSW_EXTRA_DTC_OVERLAY_FILE="$P/nucleo-mcuboot-flash.overlay;$P/nucleo-mcuboot.overlay;$P/nucleo-mcuboot-fwu.overlay;$P/nucleo-can.overlay" \
-KFSW_MCUBOOT_DTC_OVERLAY_FILE="$P/nucleo-mcuboot-flash.overlay" \
-  ./k-fsw/tools/build.sh nucleo_l496zg
-```
-
-The host adapter and flight node use 500 kbit/s. See
-`tests/hil/fwu/README.md` for upload, readback, revert and confirmation tests.
-The radio uses the same services; match the UART baud rate at each radio end.
-When radio encryption is enabled, establish both sessions with `uhf connect`
-before uploading. See @ref communications for key setup. Firmware signatures
-and radio keys serve separate purposes; keep separate keys for them.
+The host adapter and flight node use 500 kbit/s. The radio uses the same
+services; match the UART baud rate at each radio end. When radio encryption is
+enabled, establish both sessions with `uhf connect` before uploading. See
+@ref communications for key setup. Firmware signatures and radio keys serve
+separate purposes; keep separate keys for them.
 
 ## Errors
 
@@ -131,6 +101,29 @@ and radio keys serve separate purposes; keep separate keys for them.
 
 `fwu abort` erases the secondary slot, including any previous image kept there.
 A failed erase leaves the service in `failed` with its transfer details intact.
+
+## FWU lite
+
+FWU lite is a second, smaller upload path for links where FTP and RDP cost too
+much. It ends in the same slot, readback and confirmation as above.
+
+
+FWU lite accepts a node file, or a host file on builds with
+`CONFIG_KFSW_FWU_LITE_HOST_FILES`. Use an absolute host path outside `/kfsw/`:
+
+```text
+fwu send 2 /path/to/zephyr.signed.bin
+ftp get 2 /boot/firmware_2.bin /build/candidate.bin
+fwu flash 2
+```
+
+`fwu send` checks and flushes the image without scheduling a boot. The receiver
+reports `verified`. `fwu flash` schedules the trial and changes it to `ready`.
+Both upload paths leave the same slot file available for readback.
+
+Blocks carry an IEEE CRC32. Lost replies are retried; all blocks except the
+last must have the configured size. Both ends need the same
+`CONFIG_KFSW_FWU_LITE_BLOCK_SIZE`. RDP is optional and off by default.
 
 ## Related
 

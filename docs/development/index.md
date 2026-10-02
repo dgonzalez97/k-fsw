@@ -230,8 +230,8 @@ Every one of these has cost a bench session at least once.
   run that is otherwise clean. Bring it up again:
   `sudo tests/hil/stm32/nucleo-l496zg/can-up.sh 500000 normal`
 - **One ground profile per build directory.** `tools/k-ground` keys its build
-  directory on the node number, and `kfsw-gnd-can`, `kfsw-gnd-uhf` and
-  `kfsw-gnd-uhf-bench` are all node 16. Building one leaves its configuration
+  directory on the node number, and `kfsw-gnd-can`, `kfsw-gnd-uhf` and a local
+  `-bench.env` variant are all node 16. Building one leaves its configuration
   where the next expects its own. Remove `build/k-ground/node-16` when switching
   between CAN and radio work.
 - **A serial bridge needs its driver.** On a kernel that builds `ftdi_sio` as a
@@ -305,3 +305,11 @@ python tools/release.py build --output ../build/release-1.0.0
 
 The output directory must be new. Keep `artifacts/release.json` with the images;
 it records sources, tool versions, public-key fingerprint, and artifact hashes.
+
+The image to upload is `artifacts/kfsw-<target>-<version>.signed.bin`, for
+example `kfsw-nucleo_l496zg-v1.1.0.signed.bin`, where the version is
+`git describe` of the release commit. Images for different targets and versions
+can then sit side by side on a node or a ground station. The name is at most 64
+characters of letters, digits, `.`, `_` and `-`, so it always fits an FTP path;
+a longer or odd name stops the release instead of being cut. The build output
+itself stays `zephyr.signed.bin`.

@@ -1,4 +1,4 @@
-# Services and storage {#services}
+# Services {#services}
 
 [TOC]
 
@@ -6,7 +6,9 @@
 
 `kfsw-services` provides boot markers, logging, parameters, persistence,
 uploadable tables, files, commands, events, health, housekeeping, file based
-operations, and firmware updates. The application selects and starts them.
+operations, and firmware updates. The application selects and starts them. The
+[kfsw-services README](https://github.com/dgonzalez97/kfsw-services#readme)
+lists each one with the Kconfig option that turns it on.
 
 Storage is in `kfsw-platform`. Network services use the router and interfaces
 in `kfsw-comms`. For housekeeping and Yamcs, see @ref ground. For uploads and
@@ -14,7 +16,8 @@ boot recovery, see @ref firmware_update. The API is in @ref kfsw_services.
 
 ## Boot and readiness markers
 
-At startup the boot service reads and clears the reset cause and prints:
+At startup the boot service reads and clears the reset cause and logs these
+markers (see [Logging](#logging) for how markers differ from other messages):
 
 ```text
 @SERVICES ok failures=0
@@ -106,9 +109,19 @@ disagrees with its records.
 ## File based operations
 
 `fbo run <name>` runs the commands in a procedure file, `fbo stop` ends the
-run, and `fbo status` shows what it did. File size, line length and scanned
-bytes are limited, and comments count toward the scan limit. An I/O error
-stops the procedure.
+run, and `fbo status` shows what it did. The file is
+`/procedures/<name>` under the FTP root, `/kfsw/ftp/procedures` on the node,
+so it is uploaded like any file:
+
+```text
+ftp put 2 /procedures/check-in.txt /procedures/check-in.txt
+fbo run check-in.txt
+```
+
+File size, line length and scanned bytes are limited, and comments count toward
+the scan limit. An I/O error stops the procedure. Examples to copy are in
+[tests/procedures/examples](https://github.com/dgonzalez97/k-fsw/tree/main/tests/procedures/examples);
+the FBO smoke test runs each of them.
 
 ```text
 on-error continue
@@ -192,6 +205,42 @@ qualification remains pending.
 
 ## Logging
 
+Code reports what happened through the log, not with `printk`. A file names
+its module once and calls the macro for the level:
+
+```c
+#define KFSW_LOG_MODULE KFSW_LOG_MODULE_RADIO
+#include <kfsw/services/log.h>
+
+kfsw_log_info("Radio session to node %u established", peer);
+kfsw_log_error("Radio protection not started: %d", result);
+```
+
+Shell output answers the operator who typed a command; a log records what the
+node did, whether anyone asked or not. Shell handlers print with
+`shell_print`, and everything else logs. A message reaches the console, the
+history described below and, over CSP, the ground.
+
+Two kinds of line go through the log with rules of their own:
+
+- **Markers.** `@SERVICES`, `@BOOT`, `@SOURCE` and `@READY` are written with
+  `kfsw_log_marker()`. No level hides them, and they are printed without a
+  level tag so the line still starts with the marker that scripts look for.
+  The history keeps them like any message.
+- **The CSP packet trace.** With `csp debug on`, libcsp reports every packet;
+  each line is logged at INFO under the `csp` module, without libcsp's
+  colours. Leave it off on a busy link: it fills the history quickly.
+
+A node that starts logs, among others:
+
+```text
+[INFO] CSP initialized as node 1
+[INFO] CSP router started
+[INFO] Ground watchdog started, timeout 86400 s, armed
+@SERVICES ok failures=0
+@READY uptime_ms=0
+```
+
 Messages have four levels: DEBUG, INFO, WARNING and ERROR.
 `CONFIG_KFSW_LOG_MIN_LEVEL` removes the lower levels from the build. At
 runtime `log_level` sets a global level and `log_levels` one per module; a
@@ -225,7 +274,7 @@ starts clean, and a single record whose slot disagrees reads as missing.
 A power cycle clears RAM, so nothing is retained across one. Set the option
 to `n` for a ring that always starts empty.
 
-The host `csp-kiss logs` command reads a bounded window and saves JSON lines;
+`./tools/kfsw-linux csp ... logs` reads a bounded window from the host and saves JSON lines;
 see [remote diagnostics](../communications/index.md#remote-text-logs-and-discovery).
 It reports overwritten history, truncation and incomplete transfers. A busy
 writer can overwrite a requested record during transmission; that read fails
@@ -614,25 +663,28 @@ entropy. An invocation first reserves a ticket, then executes it;
 up to three attempts per phase reuse the same request bytes. An unsupported
 peer causes the call to fail. There is no fallback to the legacy protocol.
 
+Typing the command again starts a new operation. If all result attempts fail,
+or a handler resets the node, the outcome can remain unknown; inspect the
+node before starting another operation. Ordinary `cmd <node> ...` keeps its
+one-shot behaviour.
+
+The node keeps eight tickets for 60 seconds by default. New calls get BUSY when
+all are in use, and an expired or unknown ticket gets UNAVAILABLE. A restart
+discards every ticket. Tickets stop duplicates within their lifetime; they are
+not authentication and do not survive a reset.
+
+#### Wire format
+
 Version 2 adds an eight-byte token to the header (20 bytes total), preserving
 argument encoding. Opcodes 3/4 prepare and return a ticket; opcode 5 executes
 it, and opcode 2 returns the result. Prepare carries a random client nonce;
 execute carries the returned random server ticket. The cache matches source
 node, ticket, command ID, request ID, argument count and the entire payload.
 A repeated prepare within its lifetime returns the same ticket without
-extending its deadline. A repeated execute returns the recorded result.
-
-The default cache holds eight reservations/results for 60 seconds from
-reservation. New calls get BUSY when all slots are live. Expired or unknown
-tickets get UNAVAILABLE and cannot execute. A server restart discards all
-tickets. A failed entropy read prevents allocation. Tickets suppress duplicates
-within their lifetime; they provide no authentication or guarantee across resets.
-
-Typing the command again starts a new operation. If all result attempts fail,
-or a handler resets the node, the outcome can remain unknown; inspect the
-node before starting another operation. Handlers still run synchronously and
-need their own execution bounds. Ordinary `cmd <node> ...` keeps its one-shot
-legacy behavior. Changing clocks does not affect ticket lifetimes.
+extending its deadline. A repeated execute returns the recorded result. A
+failed entropy read prevents allocation. Handlers still run synchronously and
+need their own execution bounds. Changing clocks does not affect ticket
+lifetimes.
 
 ## Resource monitor
 
@@ -668,32 +720,70 @@ stacks, so its reported values do not measure stack headroom.
 `THREAD_NAME`. Measurements use the initial stack fill and the kernel thread
 list. Disable the service if the target cannot afford that overhead.
 
-## Ground watchdog
+## Watchdogs
 
-`ground_wtd` restarts its countdown only on CSP command 16 with the exact text
-`KFSWWSFK`. Any subsystem may send it. Ping, telemetry, parameter traffic and
-local feed attempts do not count. The timeout is 2 hours to 5 days
-(7200–432000 seconds), with a 24-hour default (86400 seconds).
+Three watchdogs answer three different questions. Each resets the node when
+its answer is no.
 
-From another node's console, feed node 2:
+| Watchdog | Proves | Fed by | Timeout | Enabled in |
+| --- | --- | --- | --- | --- |
+| Hardware | the CPU still runs | health, while every watched component reports | 8000 ms on the NUCLEO | `CONFIG_KFSW_WATCHDOG`, NUCLEO |
+| Health | the threads still run | the main loop (`app`) and the CSP router probe (`csp`) | 4000 ms and 8000 ms deadlines | `CONFIG_KFSW_HEALTH`, NUCLEO |
+| Ground | somebody still talks to the node | a ground watchdog feed over CSP | 24 h, from 2 h to 5 days | `CONFIG_KFSW_GNDWDT`, Linux and NUCLEO |
+
+### Hardware watchdog
+
+The MCU's independent watchdog, IWDG on the STM32L4, runs from its own
+low-speed oscillator and cannot be stopped once started. Zephyr drives it
+through its watchdog driver; `kfsw-platform` arms it after the services have
+started, so a slow boot is not reset before the shell is up. native_sim has no
+hardware watchdog. The [NUCLEO target](../targets/index.md#watchdog) explains
+why it is the independent watchdog and not `watchdog0`.
+
+### Health
+
+Health decides when the hardware watchdog is fed. Each watched component has a
+deadline; while all of them report in time, health feeds the watchdog, and when
+one misses its deadline health stops feeding and the hardware watchdog resets
+the board. A board stuck with interrupts running but its threads blocked is
+reset this way. Health needs the hardware watchdog, so it is off on Linux.
+
+### Ground watchdog
+
+The ground watchdog resets a node nobody has talked to for too long, so a
+spacecraft that lost its way out of contact eventually starts again from a
+known state. The countdown restarts only on command 16, `ground_wtd`, carrying
+the exact text `KFSWWSFK`, received over CSP. Any node may send it. Ping,
+telemetry, parameter traffic and local feed attempts do not count. The timeout
+is 2 hours to 5 days (7200–432000 seconds), with a 24-hour default (86400
+seconds).
+
+From another node's console, feed node 2 and read it back:
 
 ```text
-cmd 2 ground_wtd KFSWWSFK
-ground_wtd node=2: OK ground_wtd_cnt=86400 ground_wtd_timeout=86400
+kfsw-ground# gndwdt feed 2
+node: 2
+fed: yes
+ground_wtd_cnt: 86400
+ground_wtd_timeout: 86400
 
-cmd 2 ground_wtd get
-ground_wtd node=2: OK ground_wtd_cnt=86390 ground_wtd_timeout=86400
+kfsw-ground# gndwdt show 2
+node: 2
+ground_wtd_cnt: 86390
+ground_wtd_timeout: 86400
 ```
 
-Both nodes need `CONFIG_KFSW_GNDWDT` and `CONFIG_KFSW_COMMAND_CSP`. The command
-uses port 11 by default. The magic word checks intent; it is not authentication.
-A repeated legacy request feeds again. With `cmd retry`, a duplicate ticket
-returns the saved result without feeding again.
+A node does not feed itself: `gndwdt feed` refuses its own address. The same
+exchange is `cmd 2 ground_wtd KFSWWSFK` and `cmd 2 ground_wtd get`, which is
+what a ground tool sends. Both nodes need `CONFIG_KFSW_GNDWDT` and
+`CONFIG_KFSW_COMMAND_CSP`. The command uses port 11 by default. The magic word
+checks intent; it is not authentication. A repeated legacy request feeds again.
+With `cmd retry`, a duplicate ticket returns the saved result without feeding
+again.
 
-`get` reads the countdown without feeding, remotely or with `cmd ground_wtd get`
-on the local console. Successful feeds return the same values as the parameters.
-Without the parameter service, a feed replies `ground_wtd restarted`; `get` still
-reads the service state.
+A ground station built with `tools/k-ground` carries the service so it can feed
+others, but its own countdown starts disarmed: nobody feeds the ground. `gndwdt
+on` arms it.
 
 Table 35 exposes:
 
@@ -712,14 +802,10 @@ Set the timeout with `param set ground_wtd_timeout 86400` locally or
 `param set 2 ground_wtd_timeout 86400` remotely. The timeout keeps wire ID
 `35:0x04`; its former name was `gndwdt_timeout_s`. The countdown uses `35:0x18`.
 
-`gndwdt show`, `gndwdt on`, `gndwdt off` and `gndwdt timeout <seconds>` remain
-available locally. Changing the timeout or re-enabling the watchdog does not
-restart its countdown. A node re-enabled after its deadline can reset at the
-next check. Send a valid feed first. A reset already queued is not cancelled.
-
-TODO: define the second watchdog's feed source and timeout. Keep it separate
-from `ground_wtd`; ordinary incoming traffic must not feed the ground watchdog.
-The existing hardware watchdog and component health checks are unchanged.
+`gndwdt show`, `gndwdt on`, `gndwdt off` and `gndwdt timeout <seconds>` act on
+the local countdown. Changing the timeout or re-enabling the watchdog does not
+restart it. A node re-enabled after its deadline can reset at the next check.
+Send a valid feed first. A reset already queued is not cancelled.
 
 ## Event record
 
@@ -745,3 +831,17 @@ spinlock, so it can be called from any context.
 
 Read another node's events with `cmd <node> event_stats` and
 `cmd <node> event_tail <age>`. The ring does not survive a reset.
+
+## Modules
+
+`kfsw-modules` holds the code for a specific device or subsystem, built on
+these services. Each module has its own parameter table, in the 50 to 99 band.
+
+| Module | Table | What it is |
+| --- | --- | --- |
+| `radio-uhf` | 50 | Holybro SiK UHF radio: identity, status and optional link encryption |
+| `temperature-sensor-example` | 51 | The MCU's die temperature, sampled on a work queue; the module to copy |
+| `boton-test` | 67 | A board button and three LEDs, for bench tests |
+
+The [kfsw-modules README](https://github.com/dgonzalez97/kfsw-modules#readme)
+says how a module is laid out and how to add one.
