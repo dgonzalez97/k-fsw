@@ -216,12 +216,14 @@ packets leave on USART3; don't connect the shell terminal to the CSP UART.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `param tables` | none | Local tables with ID, band, size and saved values |
-| `param tablelist` | `[node]` | Tables of a node |
-| `param list` | `[node]` | All parameters |
-| `param table` | `[node] <table>` | One table |
+| `param tables` | `[node]` | The tables a node carries, without values |
+| `param table` | `[node] <id>` | The parameters of one table, with values |
+| `param list` | `[node]` | Every parameter of a node, with values |
 | `param get` | `[node] <name>` | Read a value |
 | `param set` | `[node] <name> <value>` | Write a value |
+
+Three views of the same parameters, from the widest to the most detailed:
+`tables` says which tables exist, `table` shows one, `list` shows them all.
 
 ```text
 kfsw:~$ param tables
@@ -343,7 +345,7 @@ Paths must start with `/` and can't contain `..` or empty components.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `cmd list` | none | Registered commands with ID, arguments and description |
+| `cmd list` | none | Registered commands and what they do, laid out as Tab lists them |
 | `cmd <name>` | `[arguments]` | Run a command on this node |
 | `cmd <node> <name>` | `[arguments]` | Run a command on another node over CSP |
 | `cmd retry <node> <name>` | `[arguments]` | Reserve a ticket and retry lost exchanges within this invocation |
@@ -355,25 +357,24 @@ Paths must start with `/` and can't contain `..` or empty components.
 
 ```text
 kfsw:~$ cmd list
- ID NAME         ARGS   DESCRIPTION
-  9 journal_stats 0 args Read persistent journal status.
- 10 journal_tail 1 arg  Read a journal event by age, newest is 0.
- 11 journal_time 1 arg  Read a journal event's sequence and time by age.
-  1 noop         0 args Round trip with no effect.
-  2 info         0 args Report uptime and storage state.
-  4 event_stats  0 args Report event record counters.
-  5 event_tail   1 arg  Read one recorded event by age, newest is 0.
-  6 hk_define    2 args Name what a report collects: <report> "[node:]table:offset ...".
-  7 hk_period    2 args Collect repeatedly: hk_period <report> <ms>, 0 to stop.
-  8 hk_clear     1 arg  Forget a report: hk_clear <report>.
-  3 reboot       1 arg  [mutating] Reset this node after a short delay: reboot <pin>.
- 16 ground_wtd   1 arg  [mutating] Ground watchdog: get, or KFSWWSFK to feed over CSP.
+  journal_stats  : Read persistent journal status.
+  journal_tail   : Read a journal event by age, newest is 0.
+  journal_time   : Read a journal event's sequence and time by age.
+  noop           : Round trip with no effect.
+  info           : Report uptime and storage state.
+  event_stats    : Report event record counters.
+  event_tail     : Read one recorded event by age, newest is 0.
+  hk_define      : Name what a report collects: <report> "[node:]table:offset ...".
+  hk_period      : Collect repeatedly: hk_period <report> <ms>, 0 to stop.
+  hk_clear       : Forget a report: hk_clear <report>.
+  reboot         : Reset this node after a short delay: reboot <pin>.
+  ground_wtd     : Ground watchdog: get, or KFSWWSFK to feed over CSP.
 
 kfsw:~$ cmd 2 info
 info node=2: OK uptime_ms=4140 storage=ready free_bytes=12288
 ```
 
-The order is registration order, not ID order.
+The order is registration order. The IDs are in the table below.
 
 ### Identifier allocation
 
@@ -392,7 +393,7 @@ is defined by that service and carries its ID in its own header.
 | 16 | `ground_wtd` | `kfsw-services`, `gndwdt.h` |
 
 The name is looked up in the local registry before the request is sent, so
-both nodes need the same command IDs. `[mutating]` commands change the node.
+both nodes need the same command IDs. `reboot` and `ground_wtd` change the node.
 Remote commands need `CONFIG_KFSW_COMMAND_CSP` (port 11). The command service
 does not authenticate callers. Radio encryption can protect that link;
 other interfaces need their own access policy.

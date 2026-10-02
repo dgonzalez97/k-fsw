@@ -80,10 +80,10 @@ echo "HK BEACON SMOKE"
 printf '%s\n' 'hk define 0 1:0 3:0' 'hk period 0 1000' >&3
 sleep 2
 
-# Below the floor. -34 is -ERANGE.
+# Below the floor, which the refusal names.
 printf '%s\n' 'hk beacon 0 16 250' >&3
 sleep 1
-if tr -d '\r' <"$work_dir/node.log" | grep -q 'beacon for report 0: -34'; then
+if tr -d '\r' <"$work_dir/node.log" | grep -q 'beacon interval must be 0 or at least 5000 ms'; then
 	printf '  [ok]   an interval under the floor is refused\n'
 else
 	printf '  [FAIL] an interval under the floor was accepted\n' >&2

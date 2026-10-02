@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include <zephyr/shell/shell.h>
+#include <zephyr/shell/shell_string_conv.h>
 
 #include <kfsw/services/gndwdt.h>
 
@@ -15,11 +16,93 @@ static const char *state_name(const struct kfsw_gndwdt_status *status)
 	return status->enabled ? "armed" : "disarmed";
 }
 
+#if CONFIG_KFSW_COMMAND_CSP
+static int parse_node(const struct shell *sh, const char *text, uint16_t *node)
+{
+	unsigned long parsed;
+	int parse_error = 0;
+
+	parsed = shell_strtoul(text, 10, &parse_error);
+	if ((parse_error != 0) || (parsed == 0U) || (parsed > 16383U)) {
+		shell_error(sh, "Node must be 1..16383: %s", text);
+		return -EINVAL;
+	}
+	*node = (uint16_t)parsed;
+	return 0;
+}
+
+/* The reply detail is "key=value ..."; print one field per line like the local show. */
+static void print_reply_fields(const struct shell *sh, const char *detail)
+{
+	char fields[KFSW_COMMAND_MAX_DETAIL_SIZE];
+	char *saved = NULL;
+
+	(void)strncpy(fields, detail, sizeof(fields) - 1U);
+	fields[sizeof(fields) - 1U] = '\0';
+	for (char *field = strtok_r(fields, " ", &saved); field != NULL;
+	     field = strtok_r(NULL, " ", &saved)) {
+		char *value = strchr(field, '=');
+
+		if (value == NULL) {
+			shell_print(sh, "%s", field);
+			continue;
+		}
+		*value = '\0';
+		shell_print(sh, "%s: %s", field, value + 1);
+	}
+}
+
+static int remote(const struct shell *sh, const char *node_text, bool feed)
+{
+	struct kfsw_command_result result;
+	uint16_t node;
+	int outcome;
+
+	outcome = parse_node(sh, node_text, &node);
+	if (outcome != 0) {
+		return outcome;
+	}
+	outcome = kfsw_gndwdt_remote(node, feed, &result);
+	if (outcome == -EINVAL) {
+		shell_error(sh, "Node %u is this node; its watchdog is fed from elsewhere", node);
+		return outcome;
+	}
+	if (outcome != 0) {
+		shell_error(sh, "Node %u did not answer (%d)", node, outcome);
+		return outcome;
+	}
+	if (result.status != KFSW_COMMAND_OK) {
+		shell_error(sh, "Node %u refused: %s", node,
+			    kfsw_command_status_name(result.status));
+		return -EIO;
+	}
+	shell_print(sh, "node: %u", node);
+	if (feed) {
+		shell_print(sh, "fed: yes");
+	}
+	print_reply_fields(sh, result.detail);
+	return 0;
+}
+
+static int cmd_gndwdt_feed(const struct shell *sh, size_t argc, char **argv)
+{
+	ARG_UNUSED(argc);
+
+	return remote(sh, argv[1], true);
+}
+#endif
+
 static int cmd_gndwdt_show(const struct shell *sh, size_t argc, char **argv)
 {
 	struct kfsw_gndwdt_status status;
 
+#if CONFIG_KFSW_COMMAND_CSP
+	if (argc == 2U) {
+		return remote(sh, argv[1], false);
+	}
+#else
 	ARG_UNUSED(argc);
+#endif
 	ARG_UNUSED(argv);
 
 	kfsw_gndwdt_get_status(&status);
@@ -66,9 +149,18 @@ static int cmd_gndwdt_timeout(const struct shell *sh, size_t argc, char **argv)
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(gndwdt_commands,
-	SHELL_CMD_ARG(off, NULL, "Disarm the countdown.", cmd_gndwdt_arm, 1, 0),
-	SHELL_CMD_ARG(on, NULL, "Arm the countdown.", cmd_gndwdt_arm, 1, 0),
+#if CONFIG_KFSW_COMMAND_CSP
+	SHELL_CMD_ARG(feed, NULL, "Feed another node's ground watchdog: feed <node>.",
+		      cmd_gndwdt_feed, 2, 0),
+#endif
+	SHELL_CMD_ARG(off, NULL, "Disarm this node's countdown.", cmd_gndwdt_arm, 1, 0),
+	SHELL_CMD_ARG(on, NULL, "Arm this node's countdown.", cmd_gndwdt_arm, 1, 0),
+#if CONFIG_KFSW_COMMAND_CSP
+	SHELL_CMD_ARG(show, NULL, "Show the countdown, here or on another node: show [node].",
+		      cmd_gndwdt_show, 1, 1),
+#else
 	SHELL_CMD_ARG(show, NULL, "Show the countdown and its counters.", cmd_gndwdt_show, 1, 0),
+#endif
 	SHELL_CMD_ARG(timeout, NULL, "Set the silence allowed: timeout <seconds>.",
 		      cmd_gndwdt_timeout, 2, 0),
 	SHELL_SUBCMD_SET_END);

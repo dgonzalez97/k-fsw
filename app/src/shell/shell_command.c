@@ -43,19 +43,33 @@ static const struct kfsw_command_info *command_at(size_t index, struct command_i
 	return search->found;
 }
 
+struct command_list {
+	const struct shell *sh;
+	size_t longest;
+};
+
+static bool measure_name(const struct kfsw_command_info *info, void *context)
+{
+	struct command_list *list = context;
+
+	list->longest = MAX(list->longest, strlen(info->name));
+	return true;
+}
+
+/* Same layout as Tab and "cmd -h". */
 static bool print_command(const struct kfsw_command_info *info, void *context)
 {
-	const struct shell *sh = context;
+	const struct command_list *list = context;
 
-	shell_print(sh, "%3u %-12s %u arg%s %s%s", info->id, info->name, info->arg_count,
-		    (info->arg_count == 1U) ? " " : "s",
-		    (info->flags & KFSW_COMMAND_FLAG_MUTATING) ? "[mutating] " : "",
+	shell_print(list->sh, "  %-*s: %s", (int)list->longest + 2, info->name,
 		    (info->help != NULL) ? info->help : "");
 	return true;
 }
 
 static int cmd_command_list(const struct shell *sh, size_t argc, char **argv)
 {
+	struct command_list list = {.sh = sh};
+
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 
@@ -63,8 +77,8 @@ static int cmd_command_list(const struct shell *sh, size_t argc, char **argv)
 		shell_error(sh, "Command registry is not initialized");
 		return -EACCES;
 	}
-	shell_print(sh, " ID NAME         ARGS   DESCRIPTION");
-	kfsw_command_visit(print_command, (void *)sh);
+	kfsw_command_visit(measure_name, &list);
+	kfsw_command_visit(print_command, &list);
 	return 0;
 }
 

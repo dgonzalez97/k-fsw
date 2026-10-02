@@ -16,7 +16,7 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(kfsw_services_hk_remote_tests LANGUAGES C)
 
 target_sources(app PRIVATE src/main.c)
-target_link_libraries(app PRIVATE kfsw::services)
+target_link_libraries(app PRIVATE kfsw::services kfsw::comms)
 
 # The remote reads are wrapped so the fakes can act as a slow, silent or
 # incomplete node.

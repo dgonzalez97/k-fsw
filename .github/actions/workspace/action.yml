@@ -28,6 +28,10 @@ runs:
         app-path: k-fsw
         toolchains: arm-zephyr-eabi
 
+    - name: Apply the workspace patches
+      shell: bash
+      run: west patch apply
+
     - name: Install system packages
       if: inputs.packages != ''
       shell: bash
