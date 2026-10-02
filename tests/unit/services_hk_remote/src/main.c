@@ -11,6 +11,7 @@
 #include <zephyr/fff.h>
 #include <zephyr/ztest.h>
 
+#include <kfsw/comms/csp.h>
 #include <kfsw/services/hk.h>
 #include <kfsw/services/parameter.h>
 
@@ -131,6 +132,22 @@ ZTEST(services_hk_remote, test_silent_node_fails_every_entry_it_owed)
 		      "nothing should be read from a node that did not answer");
 	zassert_equal(after.entries_failed - before.entries_failed, 2U,
 		      "both entries the report owed should count as failed");
+}
+
+ZTEST(services_hk_remote, test_own_address_is_read_locally)
+{
+	const struct kfsw_hk_entry entry = {.node = CONFIG_KFSW_CSP_ADDRESS, .param_id = FIRST_ID};
+	struct kfsw_hk_entry stored;
+	size_t count = 1U;
+
+	zassert_ok(kfsw_csp_init());
+	/* Nothing local carries that ID, so the define fails, but no node is asked. */
+	zassert_not_ok(kfsw_hk_define(REPORT_ID, &entry, 1U));
+	zassert_equal(__wrap_kfsw_param_remote_visit_until_fake.call_count, 0U);
+
+	define_report(1U);
+	zassert_ok(kfsw_hk_get_definition(REPORT_ID, &stored, &count));
+	zassert_equal(stored.node, REMOTE_NODE);
 }
 
 ZTEST(services_hk_remote, test_node_that_answers_carries_its_values_into_the_sample)
