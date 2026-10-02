@@ -12,6 +12,8 @@
 #include <kfsw/comms/csp.h>
 #if CONFIG_KFSW_COMMAND
 #include <kfsw/services/command.h>
+
+#include "shell_command.h"
 #endif
 
 #define KFSW_CSP_PING_TIMEOUT_MS 1000U
@@ -271,35 +273,13 @@ static int cmd_csp_ident(const struct shell *sh, size_t argc, char **argv)
 /* The pin is checked on the node that restarts. */
 static int cmd_csp_reboot(const struct shell *sh, size_t argc, char **argv)
 {
-	struct kfsw_command_result result = {0};
-	struct kfsw_command_arg args[1];
-	unsigned long node;
-	char *end;
-	int outcome;
+	uint16_t node;
+	int result = kfsw_shell_parse_node(sh, argv[1], &node);
 
-	node = strtoul(argv[1], &end, 0);
-	if ((end == argv[1]) || (*end != '\0') || (node > 16383UL)) {
-		shell_error(sh, "Invalid node: %s", argv[1]);
-		return -EINVAL;
+	if (result != 0) {
+		return result;
 	}
-
-	args[0].type = KFSW_COMMAND_TYPE_TEXT;
-	args[0].value.text = argv[2];
-
-	outcome = kfsw_command_invoke_remote((uint16_t)node, "reboot", args, ARRAY_SIZE(args),
-					     &result);
-	if (outcome != 0) {
-		shell_error(sh, "reboot node=%lu: %d", node, outcome);
-		return outcome;
-	}
-	if (result.status != KFSW_COMMAND_OK) {
-		shell_error(sh, "reboot node=%lu: %s%s%s", node,
-			    kfsw_command_status_name(result.status),
-			    (result.detail[0] != '\0') ? " " : "", result.detail);
-		return -EACCES;
-	}
-	shell_print(sh, "reboot node=%lu: OK %s", node, result.detail);
-	return 0;
+	return kfsw_shell_run_command(sh, node, "reboot", argc - 2U, &argv[2]);
 }
 #endif
 
@@ -396,8 +376,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(csp_commands,
 	SHELL_CMD_ARG(ping, NULL, "Ping a node, or this one when no node is given.", cmd_csp_ping,
 		      1, 1),
 #if CONFIG_KFSW_COMMAND && CONFIG_REBOOT
-	SHELL_CMD_ARG(reboot, NULL, "Restart a node: reboot <node> <pin>.", cmd_csp_reboot, 3,
-		      0),
+	SHELL_CMD_ARG(reboot, NULL, "Restart a node: reboot <node> <pin> [--retry].",
+		      cmd_csp_reboot, 3, 1),
 #endif
 	SHELL_CMD_ARG(routes, NULL, "Show the CSP static routing table.", cmd_csp_routes, 1, 0),
 	SHELL_SUBCMD_SET_END);

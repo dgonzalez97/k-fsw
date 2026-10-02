@@ -6,6 +6,10 @@
 
 #include <kfsw/services/event.h>
 
+#if CONFIG_KFSW_COMMAND
+#include "shell_command.h"
+#endif
+
 /* Local event record. Payloads are printed as bytes. */
 
 struct event_print_context {
@@ -54,7 +58,17 @@ static int cmd_event_stats(const struct shell *sh, size_t argc, char **argv)
 {
 	struct kfsw_event_stats stats;
 
+#if CONFIG_KFSW_COMMAND_CSP
+	if (argc == 2U) {
+		uint16_t node;
+		int result = kfsw_shell_parse_node(sh, argv[1], &node);
+
+		return (result != 0) ? result
+				     : kfsw_shell_run_command(sh, node, "event_stats", 0U, NULL);
+	}
+#else
 	ARG_UNUSED(argc);
+#endif
 	ARG_UNUSED(argv);
 
 	kfsw_event_get_stats(&stats);
@@ -65,6 +79,23 @@ static int cmd_event_stats(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "rejected: %" PRIu32, stats.rejected);
 	return 0;
 }
+
+#if CONFIG_KFSW_COMMAND
+/* One record by age, newest 0, here or on another node. */
+static int cmd_event_tail(const struct shell *sh, size_t argc, char **argv)
+{
+	uint16_t node = KFSW_SHELL_THIS_NODE;
+
+	if (argc == 3U) {
+		int result = kfsw_shell_parse_node(sh, argv[1], &node);
+
+		if (result != 0) {
+			return result;
+		}
+	}
+	return kfsw_shell_run_command(sh, node, "event_tail", 1U, &argv[argc - 1U]);
+}
+#endif
 
 static int cmd_event_clear(const struct shell *sh, size_t argc, char **argv)
 {
@@ -81,7 +112,19 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 	SHELL_CMD_ARG(clear, NULL, "Discard held records; counters are kept.", cmd_event_clear, 1,
 		      0),
 	SHELL_CMD_ARG(list, NULL, "Show held records, oldest first.", cmd_event_list, 1, 0),
+#if CONFIG_KFSW_COMMAND_CSP
+	SHELL_CMD_ARG(stats, NULL, "Show record counters, here or on a node: stats [node].",
+		      cmd_event_stats, 1, 1),
+#else
 	SHELL_CMD_ARG(stats, NULL, "Show record counters.", cmd_event_stats, 1, 0),
+#endif
+#if CONFIG_KFSW_COMMAND_CSP
+	SHELL_CMD_ARG(tail, NULL, "One record by age, newest 0: tail [node] <age>.",
+		      cmd_event_tail, 2, 1),
+#elif CONFIG_KFSW_COMMAND
+	SHELL_CMD_ARG(tail, NULL, "One record by age, newest 0: tail <age>.", cmd_event_tail,
+		      2, 0),
+#endif
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(event, &event_commands, "K-FSW event record.", NULL);

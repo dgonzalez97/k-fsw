@@ -9,10 +9,22 @@
 #if CONFIG_KFSW_LOG_HISTORY
 #include <kfsw/services/log_history.h>
 #endif
+#if CONFIG_KFSW_COMMAND
+#include "shell_command.h"
+#endif
 
 static int cmd_status(const struct shell *sh, size_t argc, char **argv)
 {
+#if CONFIG_KFSW_COMMAND_CSP
+	if (argc == 2U) {
+		uint16_t node;
+		int result = kfsw_shell_parse_node(sh, argv[1], &node);
+
+		return (result != 0) ? result : kfsw_shell_run_command(sh, node, "info", 0U, NULL);
+	}
+#else
 	ARG_UNUSED(argc);
+#endif
 	ARG_UNUSED(argv);
 
 	shell_print(sh, "K-FSW status");
@@ -105,6 +117,23 @@ SHELL_STATIC_SUBCMD_SET_CREATE(log_commands,
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(log, &log_commands, "K-FSW logging commands.", NULL);
+#if CONFIG_KFSW_COMMAND_CSP
+SHELL_CMD_ARG_REGISTER(status, NULL, "Show K-FSW status, here or on a node: status [node].",
+		       cmd_status, 1, 1);
+#else
 SHELL_CMD_ARG_REGISTER(status, NULL, "Show basic K-FSW runtime status.", cmd_status, 1, 0);
+#endif
 SHELL_CMD_ARG_REGISTER(time, NULL, "Show K-FSW monotonic time.", cmd_time, 1, 0);
 SHELL_CMD_ARG_REGISTER(version, NULL, "Show K-FSW build information.", cmd_version, 1, 0);
+
+#if CONFIG_KFSW_COMMAND && CONFIG_REBOOT
+static int cmd_reboot(const struct shell *sh, size_t argc, char **argv)
+{
+	ARG_UNUSED(argc);
+
+	return kfsw_shell_run_command(sh, KFSW_SHELL_THIS_NODE, "reboot", 1U, &argv[1]);
+}
+
+SHELL_CMD_ARG_REGISTER(reboot, NULL, "Restart this node: reboot <pin>; csp reboot for another.",
+		       cmd_reboot, 2, 0);
+#endif

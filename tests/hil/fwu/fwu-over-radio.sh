@@ -274,7 +274,7 @@ printf '%s\n' "fwu flash $FLIGHT_NODE" >&3
 wait_for_output "$work_dir/ground.log" "scheduled a swap" "$ground_pid" 120 || \
 	fail "the node did not schedule a swap"
 
-printf '%s\r' 'cmd reboot' >"$debug_serial"
+printf '%s\r' "reboot ${KFSW_REBOOT_PIN:-0000}" >"$debug_serial"
 wait_for_output "$work_dir/nucleo.log" "@READY " "$debug_capture_pid" 180 || \
 	fail "the node did not come back after the swap"
 sleep 5

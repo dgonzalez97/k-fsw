@@ -67,7 +67,7 @@ class Console:
         return text
 
     def reboot(self, pin):
-        self.run(f"cmd reboot {pin}", "rebooting in")
+        self.run(f"reboot {pin}", "rebooting in")
         self.wait_for("@READY ", timeout=60)
         self.run("")
 

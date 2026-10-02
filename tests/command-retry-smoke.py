@@ -7,6 +7,8 @@ import struct
 import serial
 from firmware_fixture import NativeNode, BenchNode, packets, send_packet
 
+REBOOT = 3
+
 
 def message(opcode, token=0, command=1, request=7, version=2, status=0):
     header = struct.pack('>BBBBHHHH', version, opcode, status, 0, command, request, 0, 0)
@@ -66,7 +68,8 @@ def main():
 
             node.send('param set cmd_timeout_ms 1000')
             node.command('param get cmd_timeout_ms', r'cmd_timeout_ms = 1000')
-            offset = node.send('cmd retry 2 noop')
+            # A reboot is the kind of request a retry must not run twice.
+            offset = node.send('csp reboot 2 0000 --retry')
             prepared_requests = []
             executed_requests = []
             peer_invocations = 0
@@ -79,30 +82,30 @@ def main():
                     prepared_requests.append(data)
                     if len(prepared_requests) == 1:
                         continue
-                    reply = message(4, 9876, request=int.from_bytes(data[6:8], 'big'))
+                    reply = message(4, 9876, command=REBOOT, request=int.from_bytes(data[6:8], 'big'))
                 else:
                     assert opcode == 5 and int.from_bytes(data[12:20], 'big') == 9876
                     executed_requests.append(data)
                     if len(executed_requests) == 1:
                         peer_invocations += 1
                         continue
-                    reply = message(2, 9876, request=int.from_bytes(data[6:8], 'big'))
+                    reply = message(2, 9876, command=REBOOT, request=int.from_bytes(data[6:8], 'big'))
                 send_packet(port, 2, header['source'], 11, header['sport'], reply)
                 if len(executed_requests) == 2:
                     break
-            node.wait(r'noop node=2: OK', offset)
+            node.wait(r'node: 2', offset)
             assert len(prepared_requests) == 2 and prepared_requests[0] == prepared_requests[1]
             assert len(executed_requests) == 2 and executed_requests[0] == executed_requests[1]
             assert peer_invocations == 1
 
-            offset = node.send('cmd retry 2 noop')
+            offset = node.send('csp reboot 2 0000 --retry')
             requests = []
             for header, data in packets(port, 3):
                 if header['destination'] == 2 and header['dport'] == 11:
                     requests.append(data)
                     send_packet(port, 2, header['source'], 11, header['sport'],
                                 message(2, version=1, command=0, request=0, status=2))
-            node.wait(r'transport failed', offset)
+            node.wait(r'Node 2 did not answer', offset)
             assert len(requests) == 1 and requests[0][0:2] == bytes([2, 3])
         result = {'server_handler_delta': 1, 'client_prepare_attempts': 2,
                   'client_execute_attempts': 2, 'client_peer_invocations': peer_invocations,

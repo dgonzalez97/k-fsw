@@ -145,6 +145,9 @@ if(CONFIG_KFSW_DEBUG_SHELL)
     target_sources_ifdef(CONFIG_KFSW_EVENT app PRIVATE
         src/shell/shell_event.c
     )
+    if(CONFIG_KFSW_JOURNAL AND CONFIG_KFSW_COMMAND)
+        target_sources(app PRIVATE src/shell/shell_journal.c)
+    endif()
     target_sources_ifdef(CONFIG_KFSW_WATCHDOG app PRIVATE
         src/shell/shell_watchdog.c
     )
