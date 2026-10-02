@@ -80,6 +80,9 @@ LAYOUT_FILE            = docs/DoxygenLayout.xml
 GENERATE_HTML          = YES
 HTML_OUTPUT            = html
 HTML_FILE_EXTENSION    = .html
+# Light only: the theme is light, and Doxygen 1.9.5+ would otherwise follow the
+# reader's dark mode in the parts kfsw.css does not restyle.
+HTML_COLORSTYLE        = LIGHT
 HTML_COLORSTYLE_HUE    = 205
 HTML_COLORSTYLE_SAT    = 80
 HTML_COLORSTYLE_GAMMA  = 90
