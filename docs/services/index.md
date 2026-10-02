@@ -274,7 +274,7 @@ starts clean, and a single record whose slot disagrees reads as missing.
 A power cycle clears RAM, so nothing is retained across one. Set the option
 to `n` for a ring that always starts empty.
 
-The host `csp-kiss logs` command reads a bounded window and saves JSON lines;
+`./tools/kfsw-linux csp ... logs` reads a bounded window from the host and saves JSON lines;
 see [remote diagnostics](../communications/index.md#remote-text-logs-and-discovery).
 It reports overwritten history, truncation and incomplete transfers. A busy
 writer can overwrite a requested record during transmission; that read fails
@@ -663,25 +663,28 @@ entropy. An invocation first reserves a ticket, then executes it;
 up to three attempts per phase reuse the same request bytes. An unsupported
 peer causes the call to fail. There is no fallback to the legacy protocol.
 
+Typing the command again starts a new operation. If all result attempts fail,
+or a handler resets the node, the outcome can remain unknown; inspect the
+node before starting another operation. Ordinary `cmd <node> ...` keeps its
+one-shot behaviour.
+
+The node keeps eight tickets for 60 seconds by default. New calls get BUSY when
+all are in use, and an expired or unknown ticket gets UNAVAILABLE. A restart
+discards every ticket. Tickets stop duplicates within their lifetime; they are
+not authentication and do not survive a reset.
+
+#### Wire format
+
 Version 2 adds an eight-byte token to the header (20 bytes total), preserving
 argument encoding. Opcodes 3/4 prepare and return a ticket; opcode 5 executes
 it, and opcode 2 returns the result. Prepare carries a random client nonce;
 execute carries the returned random server ticket. The cache matches source
 node, ticket, command ID, request ID, argument count and the entire payload.
 A repeated prepare within its lifetime returns the same ticket without
-extending its deadline. A repeated execute returns the recorded result.
-
-The default cache holds eight reservations/results for 60 seconds from
-reservation. New calls get BUSY when all slots are live. Expired or unknown
-tickets get UNAVAILABLE and cannot execute. A server restart discards all
-tickets. A failed entropy read prevents allocation. Tickets suppress duplicates
-within their lifetime; they provide no authentication or guarantee across resets.
-
-Typing the command again starts a new operation. If all result attempts fail,
-or a handler resets the node, the outcome can remain unknown; inspect the
-node before starting another operation. Handlers still run synchronously and
-need their own execution bounds. Ordinary `cmd <node> ...` keeps its one-shot
-legacy behavior. Changing clocks does not affect ticket lifetimes.
+extending its deadline. A repeated execute returns the recorded result. A
+failed entropy read prevents allocation. Handlers still run synchronously and
+need their own execution bounds. Changing clocks does not affect ticket
+lifetimes.
 
 ## Resource monitor
 

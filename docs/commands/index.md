@@ -12,7 +12,9 @@ kfsw:~$ status
 
 Wait for `@READY` before using services. `help` lists the commands in the
 build and `<command> -h` shows the syntax. Tab completes command and
-subcommand names, but not arguments such as a node or a path. A command with
+subcommand names, but not arguments such as a node or a path. When more than
+one name fits, Tab lists them one per line with their help, the same way
+`<command> -h` does. A command with
 the wrong number of arguments prints its usage:
 
 ```text
@@ -76,8 +78,8 @@ time is in `csp clock`.
 
 `log history` shows up to 32 recent retained messages when
 `CONFIG_KFSW_LOG_HISTORY` is enabled. It includes sequence, uptime, module,
-level and truncation status. To retrieve them over CSP, use the host
-`csp-kiss logs` command described in [communications](../communications/index.md#remote-text-logs-and-discovery).
+level and truncation status. To read them over CSP from the host, use
+`./tools/kfsw-linux csp ... logs`, described in [communications](../communications/index.md#remote-text-logs-and-discovery).
 
 ## UHF radio
 
