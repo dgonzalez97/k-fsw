@@ -131,7 +131,7 @@ expected_output=(
     'uid = "kfsw-1"'
     # Runtime writes are rejected; the compiled route remains active.
     "set: parameter 'route_table' is read-only"
-    'route_table = ""'
+    'route_table = "0/0 KISS"'
     '0/0 -> KISS direct'
 	'Parameter snapshot save: PASS'
 	'Parameter defaults: PASS (saved snapshot unchanged)'
