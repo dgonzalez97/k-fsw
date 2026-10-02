@@ -4,6 +4,7 @@
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/ztest.h>
 #include <csp/csp.h>
+#include <csp/csp_debug.h>
 #include <kfsw/comms/csp.h>
 #include <kfsw/services/log.h>
 #include <kfsw/services/log_history.h>
@@ -76,6 +77,34 @@ ZTEST(log_history, test_filters_and_truncation)
 	kfsw_log_error("short");
 	zassert_ok(kfsw_log_history_get(bounds.end + 1U, &record));
 	zassert_false(record.truncated);
+}
+
+ZTEST(log_history, test_markers_pass_every_level)
+{
+	struct kfsw_log_history_window bounds = window();
+	struct kfsw_log_record record;
+
+	zassert_ok(kfsw_log_set_level(4U));
+	kfsw_log_marker("@READY uptime_ms=%d", 5);
+	zassert_ok(kfsw_log_history_get(bounds.end, &record));
+	zassert_equal(record.module, KFSW_LOG_MODULE_APP);
+	zassert_equal(record.severity, 1U);
+	zassert_equal(strcmp(record.text, "@READY uptime_ms=5"), 0);
+}
+
+ZTEST(log_history, test_packet_trace_is_logged_without_colours)
+{
+	struct kfsw_log_history_window bounds = window();
+	struct kfsw_log_record record;
+
+	csp_print_func("\033[32mOUT: S %u, D %u\033[0m\n", 7U, 9U);
+	zassert_ok(kfsw_log_history_get(bounds.end, &record));
+	zassert_equal(record.module, KFSW_LOG_MODULE_CSP);
+	zassert_equal(strcmp(record.text, "OUT: S 7, D 9"), 0);
+	csp_print_func("\033[0m\n");
+	zassert_ok(kfsw_log_set_module_level(KFSW_LOG_MODULE_CSP, 2U));
+	csp_print_func("filtered\n");
+	zassert_equal(window().end, bounds.end + 1U);
 }
 
 ZTEST(log_history, test_ring_wrap_and_stale_sequence)

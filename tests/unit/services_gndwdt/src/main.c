@@ -78,7 +78,6 @@ static void feed(uint16_t node, const char *word, bool via_csp, enum kfsw_comman
 	(void)kfsw_command_invoke_id(KFSW_COMMAND_ID_GROUND_WTD, &arg, 1U, &source, &result);
 	zassert_equal(result.status, expected);
 	if (expected == KFSW_COMMAND_OK) {
-#if CONFIG_KFSW_PARAM
 		struct kfsw_gndwdt_status status;
 		char reply[KFSW_COMMAND_MAX_DETAIL_SIZE];
 
@@ -86,9 +85,6 @@ static void feed(uint16_t node, const char *word, bool via_csp, enum kfsw_comman
 		(void)snprintf(reply, sizeof(reply), "ground_wtd_cnt=%u ground_wtd_timeout=%u",
 			       status.remaining_s, status.timeout_s);
 		zassert_equal(strcmp(result.detail, reply), 0);
-#else
-		zassert_equal(strcmp(result.detail, "ground_wtd restarted"), 0);
-#endif
 	}
 }
 
