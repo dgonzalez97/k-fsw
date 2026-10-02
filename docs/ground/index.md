@@ -88,8 +88,8 @@ KFSW_RADIO_UHF=holybro
 
 `KFSW_CSP_ROUTES` sets a route table, for example `'2/14 KISS'`.
 `tools/k-ground` checks it and writes it to `CONFIG_KFSW_CSP_ROUTE_TABLE`;
-without it the node uses `0/0 -> KISS direct`. `KFSW_EXTRA_KCONFIG` and
-`KFSW_EXTRA_OVERLAY` add Kconfig lines and a devicetree overlay, which is how
+without it the node keeps `0/0 KISS` from `config/profiles/k-ground.conf`.
+`KFSW_EXTRA_KCONFIG` and `KFSW_EXTRA_OVERLAY` add Kconfig lines and a devicetree overlay, which is how
 `kfsw-gnd-can` enables CAN. `KFSW_RADIO_UHF=holybro` selects the radio module.
 
 To copy the reference configuration into your workspace:

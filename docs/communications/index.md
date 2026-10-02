@@ -52,9 +52,10 @@ and framing state.
 The longest matching prefix wins. The router delivers packets for the local
 node and forwards the rest.
 
-A single-interface composition without a route table gets
-`0/0 -> KISS direct`: every other node is reached over that serial link.
-Compositions with more than one interface need a route table. Routes are fixed
+A composition names its routes with `CONFIG_KFSW_CSP_ROUTE_TABLE`. The Linux
+and NUCLEO images use `0/0 KISS`: every other node is reached over the serial
+link. Without a table the node loads `0/0 LOOP` and reaches only itself, so a
+link is never picked by whichever interface came up first. Routes are fixed
 once the router starts.
 
 More detail is in the libcsp

@@ -41,5 +41,5 @@ A node file can set a route table:
 KFSW_CSP_ROUTES='2/14 KISS,16/10 KISS 2'
 ```
 
-Without it the node uses the direct `0/0 KISS` route. Traffic to the node's
+Without it the node keeps the `0/0 KISS` route of the k-ground profile. Traffic to the node's
 own address goes through loopback.
