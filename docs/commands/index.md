@@ -134,7 +134,7 @@ and its read counters.
 | `csp ifstat` | `<node> <interface>` | Remote interface packet/byte/error counters |
 | `csp routes` | none | Route table |
 | `csp ping` | `[node]` | Ping with CRC32 and a one-second timeout |
-| `csp debug` | `[on\|off]` | Print every packet in and out |
+| `csp debug` | `[on\|off]` | Log every packet in and out |
 | `csp clock` | `[set <utc>]` or `<node> [sync]` | Read or set wall time |
 | `csp reboot` | `<node> <pin>` | Restart a node |
 
@@ -145,16 +145,16 @@ kfsw:~$ csp ping 2
 CSP ping 2: success, rtt_ms=...
 ```
 
-`csp debug on` prints each packet's source and destination node and port,
-priority, flags, size and interface. It is off by default and only affects the
-node where it is turned on.
+`csp debug on` logs each packet's source and destination node and port,
+priority, flags, size and interface, so the trace also lands in `log history`.
+It is off by default and only affects the node where it is turned on.
 
 ```text
 kfsw:~$ csp debug on
 CSP packet trace: on
 kfsw:~$ csp ping 2
-[DEBUG] OUT: S 33, D 2, Dp 1, Sp 17, Pr 2, Fl 0x01, Sz 10 VIA: CAN (2), Tms 51060
-[DEBUG] INP: S 2, D 33, Dp 17, Sp 1, Pr 2, Fl 0x01, Sz 14 VIA: CAN, Tms 51120
+[INFO] OUT: S 33, D 2, Dp 1, Sp 17, Pr 2, Fl 0x01, Sz 10 VIA: CAN (2), Tms 51060
+[INFO] INP: S 2, D 33, Dp 17, Sp 1, Pr 2, Fl 0x01, Sz 14 VIA: CAN, Tms 51120
 CSP ping 2: success, rtt_ms=60
 ```
 

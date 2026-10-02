@@ -14,7 +14,8 @@ boot recovery, see @ref firmware_update. The API is in @ref kfsw_services.
 
 ## Boot and readiness markers
 
-At startup the boot service reads and clears the reset cause and prints:
+At startup the boot service reads and clears the reset cause and logs these
+markers (see [Logging](#logging) for how markers differ from other messages):
 
 ```text
 @SERVICES ok failures=0
@@ -191,6 +192,42 @@ failure. Native fault tests cover these policies; physical power-cut
 qualification remains pending.
 
 ## Logging
+
+Code reports what happened through the log, not with `printk`. A file names
+its module once and calls the macro for the level:
+
+```c
+#define KFSW_LOG_MODULE KFSW_LOG_MODULE_RADIO
+#include <kfsw/services/log.h>
+
+kfsw_log_info("Radio session to node %u established", peer);
+kfsw_log_error("Radio protection not started: %d", result);
+```
+
+Shell output answers the operator who typed a command; a log records what the
+node did, whether anyone asked or not. Shell handlers print with
+`shell_print`, and everything else logs. A message reaches the console, the
+history described below and, over CSP, the ground.
+
+Two kinds of line go through the log with rules of their own:
+
+- **Markers.** `@SERVICES`, `@BOOT`, `@SOURCE` and `@READY` are written with
+  `kfsw_log_marker()`. No level hides them, and they are printed without a
+  level tag so the line still starts with the marker that scripts look for.
+  The history keeps them like any message.
+- **The CSP packet trace.** With `csp debug on`, libcsp reports every packet;
+  each line is logged at INFO under the `csp` module, without libcsp's
+  colours. Leave it off on a busy link: it fills the history quickly.
+
+A node that starts logs, among others:
+
+```text
+[INFO] CSP initialized as node 1
+[INFO] CSP router started
+[INFO] Ground watchdog started, timeout 86400 s, armed
+@SERVICES ok failures=0
+@READY uptime_ms=0
+```
 
 Messages have four levels: DEBUG, INFO, WARNING and ERROR.
 `CONFIG_KFSW_LOG_MIN_LEVEL` removes the lower levels from the build. At
