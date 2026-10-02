@@ -58,7 +58,7 @@ On the flight console:
 
 ```text
 fwu status
-cmd reboot 0000
+reboot 0000
 mcuboot
 ```
 

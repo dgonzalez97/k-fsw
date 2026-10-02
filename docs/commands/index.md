@@ -36,8 +36,9 @@ service:
 | `param` | `CONFIG_KFSW_PARAM`; saving needs `CONFIG_KFSW_PARAM_PERSISTENCE` |
 | `storage` | `CONFIG_KFSW_STORAGE` |
 | `ftp` | `CONFIG_KFSW_FTP` |
-| `cmd` | `CONFIG_KFSW_COMMAND` |
 | `event` | `CONFIG_KFSW_EVENT` |
+| `journal` | `CONFIG_KFSW_JOURNAL` |
+| `reboot` | `CONFIG_KFSW_COMMAND` and `CONFIG_REBOOT` |
 | `hk` | `CONFIG_KFSW_HK` |
 | `fbo` | `CONFIG_KFSW_FBO` |
 | `fwu` | `CONFIG_KFSW_FWU` |
@@ -175,14 +176,16 @@ buffers; check `csp interfaces`, `csp routes` and `uart info`.
 
 ### Restarting a node
 
-`csp reboot <node> <pin>` restarts a node if the pin matches:
+`csp reboot <node> <pin>` restarts a node if the pin matches, and `reboot <pin>`
+restarts this one:
 
 ```text
 kfsw:~$ csp reboot 2 1234
-reboot node=2: denied wrong pin
+reboot: denied, wrong pin
 
 kfsw:~$ csp reboot 2 0000
-reboot node=2: OK rebooting in 500 ms
+node: 2
+rebooting in 500 ms
 ```
 
 The pin is `reboot_pin` in the system table: `0000` by default, persistent,
@@ -343,40 +346,38 @@ kfsw:~$ ftp verify /build/sample.bin /build/returned.bin
 
 Paths must start with `/` and can't contain `..` or empty components.
 
-## Commands
+## Another node
+
+Groups that can ask another node take the node first, as `param` does:
+`status 2`, `event stats 2`, `journal tail 2 0`, `hk period 2 0 1000`. The
+reply comes back one field per line, after the node it came from:
+
+```text
+kfsw:~$ status 2
+node: 2
+uptime_ms: 4140
+storage: ready
+free_bytes: 12288
+```
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `cmd list` | none | Registered commands and what they do, laid out as Tab lists them |
-| `cmd <name>` | `[arguments]` | Run a command on this node |
-| `cmd <node> <name>` | `[arguments]` | Run a command on another node over CSP |
-| `cmd retry <node> <name>` | `[arguments]` | Reserve a ticket and retry lost exchanges within this invocation |
-| `cmd <node> ground_wtd` | `KFSWWSFK` | Feed the ground watchdog; `gndwdt feed <node>` does the same |
-| `cmd [node] ground_wtd` | `get` | Read countdown/timeout without feeding; `gndwdt show <node>` |
-| `cmd journal_stats` | none | Persistent journal status |
-| `cmd journal_tail` | `<age>` | Committed event fields and payload; newest is 0 |
-| `cmd journal_time` | `<age>` | Sequence, event uptime and writer UTC |
+| `status` | `[node]` | Uptime and storage of a node |
+| `event stats` | `[node]` | Event record counters |
+| `event tail` | `[node] <age>` | One event record, newest is 0 |
+| `journal stats` | `[node]` | Persistent journal state |
+| `journal tail` | `[node] <age>` | One saved event, newest is 0 |
+| `journal time` | `[node] <age>` | When a saved event happened |
+| `hk define`, `hk period`, `hk clear` | `[node] ...` | Set up a node's housekeeping |
+| `reboot` | `<pin>` | Restart this node |
+| `csp reboot` | `<node> <pin>` | Restart another node |
+| `gndwdt feed`, `gndwdt show` | `<node>` | Its ground watchdog |
 
-```text
-kfsw:~$ cmd list
-  journal_stats  : Read persistent journal status.
-  journal_tail   : Read a journal event by age, newest is 0.
-  journal_time   : Read a journal event's sequence and time by age.
-  noop           : Round trip with no effect.
-  info           : Report uptime and storage state.
-  event_stats    : Report event record counters.
-  event_tail     : Read one recorded event by age, newest is 0.
-  hk_define      : Name what a report collects: <report> "[node:]table:offset ...".
-  hk_period      : Collect repeatedly: hk_period <report> <ms>, 0 to stop.
-  hk_clear       : Forget a report: hk_clear <report>.
-  reboot         : Reset this node after a short delay: reboot <pin>.
-  ground_wtd     : Ground watchdog: get, or KFSWWSFK to feed over CSP.
-
-kfsw:~$ cmd 2 info
-info node=2: OK uptime_ms=4140 storage=ready free_bytes=12288
-```
-
-The order is registration order. The IDs are in the table below.
+Underneath, each of these is a command of the command service, sent over CSP
+port 11; the commands are the wire protocol a ground tool speaks. A node only
+asks another for commands it knows itself, so both run the same IDs, listed in
+the table below. A remote request that changes the node can end in `--retry`,
+for example `csp reboot 2 0000 --retry`; see Scripts, below.
 
 ### Identifiers
 
@@ -422,7 +423,8 @@ other interfaces need their own access policy.
 | Command | Meaning |
 | --- | --- |
 | `event list` | Held records, oldest first |
-| `event stats` | Held, capacity, recorded, overwritten and rejected counts |
+| `event stats [node]` | Held, capacity, recorded, overwritten and rejected counts |
+| `event tail [node] <age>` | One record by age, newest is 0 |
 | `event clear` | Discard held records; counters are kept |
 
 ```text
@@ -437,28 +439,35 @@ in `SEQ` means records were overwritten, and `event stats` shows how many. The
 record is lost at reset. For another node:
 
 ```text
-kfsw:~$ cmd 2 event_stats
-event_stats node=2: OK held=9/32 recorded=9 overwritten=0 rejected=0
-kfsw:~$ cmd 2 event_tail 0
-event_tail node=2: OK seq=8 t=8120ms ftp/1 sev=0 0002000001000ce9d363
+kfsw:~$ event tail 2 0
+node: 2
+seq: 8
+t_ms: 8120
+src: ftp
+id: 1
+sev: 0
+data: 0002000001000ce9d363
 ```
 
 ## Housekeeping
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `hk define` | `<report> [node:]table:offset ...` | Set what a report collects |
-| `hk clear` | `<report>` | Delete a report |
+| `hk define` | `[node] <report> [node:]table:offset ...` | Set what a report collects |
+| `hk clear` | `[node] <report>` | Delete a report |
 | `hk show` | none | Reports and counters |
 | `hk collect` | `<report>` | Collect now |
 | `hk get` | `<report> [count]` | Print collected samples |
-| `hk period` | `<report> <ms>` | Collect periodically, 0 to stop |
+| `hk period` | `[node] <report> <ms>` | Collect periodically, 0 to stop |
 | `hk store` | `<report> <ms>` | Also write samples to a file, 0 to stop |
 | `hk store_clear` | `<report>` | Stop storing and delete the file |
 | `hk beacon` | `<report> <node> <ms>` | Send the latest sample periodically, 0 to stop |
 | `hk save` | none | Save the report settings |
 
-See @ref ground for Yamcs and the ground bridge.
+A leading node sets up that node's reports: `hk define 2 0 3:0 3:8` asks node 2
+to collect its own uptime and free storage as report 0. An entry always holds a
+`:`, so the node is told apart from the report. See @ref ground for Yamcs and
+the ground bridge.
 
 ## File based operations
 
@@ -527,8 +536,9 @@ The raw mask is printed as well because several causes can be latched at once;
 
 ## Scripts
 
-Ordinary commands are not retried. `cmd retry` uses a ticket to suppress
-duplicates within that invocation when `CONFIG_KFSW_COMMAND_RETRY` is enabled.
+Remote requests are not retried. Ending one with `--retry` sends it with a
+ticket that suppresses duplicates within that invocation, when
+`CONFIG_KFSW_COMMAND_RETRY` is enabled.
 A new invocation is a new operation. A timeout can mean the reply was lost
 after the command ran, so check the state before sending it again.
 
