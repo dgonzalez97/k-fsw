@@ -705,32 +705,70 @@ stacks, so its reported values do not measure stack headroom.
 `THREAD_NAME`. Measurements use the initial stack fill and the kernel thread
 list. Disable the service if the target cannot afford that overhead.
 
-## Ground watchdog
+## Watchdogs
 
-`ground_wtd` restarts its countdown only on CSP command 16 with the exact text
-`KFSWWSFK`. Any subsystem may send it. Ping, telemetry, parameter traffic and
-local feed attempts do not count. The timeout is 2 hours to 5 days
-(7200–432000 seconds), with a 24-hour default (86400 seconds).
+Three watchdogs answer three different questions. Each resets the node when
+its answer is no.
 
-From another node's console, feed node 2:
+| Watchdog | Proves | Fed by | Timeout | Enabled in |
+| --- | --- | --- | --- | --- |
+| Hardware | the CPU still runs | health, while every watched component reports | 8000 ms on the NUCLEO | `CONFIG_KFSW_WATCHDOG`, NUCLEO |
+| Health | the threads still run | the main loop (`app`) and the CSP router probe (`csp`) | 4000 ms and 8000 ms deadlines | `CONFIG_KFSW_HEALTH`, NUCLEO |
+| Ground | somebody still talks to the node | a ground watchdog feed over CSP | 24 h, from 2 h to 5 days | `CONFIG_KFSW_GNDWDT`, Linux and NUCLEO |
+
+### Hardware watchdog
+
+The MCU's independent watchdog, IWDG on the STM32L4, runs from its own
+low-speed oscillator and cannot be stopped once started. Zephyr drives it
+through its watchdog driver; `kfsw-platform` arms it after the services have
+started, so a slow boot is not reset before the shell is up. native_sim has no
+hardware watchdog. The [NUCLEO target](../targets/index.md#watchdog) explains
+why it is the independent watchdog and not `watchdog0`.
+
+### Health
+
+Health decides when the hardware watchdog is fed. Each watched component has a
+deadline; while all of them report in time, health feeds the watchdog, and when
+one misses its deadline health stops feeding and the hardware watchdog resets
+the board. A board stuck with interrupts running but its threads blocked is
+reset this way. Health needs the hardware watchdog, so it is off on Linux.
+
+### Ground watchdog
+
+The ground watchdog resets a node nobody has talked to for too long, so a
+spacecraft that lost its way out of contact eventually starts again from a
+known state. The countdown restarts only on command 16, `ground_wtd`, carrying
+the exact text `KFSWWSFK`, received over CSP. Any node may send it. Ping,
+telemetry, parameter traffic and local feed attempts do not count. The timeout
+is 2 hours to 5 days (7200–432000 seconds), with a 24-hour default (86400
+seconds).
+
+From another node's console, feed node 2 and read it back:
 
 ```text
-cmd 2 ground_wtd KFSWWSFK
-ground_wtd node=2: OK ground_wtd_cnt=86400 ground_wtd_timeout=86400
+kfsw-ground# gndwdt feed 2
+node: 2
+fed: yes
+ground_wtd_cnt: 86400
+ground_wtd_timeout: 86400
 
-cmd 2 ground_wtd get
-ground_wtd node=2: OK ground_wtd_cnt=86390 ground_wtd_timeout=86400
+kfsw-ground# gndwdt show 2
+node: 2
+ground_wtd_cnt: 86390
+ground_wtd_timeout: 86400
 ```
 
-Both nodes need `CONFIG_KFSW_GNDWDT` and `CONFIG_KFSW_COMMAND_CSP`. The command
-uses port 11 by default. The magic word checks intent; it is not authentication.
-A repeated legacy request feeds again. With `cmd retry`, a duplicate ticket
-returns the saved result without feeding again.
+A node does not feed itself: `gndwdt feed` refuses its own address. The same
+exchange is `cmd 2 ground_wtd KFSWWSFK` and `cmd 2 ground_wtd get`, which is
+what a ground tool sends. Both nodes need `CONFIG_KFSW_GNDWDT` and
+`CONFIG_KFSW_COMMAND_CSP`. The command uses port 11 by default. The magic word
+checks intent; it is not authentication. A repeated legacy request feeds again.
+With `cmd retry`, a duplicate ticket returns the saved result without feeding
+again.
 
-`get` reads the countdown without feeding, remotely or with `cmd ground_wtd get`
-on the local console. Successful feeds return the same values as the parameters.
-Without the parameter service, a feed replies `ground_wtd restarted`; `get` still
-reads the service state.
+A ground station built with `tools/k-ground` carries the service so it can feed
+others, but its own countdown starts disarmed: nobody feeds the ground. `gndwdt
+on` arms it.
 
 Table 35 exposes:
 
@@ -749,14 +787,10 @@ Set the timeout with `param set ground_wtd_timeout 86400` locally or
 `param set 2 ground_wtd_timeout 86400` remotely. The timeout keeps wire ID
 `35:0x04`; its former name was `gndwdt_timeout_s`. The countdown uses `35:0x18`.
 
-`gndwdt show`, `gndwdt on`, `gndwdt off` and `gndwdt timeout <seconds>` remain
-available locally. Changing the timeout or re-enabling the watchdog does not
-restart its countdown. A node re-enabled after its deadline can reset at the
-next check. Send a valid feed first. A reset already queued is not cancelled.
-
-TODO: define the second watchdog's feed source and timeout. Keep it separate
-from `ground_wtd`; ordinary incoming traffic must not feed the ground watchdog.
-The existing hardware watchdog and component health checks are unchanged.
+`gndwdt show`, `gndwdt on`, `gndwdt off` and `gndwdt timeout <seconds>` act on
+the local countdown. Changing the timeout or re-enabling the watchdog does not
+restart it. A node re-enabled after its deadline can reset at the next check.
+Send a valid feed first. A reset already queued is not cancelled.
 
 ## Event record
 

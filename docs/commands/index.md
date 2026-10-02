@@ -349,8 +349,8 @@ Paths must start with `/` and can't contain `..` or empty components.
 | `cmd <name>` | `[arguments]` | Run a command on this node |
 | `cmd <node> <name>` | `[arguments]` | Run a command on another node over CSP |
 | `cmd retry <node> <name>` | `[arguments]` | Reserve a ticket and retry lost exchanges within this invocation |
-| `cmd <node> ground_wtd` | `KFSWWSFK` | Feed the ground watchdog and return countdown/timeout (ID 16) |
-| `cmd [node] ground_wtd` | `get` | Read countdown/timeout without feeding |
+| `cmd <node> ground_wtd` | `KFSWWSFK` | Feed the ground watchdog; `gndwdt feed <node>` does the same |
+| `cmd [node] ground_wtd` | `get` | Read countdown/timeout without feeding; `gndwdt show <node>` |
 | `cmd journal_stats` | none | Persistent journal status |
 | `cmd journal_tail` | `<age>` | Committed event fields and payload; newest is 0 |
 | `cmd journal_time` | `<age>` | Sequence, event uptime and writer UTC |
@@ -468,6 +468,16 @@ MCUboot has nothing to swap and boots the old image. See
 @ref firmware_update.
 
 ## Watchdog and health
+
+What each of the three watchdogs proves, and what feeds it, is in
+@ref services, under Watchdogs.
+
+```text
+gndwdt show [node]                 ground watchdog countdown, here or on a node
+gndwdt feed <node>                 feed another node's ground watchdog
+gndwdt on | off                    arm or disarm the local countdown
+gndwdt timeout <seconds>           silence allowed before a reset
+```
 
 ```text
 watchdog status                    configuration and activity
