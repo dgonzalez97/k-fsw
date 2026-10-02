@@ -109,9 +109,19 @@ disagrees with its records.
 ## File based operations
 
 `fbo run <name>` runs the commands in a procedure file, `fbo stop` ends the
-run, and `fbo status` shows what it did. File size, line length and scanned
-bytes are limited, and comments count toward the scan limit. An I/O error
-stops the procedure.
+run, and `fbo status` shows what it did. The file is
+`/procedures/<name>` under the FTP root, `/kfsw/ftp/procedures` on the node,
+so it is uploaded like any file:
+
+```text
+ftp put 2 /procedures/check-in.txt /procedures/check-in.txt
+fbo run check-in.txt
+```
+
+File size, line length and scanned bytes are limited, and comments count toward
+the scan limit. An I/O error stops the procedure. Examples to copy are in
+[tests/procedures/examples](https://github.com/dgonzalez97/k-fsw/tree/main/tests/procedures/examples);
+the FBO smoke test runs each of them.
 
 ```text
 on-error continue
