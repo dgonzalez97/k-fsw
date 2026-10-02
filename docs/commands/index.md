@@ -376,10 +376,12 @@ info node=2: OK uptime_ms=4140 storage=ready free_bytes=12288
 
 The order is registration order. The IDs are in the table below.
 
-### Identifier allocation
+### Identifiers
 
-An ID is part of the wire contract: two nodes must agree on it, so an ID is
-never reused for a different command. Composition commands are defined in
+Four kinds of number are part of the wire contract: two nodes must agree on
+each, and none is reused for something else once it has been given out.
+
+**Command IDs.** Composition commands are defined in
 `app/src/commands/command_definitions.c`; a command that belongs to a service
 is defined by that service and carries its ID in its own header.
 
@@ -391,6 +393,21 @@ is defined by that service and carries its ID in its own header.
 | 9 to 11 | `journal_stats`, `journal_tail`, `journal_time` | `k-fsw` composition |
 | 12 to 15 | free | — |
 | 16 | `ground_wtd` | `kfsw-services`, `gndwdt.h` |
+
+**CSP ports.** 0 is management (CMP) and 1 ping, both from libcsp. K-FSW
+serves 9 file transfer, 10 parameter values, 11 commands, 12 parameter
+descriptors, 13 FWU lite, 14 housekeeping, 15 housekeeping beacons on the
+receiving node, and 16 log history. Each has a Kconfig option; see
+@ref communications.
+
+**Parameter tables.** 1 to 24 are core (1 `board`, 2 `system`, 3
+`telemetry`, 4 `csp`, 5 `storage`), 25 to 49 services (25 `log` through 36
+`resmon`, listed by `param tables`) and 50 to 99 modules (50 `radio-uhf`, 51
+`temp_example`, 67 `hw_test`).
+
+**Node addresses.** CSP v2 addresses are 1 to 16383. Flight nodes use 1 to
+15; ground roles start at 16, which `tools/k-ground` enforces. The reference
+ground station uses 16 for the gateway and 19 for the operator node.
 
 The name is looked up in the local registry before the request is sent, so
 both nodes need the same command IDs. `reboot` and `ground_wtd` change the node.
