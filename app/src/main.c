@@ -532,8 +532,8 @@ int main(void)
 	}
 #endif
 
-	printk("@SERVICES %s failures=%u\n", startup_failures == 0U ? "ok" : "degraded",
-	       startup_failures);
+	kfsw_log_marker("@SERVICES %s failures=%u", startup_failures == 0U ? "ok" : "degraded",
+			startup_failures);
 	kfsw_boot_service_start();
 
 	for (;;) {
