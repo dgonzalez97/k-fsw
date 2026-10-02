@@ -341,6 +341,11 @@ static int cmd_hk_beacon(const struct shell *sh, size_t argc, char **argv)
 	if (setting_result(sh, result) == KFSW_HK_APPLIED_UNSAVED) {
 		return result;
 	}
+	if (result == -ERANGE) {
+		shell_error(sh, "beacon interval must be 0 or at least %u ms",
+			    CONFIG_KFSW_HK_BEACON_FLOOR_MS);
+		return result;
+	}
 	if (result != 0) {
 		shell_error(sh, "beacon for report %u: %d", report, result);
 		return result;
@@ -525,7 +530,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 		      cmd_hk_extract, 3, CONFIG_KFSW_HK_ENTRIES),
 #endif
 #if CONFIG_KFSW_HK_BEACON
-	SHELL_CMD_ARG(beacon, NULL, "Send unprompted: beacon <report> <node> <ms>, 0 to stop.",
+	SHELL_CMD_ARG(beacon, NULL,
+		      "Send unprompted: beacon <report> <node> <ms>, 0 to stop, "
+		      STRINGIFY(CONFIG_KFSW_HK_BEACON_FLOOR_MS) " at least.",
 		      cmd_hk_beacon, 4, 0),
 #endif
 	SHELL_SUBCMD_SET_END);
