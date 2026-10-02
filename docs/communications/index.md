@@ -114,6 +114,43 @@ UART
 On receive, the router hands the packet to the service bound to its port.
 Services never read UART bytes.
 
+## RDP
+
+RDP is libcsp's reliable datagram transport: connection setup, a window,
+acknowledgements, retransmission, reordering and flow control. Data still moves
+as CSP datagrams; it is not TCP.
+
+```text
+FTP client                          FTP server
+connect                       ->
+                              <-    confirm
+PUT metadata, seq=N           ->
+                              <-    ACK N
+file chunk, seq=N+1           ->    (lost)
+file chunk, seq=N+1, resent   ->
+                              <-    ACK N+1
+                              <-    result and file CRC
+close                         ->
+```
+
+FTP doesn't retry on top of RDP. It adds the offsets, sizes, file CRC and
+temporary file that RDP can't check. See the
+[libcsp RDP section](https://github.com/libcsp/libcsp/blob/develop/doc/protocolstack.md#rdp).
+
+## Packet buffers
+
+libcsp uses preallocated buffers:
+
+- a packet from a receive call has to be freed or passed to a send or reply
+  call;
+- a packet passed to a send call is freed by libcsp, also when sending fails,
+  so don't free or reuse it;
+- an interface passes complete packets to the router queue;
+- when the pool or a queue is full, the allocation fails or the packet is
+  dropped and counted.
+
+To retry, build a new packet.
+
 ## Startup
 
 `kfsw-comms` sets up libcsp once:
@@ -396,43 +433,6 @@ through an FTDI TTL-232R-3V3 on USART3, with the ST-LINK console connected
 too. It flashes the board, checks both serial connections, pings both ways,
 runs `uart test`, checks storage, transfers 4 KiB and 16 KiB files, reads a
 remote parameter and checks the KISS counters.
-
-## RDP
-
-RDP is libcsp's reliable datagram transport: connection setup, a window,
-acknowledgements, retransmission, reordering and flow control. Data still moves
-as CSP datagrams; it is not TCP.
-
-```text
-FTP client                          FTP server
-connect                       ->
-                              <-    confirm
-PUT metadata, seq=N           ->
-                              <-    ACK N
-file chunk, seq=N+1           ->    (lost)
-file chunk, seq=N+1, resent   ->
-                              <-    ACK N+1
-                              <-    result and file CRC
-close                         ->
-```
-
-FTP doesn't retry on top of RDP. It adds the offsets, sizes, file CRC and
-temporary file that RDP can't check. See the
-[libcsp RDP section](https://github.com/libcsp/libcsp/blob/develop/doc/protocolstack.md#rdp).
-
-## Packet buffers
-
-libcsp uses preallocated buffers:
-
-- a packet from a receive call has to be freed or passed to a send or reply
-  call;
-- a packet passed to a send call is freed by libcsp, also when sending fails,
-  so don't free or reuse it;
-- an interface passes complete packets to the router queue;
-- when the pool or a queue is full, the allocation fails or the packet is
-  dropped and counted.
-
-To retry, build a new packet.
 
 ## Security
 
