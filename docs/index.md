@@ -1,6 +1,7 @@
-# K-FSW - Modular flight software on Zephyr, for small satellites {#k_fsw_manual}
+# K-FSW (KFSW) flight software manual {#k_fsw_manual}
 
-K-FSW gives spacecraft components the common services a mission needs:
+K-FSW, also written KFSW, is modular flight software on Zephyr for small
+satellites. It gives spacecraft components the common services a mission needs:
 a console, ground links, parameters, files, logs, events, commands,
 housekeeping, and firmware updates. Enable what an OBC, radio, ADCS, EPS,
 or payload needs, then write the mission-specific code.
