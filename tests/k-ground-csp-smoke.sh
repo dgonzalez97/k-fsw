@@ -166,6 +166,7 @@ wait_for_output "$work_dir/node16.log" "last_node: 19" "$node16_pid" || \
 	fail "node 16 did not record the feed from node 19"
 
 node16_expected=(
+	"state: disarmed"
 	"contacts: 1 last_node: 19"
 	"Role: kfsw-gnd-uhf"
 	"Name: kfsw-gnd-uhf"
