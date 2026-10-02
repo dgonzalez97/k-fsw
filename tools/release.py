@@ -17,6 +17,9 @@ from west.manifest import Manifest
 
 REPO = Path(__file__).resolve().parents[1]
 WORKSPACE = REPO.parent
+# The image travels as an FTP path, at most 95 characters; 64 leaves room for a
+# directory in front of it.
+IMAGE_NAME_LIMIT = 64
 
 
 def run(*args, cwd=WORKSPACE):
@@ -147,8 +150,18 @@ def verify_build(build, inputs):
     return sha256(app / "zephyr.bin")
 
 
+def image_name(target, describe):
+    name = f"kfsw-{target}-{describe}.signed.bin"
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", name):
+        raise ValueError(f"Release image name needs letters, digits, '.', '_' or '-': {name}")
+    if len(name) > IMAGE_NAME_LIMIT:
+        raise ValueError(f"Release image name is longer than {IMAGE_NAME_LIMIT} characters: {name}")
+    return name
+
+
 def build_release(output, target):
     inputs = check_inputs()
+    name = image_name(target, run("git", "describe", "--tags", "--always", cwd=REPO))
     output.mkdir(parents=True, exist_ok=False)
     hashes = []
     env = os.environ.copy()
@@ -176,6 +189,8 @@ def build_release(output, target):
             if (source / name).is_file():
                 shutil.copy2(source / name, destination / name)
     shutil.copy2(required("KFSW_RELEASE_MANIFEST"), artifacts / "west-frozen.yml")
+    shutil.copy2(artifacts / "app" / "zephyr.signed.bin", artifacts / name)
+    inputs["image"] = name
     inputs["unsigned_payload_sha256"] = hashes[0]
     inputs["artifacts"] = {
         str(p.relative_to(artifacts)): sha256(p) for p in sorted(artifacts.rglob("*")) if p.is_file()

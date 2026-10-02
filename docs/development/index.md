@@ -305,3 +305,11 @@ python tools/release.py build --output ../build/release-1.0.0
 
 The output directory must be new. Keep `artifacts/release.json` with the images;
 it records sources, tool versions, public-key fingerprint, and artifact hashes.
+
+The image to upload is `artifacts/kfsw-<target>-<version>.signed.bin`, for
+example `kfsw-nucleo_l496zg-v1.1.0.signed.bin`, where the version is
+`git describe` of the release commit. Images for different targets and versions
+can then sit side by side on a node or a ground station. The name is at most 64
+characters of letters, digits, `.`, `_` and `-`, so it always fits an FTP path;
+a longer or odd name stops the release instead of being cut. The build output
+itself stays `zephyr.signed.bin`.
