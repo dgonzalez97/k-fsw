@@ -22,9 +22,10 @@ static int parse_node(const struct shell *sh, const char *text, uint16_t *node)
 	unsigned long parsed;
 	int parse_error = 0;
 
+	/* 16383 is the CSP v2 broadcast address: a feed goes to one node. */
 	parsed = shell_strtoul(text, 10, &parse_error);
-	if ((parse_error != 0) || (parsed == 0U) || (parsed > 16383U)) {
-		shell_error(sh, "Node must be 1..16383: %s", text);
+	if ((parse_error != 0) || (parsed == 0U) || (parsed >= 16383U)) {
+		shell_error(sh, "Node must be 1..16382: %s", text);
 		return -EINVAL;
 	}
 	*node = (uint16_t)parsed;
