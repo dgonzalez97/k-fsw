@@ -26,6 +26,8 @@ fi
 	printf 'param set echo_enabled 1\n'
 	sleep 0.2
 	printf 'pa\t g\t test_u32\n'
+	# Two matches: Tab lists them one per line with their help.
+	printf 'st\t\n'
 	printf '%s\n' \
 		'help' \
 		'status' \
@@ -68,6 +70,8 @@ fi
 cat "$capture_file"
 
 expected_output=(
+	"  status   : Show basic K-FSW runtime status."
+	"  storage  : K-FSW filesystem storage commands."
     '@BOOT '
     '@READY '
     # Not anchored to the prompt, which has colour codes.

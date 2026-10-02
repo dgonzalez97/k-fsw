@@ -1,0 +1,76 @@
+shell: list Tab completions one per line with their help
+
+The completion list was a grid as wide as the terminal. One option per
+line, with the first line of its help, reads like "<command> -h".
+
+diff --git a/subsys/shell/shell.c b/subsys/shell/shell.c
+index b86806a18c1..7bee0fcd920 100644
+--- a/subsys/shell/shell.c
++++ b/subsys/shell/shell.c
+@@ -6,6 +6,7 @@
+ 
+ #include <ctype.h>
+ #include <stdlib.h>
++#include <string.h>
+ #include <zephyr/sys/atomic.h>
+ #include <zephyr/shell/shell.h>
+ #if defined(CONFIG_SHELL_BACKEND_DUMMY)
+@@ -133,32 +134,24 @@ selected_cmd_get(const struct shell *sh)
+ }
+ 
+ static void tab_item_print(const struct shell *sh, const char *option,
+-			   uint16_t longest_option)
++			   const char *help, uint16_t longest_option)
+ {
+ 	static const char *tab = "  ";
+-	uint16_t columns;
+-	uint16_t diff;
++	size_t help_len;
+ 
+ 	/* Function initialization has been requested. */
+ 	if (option == NULL) {
+-		sh->ctx->vt100_ctx.printed_cmd = 0;
+ 		return;
+ 	}
+ 
+-	longest_option += z_shell_strlen(tab);
+-
+-	columns = (sh->ctx->vt100_ctx.cons.terminal_wid
+-			- z_shell_strlen(tab)) / longest_option;
+-	__ASSERT_NO_MSG(columns != 0);
+-	diff = longest_option - z_shell_strlen(option);
+-
+-	if (sh->ctx->vt100_ctx.printed_cmd++ % columns == 0U) {
+-		z_shell_fprintf(sh, SHELL_OPTION, "\n%s%s", tab, option);
+-	} else {
+-		z_shell_fprintf(sh, SHELL_OPTION, "%s", option);
++	/* One option per line with the first line of its help, as in "cmd -h". */
++	z_shell_fprintf(sh, SHELL_OPTION, "\n%s%-*s", tab, longest_option + 2, option);
++	if (help == NULL) {
++		return;
+ 	}
+ 
+-	z_shell_op_cursor_horiz_move(sh, diff);
++	help_len = strcspn(help, "\n");
++	z_shell_fprintf(sh, SHELL_NORMAL, ": %.*s", (int)help_len, help);
+ }
+ 
+ static void history_purge(const struct shell *sh)
+@@ -435,7 +428,7 @@ static void tab_options_print(const struct shell *sh,
+ 	size_t idx = first;
+ 
+ 	/* Printing all matching commands (options). */
+-	tab_item_print(sh, SHELL_INIT_OPTION_PRINTER, longest);
++	tab_item_print(sh, SHELL_INIT_OPTION_PRINTER, NULL, longest);
+ 
+ 	while (cnt) {
+ 		/* sh->ctx->active_cmd can be safely used outside of command
+@@ -449,7 +442,7 @@ static void tab_options_print(const struct shell *sh,
+ 			continue;
+ 		}
+ 
+-		tab_item_print(sh, match->syntax, longest);
++		tab_item_print(sh, match->syntax, match->help, longest);
+ 		cnt--;
+ 	}
+ 

@@ -86,7 +86,12 @@ Initialize west from the local manifest and check out the pinned revisions:
 ```bash
 west init -l k-fsw
 west update
+west patch apply
 ```
+
+`west patch apply` applies the patches listed in `k-fsw/zephyr/patches.yml` to
+the pinned Zephyr. Today there is one: Tab in the shell lists one option per
+line with its help. Without it the build still works and Tab shows a grid.
 
 Install Zephyr's Python requirements and export its CMake package:
 
@@ -115,11 +120,14 @@ cd k-fsw-workspace
 git -C k-fsw switch main
 git -C k-fsw pull --ff-only
 west manifest --validate
+west patch clean
 west update
+west patch apply
 git -C k-fsw submodule update --init --recursive
 ```
 
-`west update` may say it left a local branch behind, and usually leaves each
+`west patch clean` takes the patches out first, so `west update` finds Zephyr
+unchanged. `west update` may say it left a local branch behind, and usually leaves each
 dependency on a detached `HEAD` at the manifest commit. That is normal. Commit
 or stash your work in the dependencies first.
 
