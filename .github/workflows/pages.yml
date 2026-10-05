@@ -40,8 +40,8 @@ jobs:
       - name: Install Doxygen
         run: sudo apt-get install --yes doxygen
 
-      - name: Install gcovr
-        run: pip install gcovr
+      - name: Install gcovr and plotly
+        run: pip install gcovr plotly
 
       - name: Build and validate SDK documentation
         run: ./k-fsw/tools/ci/docs.sh
@@ -52,6 +52,12 @@ jobs:
 
       - name: Add coverage to the documentation
         run: cp -r build/coverage/html build/docs/html/coverage
+
+      - name: Measure footprint
+        run: ./k-fsw/tools/ci/footprint.sh
+
+      - name: Add footprint to the documentation
+        run: cp -r build/footprint build/docs/html/footprint
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6

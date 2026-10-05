@@ -9,8 +9,8 @@ Run the checks that cover the change. From the workspace root:
 ```
 
 `tools/ci/all.sh` runs the software sequence. Individual entry points also cover
-Robot, Valgrind, UBSan, coverage, and Doxygen. Test output stays in the build
-directory.
+Robot, Valgrind, UBSan, coverage, @ref footprint, and Doxygen. Test output
+stays in the build directory.
 
 For a focused native suite:
 
