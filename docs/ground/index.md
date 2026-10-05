@@ -177,7 +177,7 @@ unchanged. The gateway can list its own files without a connection:
 ```text
 kfsw-gnd-uhf# ftp ls 16 /uplink
 FTP ls 16 /uplink
-f        256 test.txt
+file        256 test.txt
 entries: 1
 ```
 

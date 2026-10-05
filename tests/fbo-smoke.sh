@@ -40,6 +40,7 @@ expect()
 	sleep 10
 	printf 'fbo status\n'
 	printf 'fbo run absent.txt\n'
+	printf 'ftp ls /procedures\n'
 	sleep 3
 } | timeout 40 "$executable" --uart_stdinout --no-color \
 	-flash="$work_dir/flash.bin" --stop_at=25 >"$work_dir/out.log" 2>&1 || true
@@ -85,6 +86,12 @@ expect 'lines skipped: 1' 'if-event skipped a line whose event never happened'
 # Seven lines run and one skipped: a skipped line isn't counted as run.
 expect 'lines run: 7' 'blanks and comments are not lines'
 expect 'run absent.txt: -2' 'a procedure that does not exist is refused'
+if grep -aEq '^proc +[0-9]+ smoke\.txt' "$work_dir/out.log"; then
+	printf '  [ok]   %s\n' 'ftp ls names it a procedure'
+else
+	printf '  [FAIL] %s\n' 'ftp ls names it a procedure' >&2
+	failures=$((failures + 1))
+fi
 
 if [[ "$failures" -eq 0 ]]; then
 	echo "FBO SMOKE RESULT: PASS"

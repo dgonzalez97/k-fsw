@@ -191,6 +191,13 @@ printf '%s\n' \
 	'ftp verify /build/multi.bin /build/multi-returned.bin' \
 	'ftp verify /build/large.bin /build/large-returned.bin' \
 	'ftp get 2 /flash/missing.bin /build/missing.bin' \
+	'ftp ls 2 /' \
+	'ftp put 2 /build/large.bin /tmp/large.bin' \
+	'ftp get 2 /tmp/large.bin /build/tmp-returned.bin' \
+	'ftp verify /build/large.bin /build/tmp-returned.bin' \
+	'ftp generate /build/huge.bin 32768' \
+	'ftp put 2 /build/huge.bin /tmp/huge.bin' \
+	'ftp ls 2 /tmp' \
 	'ftp stat 2 ../params/parameters.dat' \
 	'csp ping 1' \
 	'status 2' \
@@ -325,6 +332,12 @@ node1_expected=(
 	"FTP verify /build/multi.bin /build/multi-returned.bin: PASS"
 	"FTP verify /build/large.bin /build/large-returned.bin: PASS"
 	"FTP get 2 /flash/missing.bin: not found"
+	"file       8192 large.bin"
+	"dir           0 tmp"
+	"FTP put 2 /build/large.bin -> /tmp/large.bin: PASS"
+	"FTP verify /build/large.bin /build/tmp-returned.bin: PASS"
+	# 32 KB does not fit the RAM volume with the margin; refused before any data moves.
+	"FTP put 2 /tmp/huge.bin: not enough free space"
 	"FTP stat 2 ../params/parameters.dat: invalid path/request"
     "interface: KISS"
     "  info"

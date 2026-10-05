@@ -2,12 +2,14 @@
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <zephyr/shell/shell.h>
 #include <zephyr/shell/shell_string_conv.h>
 #include <zephyr/sys/util.h>
 
 #include <kfsw/comms/csp.h>
+#include <kfsw/services/fbo.h>
 #include <kfsw/services/ftp.h>
 
 #include "diagnostics/ftp_diagnostics.h"
@@ -16,7 +18,18 @@
 
 struct ftp_list_context {
 	const struct shell *shell;
+	const char *path;
 	uint32_t entries;
+};
+
+/* A file in one of these directories is something more specific than a file. */
+static const struct {
+	const char *directory;
+	const char *kind;
+} file_kinds[] = {
+	{KFSW_FTP_BOOT_PATH, "img"},
+	{KFSW_FTP_HK_PATH, "hk"},
+	{KFSW_FBO_FTP_PATH, "proc"},
 };
 
 /* Without a node, ls, stat and mkdir act on this node. */
@@ -40,12 +53,35 @@ static bool is_number(const char *text)
 	return parse_error == 0;
 }
 
+/* The kind of an entry in directory, whose first size bytes are the virtual path. */
+static const char *entry_kind(enum kfsw_ftp_entry_type type, const char *directory, size_t size)
+{
+	if (type == KFSW_FTP_ENTRY_DIRECTORY) {
+		return "dir";
+	}
+	while ((size > 0U) && (directory[0] == '/')) {
+		directory++;
+		size--;
+	}
+	while ((size > 0U) && (directory[size - 1U] == '/')) {
+		size--;
+	}
+	for (size_t i = 0U; i < ARRAY_SIZE(file_kinds); i++) {
+		if ((strlen(file_kinds[i].directory) == size) &&
+		    (strncmp(directory, file_kinds[i].directory, size) == 0)) {
+			return file_kinds[i].kind;
+		}
+	}
+	return "file";
+}
+
 static bool print_ftp_entry(const struct kfsw_ftp_entry *entry, void *context)
 {
 	struct ftp_list_context *list_context = context;
-	const char type = (entry->type == KFSW_FTP_ENTRY_DIRECTORY) ? 'd' : 'f';
+	const char *path = list_context->path;
 
-	shell_print(list_context->shell, "%c %10" PRIu32 " %s", type, entry->size, entry->name);
+	shell_print(list_context->shell, "%-4s %10" PRIu32 " %s",
+		    entry_kind(entry->type, path, strlen(path)), entry->size, entry->name);
 	list_context->entries++;
 	return true;
 }
@@ -58,6 +94,8 @@ static int print_ftp_error(const struct shell *sh, const char *operation, uint16
 	} else if (result == -EINVAL || result == -EBADMSG) {
 		shell_error(sh, "FTP %s %u %s: invalid path/request (%d)", operation, node, path,
 			    result);
+	} else if (result == -ENOSPC) {
+		shell_error(sh, "FTP %s %u %s: not enough free space", operation, node, path);
 	} else if (result == -EBUSY) {
 		shell_error(sh, "FTP %s %u %s: server busy", operation, node, path);
 	} else if (result == -ENOTSUP) {
@@ -79,7 +117,7 @@ static int print_ftp_error(const struct shell *sh, const char *operation, uint16
 
 static int ftp_list(const struct shell *sh, uint16_t node, const char *path)
 {
-	struct ftp_list_context context = {.shell = sh};
+	struct ftp_list_context context = {.shell = sh, .path = path};
 	int result;
 
 	shell_print(sh, "FTP ls %u %s", node, (path[0] == '\0') ? "/" : path);
@@ -93,6 +131,8 @@ static int ftp_list(const struct shell *sh, uint16_t node, const char *path)
 
 static int ftp_stat(const struct shell *sh, uint16_t node, const char *path)
 {
+	const char *name = strrchr(path, '/');
+	const size_t directory_size = (name == NULL) ? 0U : (size_t)(name - path);
 	struct kfsw_ftp_stat info;
 	int result = kfsw_ftp_stat(node, path, &info);
 
@@ -100,7 +140,7 @@ static int ftp_stat(const struct shell *sh, uint16_t node, const char *path)
 		return print_ftp_error(sh, "stat", node, path, result);
 	}
 	shell_print(sh, "FTP stat %u %s", node, path);
-	shell_print(sh, "type: %s", (info.type == KFSW_FTP_ENTRY_DIRECTORY) ? "directory" : "file");
+	shell_print(sh, "type: %s", entry_kind(info.type, path, directory_size));
 	shell_print(sh, "bytes: %" PRIu32, info.size);
 	shell_print(sh, "crc32: %08" PRIx32, info.crc32);
 	return 0;

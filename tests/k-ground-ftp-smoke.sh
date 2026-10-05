@@ -165,12 +165,12 @@ node19_expected=(
 	'FTP stat 16 /uplink/test.txt'
 	'type: file'
 	'bytes: 256'
-	'f        256 test.txt'
+	'file        256 test.txt'
 	'FTP get 16 /uplink/test.txt -> /build/test-returned.txt: PASS'
 )
 node16_expected=(
 	'FTP stat 16 /uplink/test.txt'
-	'f        256 test.txt'
+	'file        256 test.txt'
 )
 
 for expected in "${node19_expected[@]}"; do

@@ -59,6 +59,7 @@ fi
 		'ftp generate' \
 		'ftp mkdir /selfnode' \
 		'ftp ls /' \
+		'ftp mkdir /tmp/scratch' \
 		'ftp stat 1 /selfnode' \
 		'ftp ls 1 /missing' \
 		'ftp put 1 /selfnode/a.bin /selfnode/b.bin' \
@@ -148,11 +149,14 @@ expected_output=(
 	'generate: wrong parameter count'
 	'generate - Create deterministic local data: generate <path> <bytes 0..32768>.'
 	'FTP mkdir 1 /selfnode: PASS'
-	# The firmware slots show in a listing of the root.
-	'd          0 boot'
+	# The firmware slots and the RAM volume show in a listing of the root.
+	'dir           0 boot'
+	'dir           0 tmp'
+	'FTP mkdir 1 /tmp/scratch: PASS'
+	'tmp_total_bytes: 32768'
 	'entries: '
 	'FTP stat 1 /selfnode'
-	'type: directory'
+	'type: dir'
 	'FTP ls 1 /missing: not found'
 	'FTP put 1: transfers need two nodes'
     '[ERROR] K-FSW shell log test: error'

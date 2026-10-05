@@ -1,16 +1,3 @@
-| `ftp ls` | `[node] [directory]` | List a directory |
-| `ftp stat` | `[node] <path>` | Type, size and CRC |
-| `ftp mkdir` | `[node] <directory>` | Create a directory |
-| `ftp put` | `<node> <local> <remote>` | Upload a file |
-| `ftp get` | `<node> <remote> <local>` | Download a file |
-| `ftp generate` | `<path> <bytes>` | Create a test file of up to 32768 bytes |
-| `ftp verify` | `<first> <second>` | Compare two local files |
-
-Without a node, `ls`, `stat` and `mkdir` act on this node, without a
-connection; `put` and `get` need another node. Listing `/` also shows the
-read-only `boot` (firmware slots, see [firmware update](../fwu/README.md)) and
-`hk` (housekeeping files) when they exist.
-
 # Shell commands {#commands}
 
 [TOC]
@@ -351,17 +338,45 @@ Paths are virtual and rooted at `/kfsw/ftp` on the node.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `ftp <node> ls` | `[directory]` | List a directory; `list` also works |
-| `ftp <node> stat` | `<path>` | Type, size and CRC |
-| `ftp <node> mkdir` | `<directory>` | Create a directory |
-| `ftp <node> put` | `<local> <remote>` | Upload a file |
-| `ftp <node> get` | `<remote> <local>` | Download a file |
+| `ftp ls` | `[node] [directory]` | List a directory |
+| `ftp stat` | `[node] <path>` | Kind, size and CRC |
+| `ftp mkdir` | `[node] <directory>` | Create a directory |
+| `ftp put` | `<node> <local> <remote>` | Upload a file |
+| `ftp get` | `<node> <remote> <local>` | Download a file |
 | `ftp generate` | `<path> <bytes>` | Create a test file of up to 32768 bytes |
 | `ftp verify` | `<first> <second>` | Compare two local files |
 
-The verb can also go first, `ftp put <node> ...`, which is the form Tab
-completion shows. `ls`, `stat` and `mkdir` work on the node's own address
-without a connection; `put` and `get` need another node.
+Without a node, `ls`, `stat` and `mkdir` act on this node, without a
+connection; `put` and `get` need another node. A transfer that would leave
+less than `CONFIG_KFSW_FTP_SPACE_MARGIN_BYTES` (4096) free on its volume is
+refused before any data moves: `not enough free space`.
+
+Listing `/` also shows these directories when they exist:
+
+| Directory | Holds | Writable |
+| --- | --- | --- |
+| `boot` | firmware slots, see [firmware update](../fwu/README.md) | no |
+| `hk` | housekeeping sample files | no |
+| `tmp` | 32 KB of RAM, empty after every boot | yes |
+
+Each entry starts with its kind:
+
+| Kind | Meaning |
+| --- | --- |
+| `dir` | directory |
+| `file` | file |
+| `img` | firmware image, in `/boot` |
+| `hk` | housekeeping samples, in `/hk` |
+| `proc` | procedure, in `/procedures` |
+
+```text
+kfsw:~$ ftp ls /
+FTP ls 1 /
+dir           0 build
+dir           0 boot
+dir           0 tmp
+entries: 3
+```
 
 ```text
 kfsw:~$ ftp generate /build/sample.bin 1024
