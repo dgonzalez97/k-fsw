@@ -58,6 +58,7 @@ static void *ftp_setup(void)
 	erase_storage_partition();
 	zassert_ok(kfsw_storage_init());
 	zassert_ok(kfsw_storage_mount());
+	zassert_ok(kfsw_storage_tmp_mount());
 	zassert_ok(kfsw_ftp_init());
 	zassert_ok(kfsw_csp_init());
 	zassert_ok(kfsw_csp_start());
@@ -299,7 +300,7 @@ static bool find_read_only_root(const struct kfsw_ftp_entry *entry, void *contex
 {
 	bool *found = context;
 
-	if ((strcmp(entry->name, KFSW_FTP_READONLY_PREFIX) == 0) &&
+	if ((strcmp(entry->name, KFSW_FTP_HK_PATH) == 0) &&
 	    (entry->type == KFSW_FTP_ENTRY_DIRECTORY)) {
 		*found = true;
 	}
@@ -323,6 +324,47 @@ ZTEST(services_ftp, test_root_listing_shows_read_only_roots)
 	zassert_ok(kfsw_ftp_mkdir(node, "/elsewhere"));
 	zassert_ok(kfsw_ftp_list(node, "/elsewhere", find_read_only_root, &found));
 	zassert_false(found);
+}
+
+static bool find_tmp_root(const struct kfsw_ftp_entry *entry, void *context)
+{
+	bool *found = context;
+
+	if (strcmp(entry->name, KFSW_FTP_TMP_PATH) == 0) {
+		*found = true;
+	}
+	return true;
+}
+
+ZTEST(services_ftp, test_tmp_root_is_writable)
+{
+	const uint16_t node = local_node();
+	struct kfsw_ftp_stat info;
+	bool found = false;
+
+	zassert_ok(kfsw_ftp_list(node, "/", find_tmp_root, &found));
+	zassert_true(found);
+	zassert_false(kfsw_ftp_path_is_read_only("/tmp/a.bin"));
+	zassert_true(kfsw_ftp_path_is_read_only("/hk/a.bin"));
+
+	zassert_ok(kfsw_ftp_mkdir(node, "/tmp/scratch"));
+	zassert_ok(kfsw_ftp_stat(node, "/tmp/scratch", &info));
+	zassert_equal(info.type, KFSW_FTP_ENTRY_DIRECTORY);
+	zassert_ok(fs_stat(KFSW_STORAGE_TMP_MOUNT_POINT "/scratch", &(struct fs_dirent){0}));
+}
+
+ZTEST(services_ftp, test_space_check_keeps_a_margin)
+{
+	struct kfsw_storage_info tmp;
+
+	zassert_ok(kfsw_storage_get_tmp_info(&tmp));
+	zassert_ok(kfsw_ftp_check_space(KFSW_STORAGE_TMP_MOUNT_POINT "/a.bin", 1024U));
+	/* Fits the free space, but not with the margin as well. */
+	zassert_equal(kfsw_ftp_check_space(KFSW_STORAGE_TMP_MOUNT_POINT "/a.bin",
+					   (uint32_t)tmp.free_bytes -
+						   (CONFIG_KFSW_FTP_SPACE_MARGIN_BYTES / 2U)),
+		      -ENOSPC);
+	zassert_equal(kfsw_ftp_check_space(KFSW_STORAGE_TMP_MOUNT_POINT "/a.bin", 40000U), -ENOSPC);
 }
 
 ZTEST(services_ftp, test_public_argument_validation_and_lifecycle)

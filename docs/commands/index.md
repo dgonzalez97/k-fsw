@@ -336,9 +336,14 @@ mount_point: /kfsw
 ready: yes
 total_bytes: 262144
 free_bytes: 237568
+tmp_mount_point: /kfsw/tmp
+tmp_ready: yes
+tmp_total_bytes: 32768
+tmp_free_bytes: 31744
 ```
 
-`storage test` writes to flash. `storage info` only reads.
+`storage test` writes to flash. `storage info` only reads. The `tmp_` lines
+are the RAM volume, formatted at every boot.
 
 ## File transfer
 

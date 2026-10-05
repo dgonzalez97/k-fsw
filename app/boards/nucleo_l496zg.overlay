@@ -9,6 +9,18 @@
 		 * longer timeout and runs in most low-power states.
 		 */
 		kfsw,watchdog = &iwdg;
+		kfsw,tmp-disk = &tmp_disk;
+	};
+
+	/* 32 KB of SRAM2 behind /kfsw/tmp, formatted at every boot. Nothing else
+	 * uses SRAM2, and it keeps its contents across a reset, hence the format.
+	 */
+	tmp_disk: tmp-disk {
+		compatible = "zephyr,ram-disk";
+		disk-name = "TMP";
+		sector-size = <512>;
+		sector-count = <64>;
+		ram-region = <&sram1>;
 	};
 };
 

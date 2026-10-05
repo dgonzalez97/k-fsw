@@ -79,7 +79,9 @@ chosen:      kfsw,csp-uart = &usart3
 UART:        PD8/PD9, 115200 baud, 8N1
 ```
 
-`kfsw,storage-partition` selects the storage partition.
+`kfsw,storage-partition` selects the storage partition. `kfsw,tmp-disk` selects
+the `zephyr,ram-disk` behind `/kfsw/tmp`; the NUCLEO points it at SRAM2 with
+`ram-region = <&sram1>`.
 Multi-link profiles declare separate named interfaces; see @ref communications.
 
 Inspect `build/<target>/zephyr/zephyr.dts` to confirm the final hardware
