@@ -4,6 +4,8 @@
 #include <zephyr/shell/shell_string_conv.h>
 #include <zephyr/sys/util.h>
 
+#include <csp/csp_error.h>
+
 #include <kfsw/comms/uart.h>
 
 #define KFSW_UART_TEST_TIMEOUT_MS 1000U
@@ -52,6 +54,10 @@ static int cmd_uart_test(const struct shell *sh, size_t argc, char **argv)
 	}
 
 	result = kfsw_uart_test_peer((uint16_t)peer, KFSW_UART_TEST_TIMEOUT_MS, &test_result);
+	if (result == CSP_ERR_NOTSUP) {
+		shell_error(sh, "UART CSP test: node %lu is not reached through a UART", peer);
+		return -ENOTSUP;
+	}
 	if (result != 0) {
 		shell_error(sh, "UART CSP test: FAIL (%d)", result);
 		return result;
