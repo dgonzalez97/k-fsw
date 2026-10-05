@@ -64,6 +64,8 @@ static int cmd_csp_info(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "hostname: %s", info.hostname);
 	shell_print(sh, "model: %s", info.model);
 	shell_print(sh, "revision: %s", info.revision);
+	shell_print(sh, "libcsp: %s", info.libcsp);
+	shell_print(sh, "protocol: CSP v%u", info.protocol);
 	shell_print(sh, "free_buffers: %zu", info.free_buffers);
 
 	return 0;

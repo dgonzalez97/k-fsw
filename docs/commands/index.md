@@ -133,7 +133,7 @@ and its read counters.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `csp info` | none | Local address, identity, revision and free buffers |
+| `csp info` | none | Local address, identity, revision, libcsp tag, CSP protocol version and free buffers |
 | `csp ident` | `[node]` | Hostname, model, revision and clock |
 | `csp interfaces` | none | Interfaces with addresses and packet, error and drop counters |
 | `csp ifstat` | `<node> <interface>` | Remote interface packet/byte/error counters |
