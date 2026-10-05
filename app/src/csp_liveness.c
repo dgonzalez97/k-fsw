@@ -42,14 +42,14 @@ static K_WORK_DELAYABLE_DEFINE(liveness_work, liveness_work_handler);
 static void liveness_work_handler(struct k_work *work)
 {
 	struct kfsw_csp_info info;
-	uint32_t round_trip_ms;
+	uint32_t round_trip_us;
 	int result;
 
 	ARG_UNUSED(work);
 
 	kfsw_csp_get_info(&info);
 	result = kfsw_csp_ping(info.address, CONFIG_KFSW_CSP_LIVENESS_TIMEOUT_MS,
-			       LIVENESS_PAYLOAD_SIZE, &round_trip_ms);
+			       LIVENESS_PAYLOAD_SIZE, &round_trip_us);
 	if (probes < UINT32_MAX) {
 		probes++;
 	}

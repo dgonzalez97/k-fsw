@@ -60,7 +60,8 @@ static int cmd_uart_test(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "UART CSP test: PASS");
 	shell_print(sh, "peer: %u", test_result.peer);
 	shell_print(sh, "interface: %s", test_result.interface_name);
-	shell_print(sh, "rtt_ms: %u", test_result.round_trip_ms);
+	shell_print(sh, "rtt_ms: %u.%03u", test_result.round_trip_us / 1000U,
+		    test_result.round_trip_us % 1000U);
 
 	return 0;
 }

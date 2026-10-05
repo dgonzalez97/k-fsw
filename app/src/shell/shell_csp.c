@@ -121,7 +121,7 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 {
 	struct kfsw_csp_info info;
 	unsigned long node;
-	uint32_t round_trip_ms;
+	uint32_t round_trip_us;
 	int parse_error = 0;
 	int result;
 
@@ -141,13 +141,13 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 
 	/* Pinging this node goes through the loopback interface. */
 	result = kfsw_csp_ping((uint16_t)node, KFSW_CSP_PING_TIMEOUT_MS, KFSW_CSP_PING_PAYLOAD_SIZE,
-			       &round_trip_ms);
+			       &round_trip_us);
 	if (result != 0) {
 		return kfsw_shell_remote_failed(sh, "csp ping", (uint16_t)node, as_errno(result));
 	}
 
 	shell_print(sh, "CSP ping %lu: success", node);
-	shell_print(sh, "rtt_ms: %u", round_trip_ms);
+	shell_print(sh, "rtt_ms: %u.%03u", round_trip_us / 1000U, round_trip_us % 1000U);
 	return 0;
 }
 

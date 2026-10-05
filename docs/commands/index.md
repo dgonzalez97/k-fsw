@@ -162,7 +162,7 @@ kfsw:~$ csp ping 2
 [INFO] OUT: S 33, D 2, Dp 1, Sp 17, Pr 2, Fl 0x01, Sz 10 VIA: CAN (2), Tms 51060
 [INFO] INP: S 2, D 33, Dp 17, Sp 1, Pr 2, Fl 0x01, Sz 14 VIA: CAN, Tms 51120
 CSP ping 2: success
-rtt_ms: 60
+rtt_ms: 60.000
 ```
 
 With several links, `csp routes` shows the interface and next hop of each
