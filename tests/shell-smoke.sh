@@ -148,6 +148,8 @@ expected_output=(
 	'generate: wrong parameter count'
 	'generate - Create deterministic local data: generate <path> <bytes 0..32768>.'
 	'FTP mkdir 1 /selfnode: PASS'
+	# The firmware slots show in a listing of the root.
+	'd          0 boot'
 	'entries: '
 	'FTP stat 1 /selfnode'
 	'type: directory'

@@ -560,12 +560,13 @@ FTP path              Zephyr path
 
 Paths are up to 96 bytes. Relative paths, empty components, `.` and `..`,
 backslashes, control characters and embedded NULs are rejected. The sandbox is
-not access control. `/hk` is a second, read-only root with the housekeeping
-sample files.
+not access control. Two read-only roots sit beside it: `/hk`, the housekeeping
+sample files, and `/boot`, the firmware slots when `CONFIG_KFSW_FWU_FILES` is
+set. A listing of `/` shows each one that exists as a directory.
 
 ### The local node
 
-`list`, `stat` and `mkdir` addressed to the node's own CSP address run
+`ls`, `stat` and `mkdir` addressed to the node's own CSP address run
 directly on local storage, without a connection or a route. They need storage
 mounted and the service started, otherwise they return `-EACCES`. `put` and
 `get` need two nodes and return `-ENOTSUP` for the local address.

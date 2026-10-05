@@ -295,6 +295,36 @@ ZTEST(services_ftp, test_local_node_negative_paths)
 		      -ENOTSUP);
 }
 
+static bool find_read_only_root(const struct kfsw_ftp_entry *entry, void *context)
+{
+	bool *found = context;
+
+	if ((strcmp(entry->name, KFSW_FTP_READONLY_PREFIX) == 0) &&
+	    (entry->type == KFSW_FTP_ENTRY_DIRECTORY)) {
+		*found = true;
+	}
+	return true;
+}
+
+ZTEST(services_ftp, test_root_listing_shows_read_only_roots)
+{
+	const uint16_t node = local_node();
+	bool found = false;
+	int result;
+
+	result = fs_mkdir(KFSW_FTP_READONLY_ROOT);
+	zassert_true((result == 0) || (result == -EEXIST));
+
+	zassert_ok(kfsw_ftp_list(node, "/", find_read_only_root, &found));
+	zassert_true(found);
+
+	/* Only the root shows them. */
+	found = false;
+	zassert_ok(kfsw_ftp_mkdir(node, "/elsewhere"));
+	zassert_ok(kfsw_ftp_list(node, "/elsewhere", find_read_only_root, &found));
+	zassert_false(found);
+}
+
 ZTEST(services_ftp, test_public_argument_validation_and_lifecycle)
 {
 	struct kfsw_ftp_transfer_result transfer;
