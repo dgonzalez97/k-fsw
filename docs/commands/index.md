@@ -70,7 +70,9 @@ uptime_ms: 10
 ```
 
 Role and name are labels set in the build. `time` is time since boot; wall
-time is in `csp clock`.
+time is in `csp clock`. An image is identified by its revision, the `git
+describe` of the build; no compile date is reported, because the date a file
+was compiled says little about the image it ends up in.
 
 ## Logging
 
@@ -131,8 +133,8 @@ and its read counters.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `csp info` | none | Local address, identity, build date and free buffers |
-| `csp ident` | `[node]` | Hostname, model, revision, build date and clock |
+| `csp info` | none | Local address, identity, revision and free buffers |
+| `csp ident` | `[node]` | Hostname, model, revision and clock |
 | `csp interfaces` | none | Interfaces with addresses and packet, error and drop counters |
 | `csp ifstat` | `<node> <interface>` | Remote interface packet/byte/error counters |
 | `csp routes` | none | Route table |

@@ -56,7 +56,6 @@ static int cmd_csp_info(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "hostname: %s", info.hostname);
 	shell_print(sh, "model: %s", info.model);
 	shell_print(sh, "revision: %s", info.revision);
-	shell_print(sh, "date: %s %s", info.build_date, info.build_time);
 	shell_print(sh, "free_buffers: %zu", info.free_buffers);
 
 	return 0;
@@ -236,7 +235,6 @@ static int cmd_csp_ident(const struct shell *sh, size_t argc, char **argv)
 		shell_print(sh, "hostname: %s", info.hostname);
 		shell_print(sh, "model: %s", info.model);
 		shell_print(sh, "revision: %s", info.revision);
-		shell_print(sh, "built: %s %s", info.build_date, info.build_time);
 		kfsw_csp_clock_get(&clock);
 		print_clock(sh, "clock", &clock);
 		return 0;
@@ -258,7 +256,10 @@ static int cmd_csp_ident(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "hostname: %s", identity.hostname);
 	shell_print(sh, "model: %s", identity.model);
 	shell_print(sh, "revision: %s", identity.revision);
-	shell_print(sh, "built: %s %s", identity.date, identity.time);
+	/* K-FSW nodes leave it empty; another libcsp node may still send one. */
+	if (identity.date[0] != '\0') {
+		shell_print(sh, "built: %s %s", identity.date, identity.time);
+	}
 
 	/* A second exchange for the clock, which the identity reply doesn't carry. */
 	if (kfsw_csp_clock_read((uint16_t)node, KFSW_CSP_PING_TIMEOUT_MS, &clock) == 0) {

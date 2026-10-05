@@ -284,7 +284,7 @@ node1_expected=(
     "Node must be 1..16382: 16383"
     "CSP node: 1"
     "hostname: kfsw-1"
-    "date: "
+    "revision: "
     "LOOP addr=1/14"
     "KISS addr=1/0"
     "0/0 -> KISS direct"
