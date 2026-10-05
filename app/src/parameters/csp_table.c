@@ -324,6 +324,7 @@ static const struct kfsw_param_definition csp_param_definitions[] = {
 const struct kfsw_param_definition_set kfsw_csp_param_definitions = {
 	.table = KFSW_PARAM_TABLE_CSP,
 	.name = KFSW_PARAM_TABLE_CSP_NAME,
+	.description = "CSP counters and the route table",
 	.definitions = csp_param_definitions,
 	.count = ARRAY_SIZE(csp_param_definitions),
 };
