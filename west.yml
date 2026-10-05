@@ -34,7 +34,7 @@ manifest:
 
     - name: kfsw-comms
       remote: kfsw
-      revision: dcbb77eec65998362fa6d04f77f2433d8524cfa3
+      revision: f60c2cc34c1138b111dd6024f52458261a6fadf9
       path: kfsw-comms
 
     - name: kfsw-modules
@@ -45,7 +45,7 @@ manifest:
     - name: libcsp
       remote: kfsw
       repo-path: kfsw-libcsp
-      revision: 3ec55abf745378b79b34d064d6e9a24e14ee5d4d
+      revision: 2381cbbd61aca885dacdcf096d3e69c495fe5afb
       path: kfsw-comms/third_party/libcsp
 
     - name: libparam
