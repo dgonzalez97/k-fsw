@@ -8,6 +8,8 @@
 
 #include <kfsw/comms/uart.h>
 
+#include "shell_remote.h"
+
 #define KFSW_UART_TEST_TIMEOUT_MS 1000U
 
 static bool print_uart_info(const struct kfsw_uart_info *info, void *context)
@@ -58,6 +60,9 @@ static int cmd_uart_test(const struct shell *sh, size_t argc, char **argv)
 		shell_error(sh, "UART CSP test: node %lu is not reached through a UART", peer);
 		return -ENOTSUP;
 	}
+	if (result == CSP_ERR_TIMEDOUT) {
+		return kfsw_shell_remote_failed(sh, "comms uart test", (uint16_t)peer, -ETIMEDOUT);
+	}
 	if (result != 0) {
 		shell_error(sh, "UART CSP test: FAIL (%d)", result);
 		return result;
@@ -78,4 +83,4 @@ SHELL_STATIC_SUBCMD_SET_CREATE(uart_commands,
 		      cmd_uart_test, 1, 1),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(uart, &uart_commands, "CSP UART commands.", NULL);
+SHELL_SUBCMD_ADD((comms), uart, &uart_commands, "CSP over UART, KISS framed.", NULL, 1, 0);

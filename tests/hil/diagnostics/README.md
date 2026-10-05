@@ -18,7 +18,7 @@ Use a new output directory for each run. Logs, JSONL captures, PCAP and the
 native flash file are kept there. The fixture creates its own Linux process.
 
 For the later bench run, use a test image with HK, parameter tables 1 and 3,
-valid wall time, a KISS link and `config/profiles/log-history.conf`. Use the
+valid wall time, a KISS link and `config/profiles/log-remote.conf`. Use the
 default log level (info), module levels, and a history depth of 32. Addresses
 100 and 101 must be unused; source address 16 is the host's. The fixture
 emits 39 log-test messages, overwriting the older RAM log history. It also

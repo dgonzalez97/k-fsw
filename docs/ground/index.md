@@ -21,7 +21,7 @@ These are the reference settings. Each node file sets two addresses:
   refuses a ground node below 16. CSP v2 addresses are 14 bits, so the
   launcher accepts up to 16383.
 - `KFSW_CSP_PEER` is the node at the other end of the serial link, the one
-  `uart test` pings when given no node. It is not a route: where packets go is
+  `comms uart test` pings when given no node. It is not a route: where packets go is
   the route table, `KFSW_CSP_ROUTES`.
 
 A bench usually needs its own variant of a role, for example the UHF gateway
@@ -30,7 +30,7 @@ as `kfsw-gnd-uhf-bench.env`; git ignores those, so device paths and bench
 routes stay on the machine they belong to.
 
 The node file sets the role, name, prompt, address, peer, radio and build
-directory. Use `status` for node identity and `uhf status` for radio settings:
+directory. Use `status` for node identity and `comms uhf status` for radio settings:
 
 ```text
 kfsw-gnd-uhf# status

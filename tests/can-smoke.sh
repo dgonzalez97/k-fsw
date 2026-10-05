@@ -130,6 +130,9 @@ printf '%s\n' \
 	'csp ident 2' \
 	'param get 2 uid' \
 	'param get 2 node_id' \
+	'comms can info' \
+	'comms can test 2' \
+	'comms can test 16' \
 	'csp interfaces' \
 	'csp counters' >&4
 
@@ -143,6 +146,11 @@ wait_for_output "$work_dir/node16.log" '2:uid = ' "$node16_pid" || \
 	fail "a remote string parameter was not readable over $interface"
 wait_for_output "$work_dir/node16.log" "2:node_id = 2" "$node16_pid" || \
 	fail "a remote scalar parameter was not readable over $interface"
+wait_for_output "$work_dir/node16.log" "CAN CSP test: PASS" "$node16_pid" || \
+	fail "comms can test did not pass over $interface"
+grep -Fq "bitrate: " "$work_dir/node16.log" || fail "comms can info did not report the bitrate"
+grep -Fq "node 16 is not reached through CAN" "$work_dir/node16.log" ||
+	fail "comms can test accepted this node's own address"
 
 # The CAN interface has to show traffic in both directions on both nodes.
 for log_file in node2.log node16.log; do

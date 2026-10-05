@@ -71,7 +71,8 @@ format_sources+=(
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp/ftp_transfer.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/log.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/log_history.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/log_history_csp.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/log_remote.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/log_remote.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/log_history_internal.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/log_history.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/libparam_print.h"
@@ -140,9 +141,10 @@ cppcheck \
 	-DCONFIG_KFSW_LOG_MIN_LEVEL=0 \
 	-DCONFIG_KFSW_LOG_HISTORY=1 \
 	-DCONFIG_KFSW_LOG_HISTORY_DEPTH=32 \
-	-DCONFIG_KFSW_LOG_HISTORY_CSP=1 \
-	-DCONFIG_KFSW_LOG_HISTORY_PORT=16 \
-	-DCONFIG_KFSW_LOG_HISTORY_STACK_SIZE=1536 \
+	-DCONFIG_KFSW_LOG_REMOTE=1 \
+	-DCONFIG_KFSW_LOG_REMOTE_PORT=16 \
+	-DCONFIG_KFSW_LOG_REMOTE_STACK_SIZE=2048 \
+	-DCONFIG_KFSW_LOG_REMOTE_TIMEOUT_MS=3000 \
 	-DCONFIG_KFSW_STORAGE=1 \
 	-DCONFIG_KFSW_FTP=1 \
 	-DCONFIG_KFSW_COMMAND=1 \

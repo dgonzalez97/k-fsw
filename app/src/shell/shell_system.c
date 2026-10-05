@@ -1,4 +1,7 @@
+#include <errno.h>
+
 #include <zephyr/shell/shell.h>
+#include <zephyr/shell/shell_string_conv.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/version.h>
 
@@ -8,6 +11,11 @@
 #include <kfsw/services/log.h>
 #if CONFIG_KFSW_LOG_HISTORY
 #include <kfsw/services/log_history.h>
+#endif
+#if CONFIG_KFSW_LOG_REMOTE
+#include <kfsw/services/log_remote.h>
+
+#include "shell_remote.h"
 #endif
 #if CONFIG_KFSW_COMMAND
 #include "shell_command.h"
@@ -109,9 +117,89 @@ static int cmd_log_history(const struct shell *sh, size_t argc, char **argv)
 }
 #endif
 
+#if CONFIG_KFSW_LOG_REMOTE
+static void print_remote_start(const struct kfsw_log_remote_start *start, void *context)
+{
+	const struct shell *sh = context;
+
+	shell_print(sh, "format: %s",
+		    (start->format == KFSW_LOG_REMOTE_DICTIONARY) ? "dictionary" : "text");
+	shell_print(sh, "first=%llu end=%llu overwritten=%llu", (unsigned long long)start->first,
+		    (unsigned long long)start->end, (unsigned long long)start->overwritten);
+}
+
+static bool print_remote_message(const struct kfsw_log_remote_message *message, void *context)
+{
+	const struct shell *sh = context;
+	char hex[(KFSW_LOG_ENCODED_SIZE * 2U) + 1U];
+
+	if (!message->package) {
+		shell_print(sh, "%llu t=%llums %s level=%u%s %s",
+			    (unsigned long long)message->sequence,
+			    (unsigned long long)message->uptime_ms,
+			    kfsw_log_module_name((enum kfsw_log_module)message->module),
+			    message->severity, message->truncated ? " truncated" : "",
+			    (const char *)message->data);
+		return true;
+	}
+	/* Decoded on a host: tools/ground/log-decode.py with the node's ELF. */
+	for (size_t i = 0U; (i < message->size) && (i < KFSW_LOG_ENCODED_SIZE); i++) {
+		(void)snprintk(&hex[i * 2U], 3U, "%02x", message->data[i]);
+	}
+	hex[MIN(message->size, KFSW_LOG_ENCODED_SIZE) * 2U] = '\0';
+	shell_print(sh, "%llu t=%llums %s level=%u%s pkg=%s", (unsigned long long)message->sequence,
+		    (unsigned long long)message->uptime_ms,
+		    kfsw_log_module_name((enum kfsw_log_module)message->module), message->severity,
+		    message->truncated ? " truncated" : "", hex);
+	return true;
+}
+
+static int cmd_log_remote(const struct shell *sh, size_t argc, char **argv)
+{
+	static const struct kfsw_log_remote_visitor visitor = {
+		.start = print_remote_start,
+		.message = print_remote_message,
+	};
+	unsigned long count = KFSW_LOG_HISTORY_MAX_READ;
+	unsigned long level = 0U;
+	int parse_error = 0;
+	uint16_t node;
+	int result = kfsw_shell_parse_node(sh, argv[1], &node);
+
+	if (result != 0) {
+		return result;
+	}
+	if (argc > 2U) {
+		count = shell_strtoul(argv[2], 10, &parse_error);
+	}
+	if (argc > 3U) {
+		level = shell_strtoul(argv[3], 10, &parse_error);
+	}
+	if ((parse_error != 0) || (count == 0U) || (count > KFSW_LOG_HISTORY_MAX_READ) ||
+	    (level > 3U)) {
+		shell_error(sh, "Usage: log remote <node> [count 1..%u] [min level 0..3]",
+			    KFSW_LOG_HISTORY_MAX_READ);
+		return -EINVAL;
+	}
+	shell_print(sh, "node: %u", node);
+	result = kfsw_log_remote_read(node, KFSW_LOG_REMOTE_LOG, (uint16_t)count, (uint8_t)level,
+				      &visitor, (void *)sh);
+	if (result == -EIO) {
+		shell_error(sh, "log remote: node %u cut the read short", node);
+		return result;
+	}
+	return (result == 0) ? 0 : kfsw_shell_remote_failed(sh, "log remote", node, result);
+}
+#endif
+
 SHELL_STATIC_SUBCMD_SET_CREATE(log_commands,
 #if CONFIG_KFSW_LOG_HISTORY
 	SHELL_CMD_ARG(history, NULL, "Read recent log messages.", cmd_log_history, 1, 0),
+#endif
+#if CONFIG_KFSW_LOG_REMOTE
+	SHELL_CMD_ARG(remote, NULL,
+		      "Read another node's recent messages: remote <node> [count] [min level].",
+		      cmd_log_remote, 2, 2),
 #endif
 	SHELL_CMD_ARG(test, NULL, "Exercise all log levels.", cmd_log_test, 1, 0),
 	SHELL_SUBCMD_SET_END);

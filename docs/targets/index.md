@@ -191,7 +191,7 @@ The scripts build first when the ELF is missing.
 
 The boot test checks that the ST-LINK is there, builds, flashes, captures the
 console and waits for `@BOOT` and `@READY`. The UART/KISS test adds an FTDI
-cable and a KFSW-Linux peer, and checks ping, `uart test`, storage, a remote
+cable and a KFSW-Linux peer, and checks ping, `comms uart test`, storage, a remote
 parameter, 4 KiB and 16 KiB transfers and the KISS counters; see
 @ref communications. The Holybro profile sets USART3 to 57600 baud for the
 radio.

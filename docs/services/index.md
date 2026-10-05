@@ -260,33 +260,60 @@ and debug dim. The colour codes wrap the whole line, so `[LEVEL] message`
 stays intact for scripts. `log_color` turns colour off.
 
 `CONFIG_KFSW_LOG_HISTORY` keeps the most recent K-FSW messages in a RAM ring
-(32 records by default, configurable from 1 to 128). `log history` prints up
-to 32 records locally. Each has a sequence, uptime in milliseconds, module,
-severity and up to 191 text bytes; longer messages are marked truncated.
-Log filters apply before retention.
-Zephyr logs, driver output and shell responses are not captured.
+(32 records by default, configurable from 1 to 128). Each record keeps the
+message as a cbprintf package: the address of its format string, the
+arguments, and any strings that were in RAM. Text is rebuilt when someone
+reads it, so a record costs 128 bytes instead of its full text. A message too
+long to package is kept as text, cut at 127 bytes and marked truncated.
+`log history` prints up to 32 records locally, with sequence, uptime in
+milliseconds, module, severity and up to 191 text bytes. Log filters apply
+before retention. Zephyr logs, driver output and shell responses are not
+captured.
 
-`CONFIG_KFSW_LOG_HISTORY_CSP` serves the history on CSP port 16 by default.
-Remote records carry at most 190 text bytes to fit encrypted radio links;
-longer records set the truncation flag. Local history keeps up to 191 bytes.
-It is enabled in the Linux composition. Other CSP compositions can use
-`config/profiles/log-history.conf`. Start the server after the CSP router.
-Reads do not remove records or write flash. UTC is not required.
+### Remote log
+
+`CONFIG_KFSW_LOG_REMOTE` serves the history, and the journal when
+`CONFIG_KFSW_JOURNAL` is set, on CSP port 16 with CRC32. Another node reads
+them from its shell:
+
+```text
+kfsw-ground# log remote 1 8          # newest 8 messages of node 1
+kfsw-ground# log remote 1 32 2       # warnings and errors only
+kfsw-ground# journal remote 1 10     # newest 10 journal records
+```
+
+Reads are bounded (1 to 32 records), do not remove anything, and do not need
+UTC. A node that does not answer within `CONFIG_KFSW_LOG_REMOTE_TIMEOUT_MS`
+(3 s) is logged as a warning.
+
+The serving node's `log_remote_format` parameter picks how messages travel:
+
+| Value | Format | On the requesting shell |
+| --- | --- | --- |
+| 0 | text, formatted on the serving node, at most 190 bytes | the message |
+| 1 | dictionary: the package as held | `pkg=<hex>` |
+
+Dictionary records are smaller on a radio link and carry no text. Decode a
+capture on a host with the ELF of the exact image that sent them:
+
+```bash
+./k-fsw/tools/ground/log-decode.py --elf build/nucleo_l496zg/zephyr/zephyr.elf capture.txt
+```
+
+It reads the format strings from the ELF and the package with Zephyr's
+dictionary parser, and prints each line with the text in place of `pkg=`.
+The Linux composition enables the service; other CSP compositions can use
+`config/profiles/log-remote.conf`. Start the server after the CSP router.
 
 `CONFIG_KFSW_LOG_HISTORY_RETAINED`, on by default, keeps the ring outside
 `.bss` so a reset that preserves RAM leaves the messages that explain it
 readable, and sequence numbers continue rather than restarting. The ring
 carries a magic, a version, the depth, the record size and a CRC32, all
-checked on first use; a ring that does not belong to the running image
+checked on first use, together with an identity of the running image, since
+a package points into it. A ring that does not belong to the running image
 starts clean, and a single record whose slot disagrees reads as missing.
 A power cycle clears RAM, so nothing is retained across one. Set the option
 to `n` for a ring that always starts empty.
-
-`./tools/kfsw-linux csp ... logs` reads a bounded window from the host and saves JSON lines;
-see [remote diagnostics](../communications/index.md#remote-text-logs-and-discovery).
-It reports overwritten history, truncation and incomplete transfers. A busy
-writer can overwrite a requested record during transmission; that read fails
-explicitly and can be retried. There is no persistent cursor across resets.
 
 ## Parameters
 

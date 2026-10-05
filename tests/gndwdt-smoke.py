@@ -58,8 +58,11 @@ def main():
                 assert node.parameter('gndwdt_contacts') == count
                 assert node.parameter('gndwdt_last_node') == source
             assert node.parameter('ground_wtd_cnt') <= 7200
-            time.sleep(2)
-            before_get = node.parameter('ground_wtd_cnt')
+            # Wait on the node's clock, not ours: a loaded host runs native_sim behind.
+            deadline = time.monotonic() + 10
+            while (before_get := node.parameter('ground_wtd_cnt')) > 7198:
+                assert time.monotonic() < deadline, 'the countdown did not move'
+                time.sleep(.2)
             reply = exchange(port, request(b'get'))
             assert reply[2] == 0
             remaining = int(reply[12:].split()[0].split(b'=')[1])

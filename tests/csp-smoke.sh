@@ -140,7 +140,7 @@ if [[ "$mode" == "terminal" ]]; then
 fi
 
 printf 'csp \t\n' >&3
-printf 'uart \t\n' >&3
+printf 'comms uart \t\n' >&3
 printf '%s\n' \
 	'csp info' \
 	'csp counters' \
@@ -205,17 +205,22 @@ printf '%s\n' \
 	'event tail 2 0' \
 	'event tail 2 999' \
 	'journal stats 2' \
+	'journal remote 2 4' \
+	'log remote 2 4' \
+	'param set 2 log_remote_format 1' \
+	'log remote 2 4' \
+	'param set 2 log_remote_format 0' \
 	'status 16383' \
 	'csp ping 2' \
 	'param get 2 test_u32' \
 	'csp info' \
-	'uart info' \
-	'uart test' >&3
+	'comms uart info' \
+	'comms uart test' >&3
 
 printf '%s\n' \
 	'csp ping 1' \
-	'uart info' \
-	'uart test' >&4
+	'comms uart info' \
+	'comms uart test' >&4
 
 wait_for_output "$work_dir/node1.log" "CSP ping 2: success" \
     "$node1_pid" || fail "node 1 could not ping CSP node 2"
@@ -352,6 +357,10 @@ node1_expected=(
     "CSP ifstat 2 LOOP"
     # No such interface: the node does not answer, which is logged as a warning.
     "csp ifstat: node 2 did not answer"
+    "format: text"
+    "format: dictionary"
+    " pkg="
+    "src=boot id=1"
     "autherr: 0"
     "txbytes: "
 )
@@ -371,6 +380,35 @@ rows = re.findall(r'CSP ifstat 2 KISS\s+tx: (\d+)\s+rx: (\d+)',
 assert len(rows) >= 2, rows
 first, last = tuple(map(int, rows[0])), tuple(map(int, rows[-1]))
 assert last[0] > first[0] and last[1] > first[1], rows
+PYTEST
+
+# A dictionary record, decoded with node 2's image, must read as the text the
+# node itself sends for the same sequence.
+python3 "$KFSW_ROOT/k-fsw/tools/ground/log-decode.py" --elf "$node2_executable" \
+	"$work_dir/node1.log" >"$work_dir/node1-decoded.log" ||
+	fail "a dictionary record of node 2 did not decode"
+python3 - "$work_dir/node1.log" "$work_dir/node1-decoded.log" <<'PYTEST'
+import re
+import sys
+from pathlib import Path
+record = re.compile(r'^(\d+) t=\d+ms \S+ level=\d( truncated)? (.*)$')
+def block(lines, name):
+    start = lines.index(f'format: {name}')
+    out = {}
+    for line in lines[start + 2:]:
+        match = record.match(line)
+        if not match:
+            break
+        out[match.group(1)] = match.group(3)
+    return out
+raw = Path(sys.argv[1]).read_text(errors='replace').splitlines()
+decoded = Path(sys.argv[2]).read_text(errors='replace').splitlines()
+text = block(raw, 'text')
+dictionary = block(decoded, 'dictionary')
+common = set(text) & set(dictionary)
+assert len(common) >= 2, (text, dictionary)
+for sequence in common:
+    assert text[sequence] == dictionary[sequence], (sequence, text[sequence], dictionary[sequence])
 PYTEST
 
 cat "$work_dir/node1.log"

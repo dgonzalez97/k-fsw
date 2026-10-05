@@ -113,8 +113,8 @@ wait_for_output "$work_dir/bridge-a.log" "starting data transfer loop" "$bridge_
 wait_for_output "$work_dir/bridge-b.log" "starting data transfer loop" "$bridge_b_pid" || \
 	fail "KISS_2 bridge did not start"
 
-printf '%s\n' 'csp interfaces' 'csp routes' 'csp ping 10' 'uart test 10' \
-	'csp ping 11' 'uart test 11' >&3
+printf '%s\n' 'csp interfaces' 'csp routes' 'csp ping 10' 'comms uart test 10' \
+	'csp ping 11' 'comms uart test 11' >&3
 wait_for_output "$work_dir/router.log" "CSP ping 10: success" "$router_pid" || \
 	fail "router traffic to node A over KISS_1 failed"
 wait_for_output "$work_dir/router.log" "interface: KISS_1" "$router_pid" || \
@@ -132,7 +132,7 @@ wait_for_output "$work_dir/node-a.log" "CSP ping 11: success" "$node_a_pid" || \
 wait_for_output "$work_dir/node-b.log" "CSP ping 10: success" "$node_b_pid" || \
 	fail "node B -> router -> node A transit failed"
 
-printf '%s\n' 'csp interfaces' 'csp routes' 'uart info' >&3
+printf '%s\n' 'csp interfaces' 'csp routes' 'comms uart info' >&3
 wait_for_output "$work_dir/router.log" "UART transport: KISS_2" "$router_pid" || \
 	fail "UART diagnostics collapsed the two interfaces"
 sleep 0.1

@@ -34,7 +34,7 @@ fi
 		'time' \
 		'version' \
 		'resmon show' \
-		'uart info' \
+		'comms uart info' \
 		'param tables' \
 		'param get uid' \
 		'param set route_table "9/9 KISS"' \

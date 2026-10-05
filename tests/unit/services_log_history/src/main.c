@@ -8,14 +8,17 @@
 #include <kfsw/comms/csp.h>
 #include <kfsw/services/log.h>
 #include <kfsw/services/log_history.h>
+#if CONFIG_KFSW_LOG_REMOTE
+#include <kfsw/services/log_remote.h>
+#endif
 
 #include "log_history_internal.h"
 
 static bool force_overwrite;
-int __real_kfsw_log_history_get(uint64_t sequence, struct kfsw_log_record *record);
-int __wrap_kfsw_log_history_get(uint64_t sequence, struct kfsw_log_record *record)
+int __real_kfsw_log_history_get_encoded(uint64_t sequence, struct kfsw_log_encoded *record);
+int __wrap_kfsw_log_history_get_encoded(uint64_t sequence, struct kfsw_log_encoded *record)
 {
-	return force_overwrite ? -ENOENT : __real_kfsw_log_history_get(sequence, record);
+	return force_overwrite ? -ENOENT : __real_kfsw_log_history_get_encoded(sequence, record);
 }
 
 static struct kfsw_log_history_window window(void)
@@ -70,10 +73,11 @@ ZTEST(log_history, test_filters_and_truncation)
 	zassert_equal(window().end, bounds.end);
 	memset(text, 'x', sizeof(text) - 1U);
 	text[sizeof(text) - 1U] = '\0';
+	/* Too long to package with its string, so the text is kept, cut to fit. */
 	kfsw_log_error("%s", text);
 	zassert_ok(kfsw_log_history_get(bounds.end, &record));
 	zassert_true(record.truncated);
-	zassert_equal(strlen(record.text), KFSW_LOG_TEXT_SIZE - 1U);
+	zassert_equal(strlen(record.text), KFSW_LOG_ENCODED_SIZE - 1U);
 	kfsw_log_error("short");
 	zassert_ok(kfsw_log_history_get(bounds.end + 1U, &record));
 	zassert_false(record.truncated);
@@ -105,6 +109,24 @@ ZTEST(log_history, test_packet_trace_is_logged_without_colours)
 	zassert_ok(kfsw_log_set_module_level(KFSW_LOG_MODULE_CSP, 2U));
 	csp_print_func("filtered\n");
 	zassert_equal(window().end, bounds.end + 1U);
+}
+
+ZTEST(log_history, test_records_are_packages_rebuilt_as_text)
+{
+	struct kfsw_log_history_window bounds = window();
+	struct kfsw_log_encoded encoded;
+	struct kfsw_log_record record;
+	char name[] = "from RAM";
+
+	kfsw_log_warning("%s and %u, %s", name, 42U, "from flash");
+	/* The RAM string is copied in; the buffer changing after does not matter. */
+	name[0] = 'X';
+	zassert_ok(kfsw_log_history_get_encoded(bounds.end, &encoded));
+	zassert_true(encoded.package);
+	zassert_true(encoded.size < KFSW_LOG_ENCODED_SIZE);
+	zassert_ok(kfsw_log_history_get(bounds.end, &record));
+	zassert_str_equal(record.text, "from RAM and 42, from flash");
+	zassert_false(record.truncated);
 }
 
 ZTEST(log_history, test_ring_wrap_and_stale_sequence)
@@ -162,19 +184,23 @@ ZTEST(log_history, test_concurrent_writer_keeps_records_consistent)
 	zassert_ok(k_thread_join(&writer_thread, K_SECONDS(1)));
 }
 
-#if CONFIG_KFSW_LOG_HISTORY_CSP
-static csp_conn_t *query(uint8_t minimum, uint16_t count, size_t size)
+#if CONFIG_KFSW_LOG_REMOTE
+#define NONCE 0x123456789abcULL
+
+static csp_conn_t *query(uint8_t stream, uint8_t minimum, uint16_t count, size_t size,
+			 uint8_t version)
 {
 	csp_packet_t *packet = csp_buffer_get(size);
 	csp_conn_t *connection =
-		csp_connect(CSP_PRIO_NORM, 7U, CONFIG_KFSW_LOG_HISTORY_PORT, 100U, CSP_O_CRC32);
+		csp_connect(CSP_PRIO_NORM, 7U, CONFIG_KFSW_LOG_REMOTE_PORT, 100U, CSP_O_CRC32);
 	zassert_not_null(packet);
 	zassert_not_null(connection);
 	memset(packet->data, 0, size);
-	packet->data[0] = 1U;
-	packet->data[1] = minimum;
-	sys_put_be16(count, &packet->data[2]);
-	sys_put_be64(0x123456789abcULL, &packet->data[4]);
+	packet->data[0] = version;
+	packet->data[1] = stream;
+	packet->data[2] = minimum;
+	sys_put_be16(count, &packet->data[3]);
+	sys_put_be64(NONCE, &packet->data[5]);
 	packet->length = size;
 	csp_send(connection, packet);
 	return connection;
@@ -184,13 +210,13 @@ static csp_packet_t *reply(csp_conn_t *connection, uint8_t type)
 {
 	csp_packet_t *packet = csp_read(connection, 500U);
 	zassert_not_null(packet);
-	zassert_equal(packet->data[0], 1U);
+	zassert_equal(packet->data[0], 2U);
 	zassert_equal(packet->data[1], type);
-	zassert_equal(sys_get_be64(&packet->data[2]), 0x123456789abcULL);
+	zassert_equal(sys_get_be64(&packet->data[2]), NONCE);
 	return packet;
 }
 
-ZTEST(log_history, test_csp_filtered_read_and_completion)
+ZTEST(log_history, test_remote_filtered_read_and_completion)
 {
 	csp_conn_t *connection;
 	csp_packet_t *packet;
@@ -198,14 +224,16 @@ ZTEST(log_history, test_csp_filtered_read_and_completion)
 
 	kfsw_log_info("filtered on read");
 	kfsw_log_error("wire record");
-	connection = query(3U, 2U, 12U);
+	connection = query(0U, 3U, 2U, 13U, 2U);
 	packet = reply(connection, 0U);
-	zassert_equal(packet->length, 34U);
-	zassert_equal(sys_get_be64(&packet->data[10]), sequence);
+	zassert_equal(packet->length, 35U);
+	zassert_equal(packet->data[10], 0U, "text unless the parameter says otherwise");
+	zassert_equal(sys_get_be64(&packet->data[11]), sequence);
 	csp_buffer_free(packet);
 	packet = reply(connection, 1U);
 	zassert_equal(sys_get_be64(&packet->data[10]), sequence + 1U);
 	zassert_equal(packet->data[27], 3U);
+	zassert_equal(packet->data[28], 0U);
 	zassert_mem_equal(&packet->data[30], "wire record", 11U);
 	csp_buffer_free(packet);
 	packet = reply(connection, 2U);
@@ -216,46 +244,120 @@ ZTEST(log_history, test_csp_filtered_read_and_completion)
 	(void)csp_close(connection);
 }
 
-ZTEST(log_history, test_csp_long_records_fit_encrypted_link)
+ZTEST(log_history, test_remote_long_records_fit_encrypted_link)
 {
-	const size_t lengths[] = {190U, 191U, 220U};
 	char text[221];
-	struct kfsw_log_record retained;
 
 	memset(text, 'x', sizeof(text));
-	for (size_t i = 0; i < ARRAY_SIZE(lengths); i++) {
-		uint64_t sequence = window().end;
+	for (int length = 100; length <= 220; length += 60) {
 		csp_conn_t *connection;
 		csp_packet_t *packet;
+		size_t expected;
 
-		kfsw_log_error("%.*s", (int)lengths[i], text);
-		connection = query(3U, 1U, 12U);
+		kfsw_log_error("%.*s", length, text);
+		connection = query(0U, 3U, 1U, 13U, 2U);
 		packet = reply(connection, 0U);
 		csp_buffer_free(packet);
 		packet = reply(connection, 1U);
-		zassert_equal(packet->length, 220U);
-		zassert_equal(packet->data[28], lengths[i] > 190U ? 1U : 0U);
-		zassert_equal(packet->data[29], 190U);
-		zassert_mem_equal(&packet->data[30], text, 190U);
+		/* Text that fits a package keeps all of it, else what the fallback kept. */
+		expected = MIN((size_t)length, KFSW_LOG_ENCODED_SIZE - 1U);
+		if (length <= 100) {
+			expected = (size_t)length;
+		}
+		zassert_equal(packet->data[29], expected, "length %d", length);
+		zassert_equal(packet->length, 30U + expected);
+		zassert_equal(packet->data[28], ((size_t)length > expected) ? 1U : 0U);
+		zassert_mem_equal(&packet->data[30], text, expected);
 		csp_buffer_free(packet);
 		packet = reply(connection, 2U);
 		zassert_equal(packet->data[10], 0U);
-		zassert_equal(sys_get_be16(&packet->data[11]), 1U);
 		csp_buffer_free(packet);
 		(void)csp_close(connection);
-		zassert_ok(kfsw_log_history_get(sequence, &retained));
-		zassert_equal(strlen(retained.text), MIN(lengths[i], KFSW_LOG_TEXT_SIZE - 1U));
 	}
 }
 
-ZTEST(log_history, test_csp_overwrite_reported)
+struct collected {
+	struct kfsw_log_remote_start start;
+	struct kfsw_log_remote_message last;
+	unsigned int messages;
+};
+
+static void collect_start(const struct kfsw_log_remote_start *start, void *context)
 {
+	((struct collected *)context)->start = *start;
+}
+
+static bool collect_message(const struct kfsw_log_remote_message *message, void *context)
+{
+	struct collected *collected = context;
+
+	collected->last = *message;
+	collected->messages++;
+	return true;
+}
+
+static const struct kfsw_log_remote_visitor collector = {
+	.start = collect_start,
+	.message = collect_message,
+};
+
+ZTEST(log_history, test_remote_client_reads_both_formats)
+{
+	struct collected collected = {0};
+	struct kfsw_log_record rebuilt;
+	struct kfsw_log_encoded encoded = {0};
+
+	kfsw_log_warning("value %u", 7U);
+	zassert_ok(kfsw_log_remote_read(7U, KFSW_LOG_REMOTE_LOG, 1U, 0U, &collector, &collected));
+	zassert_equal(collected.start.format, KFSW_LOG_REMOTE_TEXT);
+	zassert_equal(collected.messages, 1U);
+	zassert_false(collected.last.package);
+	zassert_str_equal((const char *)collected.last.data, "value 7");
+
+	zassert_ok(kfsw_log_remote_set_format(KFSW_LOG_REMOTE_DICTIONARY));
+	collected = (struct collected){0};
+	zassert_ok(kfsw_log_remote_read(7U, KFSW_LOG_REMOTE_LOG, 1U, 0U, &collector, &collected));
+	zassert_ok(kfsw_log_remote_set_format(KFSW_LOG_REMOTE_TEXT));
+	zassert_equal(kfsw_log_remote_set_format(2U), -ERANGE);
+	zassert_equal(collected.start.format, KFSW_LOG_REMOTE_DICTIONARY);
+	zassert_true(collected.last.package);
+
+	/* The package is the record as held, so this image can rebuild its text. */
+	encoded.package = true;
+	encoded.size = collected.last.size;
+	memcpy(encoded.data, collected.last.data, collected.last.size);
+	kfsw_log_history_format(&encoded, &rebuilt);
+	zassert_str_equal(rebuilt.text, "value 7");
+}
+
+ZTEST(log_history, test_remote_client_arguments_and_streams)
+{
+	struct collected collected = {0};
+
+	zassert_equal(kfsw_log_remote_read(7U, KFSW_LOG_REMOTE_LOG, 0U, 0U, &collector, &collected),
+		      -EINVAL);
+	zassert_equal(
+		kfsw_log_remote_read(7U, KFSW_LOG_REMOTE_LOG, 33U, 0U, &collector, &collected),
+		-EINVAL);
+	zassert_equal(kfsw_log_remote_read(7U, KFSW_LOG_REMOTE_LOG, 1U, 4U, &collector, &collected),
+		      -EINVAL);
+	zassert_equal(kfsw_log_remote_read(7U, KFSW_LOG_REMOTE_LOG, 1U, 0U, NULL, &collected),
+		      -EINVAL);
+	/* This image keeps no journal. */
+	zassert_equal(
+		kfsw_log_remote_read(7U, KFSW_LOG_REMOTE_JOURNAL, 4U, 0U, &collector, &collected),
+		-ENOTSUP);
+}
+
+ZTEST(log_history, test_remote_overwrite_reported)
+{
+	struct collected collected = {0};
 	csp_conn_t *connection;
 	csp_packet_t *packet;
 
 	kfsw_log_error("overwritten during retrieval");
 	force_overwrite = true;
-	connection = query(0U, 1U, 12U);
+	connection = query(0U, 0U, 1U, 13U, 2U);
 	packet = reply(connection, 0U);
 	csp_buffer_free(packet);
 	packet = reply(connection, 2U);
@@ -263,18 +365,24 @@ ZTEST(log_history, test_csp_overwrite_reported)
 	zassert_equal(sys_get_be16(&packet->data[11]), 0U);
 	csp_buffer_free(packet);
 	(void)csp_close(connection);
+	zassert_equal(kfsw_log_remote_read(7U, KFSW_LOG_REMOTE_LOG, 1U, 0U, &collector, &collected),
+		      -EIO);
 	force_overwrite = false;
 }
 
-ZTEST(log_history, test_csp_rejects_invalid_requests)
+ZTEST(log_history, test_remote_rejects_invalid_requests)
 {
-	const uint16_t counts[] = {0U, 33U, 1U, 1U};
-	const uint8_t levels[] = {0U, 0U, 4U, 0U};
-	const size_t sizes[] = {12U, 12U, 12U, 13U};
+	/* count 0, count 33, level 4, a stream that does not exist, version 1, size 12 */
+	const uint16_t counts[] = {0U, 33U, 1U, 1U, 1U, 1U};
+	const uint8_t levels[] = {0U, 0U, 4U, 0U, 0U, 0U};
+	const uint8_t streams[] = {0U, 0U, 0U, 2U, 0U, 0U};
+	const uint8_t versions[] = {2U, 2U, 2U, 2U, 1U, 2U};
+	const size_t sizes[] = {13U, 13U, 13U, 13U, 13U, 12U};
 
 	for (size_t i = 0; i < ARRAY_SIZE(counts); i++) {
-		csp_conn_t *connection = query(levels[i], counts[i], sizes[i]);
-		zassert_is_null(csp_read(connection, 50U));
+		csp_conn_t *connection =
+			query(streams[i], levels[i], counts[i], sizes[i], versions[i]);
+		zassert_is_null(csp_read(connection, 50U), "request %zu was answered", i);
 		(void)csp_close(connection);
 	}
 }
@@ -282,12 +390,12 @@ ZTEST(log_history, test_csp_rejects_invalid_requests)
 
 static void *setup(void)
 {
-#if CONFIG_KFSW_LOG_HISTORY_CSP
-	zassert_equal(kfsw_log_history_server_start(), -ENETDOWN);
+#if CONFIG_KFSW_LOG_REMOTE
+	zassert_equal(kfsw_log_remote_server_start(), -ENETDOWN);
 	zassert_ok(kfsw_csp_init());
 	zassert_ok(kfsw_csp_start());
-	zassert_ok(kfsw_log_history_server_start());
-	zassert_ok(kfsw_log_history_server_start());
+	zassert_ok(kfsw_log_remote_server_start());
+	zassert_ok(kfsw_log_remote_server_start());
 #endif
 	return NULL;
 }
@@ -298,7 +406,8 @@ static struct kfsw_log_retained_header retained(uint64_t next_sequence)
 		.magic = KFSW_LOG_RETAINED_MAGIC,
 		.version = KFSW_LOG_RETAINED_VERSION,
 		.depth = CONFIG_KFSW_LOG_HISTORY_DEPTH,
-		.record_size = sizeof(struct kfsw_log_record),
+		.record_size = sizeof(struct kfsw_log_encoded),
+		.image = kfsw_log_history_image(),
 		.next_sequence = next_sequence,
 	};
 
@@ -342,7 +451,7 @@ ZTEST(log_history, test_retained_ring_continues_where_it_left_off)
 
 ZTEST(log_history, test_retained_ring_that_does_not_belong_starts_clean)
 {
-	struct kfsw_log_retained_header rejected[6];
+	struct kfsw_log_retained_header rejected[7];
 	struct kfsw_log_record record;
 
 	kfsw_log_warning("before the reset");
@@ -353,11 +462,15 @@ ZTEST(log_history, test_retained_ring_that_does_not_belong_starts_clean)
 	rejected[2] = retained(window().end);
 	rejected[2].depth = CONFIG_KFSW_LOG_HISTORY_DEPTH + 1U;
 	rejected[3] = retained(window().end);
-	rejected[3].record_size = sizeof(struct kfsw_log_record) - 1U;
+	rejected[3].record_size = sizeof(struct kfsw_log_encoded) - 1U;
 	rejected[4] = retained(0U);
 	/* Valid in every field, but one bit of the header did not survive. */
 	rejected[5] = retained(window().end);
 	rejected[5].crc ^= 1U;
+	/* Left by another image, whose format strings are elsewhere. */
+	rejected[6] = retained(window().end);
+	rejected[6].image ^= 1U;
+	rejected[6].crc = kfsw_log_history_header_crc(&rejected[6]);
 
 	for (size_t i = 0; i < ARRAY_SIZE(rejected); i++) {
 		struct kfsw_log_history_window bounds;

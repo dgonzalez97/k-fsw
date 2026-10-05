@@ -32,7 +32,7 @@ node 2.
 | 12 | libparam descriptors | `KFSW_PARAM_LIST_PORT` |
 | 13 | FWU lite uploads | `KFSW_FWU_LITE_CSP_PORT` |
 | 14 | Housekeeping | `KFSW_HK_CSP_PORT` |
-| 16 | Log history | `KFSW_LOG_HISTORY_PORT` |
+| 16 | Remote log (log history and journal) | `KFSW_LOG_REMOTE_PORT` |
 
 Every node serves ports 0 and 1; libcsp's ports 2 to 6 are not served. Both
 ends of a link must use the same port numbers.
@@ -76,8 +76,8 @@ console:
 ```text
 param set uhf_key_hex <64 hex digits>
 param get uhf_crypto_error
-uhf connect
-uhf status
+comms uhf connect
+comms uhf status
 ```
 
 Use the same key on both ends and set `KFSW_CSP_UART_PEER_ADDRESS` on each
@@ -91,7 +91,7 @@ plaintext is rejected, and a missing key or session blocks traffic.
 The link uses AES-256-GCM with a 16-byte tag, and the CSP header is
 authenticated too. Sessions and sequence numbers reject replayed frames, also
 after a reset. A replayed handshake can interrupt a session but can't restore
-an old key; `uhf connect` starts a new handshake. With the default 256-byte
+an old key; `comms uhf connect` starts a new handshake. With the default 256-byte
 buffer and CRC32, an encrypted packet carries up to 220 bytes of data. Other
 interfaces are not encrypted.
 
@@ -164,7 +164,7 @@ To retry, build a new packet.
 
 Services bind their ports after `kfsw_csp_init()`. The application starts
 the router before starting its remote services. The API gives the state,
-interfaces, routes, free buffers and ping. `csp interfaces` and `uart info`
+interfaces, routes, free buffers and ping. `csp interfaces` and `comms uart info`
 show the counters since boot.
 
 ## Counters
@@ -269,24 +269,15 @@ K-FSW's standard ping echoes the original size. CAN/ZMQ remain CSP 1 only.
 The bench fixture is in `tests/hil/diagnostics/README.md` in the application
 checkout.
 
-## Remote text logs and discovery
+## Discovery
 
 ```bash
-./tools/kfsw-linux csp --device /dev/pts/7 logs --node 1 --output logs.jsonl
-./tools/kfsw-linux csp --device /dev/pts/7 logs --node 1 --count 16 --min-level 2
 ./tools/kfsw-linux csp --device /dev/pts/7 discover --nodes 1,2 --output nodes.jsonl
 ./tools/kfsw-linux csp --device /dev/pts/7 --source 100 discover --range 1:16 --budget-ms 5000
 ```
 
-`logs` considers the latest 1 to 32 retained records, then filters by severity
-(0 debug, 1 info, 2 warning, 3 error). JSONL contains a start record, log
-records and an end record with `complete: true` only after all expected
-replies arrive. `text_hex` preserves the original bytes; `text` replaces
-invalid UTF-8 with replacement characters. Output files must be new, and
-each record is flushed. A failed transfer keeps partial output and exits
-nonzero. An absent end record also means incomplete output. The global
-`--timeout-ms` is the budget for the entire log transfer; raise it for slow
-links. Use `--port` inside `logs` when the node's log port differs from 16.
+Another node's log and journal are read from a K-FSW shell with `log remote`
+and `journal remote`; see the services guide.
 
 `discover` queries explicit unicast addresses or an inclusive range, up to
 64 addresses. It pings each node and then asks for CMP identity. It reports
@@ -431,7 +422,7 @@ separate PTY.
 The UART hardware test connects KFSW-Linux node 1 to NUCLEO-L496ZG node 2
 through an FTDI TTL-232R-3V3 on USART3, with the ST-LINK console connected
 too. It flashes the board, checks both serial connections, pings both ways,
-runs `uart test`, checks storage, transfers 4 KiB and 16 KiB files, reads a
+runs `comms uart test`, checks storage, transfers 4 KiB and 16 KiB files, reads a
 remote parameter and checks the KISS counters.
 
 ## Security

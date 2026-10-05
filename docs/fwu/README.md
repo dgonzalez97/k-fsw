@@ -83,7 +83,7 @@ send is `build/<target>/app/zephyr/zephyr.signed.bin`.
 
 The host adapter and flight node use 500 kbit/s. The radio uses the same
 services; match the UART baud rate at each radio end. When radio encryption is
-enabled, establish both sessions with `uhf connect` before uploading. See
+enabled, establish both sessions with `comms uhf connect` before uploading. See
 @ref communications for key setup. Firmware signatures and radio keys serve
 separate purposes; keep separate keys for them.
 

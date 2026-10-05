@@ -133,11 +133,11 @@ On the node 16 shell:
 
 ```text
 kfsw-gnd-uhf# status
-kfsw-gnd-uhf# uhf status
+kfsw-gnd-uhf# comms uhf status
 kfsw-gnd-uhf# csp info
 kfsw-gnd-uhf# csp interfaces
 kfsw-gnd-uhf# csp routes
-kfsw-gnd-uhf# uart info
+kfsw-gnd-uhf# comms uart info
 kfsw-gnd-uhf# csp ping 2
 ```
 
@@ -145,16 +145,16 @@ On the NUCLEO console, node 2:
 
 ```text
 kfsw:~$ status
-kfsw:~$ uhf status
+kfsw:~$ comms uhf status
 kfsw:~$ csp info
 kfsw:~$ csp interfaces
 kfsw:~$ csp routes
-kfsw:~$ uart info
+kfsw:~$ comms uart info
 kfsw:~$ csp ping 16
 ```
 
-`uhf status` should show `holybro-sik`, expected serial `57600 8N1` and RF link
-`unknown`. `uart info` and `csp interfaces` show the traffic and counters.
+`comms uhf status` should show `holybro-sik`, expected serial `57600 8N1` and RF link
+`unknown`. `comms uart info` and `csp interfaces` show the traffic and counters.
 
 Then try a parameter over the radio. Set `log_level` to another value between
 0 and 4 and read it back, then send an invalid value; the node should go back
@@ -177,7 +177,7 @@ cases and check that both shells still respond:
 kfsw-gnd-uhf# param get 2 missing
 kfsw-gnd-uhf# csp ping 3
 kfsw-gnd-uhf# status
-kfsw-gnd-uhf# uart info
+kfsw-gnd-uhf# comms uart info
 kfsw-gnd-uhf# csp interfaces
 ```
 
@@ -185,7 +185,7 @@ The missing name should be rejected and the ping to node 3 should time out.
 Stop the bridge and both shells with `Ctrl-C`.
 
 The local node 16 and node 19 demo uses a 115200-baud PTY even though
-`uhf status` shows the radio's 57600; the radio overlay sets both to 57600.
+`comms uhf status` shows the radio's 57600; the radio overlay sets both to 57600.
 
 ## Raw bytes
 

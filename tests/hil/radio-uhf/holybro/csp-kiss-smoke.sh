@@ -205,7 +205,7 @@ wait_for_output "$work_dir/nucleo.log" "@READY " "$debug_capture_pid" || \
 printf '%s\r\n' 'param set echo_enabled 1' >"$debug_serial"
 sleep 1
 
-printf '%s\r\n' 'status' 'uhf status' 'uart info' 'csp interfaces' 'csp routes' \
+printf '%s\r\n' 'status' 'comms uhf status' 'comms uart info' 'csp interfaces' 'csp routes' \
 	>"$debug_serial"
 wait_for_output "$work_dir/nucleo.log" "CSP node: 2" "$debug_capture_pid" || \
 	fail "NUCLEO did not report CSP node 2"
@@ -247,7 +247,7 @@ bridge_pid=$!
 wait_for_output "$work_dir/socat.log" "starting data transfer loop" \
 	"$bridge_pid" || fail "the PTY-to-Holybro bridge did not become ready"
 
-printf '%s\n' 'status' 'uhf status' 'uart info' 'csp interfaces' 'csp routes' \
+printf '%s\n' 'status' 'comms uhf status' 'comms uart info' 'csp interfaces' 'csp routes' \
 	'csp ping 2' >&3
 wait_for_output "$work_dir/ground.log" "Role: kfsw-gnd-uhf" "$ground_pid" || \
 	fail "the UHF gateway did not report its role"
@@ -427,8 +427,8 @@ wait_for_output "$work_dir/nucleo.log" "crc32: $uploaded_crc" \
 	"$debug_capture_pid" || \
 	fail "NUCLEO does not report the received file in its own FTP root"
 
-printf '%s\r\n' 'uart info' 'csp interfaces' >"$debug_serial"
-printf '%s\n' 'uart info' 'csp interfaces' >&3
+printf '%s\r\n' 'comms uart info' 'csp interfaces' >"$debug_serial"
+printf '%s\n' 'comms uart info' 'csp interfaces' >&3
 wait_for_clean_transport_stats "$work_dir/ground.log" "$ground_pid" || \
 	fail "k-ground does not have clean, nonzero post-traffic KISS counters"
 wait_for_clean_transport_stats "$work_dir/nucleo.log" "$debug_capture_pid" || \
