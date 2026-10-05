@@ -343,7 +343,7 @@ wait_for_output_count "$work_dir/ground.log" \
 	fail "invalid remote log_level did not restore the compiled default"
 wait_for_output "$work_dir/ground.log" "get: parameter 'missing' not found" \
 	"$ground_pid" || fail "missing remote parameter was not rejected"
-wait_for_output "$work_dir/ground.log" "CSP ping 3: failed" "$ground_pid" || \
+wait_for_output "$work_dir/ground.log" "csp ping: node 3 did not answer" "$ground_pid" || \
 	fail "a nonexistent CSP node did not fail cleanly"
 wait_for_output_count "$work_dir/ground.log" "K-FSW status" \
 	"$((ground_status_count_before + 1))" "$ground_pid" || \

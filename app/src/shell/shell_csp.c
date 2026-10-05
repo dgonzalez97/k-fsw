@@ -9,12 +9,20 @@
 #include <zephyr/shell/shell_string_conv.h>
 #include <zephyr/sys/util.h>
 
+#include <csp/csp_error.h>
 #include <kfsw/comms/csp.h>
 #if CONFIG_KFSW_COMMAND
 #include <kfsw/services/command.h>
 
 #include "shell_command.h"
 #endif
+#include "shell_remote.h"
+
+/* libcsp's own timeout code, as the ping and identity exchanges return it. */
+static int as_errno(int csp_result)
+{
+	return (csp_result == CSP_ERR_TIMEDOUT) ? -ETIMEDOUT : csp_result;
+}
 
 #define KFSW_CSP_PING_TIMEOUT_MS 1000U
 #define KFSW_CSP_PING_PAYLOAD_SIZE 10U
@@ -135,8 +143,7 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 	result = kfsw_csp_ping((uint16_t)node, KFSW_CSP_PING_TIMEOUT_MS, KFSW_CSP_PING_PAYLOAD_SIZE,
 			       &round_trip_ms);
 	if (result != 0) {
-		shell_error(sh, "CSP ping %lu: failed (%d)", node, result);
-		return result;
+		return kfsw_shell_remote_failed(sh, "csp ping", (uint16_t)node, as_errno(result));
 	}
 
 	shell_print(sh, "CSP ping %lu: success", node);
@@ -159,8 +166,8 @@ static int cmd_csp_ifstat(const struct shell *sh, size_t argc, char **argv)
 	result = kfsw_csp_interface_stats_read((uint16_t)node, argv[2], KFSW_CSP_PING_TIMEOUT_MS,
 					       &stats);
 	if (result != 0) {
-		shell_error(sh, "CSP ifstat %lu %s: failed (%d)", node, argv[2], result);
-		return result;
+		/* A node that carries no such interface does not answer either. */
+		return kfsw_shell_remote_failed(sh, "csp ifstat", (uint16_t)node, result);
 	}
 	shell_print(sh, "CSP ifstat %lu %s", node, stats.name);
 	shell_print(sh, "tx: %u", stats.tx_packets);
@@ -254,8 +261,7 @@ static int cmd_csp_ident(const struct shell *sh, size_t argc, char **argv)
 
 	result = kfsw_csp_identify((uint16_t)node, KFSW_CSP_PING_TIMEOUT_MS, &identity);
 	if (result != 0) {
-		shell_error(sh, "CSP ident %lu: failed (%d)", node, result);
-		return result;
+		return kfsw_shell_remote_failed(sh, "csp ident", (uint16_t)node, as_errno(result));
 	}
 
 	shell_print(sh, "CSP ident %lu", node);

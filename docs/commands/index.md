@@ -174,9 +174,12 @@ kfsw:~$ csp routes
 11/14 -> KISS_2 via 11
 ```
 
-Routes are set at build time and can't be changed from the shell. A ping
-timeout can mean no peer, a wrong address or route, framing errors or no free
-buffers; check `csp interfaces`, `csp routes` and `uart info`.
+Routes are set at build time and can't be changed from the shell. A node that
+does not answer is logged as a warning, `[WARNING] csp ping: node 5 did not
+answer`, and kept in `log history`; the same goes for every request to another
+node, `param`, `status`, `ftp` and the rest. No answer can mean no peer, a wrong
+address or route, framing errors or no free buffers; check `csp interfaces`,
+`csp routes` and `uart info`.
 
 ### Restarting a node
 
@@ -356,8 +359,9 @@ Paths must start with `/` and can't contain `..` or empty components.
 ## Another node
 
 Groups that can ask another node take the node first, as `param` does:
-`status 2`, `event stats 2`, `journal tail 2 0`, `hk period 2 0 1000`. The
-reply comes back one field per line, after the node it came from:
+`status 2`, `event stats 2`, `journal tail 2 0`, `hk period 2 0 1000`. A node
+gets 3 seconds to answer; one that does not is logged as a warning. The reply
+comes back one field per line, after the node it came from:
 
 ```text
 kfsw:~$ status 2

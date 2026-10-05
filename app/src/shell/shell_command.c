@@ -9,6 +9,9 @@
 #include <kfsw/services/command.h>
 
 #include "shell_command.h"
+#if CONFIG_KFSW_COMMAND_CSP
+#include "shell_remote.h"
+#endif
 
 /*
  * Shell side of the command registry. Each shell group that reaches a command,
@@ -115,7 +118,7 @@ static int invoke_remote(const struct shell *sh, uint16_t node, const char *name
 			    : kfsw_command_invoke_remote(node, name, args, count, result);
 
 	if (outcome != 0) {
-		shell_error(sh, "Node %u did not answer (%d)", node, outcome);
+		(void)kfsw_shell_remote_failed(sh, name, node, outcome);
 	}
 	return outcome;
 #else

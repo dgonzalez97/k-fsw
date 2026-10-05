@@ -337,7 +337,8 @@ node1_expected=(
     "CSP counters cleared"
     "CSP ifstat 2 KISS"
     "CSP ifstat 2 LOOP"
-    "CSP ifstat 2 missing: failed ("
+    # No such interface: the node does not answer, which is logged as a warning.
+    "csp ifstat: node 2 did not answer"
     "autherr: 0"
     "txbytes: "
 )
