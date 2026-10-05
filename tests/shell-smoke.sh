@@ -57,10 +57,10 @@ fi
 		'storage test' \
 		'ftp' \
 		'ftp generate' \
-		'ftp 1 mkdir /selfnode' \
-		'ftp 1 ls /' \
+		'ftp mkdir /selfnode' \
+		'ftp ls /' \
 		'ftp stat 1 /selfnode' \
-		'ftp 1 ls /missing' \
+		'ftp ls 1 /missing' \
 		'ftp put 1 /selfnode/a.bin /selfnode/b.bin' \
 		'log test'
 } |
@@ -80,7 +80,7 @@ expected_output=(
     'echo_enabled = 1'
 	'Available commands:'
 	'csp      : K-FSW CSP commands.'
-	'ftp      : K-FSW file transfer:'
+	'ftp      : K-FSW file transfer. Without a node, this node.'
 	'param    : K-FSW parameter commands.'
 	'status   : Show K-FSW status, here or on a node: status [node].'
 	'storage  : K-FSW filesystem storage commands.'
@@ -144,14 +144,14 @@ expected_output=(
 	'ready: yes'
 	'total_bytes: '
 	'Storage test: PASS'
-	'  mkdir     : Create a directory: mkdir <node> <path>; <node> may be this node.'
+	'  mkdir     : Create a directory: mkdir [node] <path>.'
 	'generate: wrong parameter count'
 	'generate - Create deterministic local data: generate <path> <bytes 0..32768>.'
 	'FTP mkdir 1 /selfnode: PASS'
 	'entries: '
 	'FTP stat 1 /selfnode'
 	'type: directory'
-	'FTP list 1 /missing: not found'
+	'FTP ls 1 /missing: not found'
 	'FTP put 1: transfers need two nodes'
     '[ERROR] K-FSW shell log test: error'
     '[WARNING] K-FSW shell log test: warning'

@@ -2,15 +2,16 @@
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 
 #include <zephyr/shell/shell.h>
 #include <zephyr/shell/shell_string_conv.h>
 #include <zephyr/sys/util.h>
 
+#include <kfsw/comms/csp.h>
 #include <kfsw/services/ftp.h>
 
 #include "diagnostics/ftp_diagnostics.h"
+#include "shell_command.h"
 #include "shell_remote.h"
 
 struct ftp_list_context {
@@ -18,18 +19,25 @@ struct ftp_list_context {
 	uint32_t entries;
 };
 
-static int parse_ftp_node(const struct shell *sh, const char *text, uint16_t *node)
+/* Without a node, ls, stat and mkdir act on this node. */
+static int optional_node(const struct shell *sh, bool given, const char *text, uint16_t *node)
 {
-	unsigned long parsed;
+	struct kfsw_csp_info info;
+
+	if (given) {
+		return kfsw_shell_parse_node(sh, text, node);
+	}
+	kfsw_csp_get_info(&info);
+	*node = info.address;
+	return 0;
+}
+
+static bool is_number(const char *text)
+{
 	int parse_error = 0;
 
-	parsed = shell_strtoul(text, 10, &parse_error);
-	if ((parse_error != 0) || (parsed > 16383U)) {
-		shell_error(sh, "CSP node must be in range 0..16383");
-		return -EINVAL;
-	}
-	*node = (uint16_t)parsed;
-	return 0;
+	(void)shell_strtoul(text, 10, &parse_error);
+	return parse_error == 0;
 }
 
 static bool print_ftp_entry(const struct kfsw_ftp_entry *entry, void *context)
@@ -74,10 +82,10 @@ static int ftp_list(const struct shell *sh, uint16_t node, const char *path)
 	struct ftp_list_context context = {.shell = sh};
 	int result;
 
-	shell_print(sh, "FTP list %u %s", node, (path[0] == '\0') ? "/" : path);
+	shell_print(sh, "FTP ls %u %s", node, (path[0] == '\0') ? "/" : path);
 	result = kfsw_ftp_list(node, path, print_ftp_entry, &context);
 	if (result != 0) {
-		return print_ftp_error(sh, "list", node, path, result);
+		return print_ftp_error(sh, "ls", node, path, result);
 	}
 	shell_print(sh, "entries: %" PRIu32, context.entries);
 	return 0;
@@ -133,32 +141,32 @@ static int ftp_transfer(const struct shell *sh, bool upload, uint16_t node, cons
 	return 0;
 }
 
-static int cmd_ftp_list(const struct shell *sh, size_t argc, char **argv)
+static int cmd_ftp_ls(const struct shell *sh, size_t argc, char **argv)
 {
+	const bool given = (argc == 3U) || ((argc == 2U) && is_number(argv[1]));
 	uint16_t node;
-	int result = parse_ftp_node(sh, argv[1], &node);
+	int result = optional_node(sh, given, argv[1], &node);
 
-	return (result == 0) ? ftp_list(sh, node, (argc == 3U) ? argv[2] : "") : result;
+	if (result != 0) {
+		return result;
+	}
+	return ftp_list(sh, node, (argc > (given ? 2U : 1U)) ? argv[argc - 1U] : "");
 }
 
 static int cmd_ftp_stat(const struct shell *sh, size_t argc, char **argv)
 {
 	uint16_t node;
-	int result;
+	int result = optional_node(sh, argc == 3U, argv[1], &node);
 
-	ARG_UNUSED(argc);
-	result = parse_ftp_node(sh, argv[1], &node);
-	return (result == 0) ? ftp_stat(sh, node, argv[2]) : result;
+	return (result == 0) ? ftp_stat(sh, node, argv[argc - 1U]) : result;
 }
 
 static int cmd_ftp_mkdir(const struct shell *sh, size_t argc, char **argv)
 {
 	uint16_t node;
-	int result;
+	int result = optional_node(sh, argc == 3U, argv[1], &node);
 
-	ARG_UNUSED(argc);
-	result = parse_ftp_node(sh, argv[1], &node);
-	return (result == 0) ? ftp_mkdir(sh, node, argv[2]) : result;
+	return (result == 0) ? ftp_mkdir(sh, node, argv[argc - 1U]) : result;
 }
 
 static int cmd_ftp_get(const struct shell *sh, size_t argc, char **argv)
@@ -167,7 +175,7 @@ static int cmd_ftp_get(const struct shell *sh, size_t argc, char **argv)
 	int result;
 
 	ARG_UNUSED(argc);
-	result = parse_ftp_node(sh, argv[1], &node);
+	result = kfsw_shell_parse_node(sh, argv[1], &node);
 	return (result == 0) ? ftp_transfer(sh, false, node, argv[2], argv[3]) : result;
 }
 
@@ -177,7 +185,7 @@ static int cmd_ftp_put(const struct shell *sh, size_t argc, char **argv)
 	int result;
 
 	ARG_UNUSED(argc);
-	result = parse_ftp_node(sh, argv[1], &node);
+	result = kfsw_shell_parse_node(sh, argv[1], &node);
 	return (result == 0) ? ftp_transfer(sh, true, node, argv[2], argv[3]) : result;
 }
 
@@ -226,65 +234,14 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 		      cmd_ftp_generate, 3, 0),
 	SHELL_CMD_ARG(get, NULL, "Download from a remote node: get <node> <remote> <local>.",
 		      cmd_ftp_get, 4, 0),
-	SHELL_CMD_ARG(list, NULL, "List a directory: list <node> [path]; <node> may be this node.",
-		      cmd_ftp_list, 2, 1),
-	SHELL_CMD_ARG(ls, NULL, "List a directory: ls <node> [path]; <node> may be this node.",
-		      cmd_ftp_list, 2, 1),
-	SHELL_CMD_ARG(mkdir, NULL,
-		      "Create a directory: mkdir <node> <path>; <node> may be this node.",
-		      cmd_ftp_mkdir, 3, 0),
+	SHELL_CMD_ARG(ls, NULL, "List a directory: ls [node] [path].", cmd_ftp_ls, 1, 2),
+	SHELL_CMD_ARG(mkdir, NULL, "Create a directory: mkdir [node] <path>.", cmd_ftp_mkdir, 2,
+		      1),
 	SHELL_CMD_ARG(put, NULL, "Upload to a remote node: put <node> <local> <remote>.",
 		      cmd_ftp_put, 4, 0),
-	SHELL_CMD_ARG(stat, NULL,
-		      "Show metadata: stat <node> <path>; <node> may be this node.", cmd_ftp_stat,
-		      3, 0),
+	SHELL_CMD_ARG(stat, NULL, "Show metadata: stat [node] <path>.", cmd_ftp_stat, 2, 1),
 	SHELL_CMD_ARG(verify, NULL, "Compare two local files: verify <first> <second>.",
 		      cmd_ftp_verify, 3, 0),
 	SHELL_SUBCMD_SET_END);
 
-static int print_ftp_usage(const struct shell *sh)
-{
-	shell_error(sh, "Usage: ftp <command> [arguments]");
-	shell_error(sh, "   or: ftp <node> <ls|list|stat|mkdir|put|get> [paths]");
-	shell_help(sh);
-	return -EINVAL;
-}
-
-static int cmd_ftp_compat(const struct shell *sh, size_t argc, char **argv)
-{
-	uint16_t node;
-	int result;
-
-	if (argc == 1U) {
-		shell_help(sh);
-		return SHELL_CMD_HELP_PRINTED;
-	}
-	if (argc < 3U) {
-		return print_ftp_usage(sh);
-	}
-	result = parse_ftp_node(sh, argv[1], &node);
-	if (result != 0) {
-		return result;
-	}
-	if (((strcmp(argv[2], "ls") == 0) || (strcmp(argv[2], "list") == 0)) &&
-	    ((argc == 3U) || (argc == 4U))) {
-		return ftp_list(sh, node, (argc == 4U) ? argv[3] : "");
-	}
-	if ((strcmp(argv[2], "stat") == 0) && (argc == 4U)) {
-		return ftp_stat(sh, node, argv[3]);
-	}
-	if ((strcmp(argv[2], "mkdir") == 0) && (argc == 4U)) {
-		return ftp_mkdir(sh, node, argv[3]);
-	}
-	if ((strcmp(argv[2], "put") == 0) && (argc == 5U)) {
-		return ftp_transfer(sh, true, node, argv[3], argv[4]);
-	}
-	if ((strcmp(argv[2], "get") == 0) && (argc == 5U)) {
-		return ftp_transfer(sh, false, node, argv[3], argv[4]);
-	}
-	return print_ftp_usage(sh);
-}
-
-SHELL_CMD_ARG_REGISTER(ftp, &ftp_commands,
-		       "K-FSW file transfer: ftp <command> ... or ftp <node> <command> ...",
-		       cmd_ftp_compat, 1, 4);
+SHELL_CMD_REGISTER(ftp, &ftp_commands, "K-FSW file transfer. Without a node, this node.", NULL);

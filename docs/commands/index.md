@@ -1,3 +1,16 @@
+| `ftp ls` | `[node] [directory]` | List a directory |
+| `ftp stat` | `[node] <path>` | Type, size and CRC |
+| `ftp mkdir` | `[node] <directory>` | Create a directory |
+| `ftp put` | `<node> <local> <remote>` | Upload a file |
+| `ftp get` | `<node> <remote> <local>` | Download a file |
+| `ftp generate` | `<path> <bytes>` | Create a test file of up to 32768 bytes |
+| `ftp verify` | `<first> <second>` | Compare two local files |
+
+Without a node, `ls`, `stat` and `mkdir` act on this node, without a
+connection; `put` and `get` need another node. Listing `/` also shows the
+read-only `boot` (firmware slots, see [firmware update](../fwu/README.md)) and
+`hk` (housekeeping files) when they exist.
+
 # Shell commands {#commands}
 
 [TOC]
@@ -347,7 +360,7 @@ without a connection; `put` and `get` need another node.
 
 ```text
 kfsw:~$ ftp generate /build/sample.bin 1024
-kfsw:~$ ftp 2 mkdir /exchange
+kfsw:~$ ftp mkdir 2 /exchange
 kfsw:~$ ftp put 2 /build/sample.bin /exchange/sample.bin
 kfsw:~$ ftp stat 2 /exchange/sample.bin
 kfsw:~$ ftp get 2 /exchange/sample.bin /build/returned.bin

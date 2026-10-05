@@ -174,15 +174,15 @@ printf '%s\n' \
 	'ftp generate /build/single.bin 128' \
 	'ftp generate /build/multi.bin 1024' \
 	'ftp generate /build/large.bin 8192' \
-	'ftp 2 mkdir /flash' \
-	'ftp 2 put /build/empty.bin /flash/empty.bin' \
+	'ftp mkdir 2 /flash' \
+	'ftp put 2 /build/empty.bin /flash/empty.bin' \
 	'ftp put 2 /build/single.bin /flash/single.bin' \
 	$'ftp p\t 2 /build/single.bin /flash/single.bin' \
 	'ftp put 2 /build/multi.bin /flash/multi.bin' \
 	'ftp put 2 /build/large.bin /flash/large.bin' \
 	'ftp stat 2 /flash/large.bin' \
-	'ftp 2 ls /flash' \
-	'ftp 2 get /flash/empty.bin /build/empty-returned.bin' \
+	'ftp ls 2 /flash' \
+	'ftp get 2 /flash/empty.bin /build/empty-returned.bin' \
 	'ftp get 2 /flash/single.bin /build/single-returned.bin' \
 	'ftp get 2 /flash/multi.bin /build/multi-returned.bin' \
 	'ftp get 2 /flash/large.bin /build/large-returned.bin' \
@@ -317,7 +317,7 @@ node1_expected=(
 	"bytes: 8192"
 	"FTP stat 2 /flash/large.bin"
 	"type: file"
-	"FTP list 2 /flash"
+	"FTP ls 2 /flash"
 	"entries: 4"
 	"FTP get 2 /flash/large.bin -> /build/large-returned.bin: PASS"
 	"FTP verify /build/empty.bin /build/empty-returned.bin: PASS"

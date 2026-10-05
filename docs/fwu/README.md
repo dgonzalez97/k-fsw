@@ -21,7 +21,7 @@ The previous image remains in the secondary slot until the next upload or
 `fwu abort` erases it. These names identify slots, not firmware versions.
 
 ```text
-ftp list 2 /boot
+ftp ls 2 /boot
 ftp get 2 /boot/firmware_1.bin /build/running.bin
 ftp get 2 /boot/firmware_2.bin /build/previous.bin
 ```
