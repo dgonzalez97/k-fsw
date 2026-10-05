@@ -284,4 +284,4 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 		      cmd_ftp_verify, 3, 0),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(ftp, &ftp_commands, "K-FSW file transfer. Without a node, this node.", NULL);
+SHELL_CMD_REGISTER(ftp, &ftp_commands, "File transfer. Without a node, this node.", NULL);

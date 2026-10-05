@@ -188,4 +188,4 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 	SHELL_CMD_ARG(status, NULL, "Show update state and slot geometry.", cmd_fwu_status, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(fwu, &fwu_commands, "K-FSW firmware update.", NULL);
+SHELL_CMD_REGISTER(fwu, &fwu_commands, "Firmware update.", NULL);

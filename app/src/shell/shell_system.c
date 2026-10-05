@@ -111,20 +111,20 @@ static int cmd_log_history(const struct shell *sh, size_t argc, char **argv)
 
 SHELL_STATIC_SUBCMD_SET_CREATE(log_commands,
 #if CONFIG_KFSW_LOG_HISTORY
-	SHELL_CMD_ARG(history, NULL, "Read recent K-FSW log messages.", cmd_log_history, 1, 0),
+	SHELL_CMD_ARG(history, NULL, "Read recent log messages.", cmd_log_history, 1, 0),
 #endif
-	SHELL_CMD_ARG(test, NULL, "Exercise all K-FSW log levels.", cmd_log_test, 1, 0),
+	SHELL_CMD_ARG(test, NULL, "Exercise all log levels.", cmd_log_test, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(log, &log_commands, "K-FSW logging commands.", NULL);
+SHELL_CMD_REGISTER(log, &log_commands, "Logging commands.", NULL);
 #if CONFIG_KFSW_COMMAND_CSP
-SHELL_CMD_ARG_REGISTER(status, NULL, "Show K-FSW status, here or on a node: status [node].",
-		       cmd_status, 1, 1);
+SHELL_CMD_ARG_REGISTER(status, NULL, "Show status, here or on a node: status [node].", cmd_status,
+		       1, 1);
 #else
-SHELL_CMD_ARG_REGISTER(status, NULL, "Show basic K-FSW runtime status.", cmd_status, 1, 0);
+SHELL_CMD_ARG_REGISTER(status, NULL, "Show basic runtime status.", cmd_status, 1, 0);
 #endif
-SHELL_CMD_ARG_REGISTER(time, NULL, "Show K-FSW monotonic time.", cmd_time, 1, 0);
-SHELL_CMD_ARG_REGISTER(version, NULL, "Show K-FSW build information.", cmd_version, 1, 0);
+SHELL_CMD_ARG_REGISTER(time, NULL, "Show monotonic time.", cmd_time, 1, 0);
+SHELL_CMD_ARG_REGISTER(version, NULL, "Show build information.", cmd_version, 1, 0);
 
 #if CONFIG_KFSW_COMMAND && CONFIG_REBOOT
 static int cmd_reboot(const struct shell *sh, size_t argc, char **argv)

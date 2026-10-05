@@ -395,4 +395,4 @@ SHELL_STATIC_SUBCMD_SET_CREATE(csp_commands,
 	SHELL_CMD_ARG(routes, NULL, "Show the CSP static routing table.", cmd_csp_routes, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(csp, &csp_commands, "K-FSW CSP commands.", NULL);
+SHELL_CMD_REGISTER(csp, &csp_commands, "CSP commands.", NULL);

@@ -71,8 +71,8 @@ fi
 cat "$capture_file"
 
 expected_output=(
-	"  status   : Show K-FSW status, here or on a node: status [node]."
-	"  storage  : K-FSW filesystem storage commands."
+	"  status   : Show status, here or on a node: status [node]."
+	"  storage  : Filesystem storage commands."
     '@BOOT '
     '@READY '
     # Not anchored to the prompt, which has colour codes.
@@ -80,12 +80,12 @@ expected_output=(
     # Off by default, and the test turned it on for the completion check above.
     'echo_enabled = 1'
 	'Available commands:'
-	'csp      : K-FSW CSP commands.'
-	'ftp      : K-FSW file transfer. Without a node, this node.'
-	'param    : K-FSW parameter commands.'
-	'status   : Show K-FSW status, here or on a node: status [node].'
-	'storage  : K-FSW filesystem storage commands.'
-	'version  : Show K-FSW build information.'
+	'csp      : CSP commands.'
+	'ftp      : File transfer. Without a node, this node.'
+	'param    : Parameter commands.'
+	'status   : Show status, here or on a node: status [node].'
+	'storage  : Filesystem storage commands.'
+	'version  : Show build information.'
     'K-FSW status'
 	'Role: flight'
 	'Name: kfsw'

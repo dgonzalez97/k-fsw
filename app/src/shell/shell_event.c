@@ -127,4 +127,4 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 #endif
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(event, &event_commands, "K-FSW event record.", NULL);
+SHELL_CMD_REGISTER(event, &event_commands, "Event record.", NULL);

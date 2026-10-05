@@ -72,4 +72,4 @@ SHELL_STATIC_SUBCMD_SET_CREATE(uart_commands,
 		      cmd_uart_test, 1, 1),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(uart, &uart_commands, "K-FSW CSP UART commands.", NULL);
+SHELL_CMD_REGISTER(uart, &uart_commands, "CSP UART commands.", NULL);

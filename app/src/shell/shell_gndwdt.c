@@ -134,4 +134,4 @@ SHELL_STATIC_SUBCMD_SET_CREATE(gndwdt_commands,
 		      cmd_gndwdt_timeout, 2, 0),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(gndwdt, &gndwdt_commands, "K-FSW ground watchdog.", NULL);
+SHELL_CMD_REGISTER(gndwdt, &gndwdt_commands, "Ground watchdog.", NULL);

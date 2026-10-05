@@ -127,10 +127,10 @@ static int cmd_storage_test(const struct shell *sh, size_t argc, char **argv)
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	storage_commands,
-	SHELL_CMD_ARG(info, NULL, "Show K-FSW filesystem storage status.", cmd_storage_info, 1,
+	SHELL_CMD_ARG(info, NULL, "Show filesystem storage status.", cmd_storage_info, 1,
 		      0),
 	SHELL_CMD_ARG(test, NULL, "Run storage test: test [write|read <value>].",
 		      cmd_storage_test, 1, 2),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(storage, &storage_commands, "K-FSW filesystem storage commands.", NULL);
+SHELL_CMD_REGISTER(storage, &storage_commands, "Filesystem storage commands.", NULL);
