@@ -94,10 +94,10 @@ def native(stack, executable, output, label, prompt):
 
 def sessions(ground, flight):
     for attempt in range(6):
-        ground.run("uhf connect")
+        ground.run("comms uhf connect")
         time.sleep(0.7)
-        gs = ground.run("uhf status")
-        fs = flight.run("uhf status")
+        gs = ground.run("comms uhf status")
+        fs = flight.run("comms uhf status")
         if "sessions TX/RX: 1/1" in gs and "sessions TX/RX: 1/1" in fs:
             return
         time.sleep(1)
@@ -136,7 +136,7 @@ def tests(ground, flight, bridge, key, reboot):
     print("Encrypted traffic, remote-write rejection and wire replay: PASS", flush=True)
 
     ground.run(f"param set uhf_key_hex {wrong}")
-    ground.run("uhf connect")
+    ground.run("comms uhf connect")
     time.sleep(1)
     if ": success" in ground.run("csp ping 2"):
         raise RuntimeError("Different radio keys communicated")
@@ -171,7 +171,7 @@ def tests(ground, flight, bridge, key, reboot):
     for label, console in (("flight", flight), ("ground", ground)):
         console.run("csp interfaces")
         console.run("kernel thread stacks")
-        console.run("uhf status")
+        console.run("comms uhf status")
     if bridge.error:
         raise RuntimeError(str(bridge.error))
 

@@ -148,7 +148,7 @@ if [[ "$mode" == "terminal" ]]; then
 	exit 0
 fi
 
-printf '%s\n' 'status' 'version' 'uhf status' 'csp info' 'csp routes' \
+printf '%s\n' 'status' 'version' 'comms uhf status' 'csp info' 'csp routes' \
 	'csp ping 19' >&3
 printf '%s\n' 'status' 'version' 'csp info' 'csp ping 16' >&4
 

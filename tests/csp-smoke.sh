@@ -140,7 +140,7 @@ if [[ "$mode" == "terminal" ]]; then
 fi
 
 printf 'csp \t\n' >&3
-printf 'uart \t\n' >&3
+printf 'comms uart \t\n' >&3
 printf '%s\n' \
 	'csp info' \
 	'csp counters' \
@@ -205,17 +205,22 @@ printf '%s\n' \
 	'event tail 2 0' \
 	'event tail 2 999' \
 	'journal stats 2' \
+	'journal remote 2 4' \
+	'log remote 2 4' \
+	'param set 2 log_remote_format 1' \
+	'log remote 2 4' \
+	'param set 2 log_remote_format 0' \
 	'status 16383' \
 	'csp ping 2' \
 	'param get 2 test_u32' \
 	'csp info' \
-	'uart info' \
-	'uart test' >&3
+	'comms uart info' \
+	'comms uart test' >&3
 
 printf '%s\n' \
 	'csp ping 1' \
-	'uart info' \
-	'uart test' >&4
+	'comms uart info' \
+	'comms uart test' >&4
 
 wait_for_output "$work_dir/node1.log" "CSP ping 2: success" \
     "$node1_pid" || fail "node 1 could not ping CSP node 2"

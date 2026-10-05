@@ -76,8 +76,8 @@ console:
 ```text
 param set uhf_key_hex <64 hex digits>
 param get uhf_crypto_error
-uhf connect
-uhf status
+comms uhf connect
+comms uhf status
 ```
 
 Use the same key on both ends and set `KFSW_CSP_UART_PEER_ADDRESS` on each
@@ -91,7 +91,7 @@ plaintext is rejected, and a missing key or session blocks traffic.
 The link uses AES-256-GCM with a 16-byte tag, and the CSP header is
 authenticated too. Sessions and sequence numbers reject replayed frames, also
 after a reset. A replayed handshake can interrupt a session but can't restore
-an old key; `uhf connect` starts a new handshake. With the default 256-byte
+an old key; `comms uhf connect` starts a new handshake. With the default 256-byte
 buffer and CRC32, an encrypted packet carries up to 220 bytes of data. Other
 interfaces are not encrypted.
 
@@ -164,7 +164,7 @@ To retry, build a new packet.
 
 Services bind their ports after `kfsw_csp_init()`. The application starts
 the router before starting its remote services. The API gives the state,
-interfaces, routes, free buffers and ping. `csp interfaces` and `uart info`
+interfaces, routes, free buffers and ping. `csp interfaces` and `comms uart info`
 show the counters since boot.
 
 ## Counters
@@ -431,7 +431,7 @@ separate PTY.
 The UART hardware test connects KFSW-Linux node 1 to NUCLEO-L496ZG node 2
 through an FTDI TTL-232R-3V3 on USART3, with the ST-LINK console connected
 too. It flashes the board, checks both serial connections, pings both ways,
-runs `uart test`, checks storage, transfers 4 KiB and 16 KiB files, reads a
+runs `comms uart test`, checks storage, transfers 4 KiB and 16 KiB files, reads a
 remote parameter and checks the KISS counters.
 
 ## Security

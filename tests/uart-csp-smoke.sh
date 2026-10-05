@@ -236,7 +236,7 @@ printf '%s\r\n' \
 	'status' \
 	'storage info' \
 	'storage test' \
-	'uart info' >"$debug_serial"
+	'comms uart info' >"$debug_serial"
 wait_for_output "$work_dir/nucleo.log" "K-FSW status" \
 	"$debug_capture_pid" || fail "NUCLEO debug shell did not answer status"
 wait_for_output "$work_dir/nucleo.log" "board: nucleo_l496zg/stm32l496xx" \
@@ -296,15 +296,15 @@ wait_for_output "$work_dir/linux.log" "CSP ping 2: success" "$linux_pid" || \
 
 printf '%s\r\n' \
 	'csp ping 1' \
-	'uart test' \
-	'uart info' >"$debug_serial"
+	'comms uart test' \
+	'comms uart info' >"$debug_serial"
 
 wait_for_output "$work_dir/nucleo.log" "CSP ping 1: success" \
 	"$debug_capture_pid" || fail "NUCLEO could not ping KFSW-Linux CSP node 1"
 wait_for_output "$work_dir/nucleo.log" "UART CSP test: PASS" \
 	"$debug_capture_pid" || fail "NUCLEO UART transport test did not pass"
 
-printf '%s\n' 'uart test' 'uart info' >&3
+printf '%s\n' 'comms uart test' 'comms uart info' >&3
 wait_for_output "$work_dir/linux.log" "UART CSP test: PASS" "$linux_pid" || \
 	fail "KFSW-Linux UART transport test did not pass"
 
@@ -322,7 +322,7 @@ printf '%s\n' \
 	'ftp verify /build/hil-16k.bin /build/hil-16k-returned.bin' \
 	'csp ping 2' \
 	'param get 2 test_u32' \
-	'uart info' >&3
+	'comms uart info' >&3
 
 wait_for_output "$work_dir/linux.log" \
 	"FTP put node=2 source=/build/hil-4k.bin destination=/hil/hil-4k.bin: PASS bytes=4096" \

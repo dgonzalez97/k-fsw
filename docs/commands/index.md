@@ -32,7 +32,8 @@ service:
 | --- | --- |
 | `status`, `version`, `time`, `log` | always |
 | `csp` | `CONFIG_KFSW_CSP` |
-| `uart` | `CONFIG_KFSW_CSP_KISS_UART` |
+| `comms uart` | `CONFIG_KFSW_CSP_KISS_UART` |
+| `comms can` | `CONFIG_KFSW_CSP_CAN` |
 | `param` | `CONFIG_KFSW_PARAM`; saving needs `CONFIG_KFSW_PARAM_PERSISTENCE` |
 | `storage` | `CONFIG_KFSW_STORAGE` |
 | `ftp` | `CONFIG_KFSW_FTP` |
@@ -46,7 +47,7 @@ service:
 | `health` | `CONFIG_KFSW_HEALTH` |
 | `gndwdt` | `CONFIG_KFSW_GNDWDT` |
 | `resmon` | `CONFIG_KFSW_RESMON` |
-| `uhf` | `CONFIG_KFSW_RADIO_UHF_SHELL` |
+| `comms uhf` | `CONFIG_KFSW_RADIO_UHF_SHELL` |
 | `temp` | `CONFIG_KFSW_TEMP_EXAMPLE_SHELL` |
 | `boton_test`, `test` | `CONFIG_KFSW_BOTON_TEST_SHELL` |
 
@@ -81,17 +82,25 @@ was compiled says little about the image it ends up in.
 
 `log history` shows up to 32 recent retained messages when
 `CONFIG_KFSW_LOG_HISTORY` is enabled. It includes sequence, uptime, module,
-level and truncation status. To read them over CSP from the host, use
-`./tools/kfsw-linux csp ... logs`, described in [communications](../communications/index.md#remote-text-logs-and-discovery).
+level and truncation status.
+
+| Command | Arguments | Meaning |
+| --- | --- | --- |
+| `log remote` | `<node> [count] [min level]` | Another node's newest messages, text or dictionary |
+| `journal remote` | `<node> [count]` | Another node's newest journal records, in one read |
+
+`log_remote_format` on the serving node picks text (0) or dictionary (1).
+Dictionary lines show `pkg=<hex>`; `tools/ground/log-decode.py --elf` turns
+them back into text. See [remote log](../services/index.md).
 
 ## UHF radio
 
-`uhf status` prints the radio implementation, the expected hardware and serial
-settings, and the link state. With `CONFIG_KFSW_RADIO_UHF_CRYPTO`, `uhf connect`
+`comms uhf status` prints the radio implementation, the expected hardware and serial
+settings, and the link state. With `CONFIG_KFSW_RADIO_UHF_CRYPTO`, `comms uhf connect`
 starts new encrypted sessions with the configured peer.
 
 ```text
-kfsw-gnd-uhf# uhf status
+kfsw-gnd-uhf# comms uhf status
 UHF radio
 enabled: yes
 implementation: holybro-sik
@@ -103,7 +112,7 @@ hardware status: unavailable
 RF link: unknown
 ```
 
-`uhf status` doesn't talk to the modem. Traffic and errors are in `uart info`
+`comms uhf status` doesn't talk to the modem. Traffic and errors are in `comms uart info`
 and `csp interfaces`.
 
 ## Button and LED example
@@ -179,7 +188,7 @@ does not answer is logged as a warning, `[WARNING] csp ping: node 5 did not
 answer`, and kept in `log history`; the same goes for every request to another
 node, `param`, `status`, `ftp` and the rest. No answer can mean no peer, a wrong
 address or route, framing errors or no free buffers; check `csp interfaces`,
-`csp routes` and `uart info`.
+`csp routes` and `comms uart info`.
 
 ### Restarting a node
 
@@ -213,15 +222,24 @@ All three at zero means no valid reset note was found. Power loss is one
 possible cause; a reset before a note was written gives the same result.
 Check the hardware reset cause as well.
 
-## UART/KISS
+## Links: `comms`
+
+Each link a composition carries is a subcommand of `comms`; the radio module
+adds `uhf` the same way.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `uart info` | none | Each CSP UART with baud, state, KISS name, address and counters |
-| `uart test` | `[node]` | Check that the route uses a UART/KISS link, then ping with a 128-byte payload |
+| `comms uart info` | none | Each CSP UART with baud, state, KISS name, address and counters |
+| `comms uart test` | `[node]` | Check that the route uses a UART/KISS link, then ping with a 128-byte payload |
+| `comms can info` | none | The CSP CAN interface: bitrate, address and counters |
+| `comms can test` | `<node>` | Check that the route uses CAN, then ping with a 64-byte payload |
+| `comms uhf status` | none | See [UHF radio](#commands) |
 
-Give the node to test one link out of several, for example `uart test 10` and
-`uart test 11`. On the NUCLEO these commands run on the ST-LINK console and the
+A test refuses this node's own address, whose packets never reach the link,
+and a peer that does not answer is logged as a warning.
+
+Give the node to test one link out of several, for example `comms uart test 10` and
+`comms uart test 11`. On the NUCLEO these commands run on the ST-LINK console and the
 packets leave on USART3; don't connect the shell terminal to the CSP UART.
 
 ## Parameters
