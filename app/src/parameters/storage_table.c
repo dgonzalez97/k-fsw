@@ -114,6 +114,7 @@ static const struct kfsw_param_definition storage_param_definitions[] = {
 const struct kfsw_param_definition_set kfsw_storage_param_definitions = {
 	.table = KFSW_PARAM_TABLE_STORAGE,
 	.name = KFSW_PARAM_TABLE_STORAGE_NAME,
+	.description = "Filesystem size, free space, mount",
 	.definitions = storage_param_definitions,
 	.count = ARRAY_SIZE(storage_param_definitions),
 };

@@ -179,6 +179,8 @@ write_ground_config()
 		if [[ "$ground_radio_uhf" == "holybro" ]]; then
 			printf 'CONFIG_KFSW_RADIO_UHF=y\n'
 			printf 'CONFIG_KFSW_RADIO_UHF_HOLYBRO=y\n'
+			# A remote parameter listing takes about 35 s over the radio.
+			printf 'CONFIG_KFSW_PARAM_LIST_TIMEOUT_MS=40000\n'
 			printf 'CONFIG_KFSW_RADIO_UHF_EXPECTED_SERIAL_BAUD=57600\n'
 		fi
 	} >>"$config_file" || fail "cannot write generated ground configuration"

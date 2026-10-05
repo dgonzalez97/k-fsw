@@ -8,6 +8,9 @@
 #include <kfsw/services/gndwdt.h>
 
 #include "shell_command.h"
+#if CONFIG_KFSW_COMMAND_CSP
+#include "shell_remote.h"
+#endif
 
 static const char *state_name(const struct kfsw_gndwdt_status *status)
 {
@@ -34,8 +37,8 @@ static int remote(const struct shell *sh, const char *node_text, bool feed)
 		return outcome;
 	}
 	if (outcome != 0) {
-		shell_error(sh, "Node %u did not answer (%d)", node, outcome);
-		return outcome;
+		return kfsw_shell_remote_failed(sh, feed ? "gndwdt feed" : "gndwdt show", node,
+						outcome);
 	}
 	if (result.status != KFSW_COMMAND_OK) {
 		shell_error(sh, "Node %u refused: %s", node,

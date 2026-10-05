@@ -105,7 +105,7 @@ def main():
                     requests.append(data)
                     send_packet(port, 2, header['source'], 11, header['sport'],
                                 message(2, version=1, command=0, request=0, status=2))
-            node.wait(r'Node 2 did not answer', offset)
+            node.wait(r'reboot: node 2 (did not answer|failed)', offset)
             assert len(requests) == 1 and requests[0][0:2] == bytes([2, 3])
         result = {'server_handler_delta': 1, 'client_prepare_attempts': 2,
                   'client_execute_attempts': 2, 'client_peer_invocations': peer_invocations,

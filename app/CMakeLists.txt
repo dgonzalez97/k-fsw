@@ -112,6 +112,7 @@ if(CONFIG_KFSW_DEBUG_SHELL)
 
     target_sources_ifdef(CONFIG_KFSW_CSP app PRIVATE
         src/shell/shell_csp.c
+        src/shell/shell_remote.c
     )
     target_sources_ifdef(CONFIG_KFSW_CSP_KISS_UART app PRIVATE
         src/shell/shell_uart.c

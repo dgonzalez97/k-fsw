@@ -174,9 +174,12 @@ kfsw:~$ csp routes
 11/14 -> KISS_2 via 11
 ```
 
-Routes are set at build time and can't be changed from the shell. A ping
-timeout can mean no peer, a wrong address or route, framing errors or no free
-buffers; check `csp interfaces`, `csp routes` and `uart info`.
+Routes are set at build time and can't be changed from the shell. A node that
+does not answer is logged as a warning, `[WARNING] csp ping: node 5 did not
+answer`, and kept in `log history`; the same goes for every request to another
+node, `param`, `status`, `ftp` and the rest. No answer can mean no peer, a wrong
+address or route, framing errors or no free buffers; check `csp interfaces`,
+`csp routes` and `uart info`.
 
 ### Restarting a node
 
@@ -232,18 +235,21 @@ packets leave on USART3; don't connect the shell terminal to the CSP UART.
 | `param set` | `[node] <name> <value>` | Write a value |
 
 Three views of the same parameters, from the widest to the most detailed:
-`tables` says which tables exist, `table` shows one, `list` shows them all.
+`tables` says which tables exist, `table` shows one, `list` shows them all. `layer` says which part of K-FSW defines the table, `kept` how many of its
+values are saved, and `holds` what is in it. Table names are not sent over the
+link, so for another node the names and descriptions come from this build,
+whose table numbers are the same.
 
 ```text
 kfsw:~$ param tables
- id  band     name        params    kept
----  -------  ----------  ------  ------
-  1  core     board           11       0
-  2  core     system           3       3
-  3  core     telemetry        5       0
-  4  core     csp              8       0
-  5  core     storage          4       0
- 25  service  log              5       2
+ id  layer    name          params  kept  holds
+---  -------  ------------  ------  ----  -----
+  1  core     board             11     0  Node identity and what the board carries
+  2  core     system             3     3  Boot delay, report period, reboot pin
+  3  core     telemetry          5     0  Uptime, storage and CSP buffers
+  4  core     csp               15     0  CSP counters and the route table
+  5  core     storage            4     0  Filesystem size, free space, mount
+ 25  service  log                5     2  Log levels, colour and counters
 ```
 
 ```text
@@ -353,8 +359,9 @@ Paths must start with `/` and can't contain `..` or empty components.
 ## Another node
 
 Groups that can ask another node take the node first, as `param` does:
-`status 2`, `event stats 2`, `journal tail 2 0`, `hk period 2 0 1000`. The
-reply comes back one field per line, after the node it came from:
+`status 2`, `event stats 2`, `journal tail 2 0`, `hk period 2 0 1000`. A node
+gets 3 seconds to answer; one that does not is logged as a warning. The reply
+comes back one field per line, after the node it came from:
 
 ```text
 kfsw:~$ status 2

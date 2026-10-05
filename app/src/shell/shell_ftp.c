@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <zephyr/shell/shell.h>
@@ -10,6 +11,7 @@
 #include <kfsw/services/ftp.h>
 
 #include "diagnostics/ftp_diagnostics.h"
+#include "shell_remote.h"
 
 struct ftp_list_context {
 	const struct shell *shell;
@@ -56,6 +58,11 @@ static int print_ftp_error(const struct shell *sh, const char *operation, uint16
 	} else if (result == -EACCES) {
 		shell_error(sh, "FTP %s %u %s: service or storage not ready", operation, node,
 			    path);
+	} else if (kfsw_shell_no_answer(result)) {
+		char what[16];
+
+		(void)snprintf(what, sizeof(what), "ftp %s", operation);
+		(void)kfsw_shell_remote_failed(sh, what, node, result);
 	} else {
 		shell_error(sh, "FTP %s %u %s: FAIL (%d)", operation, node, path, result);
 	}
