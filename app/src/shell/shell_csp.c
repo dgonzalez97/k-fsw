@@ -56,7 +56,6 @@ static int cmd_csp_info(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "hostname: %s", info.hostname);
 	shell_print(sh, "model: %s", info.model);
 	shell_print(sh, "revision: %s", info.revision);
-	shell_print(sh, "date: %s %s", info.build_date, info.build_time);
 	shell_print(sh, "free_buffers: %zu", info.free_buffers);
 
 	return 0;
@@ -140,7 +139,8 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 		return result;
 	}
 
-	shell_print(sh, "CSP ping %lu: success, rtt_ms=%u", node, round_trip_ms);
+	shell_print(sh, "CSP ping %lu: success", node);
+	shell_print(sh, "rtt_ms: %u", round_trip_ms);
 	return 0;
 }
 
@@ -159,15 +159,20 @@ static int cmd_csp_ifstat(const struct shell *sh, size_t argc, char **argv)
 	result = kfsw_csp_interface_stats_read((uint16_t)node, argv[2], KFSW_CSP_PING_TIMEOUT_MS,
 					       &stats);
 	if (result != 0) {
-		shell_error(sh, "CSP ifstat node=%lu interface=%s: failed (%d)", node, argv[2],
-			    result);
+		shell_error(sh, "CSP ifstat %lu %s: failed (%d)", node, argv[2], result);
 		return result;
 	}
-	shell_print(sh, "CSP ifstat node=%lu interface=%s tx=%u rx=%u txerr=%u rxerr=%u drop=%u",
-		    node, stats.name, stats.tx_packets, stats.rx_packets, stats.tx_errors,
-		    stats.rx_errors, stats.dropped_packets);
-	shell_print(sh, "autherr=%u frame=%u txbytes=%u rxbytes=%u irq=%u", stats.auth_errors,
-		    stats.frame_errors, stats.tx_bytes, stats.rx_bytes, stats.interrupts);
+	shell_print(sh, "CSP ifstat %lu %s", node, stats.name);
+	shell_print(sh, "tx: %u", stats.tx_packets);
+	shell_print(sh, "rx: %u", stats.rx_packets);
+	shell_print(sh, "txerr: %u", stats.tx_errors);
+	shell_print(sh, "rxerr: %u", stats.rx_errors);
+	shell_print(sh, "drop: %u", stats.dropped_packets);
+	shell_print(sh, "autherr: %u", stats.auth_errors);
+	shell_print(sh, "frame: %u", stats.frame_errors);
+	shell_print(sh, "txbytes: %u", stats.tx_bytes);
+	shell_print(sh, "rxbytes: %u", stats.rx_bytes);
+	shell_print(sh, "irq: %u", stats.interrupts);
 	return 0;
 }
 
@@ -236,7 +241,6 @@ static int cmd_csp_ident(const struct shell *sh, size_t argc, char **argv)
 		shell_print(sh, "hostname: %s", info.hostname);
 		shell_print(sh, "model: %s", info.model);
 		shell_print(sh, "revision: %s", info.revision);
-		shell_print(sh, "built: %s %s", info.build_date, info.build_time);
 		kfsw_csp_clock_get(&clock);
 		print_clock(sh, "clock", &clock);
 		return 0;
@@ -258,7 +262,10 @@ static int cmd_csp_ident(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "hostname: %s", identity.hostname);
 	shell_print(sh, "model: %s", identity.model);
 	shell_print(sh, "revision: %s", identity.revision);
-	shell_print(sh, "built: %s %s", identity.date, identity.time);
+	/* K-FSW nodes leave it empty; another libcsp node may still send one. */
+	if (identity.date[0] != '\0') {
+		shell_print(sh, "built: %s %s", identity.date, identity.time);
+	}
 
 	/* A second exchange for the clock, which the identity reply doesn't carry. */
 	if (kfsw_csp_clock_read((uint16_t)node, KFSW_CSP_PING_TIMEOUT_MS, &clock) == 0) {

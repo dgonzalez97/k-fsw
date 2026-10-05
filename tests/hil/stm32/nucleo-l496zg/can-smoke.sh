@@ -66,7 +66,9 @@ timeout 90 "$ground_exe" --uart_stdinout "--can-if=$interface" --stop_at=45.0 --
 sed -i 's/\x1b\[[0-9;]*[A-Za-z]//g' "$work/session.log"
 
 grep -q "^CAN addr=" "$work/session.log" || fail "the ground node registered no CAN interface"
-rtt="$(sed -n "s/^CSP ping $flight: success, rtt_ms=\([0-9]*\).*/\1/p" "$work/session.log" | head -1)"
+rtt="$(tr -d '\r' <"$work/session.log" |
+	awk -v head="CSP ping $flight: success" '$0 == head { found = 1; next }
+	     found && /^rtt_ms: / { print $2; exit }')"
 [[ -n "$rtt" ]] || fail "no ping reply from node $flight over CAN"
 grep -q "hostname: kfsw-$flight" "$work/session.log" ||
 	fail "node $flight did not identify itself"

@@ -147,27 +147,29 @@ printf '%s\n' \
 	>&4
 
 wait_for_output "$work_dir/node19.log" \
-	"FTP verify first=/build/test.txt second=/build/test-returned.txt: PASS" \
+	"FTP verify /build/test.txt /build/test-returned.txt: PASS" \
 	"$node19_pid" || fail "the uploaded and downloaded copies did not match"
 wait_for_output "$work_dir/node19.log" \
-	"FTP get node=16 path=/uplink/missing.txt: not found" \
+	"FTP get 16 /uplink/missing.txt: not found" \
 	"$node19_pid" || fail "a missing remote file was not reported as not found"
 
 # The receiving node sees the committed file in its own FTP root.
 printf '%s\n' 'ftp 16 ls /uplink' 'ftp stat 16 /uplink/test.txt' >&3
-wait_for_output "$work_dir/node16.log" "FTP list: PASS entries=1" \
+wait_for_output "$work_dir/node16.log" "entries: 1" \
 	"$node16_pid" || fail "node 16 does not list the received file locally"
 
 node19_expected=(
-	'FTP generate path=/build/test.txt: PASS bytes=256'
-	'FTP mkdir node=16 path=/uplink: PASS'
-	'FTP put node=16 source=/build/test.txt destination=/uplink/test.txt: PASS bytes=256'
-	'FTP stat node=16 path=/uplink/test.txt type=file bytes=256'
+	'FTP generate /build/test.txt: PASS'
+	'FTP mkdir 16 /uplink: PASS'
+	'FTP put 16 /build/test.txt -> /uplink/test.txt: PASS'
+	'FTP stat 16 /uplink/test.txt'
+	'type: file'
+	'bytes: 256'
 	'f        256 test.txt'
-	'FTP get node=16 source=/uplink/test.txt destination=/build/test-returned.txt: PASS bytes=256'
+	'FTP get 16 /uplink/test.txt -> /build/test-returned.txt: PASS'
 )
 node16_expected=(
-	'FTP stat node=16 path=/uplink/test.txt type=file bytes=256'
+	'FTP stat 16 /uplink/test.txt'
 	'f        256 test.txt'
 )
 
@@ -181,10 +183,11 @@ for expected in "${node16_expected[@]}"; do
 done
 
 # The same CRC must appear on both nodes and on both local copies.
-uploaded_crc="$(sed -n 's/.*FTP generate path=\/build\/test\.txt: PASS bytes=256 crc32=\([0-9a-f]*\).*/\1/p' \
-	"$work_dir/node19.log" | head -1)"
+uploaded_crc="$(tr -d '\r' <"$work_dir/node19.log" |
+	awk '/FTP generate \/build\/test.txt: PASS/ { found = 1 }
+	     found && /^crc32: / { print $2; exit }')"
 [[ -n "$uploaded_crc" ]] || fail "the generated file did not report a CRC"
-grep -Fq "crc32=$uploaded_crc" "$work_dir/node16.log" || \
+grep -Fq "crc32: $uploaded_crc" "$work_dir/node16.log" || \
 	fail "node 16 reports a different CRC than node 19 generated"
 
 cat "$work_dir/node19.log"

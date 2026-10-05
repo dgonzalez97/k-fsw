@@ -68,7 +68,7 @@ expect 'dataset.bin' 'the dataset is where file transfer can fetch it'
 expect 'selected: 1' 'a one-sequence window selects one sample'
 expect 'selected: 0' 'a window past the end selects nothing'
 # -30 is -EROFS: /hk is served read-only.
-expect 'path=/hk/evil: FAIL (-30)' 'the ground cannot write under /hk'
+expect '/hk/evil: FAIL (-30)' 'the ground cannot write under /hk'
 
 if [[ "$(grep -ac 'report0.bin' "$work_dir/out.log")" -ge 2 ]]; then
 	printf '  [FAIL] the file outlived its definition\n' >&2

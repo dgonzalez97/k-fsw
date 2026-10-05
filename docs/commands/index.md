@@ -70,7 +70,9 @@ uptime_ms: 10
 ```
 
 Role and name are labels set in the build. `time` is time since boot; wall
-time is in `csp clock`.
+time is in `csp clock`. An image is identified by its revision, the `git
+describe` of the build; no compile date is reported, because the date a file
+was compiled says little about the image it ends up in.
 
 ## Logging
 
@@ -131,8 +133,8 @@ and its read counters.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `csp info` | none | Local address, identity, build date and free buffers |
-| `csp ident` | `[node]` | Hostname, model, revision, build date and clock |
+| `csp info` | none | Local address, identity, revision and free buffers |
+| `csp ident` | `[node]` | Hostname, model, revision and clock |
 | `csp interfaces` | none | Interfaces with addresses and packet, error and drop counters |
 | `csp ifstat` | `<node> <interface>` | Remote interface packet/byte/error counters |
 | `csp routes` | none | Route table |
@@ -145,7 +147,8 @@ and its read counters.
 kfsw:~$ csp routes
 0/0 -> KISS direct
 kfsw:~$ csp ping 2
-CSP ping 2: success, rtt_ms=...
+CSP ping 2: success
+rtt_ms: ...
 ```
 
 `csp debug on` logs each packet's source and destination node and port,
@@ -158,7 +161,8 @@ CSP packet trace: on
 kfsw:~$ csp ping 2
 [INFO] OUT: S 33, D 2, Dp 1, Sp 17, Pr 2, Fl 0x01, Sz 10 VIA: CAN (2), Tms 51060
 [INFO] INP: S 2, D 33, Dp 17, Sp 1, Pr 2, Fl 0x01, Sz 14 VIA: CAN, Tms 51120
-CSP ping 2: success, rtt_ms=60
+CSP ping 2: success
+rtt_ms: 60
 ```
 
 With several links, `csp routes` shows the interface and next hop of each

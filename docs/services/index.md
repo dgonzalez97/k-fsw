@@ -46,6 +46,14 @@ Revisions: app:1ba96309fb plat:31818d2c37 svc:919c4c43ba comms:d35abd4986 mod:b4
 Read `boot_revisions` from table 32. A trailing `+` marks a repository with
 uncommitted changes at build time.
 
+### Restart count
+
+`boot_count` in table 32 counts restarts across the life of the node. It is
+saved only when a parameter snapshot already exists: a new flash, or one
+cleared with `param clear`, keeps nothing stored, which is the state to recover
+from a bad saved value. Until something saves a snapshot, every restart counts
+as the first; `param save` starts the count.
+
 ## Housekeeping
 
 Reports collect local and remote parameters. A periodic report keeps its
@@ -820,8 +828,10 @@ monotonic timestamp, a sequence number, a severity and a small payload. Event
 IDs and payloads can be decoded without parsing console text.
 
 ```text
-log    "FTP put node=2 destination=/uplink/test.txt: PASS bytes=256 crc32=0ce9d363"
-event  source=ftp id=1 payload={node:2, bytes:256, crc32:0x0ce9d363}
+console  FTP put 2 /build/test.txt -> /uplink/test.txt: PASS
+         bytes: 256
+         crc32: 0ce9d363
+event    source=ftp id=1 payload={node:2, bytes:256, crc32:0x0ce9d363}
 ```
 
 Sequence gaps identify missing events.
