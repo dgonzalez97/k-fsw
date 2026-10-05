@@ -312,10 +312,11 @@ local-only composition.
 
 ### Tables
 
-A parameter is addressed by table and offset. Table numbers are split in
-bands:
+A parameter is addressed by table and offset. Table numbers are split by the
+layer that defines the table, which `param tables` shows in its `layer`
+column:
 
-| Band | Used by |
+| Numbers | Used by |
 | --- | --- |
 | 0 | Reserved, never valid |
 | 1-24 | Application, platform and comms |
@@ -328,7 +329,11 @@ are unique inside a table. Names are unique on the node and up to
 `KFSW_PARAM_NAME_MAX` (32) characters; a longer name is refused at
 registration.
 
-| ID | Band | Name | Source |
+A definition set can carry a `description`, one short line saying what the
+table holds; `param tables` prints it in its `holds` column. Every table in
+the five repositories has one, and a new table should too.
+
+| ID | Layer | Name | Source |
 | --- | --- | --- | --- |
 | 1 | core | `board` | `k-fsw/app/src/parameters/board_table.c` |
 | 2 | core | `system` | `k-fsw/app/src/parameters/system_table.c` |
@@ -851,7 +856,7 @@ Read another node's events with `event stats <node>` and
 ## Modules
 
 `kfsw-modules` holds the code for a specific device or subsystem, built on
-these services. Each module has its own parameter table, in the 50 to 99 band.
+these services. Each module has its own parameter table, numbered 50 to 99.
 
 | Module | Table | What it is |
 | --- | --- | --- |

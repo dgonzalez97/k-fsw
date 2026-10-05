@@ -232,18 +232,21 @@ packets leave on USART3; don't connect the shell terminal to the CSP UART.
 | `param set` | `[node] <name> <value>` | Write a value |
 
 Three views of the same parameters, from the widest to the most detailed:
-`tables` says which tables exist, `table` shows one, `list` shows them all.
+`tables` says which tables exist, `table` shows one, `list` shows them all. `layer` says which part of K-FSW defines the table, `kept` how many of its
+values are saved, and `holds` what is in it. Table names are not sent over the
+link, so for another node the names and descriptions come from this build,
+whose table numbers are the same.
 
 ```text
 kfsw:~$ param tables
- id  band     name        params    kept
----  -------  ----------  ------  ------
-  1  core     board           11       0
-  2  core     system           3       3
-  3  core     telemetry        5       0
-  4  core     csp              8       0
-  5  core     storage          4       0
- 25  service  log              5       2
+ id  layer    name          params  kept  holds
+---  -------  ------------  ------  ----  -----
+  1  core     board             11     0  Node identity and what the board carries
+  2  core     system             3     3  Boot delay, report period, reboot pin
+  3  core     telemetry          5     0  Uptime, storage and CSP buffers
+  4  core     csp               15     0  CSP counters and the route table
+  5  core     storage            4     0  Filesystem size, free space, mount
+ 25  service  log                5     2  Log levels, colour and counters
 ```
 
 ```text
