@@ -4,6 +4,7 @@
 
 #include <zephyr/devicetree.h>
 #include <zephyr/fs/fs.h>
+#include <zephyr/fs/littlefs.h>
 #include <zephyr/storage/flash_map.h>
 #include <zephyr/ztest.h>
 
@@ -119,6 +120,48 @@ ZTEST(platform_storage, test_unmounted_state_is_reported)
 	zassert_equal(info.total_bytes, 0U, "unmounted total capacity is nonzero");
 	zassert_equal(info.free_bytes, 0U, "unmounted free capacity is nonzero");
 	zassert_ok(kfsw_storage_mount(), "remount failed");
+}
+
+FS_LITTLEFS_DECLARE_CUSTOM_CONFIG(stale_littlefs, 4, 512, 512, 512, 8);
+
+/* A file left on the RAM disk before the mount, as SRAM2 keeps one across a reset. */
+static void leave_stale_file(void)
+{
+	struct fs_mount_t stale = {
+		.type = FS_LITTLEFS,
+		.fs_data = &stale_littlefs,
+		.storage_dev = (void *)"TMP",
+		.mnt_point = "/stale",
+		.flags = FS_MOUNT_FLAG_USE_DISK_ACCESS,
+	};
+	struct fs_file_t file;
+
+	zassert_ok(fs_mount(&stale));
+	fs_file_t_init(&file);
+	zassert_ok(fs_open(&file, "/stale/left.bin", FS_O_CREATE | FS_O_WRITE));
+	zassert_equal(fs_write(&file, "x", 1U), 1);
+	zassert_ok(fs_close(&file));
+	zassert_ok(fs_unmount(&stale));
+}
+
+ZTEST(platform_storage, test_tmp_starts_empty)
+{
+	struct kfsw_storage_info info;
+	struct fs_dirent entry;
+
+	leave_stale_file();
+	zassert_ok(kfsw_storage_tmp_mount());
+	zassert_equal(fs_stat(KFSW_STORAGE_TMP_MOUNT_POINT "/left.bin", &entry), -ENOENT);
+
+	zassert_ok(fs_mkdir(KFSW_STORAGE_TMP_MOUNT_POINT "/kept"));
+	zassert_ok(kfsw_storage_tmp_mount(), "a second call while mounted is harmless");
+	zassert_ok(fs_stat(KFSW_STORAGE_TMP_MOUNT_POINT "/kept", &entry));
+
+	zassert_ok(kfsw_storage_get_tmp_info(&info));
+	zassert_true(info.ready);
+	zassert_str_equal(info.mount_point, KFSW_STORAGE_TMP_MOUNT_POINT);
+	zassert_equal(info.total_bytes, 32U * 1024U);
+	zassert_true((info.free_bytes > 0U) && (info.free_bytes < info.total_bytes));
 }
 
 ZTEST_SUITE(platform_storage, NULL, storage_setup, NULL, NULL, NULL);

@@ -384,10 +384,10 @@ wait_for_output "$work_dir/nucleo.log" "recorded: " "$debug_capture_pid" || \
 # run; the upload replaces the file.
 printf '%s\n' \
 	'ftp generate /build/test.txt 256' \
-	'ftp 2 mkdir /uplink' \
+	'ftp mkdir 2 /uplink' \
 	'ftp put 2 /build/test.txt /uplink/test.txt' \
 	'ftp stat 2 /uplink/test.txt' \
-	'ftp 2 ls /uplink' \
+	'ftp ls 2 /uplink' \
 	'ftp get 2 /uplink/test.txt /build/test-returned.txt' \
 	'ftp verify /build/test.txt /build/test-returned.txt' \
 	'ftp get 2 /uplink/missing.txt /build/missing.txt' >&3
@@ -422,7 +422,7 @@ wait_for_output "$work_dir/ground.log" \
 	fail "a missing remote file was not reported as not found"
 
 # The flight node sees the committed file in its own FTP root.
-printf '%s\r\n' 'ftp 2 ls /uplink' 'ftp stat 2 /uplink/test.txt' >"$debug_serial"
+printf '%s\r\n' 'ftp ls 2 /uplink' 'ftp stat 2 /uplink/test.txt' >"$debug_serial"
 wait_for_output "$work_dir/nucleo.log" "crc32: $uploaded_crc" \
 	"$debug_capture_pid" || \
 	fail "NUCLEO does not report the received file in its own FTP root"

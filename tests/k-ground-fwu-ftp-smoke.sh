@@ -195,13 +195,13 @@ wait_for_output "$work_dir/node19.log" "FTP put" "$node19_pid" "$TRANSFER_LIMIT_
 	fail "the put did not complete"
 
 # The image must go to the update service, not into the transfer root.
-printf '%s\n' 'fwu status' 'ftp 16 ls /' >&3
+printf '%s\n' 'fwu status' 'ftp ls 16 /' >&3
 wait_for_output "$work_dir/node16.log" "received: 20000" "$node16_pid" || \
 	fail "the update service did not receive the image"
 wait_for_output "$work_dir/node16.log" "actual_crc32: $image_crc" "$node16_pid" || \
 	fail "the received image does not match what was sent"
 
-if sed -n '/ftp 16 ls \//,$p' "$work_dir/node16.log" | grep -aq "firmware.bin"; then
+if sed -n '/ftp ls 16 \//,$p' "$work_dir/node16.log" | grep -aq "firmware.bin"; then
 	fail "the image was stored as a file instead of reaching the update service"
 fi
 

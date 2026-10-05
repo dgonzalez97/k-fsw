@@ -40,14 +40,14 @@ KFSW Linux Transfers Files Through Remote CSP Node
     Execute KFSW Command
     ...    ftp generate /build/robot.bin 1024
     ...    FTP generate /build/robot.bin: PASS
-    Execute KFSW Command    ftp 2 mkdir /robot    FTP mkdir 2 /robot: PASS
+    Execute KFSW Command    ftp mkdir 2 /robot    FTP mkdir 2 /robot: PASS
     Execute KFSW Command
     ...    ftp put 2 /build/robot.bin /robot/upload.bin
     ...    FTP put 2 /build/robot.bin -> /robot/upload.bin: PASS
     Execute KFSW Command
     ...    ftp stat 2 /robot/upload.bin
     ...    bytes: 1024
-    Execute KFSW Command    ftp 2 ls /robot    entries: 1
+    Execute KFSW Command    ftp ls 2 /robot    entries: 1
     Execute KFSW Command
     ...    ftp get 2 /robot/upload.bin /build/robot-returned.bin
     ...    FTP get 2 /robot/upload.bin -> /build/robot-returned.bin: PASS

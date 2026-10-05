@@ -12,6 +12,15 @@
 		kfsw,storage-partition = &storage_partition;
 		/* Always set; it costs nothing when the update service is not built in. */
 		kfsw,fwu-partition = &slot1_partition;
+		kfsw,tmp-disk = &tmp_disk;
+	};
+
+	/* 32 KB of RAM behind /kfsw/tmp, formatted at every boot. */
+	tmp_disk: tmp-disk {
+		compatible = "zephyr,ram-disk";
+		disk-name = "TMP";
+		sector-size = <512>;
+		sector-count = <64>;
 	};
 };
 

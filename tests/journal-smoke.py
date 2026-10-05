@@ -82,7 +82,7 @@ def main():
         unknown_command(node.device, args.node, args.baud)
         settled(node, 2)
         first = read_record(node)
-        assert (first['src'], first['id'], first['sev']) == ('2', '2', '1'), first
+        assert (first['src'], first['id'], first['sev']) == ('command', '2', '1'), first
         timing = fields(node, 'journal time 0', 'valid')
         assert remote_record(node.device, args.node, 0, args.baud) == first
         if args.expected_previous_boot is not None:
@@ -94,7 +94,7 @@ def main():
         with NativeNode(args.executable, args.output / 'second', flash) as node:
             settled(node, 3)
             boot = read_record(node)
-            assert (boot['boot'], boot['src'], boot['id']) == ('2', '1', '1'), boot
+            assert (boot['boot'], boot['src'], boot['id']) == ('2', 'boot', '1'), boot
             assert read_record(node, 1) == first
             assert remote_record(node.device, 1, 1, args.baud) == first
             assert fields(node, 'journal time 1', 'valid') == timing

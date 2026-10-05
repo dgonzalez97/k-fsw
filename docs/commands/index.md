@@ -133,7 +133,7 @@ and its read counters.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `csp info` | none | Local address, identity, revision and free buffers |
+| `csp info` | none | Local address, identity, revision, libcsp tag, CSP protocol version and free buffers |
 | `csp ident` | `[node]` | Hostname, model, revision and clock |
 | `csp interfaces` | none | Interfaces with addresses and packet, error and drop counters |
 | `csp ifstat` | `<node> <interface>` | Remote interface packet/byte/error counters |
@@ -162,7 +162,7 @@ kfsw:~$ csp ping 2
 [INFO] OUT: S 33, D 2, Dp 1, Sp 17, Pr 2, Fl 0x01, Sz 10 VIA: CAN (2), Tms 51060
 [INFO] INP: S 2, D 33, Dp 17, Sp 1, Pr 2, Fl 0x01, Sz 14 VIA: CAN, Tms 51120
 CSP ping 2: success
-rtt_ms: 60
+rtt_ms: 60.000
 ```
 
 With several links, `csp routes` shows the interface and next hop of each
@@ -323,9 +323,14 @@ mount_point: /kfsw
 ready: yes
 total_bytes: 262144
 free_bytes: 237568
+tmp_mount_point: /kfsw/tmp
+tmp_ready: yes
+tmp_total_bytes: 32768
+tmp_free_bytes: 31744
 ```
 
-`storage test` writes to flash. `storage info` only reads.
+`storage test` writes to flash. `storage info` only reads. The `tmp_` lines
+are the RAM volume, formatted at every boot.
 
 ## File transfer
 
@@ -333,21 +338,49 @@ Paths are virtual and rooted at `/kfsw/ftp` on the node.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `ftp <node> ls` | `[directory]` | List a directory; `list` also works |
-| `ftp <node> stat` | `<path>` | Type, size and CRC |
-| `ftp <node> mkdir` | `<directory>` | Create a directory |
-| `ftp <node> put` | `<local> <remote>` | Upload a file |
-| `ftp <node> get` | `<remote> <local>` | Download a file |
+| `ftp ls` | `[node] [directory]` | List a directory |
+| `ftp stat` | `[node] <path>` | Kind, size and CRC |
+| `ftp mkdir` | `[node] <directory>` | Create a directory |
+| `ftp put` | `<node> <local> <remote>` | Upload a file |
+| `ftp get` | `<node> <remote> <local>` | Download a file |
 | `ftp generate` | `<path> <bytes>` | Create a test file of up to 32768 bytes |
 | `ftp verify` | `<first> <second>` | Compare two local files |
 
-The verb can also go first, `ftp put <node> ...`, which is the form Tab
-completion shows. `ls`, `stat` and `mkdir` work on the node's own address
-without a connection; `put` and `get` need another node.
+Without a node, `ls`, `stat` and `mkdir` act on this node, without a
+connection; `put` and `get` need another node. A transfer that would leave
+less than `CONFIG_KFSW_FTP_SPACE_MARGIN_BYTES` (4096) free on its volume is
+refused before any data moves: `not enough free space`.
+
+Listing `/` also shows these directories when they exist:
+
+| Directory | Holds | Writable |
+| --- | --- | --- |
+| `boot` | firmware slots, see [firmware update](../fwu/README.md) | no |
+| `hk` | housekeeping sample files | no |
+| `tmp` | 32 KB of RAM, empty after every boot | yes |
+
+Each entry starts with its kind:
+
+| Kind | Meaning |
+| --- | --- |
+| `dir` | directory |
+| `file` | file |
+| `img` | firmware image, in `/boot` |
+| `hk` | housekeeping samples, in `/hk` |
+| `proc` | procedure, in `/procedures` |
+
+```text
+kfsw:~$ ftp ls /
+FTP ls 1 /
+dir           0 build
+dir           0 boot
+dir           0 tmp
+entries: 3
+```
 
 ```text
 kfsw:~$ ftp generate /build/sample.bin 1024
-kfsw:~$ ftp 2 mkdir /exchange
+kfsw:~$ ftp mkdir 2 /exchange
 kfsw:~$ ftp put 2 /build/sample.bin /exchange/sample.bin
 kfsw:~$ ftp stat 2 /exchange/sample.bin
 kfsw:~$ ftp get 2 /exchange/sample.bin /build/returned.bin

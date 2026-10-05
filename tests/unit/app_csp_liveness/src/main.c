@@ -31,14 +31,14 @@ void kfsw_csp_get_info(struct kfsw_csp_info *info)
 	};
 }
 
-int kfsw_csp_ping(uint16_t node, uint32_t timeout_ms, size_t payload_size, uint32_t *round_trip_ms)
+int kfsw_csp_ping(uint16_t node, uint32_t timeout_ms, size_t payload_size, uint32_t *round_trip_us)
 {
 	ARG_UNUSED(payload_size);
 
 	ping_node = node;
 	ping_timeout_ms = timeout_ms;
-	if (ping_result == 0 && round_trip_ms != NULL) {
-		*round_trip_ms = 1U;
+	if (ping_result == 0 && round_trip_us != NULL) {
+		*round_trip_us = 1U;
 	}
 	return ping_result;
 }

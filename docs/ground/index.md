@@ -149,7 +149,7 @@ kfsw-ops# ftp generate /build/test.txt 256
 FTP generate /build/test.txt: PASS
 bytes: 256
 crc32: 0ce9d363
-kfsw-ops# ftp 16 mkdir /uplink
+kfsw-ops# ftp mkdir 16 /uplink
 FTP mkdir 16 /uplink: PASS
 kfsw-ops# ftp put 16 /build/test.txt /uplink/test.txt
 FTP put 16 /build/test.txt -> /uplink/test.txt: PASS
@@ -175,9 +175,9 @@ The same CRC on both nodes and on the returned copy means the file came back
 unchanged. The gateway can list its own files without a connection:
 
 ```text
-kfsw-gnd-uhf# ftp 16 ls /uplink
-FTP list 16 /uplink
-f        256 test.txt
+kfsw-gnd-uhf# ftp ls 16 /uplink
+FTP ls 16 /uplink
+file        256 test.txt
 entries: 1
 ```
 

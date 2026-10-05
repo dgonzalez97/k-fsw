@@ -56,4 +56,4 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 		      cmd_journal_time, 2, NODE_ARGS),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(journal, &journal_commands, "K-FSW persistent event journal.", NULL);
+SHELL_CMD_REGISTER(journal, &journal_commands, "Persistent event journal.", NULL);

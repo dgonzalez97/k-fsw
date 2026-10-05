@@ -57,19 +57,20 @@ Paths are virtual and rooted at `/kfsw/ftp`. The service creates
 native node can't be reached.
 
 ```text
-ftp <node> mkdir <remote-directory>
-ftp <node> ls [remote-directory]
-ftp <node> stat <remote-path>
-ftp <node> put <local-path> <remote-path>
-ftp <node> get <remote-path> <local-path>
+ftp mkdir [node] <directory>
+ftp ls [node] [directory]
+ftp stat [node] <path>
+ftp put <node> <local-path> <remote-path>
+ftp get <node> <remote-path> <local-path>
 ```
 
-The verb can also go first, `ftp put <node> ...`, which is the form Tab
-completion shows. `ls` is the same as `list`:
+Without a node, `mkdir`, `ls` and `stat` act on this node. Listing `/` also
+shows `boot`, the firmware slots, and `hk`, the housekeeping files, when they
+exist; both are read-only.
 
 ```text
-ftp 7 put /build/sample.txt /flash/sample.txt
-ftp 7 ls /flash
+ftp put 7 /build/sample.txt /flash/sample.txt
+ftp ls 7 /flash
 ```
 
 `ftp generate <path> <bytes>` creates a test file and

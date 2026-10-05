@@ -64,6 +64,8 @@ static int cmd_csp_info(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "hostname: %s", info.hostname);
 	shell_print(sh, "model: %s", info.model);
 	shell_print(sh, "revision: %s", info.revision);
+	shell_print(sh, "libcsp: %s", info.libcsp);
+	shell_print(sh, "protocol: CSP v%u", info.protocol);
 	shell_print(sh, "free_buffers: %zu", info.free_buffers);
 
 	return 0;
@@ -121,7 +123,7 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 {
 	struct kfsw_csp_info info;
 	unsigned long node;
-	uint32_t round_trip_ms;
+	uint32_t round_trip_us;
 	int parse_error = 0;
 	int result;
 
@@ -141,13 +143,13 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 
 	/* Pinging this node goes through the loopback interface. */
 	result = kfsw_csp_ping((uint16_t)node, KFSW_CSP_PING_TIMEOUT_MS, KFSW_CSP_PING_PAYLOAD_SIZE,
-			       &round_trip_ms);
+			       &round_trip_us);
 	if (result != 0) {
 		return kfsw_shell_remote_failed(sh, "csp ping", (uint16_t)node, as_errno(result));
 	}
 
 	shell_print(sh, "CSP ping %lu: success", node);
-	shell_print(sh, "rtt_ms: %u", round_trip_ms);
+	shell_print(sh, "rtt_ms: %u.%03u", round_trip_us / 1000U, round_trip_us % 1000U);
 	return 0;
 }
 
@@ -395,4 +397,4 @@ SHELL_STATIC_SUBCMD_SET_CREATE(csp_commands,
 	SHELL_CMD_ARG(routes, NULL, "Show the CSP static routing table.", cmd_csp_routes, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(csp, &csp_commands, "K-FSW CSP commands.", NULL);
+SHELL_CMD_REGISTER(csp, &csp_commands, "CSP commands.", NULL);

@@ -515,9 +515,10 @@ counters.
 
 ## Storage
 
-K-FSW mounts one [LittleFS](https://github.com/littlefs-project/littlefs)
-volume at `/kfsw`. The platform layer handles init, mount, unmount and
-capacity. Once it is mounted, services use the normal Zephyr
+K-FSW mounts a [LittleFS](https://github.com/littlefs-project/littlefs)
+volume in flash at `/kfsw` and, where the composition has a RAM disk, a 32 KB
+scratch volume at `/kfsw/tmp` that `kfsw_storage_tmp_mount()` formats at every
+boot. The platform layer handles init, mount, unmount and capacity. Once it is mounted, services use the normal Zephyr
 [filesystem API](https://docs.zephyrproject.org/4.4.0/services/file_system/index.html).
 
 The partition is selected with the `kfsw,storage-partition` devicetree
@@ -560,12 +561,27 @@ FTP path              Zephyr path
 
 Paths are up to 96 bytes. Relative paths, empty components, `.` and `..`,
 backslashes, control characters and embedded NULs are rejected. The sandbox is
-not access control. `/hk` is a second, read-only root with the housekeeping
-sample files.
+not access control. Three more roots sit beside it, and a listing of `/` shows
+each one that exists as a directory:
+
+| Path | Volume | Writable |
+| --- | --- | --- |
+| `/hk` | housekeeping sample files, in flash | no |
+| `/boot` | firmware slots, with `CONFIG_KFSW_FWU_FILES` | no |
+| `/tmp` | `/kfsw/tmp`, RAM, with `CONFIG_KFSW_STORAGE_TMP` | yes |
+
+`/tmp` is LittleFS on a RAM disk, formatted at every boot; nothing in it
+survives a reset. The composition picks the disk with the `kfsw,tmp-disk`
+chosen node: 32 KB in the Linux composition and in SRAM2 on the NUCLEO.
+
+A transfer that would leave less than `CONFIG_KFSW_FTP_SPACE_MARGIN_BYTES`
+(4096 by default) free on its destination volume is refused with `-ENOSPC`
+before the partial file is created. The firmware upload path writes the slot
+and is not checked.
 
 ### The local node
 
-`list`, `stat` and `mkdir` addressed to the node's own CSP address run
+`ls`, `stat` and `mkdir` addressed to the node's own CSP address run
 directly on local storage, without a connection or a route. They need storage
 mounted and the service started, otherwise they return `-EACCES`. `put` and
 `get` need two nodes and return `-ENOTSUP` for the local address.

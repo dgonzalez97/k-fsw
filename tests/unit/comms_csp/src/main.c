@@ -42,11 +42,11 @@ ZTEST(comms_csp_state, test_reports_configured_identity_before_init)
 
 ZTEST(comms_csp_state, test_rejects_operations_before_init)
 {
-	uint32_t round_trip_ms = UINT32_MAX;
+	uint32_t round_trip_us = UINT32_MAX;
 
 	zassert_equal(kfsw_csp_start(), CSP_ERR_INVAL);
-	zassert_equal(kfsw_csp_ping(1U, 10U, 1U, &round_trip_ms), CSP_ERR_INVAL);
-	zassert_equal(round_trip_ms, UINT32_MAX);
+	zassert_equal(kfsw_csp_ping(1U, 10U, 1U, &round_trip_us), CSP_ERR_INVAL);
+	zassert_equal(round_trip_us, UINT32_MAX);
 	struct kfsw_csp_interface_stats stats;
 	zassert_equal(kfsw_csp_interface_stats_read(1, "KISS", 10, &stats), -ENETDOWN);
 }

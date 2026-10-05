@@ -67,6 +67,12 @@ expect 'Extracted' 'the selected samples become a dataset file'
 expect 'dataset.bin' 'the dataset is where file transfer can fetch it'
 expect 'selected: 1' 'a one-sequence window selects one sample'
 expect 'selected: 0' 'a window past the end selects nothing'
+if grep -aEq '^hk +[0-9]+ report0\.bin' "$work_dir/out.log"; then
+	printf '  [ok]   %s\n' 'ftp ls names it a housekeeping file'
+else
+	printf '  [FAIL] %s\n' 'ftp ls names it a housekeeping file' >&2
+	failures=$((failures + 1))
+fi
 # -30 is -EROFS: /hk is served read-only.
 expect '/hk/evil: FAIL (-30)' 'the ground cannot write under /hk'
 

@@ -2,6 +2,15 @@
 	chosen {
 		kfsw,fwu-partition = &slot1_partition;
 		kfsw,storage-partition = &storage_partition;
+		kfsw,tmp-disk = &tmp_disk;
+	};
+
+	/* RAM volume behind /kfsw/tmp. */
+	tmp_disk: tmp-disk {
+		compatible = "zephyr,ram-disk";
+		disk-name = "TMP";
+		sector-size = <512>;
+		sector-count = <64>;
 	};
 };
 

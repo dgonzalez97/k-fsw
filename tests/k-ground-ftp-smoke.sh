@@ -137,10 +137,10 @@ wait_for_output "$work_dir/node16.log" "CSP ping 19: success" "$node16_pid" || \
 # The operator node drives the whole round trip.
 printf '%s\n' \
 	'ftp generate /build/test.txt 256' \
-	'ftp 16 mkdir /uplink' \
+	'ftp mkdir 16 /uplink' \
 	'ftp put 16 /build/test.txt /uplink/test.txt' \
 	'ftp stat 16 /uplink/test.txt' \
-	'ftp 16 ls /uplink' \
+	'ftp ls 16 /uplink' \
 	'ftp get 16 /uplink/test.txt /build/test-returned.txt' \
 	'ftp verify /build/test.txt /build/test-returned.txt' \
 	'ftp get 16 /uplink/missing.txt /build/missing.txt' \
@@ -154,7 +154,7 @@ wait_for_output "$work_dir/node19.log" \
 	"$node19_pid" || fail "a missing remote file was not reported as not found"
 
 # The receiving node sees the committed file in its own FTP root.
-printf '%s\n' 'ftp 16 ls /uplink' 'ftp stat 16 /uplink/test.txt' >&3
+printf '%s\n' 'ftp ls 16 /uplink' 'ftp stat 16 /uplink/test.txt' >&3
 wait_for_output "$work_dir/node16.log" "entries: 1" \
 	"$node16_pid" || fail "node 16 does not list the received file locally"
 
@@ -165,12 +165,12 @@ node19_expected=(
 	'FTP stat 16 /uplink/test.txt'
 	'type: file'
 	'bytes: 256'
-	'f        256 test.txt'
+	'file        256 test.txt'
 	'FTP get 16 /uplink/test.txt -> /build/test-returned.txt: PASS'
 )
 node16_expected=(
 	'FTP stat 16 /uplink/test.txt'
-	'f        256 test.txt'
+	'file        256 test.txt'
 )
 
 for expected in "${node19_expected[@]}"; do

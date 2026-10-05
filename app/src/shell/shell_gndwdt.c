@@ -20,6 +20,20 @@ static const char *state_name(const struct kfsw_gndwdt_status *status)
 	return status->enabled ? "armed" : "disarmed";
 }
 
+static int show_local(const struct shell *sh)
+{
+	struct kfsw_gndwdt_status status;
+
+	kfsw_gndwdt_get_status(&status);
+	shell_print(sh, "state: %s", state_name(&status));
+	shell_print(sh, "ground_wtd_timeout: %u", status.timeout_s);
+	shell_print(sh, "ground_wtd_cnt: %u", status.remaining_s);
+	shell_print(sh, "since_contact_s: %u", status.since_contact_s);
+	shell_print(sh, "contacts: %u last_node: %u", status.contacts, status.last_node);
+	shell_print(sh, "expiries: %u", status.expiries);
+	return 0;
+}
+
 #if CONFIG_KFSW_COMMAND_CSP
 static int remote(const struct shell *sh, const char *node_text, bool feed)
 {
@@ -32,6 +46,9 @@ static int remote(const struct shell *sh, const char *node_text, bool feed)
 		return outcome;
 	}
 	outcome = kfsw_gndwdt_remote(node, feed, &result);
+	if ((outcome == -EINVAL) && !feed) {
+		return show_local(sh);
+	}
 	if (outcome == -EINVAL) {
 		shell_error(sh, "Node %u is this node; its watchdog is fed from elsewhere", node);
 		return outcome;
@@ -63,8 +80,6 @@ static int cmd_gndwdt_feed(const struct shell *sh, size_t argc, char **argv)
 
 static int cmd_gndwdt_show(const struct shell *sh, size_t argc, char **argv)
 {
-	struct kfsw_gndwdt_status status;
-
 #if CONFIG_KFSW_COMMAND_CSP
 	if (argc == 2U) {
 		return remote(sh, argv[1], false);
@@ -73,15 +88,7 @@ static int cmd_gndwdt_show(const struct shell *sh, size_t argc, char **argv)
 	ARG_UNUSED(argc);
 #endif
 	ARG_UNUSED(argv);
-
-	kfsw_gndwdt_get_status(&status);
-	shell_print(sh, "state: %s", state_name(&status));
-	shell_print(sh, "ground_wtd_timeout: %u", status.timeout_s);
-	shell_print(sh, "ground_wtd_cnt: %u", status.remaining_s);
-	shell_print(sh, "since_contact_s: %u", status.since_contact_s);
-	shell_print(sh, "contacts: %u last_node: %u", status.contacts, status.last_node);
-	shell_print(sh, "expiries: %u", status.expiries);
-	return 0;
+	return show_local(sh);
 }
 
 static int cmd_gndwdt_arm(const struct shell *sh, size_t argc, char **argv)
@@ -134,4 +141,4 @@ SHELL_STATIC_SUBCMD_SET_CREATE(gndwdt_commands,
 		      cmd_gndwdt_timeout, 2, 0),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(gndwdt, &gndwdt_commands, "K-FSW ground watchdog.", NULL);
+SHELL_CMD_REGISTER(gndwdt, &gndwdt_commands, "Ground watchdog.", NULL);

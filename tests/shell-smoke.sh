@@ -57,10 +57,11 @@ fi
 		'storage test' \
 		'ftp' \
 		'ftp generate' \
-		'ftp 1 mkdir /selfnode' \
-		'ftp 1 ls /' \
+		'ftp mkdir /selfnode' \
+		'ftp ls /' \
+		'ftp mkdir /tmp/scratch' \
 		'ftp stat 1 /selfnode' \
-		'ftp 1 ls /missing' \
+		'ftp ls 1 /missing' \
 		'ftp put 1 /selfnode/a.bin /selfnode/b.bin' \
 		'log test'
 } |
@@ -70,8 +71,8 @@ fi
 cat "$capture_file"
 
 expected_output=(
-	"  status   : Show K-FSW status, here or on a node: status [node]."
-	"  storage  : K-FSW filesystem storage commands."
+	"  status   : Show status, here or on a node: status [node]."
+	"  storage  : Filesystem storage commands."
     '@BOOT '
     '@READY '
     # Not anchored to the prompt, which has colour codes.
@@ -79,12 +80,12 @@ expected_output=(
     # Off by default, and the test turned it on for the completion check above.
     'echo_enabled = 1'
 	'Available commands:'
-	'csp      : K-FSW CSP commands.'
-	'ftp      : K-FSW file transfer:'
-	'param    : K-FSW parameter commands.'
-	'status   : Show K-FSW status, here or on a node: status [node].'
-	'storage  : K-FSW filesystem storage commands.'
-	'version  : Show K-FSW build information.'
+	'csp      : CSP commands.'
+	'ftp      : File transfer. Without a node, this node.'
+	'param    : Parameter commands.'
+	'status   : Show status, here or on a node: status [node].'
+	'storage  : Filesystem storage commands.'
+	'version  : Show build information.'
     'K-FSW status'
 	'Role: flight'
 	'Name: kfsw'
@@ -144,14 +145,19 @@ expected_output=(
 	'ready: yes'
 	'total_bytes: '
 	'Storage test: PASS'
-	'  mkdir     : Create a directory: mkdir <node> <path>; <node> may be this node.'
+	'  mkdir     : Create a directory: mkdir [node] <path>.'
 	'generate: wrong parameter count'
 	'generate - Create deterministic local data: generate <path> <bytes 0..32768>.'
 	'FTP mkdir 1 /selfnode: PASS'
+	# The firmware slots and the RAM volume show in a listing of the root.
+	'dir           0 boot'
+	'dir           0 tmp'
+	'FTP mkdir 1 /tmp/scratch: PASS'
+	'tmp_total_bytes: 32768'
 	'entries: '
 	'FTP stat 1 /selfnode'
-	'type: directory'
-	'FTP list 1 /missing: not found'
+	'type: dir'
+	'FTP ls 1 /missing: not found'
 	'FTP put 1: transfers need two nodes'
     '[ERROR] K-FSW shell log test: error'
     '[WARNING] K-FSW shell log test: warning'

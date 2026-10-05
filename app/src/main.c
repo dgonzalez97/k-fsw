@@ -129,6 +129,14 @@ int main(void)
 	}
 #endif
 
+#if CONFIG_KFSW_STORAGE_TMP
+	result = kfsw_storage_tmp_mount();
+	if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Failed to mount %s: %d", KFSW_STORAGE_TMP_MOUNT_POINT, result);
+	}
+#endif
+
 #if CONFIG_KFSW_PARAM
 	/* Core tables first, then services, then modules, in band order. */
 	const struct kfsw_param_definition_set *const parameter_sets[] = {

@@ -310,10 +310,10 @@ wait_for_output "$work_dir/linux.log" "UART CSP test: PASS" "$linux_pid" || \
 
 printf '%s\n' \
 	'ftp generate /build/hil-4k.bin 4096' \
-	'ftp 2 mkdir /hil' \
+	'ftp mkdir 2 /hil' \
 	'ftp put 2 /build/hil-4k.bin /hil/hil-4k.bin' \
 	'ftp stat 2 /hil/hil-4k.bin' \
-	'ftp 2 ls /hil' \
+	'ftp ls 2 /hil' \
 	'ftp get 2 /hil/hil-4k.bin /build/hil-4k-returned.bin' \
 	'ftp verify /build/hil-4k.bin /build/hil-4k-returned.bin' \
 	'ftp generate /build/hil-16k.bin 16384' \
