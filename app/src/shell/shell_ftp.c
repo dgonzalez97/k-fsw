@@ -44,20 +44,20 @@ static int print_ftp_error(const struct shell *sh, const char *operation, uint16
 			   const char *path, int result)
 {
 	if (result == -ENOENT) {
-		shell_error(sh, "FTP %s node=%u path=%s: not found", operation, node, path);
+		shell_error(sh, "FTP %s %u %s: not found", operation, node, path);
 	} else if (result == -EINVAL || result == -EBADMSG) {
-		shell_error(sh, "FTP %s node=%u path=%s: invalid path/request (%d)", operation,
-			    node, path, result);
+		shell_error(sh, "FTP %s %u %s: invalid path/request (%d)", operation, node, path,
+			    result);
 	} else if (result == -EBUSY) {
-		shell_error(sh, "FTP %s node=%u path=%s: server busy", operation, node, path);
+		shell_error(sh, "FTP %s %u %s: server busy", operation, node, path);
 	} else if (result == -ENOTSUP) {
-		shell_error(sh, "FTP %s node=%u: transfers need two nodes; use a remote node",
-			    operation, node);
+		shell_error(sh, "FTP %s %u: transfers need two nodes; use a remote node", operation,
+			    node);
 	} else if (result == -EACCES) {
-		shell_error(sh, "FTP %s node=%u path=%s: service or storage not ready", operation,
-			    node, path);
+		shell_error(sh, "FTP %s %u %s: service or storage not ready", operation, node,
+			    path);
 	} else {
-		shell_error(sh, "FTP %s node=%u path=%s: FAIL (%d)", operation, node, path, result);
+		shell_error(sh, "FTP %s %u %s: FAIL (%d)", operation, node, path, result);
 	}
 	return result;
 }
@@ -67,12 +67,12 @@ static int ftp_list(const struct shell *sh, uint16_t node, const char *path)
 	struct ftp_list_context context = {.shell = sh};
 	int result;
 
-	shell_print(sh, "FTP list node=%u path=%s", node, (path[0] == '\0') ? "/" : path);
+	shell_print(sh, "FTP list %u %s", node, (path[0] == '\0') ? "/" : path);
 	result = kfsw_ftp_list(node, path, print_ftp_entry, &context);
 	if (result != 0) {
 		return print_ftp_error(sh, "list", node, path, result);
 	}
-	shell_print(sh, "FTP list: PASS entries=%" PRIu32, context.entries);
+	shell_print(sh, "entries: %" PRIu32, context.entries);
 	return 0;
 }
 
@@ -84,9 +84,10 @@ static int ftp_stat(const struct shell *sh, uint16_t node, const char *path)
 	if (result != 0) {
 		return print_ftp_error(sh, "stat", node, path, result);
 	}
-	shell_print(sh, "FTP stat node=%u path=%s type=%s bytes=%" PRIu32 " crc32=%08" PRIx32, node,
-		    path, (info.type == KFSW_FTP_ENTRY_DIRECTORY) ? "directory" : "file", info.size,
-		    info.crc32);
+	shell_print(sh, "FTP stat %u %s", node, path);
+	shell_print(sh, "type: %s", (info.type == KFSW_FTP_ENTRY_DIRECTORY) ? "directory" : "file");
+	shell_print(sh, "bytes: %" PRIu32, info.size);
+	shell_print(sh, "crc32: %08" PRIx32, info.crc32);
 	return 0;
 }
 
@@ -97,7 +98,7 @@ static int ftp_mkdir(const struct shell *sh, uint16_t node, const char *path)
 	if (result != 0) {
 		return print_ftp_error(sh, "mkdir", node, path, result);
 	}
-	shell_print(sh, "FTP mkdir node=%u path=%s: PASS", node, path);
+	shell_print(sh, "FTP mkdir %u %s: PASS", node, path);
 	return 0;
 }
 
@@ -117,11 +118,11 @@ static int ftp_transfer(const struct shell *sh, bool upload, uint16_t node, cons
 	const uint64_t throughput =
 		(info.duration_ms == 0U) ? 0U : ((uint64_t)info.bytes * 1000U) / info.duration_ms;
 
-	shell_print(sh,
-		    "FTP %s node=%u source=%s destination=%s: PASS bytes=%" PRIu32
-		    " crc32=%08" PRIx32 " duration_ms=%" PRIu32 " throughput_Bps=%" PRIu64,
-		    operation, node, source, destination, info.bytes, info.crc32, info.duration_ms,
-		    throughput);
+	shell_print(sh, "FTP %s %u %s -> %s: PASS", operation, node, source, destination);
+	shell_print(sh, "bytes: %" PRIu32, info.bytes);
+	shell_print(sh, "crc32: %08" PRIx32, info.crc32);
+	shell_print(sh, "duration_ms: %" PRIu32, info.duration_ms);
+	shell_print(sh, "throughput_Bps: %" PRIu64, throughput);
 	return 0;
 }
 
@@ -188,11 +189,12 @@ static int cmd_ftp_generate(const struct shell *sh, size_t argc, char **argv)
 	}
 	result = ftp_diagnostic_generate(argv[1], (uint32_t)size, &crc32);
 	if (result != 0) {
-		shell_error(sh, "FTP generate path=%s: FAIL (%d)", argv[1], result);
+		shell_error(sh, "FTP generate %s: FAIL (%d)", argv[1], result);
 		return result;
 	}
-	shell_print(sh, "FTP generate path=%s: PASS bytes=%lu crc32=%08" PRIx32, argv[1], size,
-		    crc32);
+	shell_print(sh, "FTP generate %s: PASS", argv[1]);
+	shell_print(sh, "bytes: %lu", size);
+	shell_print(sh, "crc32: %08" PRIx32, crc32);
 	return 0;
 }
 
@@ -203,11 +205,10 @@ static int cmd_ftp_verify(const struct shell *sh, size_t argc, char **argv)
 	ARG_UNUSED(argc);
 	result = ftp_diagnostic_compare(argv[1], argv[2]);
 	if (result != 0) {
-		shell_error(sh, "FTP verify first=%s second=%s: FAIL (%d)", argv[1], argv[2],
-			    result);
+		shell_error(sh, "FTP verify %s %s: FAIL (%d)", argv[1], argv[2], result);
 		return result;
 	}
-	shell_print(sh, "FTP verify first=%s second=%s: PASS", argv[1], argv[2]);
+	shell_print(sh, "FTP verify %s %s: PASS", argv[1], argv[2]);
 	return 0;
 }
 

@@ -178,10 +178,10 @@ wait_for_output "$work_dir/node16.log" "CSP ping 19: success" "$node16_pid" || \
 
 # The file transfer route needs the image as a file on the sending node.
 printf '%s\n' 'ftp generate /build/image.bin 20000' >&4
-wait_for_output "$work_dir/node19.log" "FTP generate" "$node19_pid" || \
+wait_for_output "$work_dir/node19.log" "crc32: " "$node19_pid" || \
 	fail "the sending node could not produce a stand-in image"
 
-image_crc="$(sed -n 's/.*crc32=\([0-9a-f]*\).*/\1/p' "$work_dir/node19.log" | tail -1)"
+image_crc="$(tr -d '\r' <"$work_dir/node19.log" | sed -n 's/^crc32: \([0-9a-f]*\).*/\1/p' | tail -1)"
 [[ -n "$image_crc" ]] || fail "could not read the image checksum"
 
 printf '%s\n' 'fwu abort' 'fwu status' >&3

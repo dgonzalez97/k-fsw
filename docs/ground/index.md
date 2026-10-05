@@ -124,10 +124,12 @@ Start the UHF gateway and the operator shell in two terminals:
 
 ```text
 kfsw-ops# csp ping 16
-CSP ping 16: success, rtt_ms=...
+CSP ping 16: success
+rtt_ms: ...
 
 kfsw-gnd-uhf# csp ping 19
-CSP ping 19: success, rtt_ms=...
+CSP ping 19: success
+rtt_ms: ...
 ```
 
 `k-ground demo` starts both and opens the operator shell. `k-ground test`
@@ -144,17 +146,29 @@ Ground nodes include the file transfer service. From the operator shell:
 
 ```text
 kfsw-ops# ftp generate /build/test.txt 256
-FTP generate path=/build/test.txt: PASS bytes=256 crc32=0ce9d363
+FTP generate /build/test.txt: PASS
+bytes: 256
+crc32: 0ce9d363
 kfsw-ops# ftp 16 mkdir /uplink
-FTP mkdir node=16 path=/uplink: PASS
+FTP mkdir 16 /uplink: PASS
 kfsw-ops# ftp put 16 /build/test.txt /uplink/test.txt
-FTP put node=16 source=/build/test.txt destination=/uplink/test.txt: PASS bytes=256 crc32=0ce9d363 ...
+FTP put 16 /build/test.txt -> /uplink/test.txt: PASS
+bytes: 256
+crc32: 0ce9d363
+duration_ms: 190
+throughput_Bps: 1347
 kfsw-ops# ftp stat 16 /uplink/test.txt
-FTP stat node=16 path=/uplink/test.txt type=file bytes=256 crc32=0ce9d363
+FTP stat 16 /uplink/test.txt
+type: file
+bytes: 256
+crc32: 0ce9d363
 kfsw-ops# ftp get 16 /uplink/test.txt /build/test-returned.txt
-FTP get node=16 source=/uplink/test.txt destination=/build/test-returned.txt: PASS bytes=256 ...
+FTP get 16 /uplink/test.txt -> /build/test-returned.txt: PASS
+bytes: 256
+crc32: 0ce9d363
+...
 kfsw-ops# ftp verify /build/test.txt /build/test-returned.txt
-FTP verify first=/build/test.txt second=/build/test-returned.txt: PASS
+FTP verify /build/test.txt /build/test-returned.txt: PASS
 ```
 
 The same CRC on both nodes and on the returned copy means the file came back
@@ -162,8 +176,9 @@ unchanged. The gateway can list its own files without a connection:
 
 ```text
 kfsw-gnd-uhf# ftp 16 ls /uplink
+FTP list 16 /uplink
 f        256 test.txt
-FTP list: PASS entries=1
+entries: 1
 ```
 
 `tests/k-ground-ftp-smoke.sh` runs this sequence, including a missing file.

@@ -139,7 +139,8 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 		return result;
 	}
 
-	shell_print(sh, "CSP ping %lu: success, rtt_ms=%u", node, round_trip_ms);
+	shell_print(sh, "CSP ping %lu: success", node);
+	shell_print(sh, "rtt_ms: %u", round_trip_ms);
 	return 0;
 }
 
@@ -158,15 +159,20 @@ static int cmd_csp_ifstat(const struct shell *sh, size_t argc, char **argv)
 	result = kfsw_csp_interface_stats_read((uint16_t)node, argv[2], KFSW_CSP_PING_TIMEOUT_MS,
 					       &stats);
 	if (result != 0) {
-		shell_error(sh, "CSP ifstat node=%lu interface=%s: failed (%d)", node, argv[2],
-			    result);
+		shell_error(sh, "CSP ifstat %lu %s: failed (%d)", node, argv[2], result);
 		return result;
 	}
-	shell_print(sh, "CSP ifstat node=%lu interface=%s tx=%u rx=%u txerr=%u rxerr=%u drop=%u",
-		    node, stats.name, stats.tx_packets, stats.rx_packets, stats.tx_errors,
-		    stats.rx_errors, stats.dropped_packets);
-	shell_print(sh, "autherr=%u frame=%u txbytes=%u rxbytes=%u irq=%u", stats.auth_errors,
-		    stats.frame_errors, stats.tx_bytes, stats.rx_bytes, stats.interrupts);
+	shell_print(sh, "CSP ifstat %lu %s", node, stats.name);
+	shell_print(sh, "tx: %u", stats.tx_packets);
+	shell_print(sh, "rx: %u", stats.rx_packets);
+	shell_print(sh, "txerr: %u", stats.tx_errors);
+	shell_print(sh, "rxerr: %u", stats.rx_errors);
+	shell_print(sh, "drop: %u", stats.dropped_packets);
+	shell_print(sh, "autherr: %u", stats.auth_errors);
+	shell_print(sh, "frame: %u", stats.frame_errors);
+	shell_print(sh, "txbytes: %u", stats.tx_bytes);
+	shell_print(sh, "rxbytes: %u", stats.rx_bytes);
+	shell_print(sh, "irq: %u", stats.interrupts);
 	return 0;
 }
 

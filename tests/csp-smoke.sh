@@ -263,13 +263,13 @@ wait_for_output "$work_dir/node1.log" \
     "set: parameter 'node_id' is read-only" "$node1_pid" || \
     fail "remote read-only parameter write was not rejected"
 wait_for_output "$work_dir/node1.log" \
-	"FTP verify first=/build/large.bin second=/build/large-returned.bin: PASS" \
+	"FTP verify /build/large.bin /build/large-returned.bin: PASS" \
 	"$node1_pid" || fail "8 KiB FTP round trip did not pass"
 wait_for_output "$work_dir/node1.log" \
-	"FTP get node=2 path=/flash/missing.bin: not found" \
+	"FTP get 2 /flash/missing.bin: not found" \
 	"$node1_pid" || fail "missing remote FTP file was not rejected"
 wait_for_output "$work_dir/node1.log" \
-	"FTP stat node=2 path=../params/parameters.dat: invalid path/request" \
+	"FTP stat 2 ../params/parameters.dat: invalid path/request" \
 	"$node1_pid" || fail "FTP path traversal was not rejected"
 
 node1_expected=(
@@ -305,22 +305,27 @@ node1_expected=(
     '2:uid = "kfsw-2"'
     "get: parameter 'missing' not found"
     "set: parameter 'node_id' is read-only"
-	"FTP generate path=/build/empty.bin: PASS bytes=0 crc32=00000000"
-	"FTP mkdir node=2 path=/flash: PASS"
-	"FTP put node=2 source=/build/empty.bin destination=/flash/empty.bin: PASS bytes=0"
-	"FTP put node=2 source=/build/single.bin destination=/flash/single.bin: PASS bytes=128"
-	"FTP put node=2 source=/build/multi.bin destination=/flash/multi.bin: PASS bytes=1024"
-	"FTP put node=2 source=/build/large.bin destination=/flash/large.bin: PASS bytes=8192"
-	"FTP stat node=2 path=/flash/large.bin type=file bytes=8192"
-	"FTP list node=2 path=/flash"
-	"FTP list: PASS entries=4"
-	"FTP get node=2 source=/flash/large.bin destination=/build/large-returned.bin: PASS bytes=8192"
-	"FTP verify first=/build/empty.bin second=/build/empty-returned.bin: PASS"
-	"FTP verify first=/build/single.bin second=/build/single-returned.bin: PASS"
-	"FTP verify first=/build/multi.bin second=/build/multi-returned.bin: PASS"
-	"FTP verify first=/build/large.bin second=/build/large-returned.bin: PASS"
-	"FTP get node=2 path=/flash/missing.bin: not found"
-	"FTP stat node=2 path=../params/parameters.dat: invalid path/request"
+	"FTP generate /build/empty.bin: PASS"
+	"crc32: 00000000"
+	"FTP mkdir 2 /flash: PASS"
+	"FTP put 2 /build/empty.bin -> /flash/empty.bin: PASS"
+	"FTP put 2 /build/single.bin -> /flash/single.bin: PASS"
+	"FTP put 2 /build/multi.bin -> /flash/multi.bin: PASS"
+	"FTP put 2 /build/large.bin -> /flash/large.bin: PASS"
+	"bytes: 128"
+	"bytes: 1024"
+	"bytes: 8192"
+	"FTP stat 2 /flash/large.bin"
+	"type: file"
+	"FTP list 2 /flash"
+	"entries: 4"
+	"FTP get 2 /flash/large.bin -> /build/large-returned.bin: PASS"
+	"FTP verify /build/empty.bin /build/empty-returned.bin: PASS"
+	"FTP verify /build/single.bin /build/single-returned.bin: PASS"
+	"FTP verify /build/multi.bin /build/multi-returned.bin: PASS"
+	"FTP verify /build/large.bin /build/large-returned.bin: PASS"
+	"FTP get 2 /flash/missing.bin: not found"
+	"FTP stat 2 ../params/parameters.dat: invalid path/request"
     "interface: KISS"
     "  info"
     "  test"
@@ -330,10 +335,11 @@ node1_expected=(
     "routes"
     "last_can_error=0 (none)"
     "CSP counters cleared"
-    "CSP ifstat node=2 interface=KISS tx="
-    "CSP ifstat node=2 interface=LOOP tx="
-    "CSP ifstat node=2 interface=missing: failed ("
-    "autherr=0 frame=0 txbytes="
+    "CSP ifstat 2 KISS"
+    "CSP ifstat 2 LOOP"
+    "CSP ifstat 2 missing: failed ("
+    "autherr: 0"
+    "txbytes: "
 )
 
 for expected in "${node1_expected[@]}"; do
@@ -346,7 +352,7 @@ python3 - "$work_dir/node1.log" <<'PYTEST'
 import re
 import sys
 from pathlib import Path
-rows = re.findall(r'CSP ifstat node=2 interface=KISS tx=(\d+) rx=(\d+)',
+rows = re.findall(r'CSP ifstat 2 KISS\s+tx: (\d+)\s+rx: (\d+)',
                   Path(sys.argv[1]).read_text())
 assert len(rows) >= 2, rows
 first, last = tuple(map(int, rows[0])), tuple(map(int, rows[-1]))
