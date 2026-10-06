@@ -51,6 +51,12 @@ if [[ -n "${KFSW_CONF_FILE:-}" ]]; then
 	cmake_args+=("-DCONF_FILE=$KFSW_CONF_FILE")
 fi
 
+# Extra CMake definitions, separated by spaces, for analysis builds.
+if [[ -n "${KFSW_CMAKE_ARGS:-}" ]]; then
+	read -r -a extra_cmake_args <<<"$KFSW_CMAKE_ARGS"
+	cmake_args+=("${extra_cmake_args[@]}")
+fi
+
 # The bootloader is configured in app/sysbuild.conf. Only the signing key is
 # passed here; without it MCUboot uses its public development key.
 if [[ -n "${KFSW_MCUBOOT_KEY:-}" ]]; then

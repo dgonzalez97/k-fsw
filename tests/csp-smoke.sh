@@ -358,6 +358,8 @@ node1_expected=(
     # No such interface: the node does not answer, which is logged as a warning.
     "csp ifstat: node 2 did not answer"
     "format: text"
+    # status 2 lists node 2's revisions, read from its boot_revisions.
+    "  kfsw-services: "
     "format: dictionary"
     " pkg="
     "src=boot id=1"

@@ -35,12 +35,13 @@ startup; release builds set the version and source commit explicitly, see
 ### Build revisions
 
 `boot_image` identifies the `k-fsw` revision. `boot_revisions` also lists the
-platform, services, communications and modules revisions used in the build:
+platform, services, communications, modules, libcsp and libparam revisions
+used in the build, eight hex digits each; `status` prints them one a line:
 
 ```text
 kfsw:~$ version
-K-FSW: v1.0.1-26-g1ba9630
-Revisions: app:1ba96309fb plat:31818d2c37 svc:919c4c43ba comms:d35abd4986 mod:b476a0c9ed
+K-FSW: v1.0.4-77-g3516c1a
+Revisions: app:3516c1a1 plat:049b7289 svc:ed838173 comms:b4289702 mod:ad39ef41 csp:d62491f5 param:c8a7c104
 ```
 
 Read `boot_revisions` from table 32. A trailing `+` marks a repository with

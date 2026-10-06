@@ -248,7 +248,8 @@ ZTEST(log_history, test_remote_long_records_fit_encrypted_link)
 {
 	char text[221];
 
-	memset(text, 'x', sizeof(text));
+	memset(text, 'x', sizeof(text) - 1U);
+	text[sizeof(text) - 1U] = '\0';
 	for (int length = 100; length <= 220; length += 60) {
 		csp_conn_t *connection;
 		csp_packet_t *packet;
