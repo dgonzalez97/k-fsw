@@ -72,6 +72,11 @@ void kfsw_shell_print_fields(const struct shell *sh, const char *text)
 	     field = strtok_r(NULL, " ", &saved)) {
 		char *value = strchr(field, '=');
 
+		/* A text longer than the copy loses the end of its last field. */
+		if (value == NULL) {
+			shell_print(sh, "%s", field);
+			continue;
+		}
 		*value = '\0';
 		shell_print(sh, "%s: %s", field, value + 1);
 	}
