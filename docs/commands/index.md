@@ -55,7 +55,7 @@ service:
 
 | Command | Prints |
 | --- | --- |
-| `status` | Role, name, CSP node, board, hardware ID and uptime |
+| `status [node]` | Role, name, CSP node, board, hardware ID, uptime, and the revision of each repository |
 | `version` | K-FSW version, Zephyr version, board, SoC and hardware ID |
 | `time` | Milliseconds and microseconds since boot |
 
@@ -68,7 +68,19 @@ CSP node: 1
 board: native_sim/native/64
 unit: 007f0101
 uptime_ms: 10
+revisions:
+  k-fsw: 3516c1a1
+  kfsw-platform: 049b7289
+  kfsw-services: ed838173
+  kfsw-comms: b4289702
+  kfsw-modules: ad39ef41
+  kfsw-libcsp: d62491f5
+  kfsw-libparam: c8a7c104
 ```
+
+A trailing `+` marks a repository with uncommitted changes at build time.
+`status 2` asks node 2 for the same, its revisions read from its
+`boot_revisions` parameter.
 
 Role and name are labels set in the build. `time` is time since boot; wall
 time is in `csp clock`. An image is identified by its revision, the `git

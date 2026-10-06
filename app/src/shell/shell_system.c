@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <string.h>
 
 #include <zephyr/shell/shell.h>
 #include <zephyr/shell/shell_string_conv.h>
@@ -20,6 +21,83 @@
 #if CONFIG_KFSW_COMMAND
 #include "shell_command.h"
 #endif
+#if CONFIG_KFSW_PARAM_CSP
+#include <kfsw/comms/csp.h>
+#include <kfsw/services/parameter.h>
+#endif
+#if CONFIG_KFSW_COMMAND_CSP && !CONFIG_KFSW_LOG_REMOTE
+#include "shell_remote.h"
+#endif
+
+/* The build's "app:1ba96309 plat:31818d2c ...", one repository a line. */
+static void print_revisions(const struct shell *sh, const char *revisions)
+{
+	static const struct {
+		const char *label;
+		const char *repository;
+	} names[] = {
+		{"app", "k-fsw"},           {"plat", "kfsw-platform"}, {"svc", "kfsw-services"},
+		{"comms", "kfsw-comms"},    {"mod", "kfsw-modules"},   {"csp", "kfsw-libcsp"},
+		{"param", "kfsw-libparam"},
+	};
+	const char *cursor = revisions;
+
+	shell_print(sh, "revisions:");
+	while (*cursor != '\0') {
+		const char *end = strchr(cursor, ' ');
+		const size_t length = (end != NULL) ? (size_t)(end - cursor) : strlen(cursor);
+		const char *colon = memchr(cursor, ':', length);
+
+		if (colon != NULL) {
+			const size_t label_length = (size_t)(colon - cursor);
+			const char *name = NULL;
+
+			for (size_t i = 0U; (i < ARRAY_SIZE(names)) && (name == NULL); i++) {
+				if ((strlen(names[i].label) == label_length) &&
+				    (strncmp(names[i].label, cursor, label_length) == 0)) {
+					name = names[i].repository;
+				}
+			}
+			shell_print(sh, "  %.*s: %.*s",
+				    (name != NULL) ? (int)strlen(name) : (int)label_length,
+				    (name != NULL) ? name : cursor,
+				    (int)(length - label_length - 1U), colon + 1);
+		}
+		cursor += length;
+		while (*cursor == ' ') {
+			cursor++;
+		}
+	}
+}
+
+#if CONFIG_KFSW_COMMAND_CSP
+static int remote_status(const struct shell *sh, uint16_t node)
+{
+	int result = kfsw_shell_run_command(sh, node, "info", 0U, NULL);
+#if CONFIG_KFSW_PARAM_CSP
+	struct kfsw_param_value value;
+	struct kfsw_csp_info info;
+
+	if (result != 0) {
+		return result;
+	}
+	/* The parameter client reads other nodes; this one answers from here. */
+	kfsw_csp_get_info(&info);
+	if (node == info.address) {
+		print_revisions(sh, kfsw_boot_get_revisions());
+		return 0;
+	}
+	result = kfsw_param_remote_get(node, "boot_revisions", &value);
+	if (result != 0) {
+		return kfsw_shell_remote_failed(sh, "status revisions", node, result);
+	}
+	if (value.type == KFSW_PARAM_STRING) {
+		print_revisions(sh, value.text);
+	}
+#endif
+	return result;
+}
+#endif
 
 static int cmd_status(const struct shell *sh, size_t argc, char **argv)
 {
@@ -28,7 +106,7 @@ static int cmd_status(const struct shell *sh, size_t argc, char **argv)
 		uint16_t node;
 		int result = kfsw_shell_parse_node(sh, argv[1], &node);
 
-		return (result != 0) ? result : kfsw_shell_run_command(sh, node, "info", 0U, NULL);
+		return (result != 0) ? result : remote_status(sh, node);
 	}
 #else
 	ARG_UNUSED(argc);
@@ -44,6 +122,7 @@ static int cmd_status(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "board: %s", CONFIG_BOARD_TARGET);
 	shell_print(sh, "unit: %s", kfsw_boot_get_hardware_id());
 	shell_print(sh, "uptime_ms: %llu", (unsigned long long)kfsw_time_monotonic_ms());
+	print_revisions(sh, kfsw_boot_get_revisions());
 
 	return 0;
 }
