@@ -97,7 +97,7 @@ int main(void)
 	uint32_t startup_failures = 0;
 #if CONFIG_KFSW_STORAGE || CONFIG_KFSW_PARAM || CONFIG_KFSW_CSP || CONFIG_KFSW_RADIO_UHF ||        \
 	CONFIG_KFSW_BOTON_TEST || CONFIG_KFSW_COMMAND || CONFIG_KFSW_WATCHDOG ||                   \
-	CONFIG_KFSW_GNDWDT || CONFIG_KFSW_RESMON
+	CONFIG_KFSW_GNDWDT || CONFIG_KFSW_RESMON || CONFIG_BOOTLOADER_MCUBOOT
 	int result;
 #endif
 
@@ -126,6 +126,14 @@ int main(void)
 		kfsw_log_error("Failed to mount storage: %d", result);
 	} else {
 		kfsw_log_info("Storage mounted at %s", KFSW_STORAGE_MOUNT_POINT);
+	}
+#endif
+
+#if CONFIG_BOOTLOADER_MCUBOOT && CONFIG_MCUBOOT_IMG_MANAGER
+	result = kfsw_boot_diagnostics_start();
+	if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Boot trial diagnostics unavailable: %d", result);
 	}
 #endif
 
