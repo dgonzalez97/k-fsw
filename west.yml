@@ -20,7 +20,19 @@ manifest:
       remote: zephyrproject
       revision: v4.4.0
       path: zephyr
-      import: true
+      import:
+        name-allowlist:
+          # Cortex-M core and the three supported MCU families.
+          - cmsis_6
+          - hal_stm32
+          - hal_nxp
+          - hal_rpi_pico
+          # Reference compositions and optional MCUboot/encrypted-radio profiles.
+          - littlefs
+          - picolibc
+          - mcuboot
+          - mbedtls
+          - tf-psa-crypto
 
     - name: kfsw-platform
       remote: kfsw
