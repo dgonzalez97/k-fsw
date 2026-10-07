@@ -21,3 +21,5 @@ for target in "${targets[@]}"; do
 	echo "CI BUILD: $target"
 	KFSW_PRISTINE=always "$KFSW_TOOLS_DIR/build.sh" "$target"
 done
+
+echo "BUILD RESULT: PASS (${targets[*]})"

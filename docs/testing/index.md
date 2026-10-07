@@ -12,6 +12,14 @@ Run the checks that cover the change. From the workspace root:
 Robot, Valgrind, UBSan, coverage, @ref footprint, and Doxygen. Test output
 stays in the build directory.
 
+Read `all.sh`'s own exit status to tell whether it passed. Every stage prints
+`<STAGE> RESULT: PASS`, so a log with no `FAIL` and a tail that reaches
+`DOCS RESULT` is a good sign, but the exit status is the verdict. Doxygen writes
+its warnings to `build/docs/doxygen-warnings.log` rather than the console, with
+`WARN_AS_ERROR` set, so a failing documentation build prints nothing unusual and
+simply stops before its result line. When any stage fails, `set -Eeuo pipefail`
+ends the run there and the log stops mid-stage.
+
 `tools/ci/csp-v1.sh`, part of `all.sh`, repeats the CSP checks under CSP 1: the
 NUCLEO builds with and without CAN, an address CSP 1 cannot carry fails the
 build, the CSP and multi-KISS smokes pass, and a CSP 2 node gets no answer from
