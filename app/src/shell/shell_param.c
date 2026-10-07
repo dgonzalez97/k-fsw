@@ -166,8 +166,8 @@ static int parse_param_node(const struct shell *sh, const char *text, uint16_t *
 	int parse_error = 0;
 
 	parsed = shell_strtoul(text, 10, &parse_error);
-	if ((parse_error != 0) || (parsed == 0U) || (parsed > 16383U)) {
-		shell_error(sh, "CSP node must be in range 1..16383");
+	if ((parse_error != 0) || (parsed == 0U) || (parsed > KFSW_CSP_BROADCAST_ADDRESS)) {
+		shell_error(sh, "CSP node must be in range 1..%u", KFSW_CSP_BROADCAST_ADDRESS);
 		return -EINVAL;
 	}
 

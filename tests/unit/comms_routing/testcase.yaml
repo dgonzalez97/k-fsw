@@ -10,3 +10,15 @@ tests:
       - native_sim/native/64
     integration_platforms:
       - native_sim/native/64
+  kfsw.comms.routing.csp1:
+    tags:
+      - unit
+      - comms
+      - csp
+      - routing
+    extra_configs:
+      - CONFIG_KFSW_CSP_VERSION_1=y
+    platform_allow:
+      - native_sim/native/64
+    integration_platforms:
+      - native_sim/native/64

@@ -94,7 +94,9 @@ ZTEST(comms_ifstats, test_rejects_invalid_arguments_without_sending)
 	zassert_equal(kfsw_csp_interface_stats_read(2, NULL, 50, &stats), -EINVAL);
 	zassert_equal(kfsw_csp_interface_stats_read(2, "", 50, &stats), -EINVAL);
 	zassert_equal(kfsw_csp_interface_stats_read(2, "abcdefghijk", 50, &stats), -EINVAL);
-	zassert_equal(kfsw_csp_interface_stats_read(16384, "KISS", 50, &stats), -EINVAL);
+	zassert_equal(
+		kfsw_csp_interface_stats_read(KFSW_CSP_BROADCAST_ADDRESS + 1U, "KISS", 50, &stats),
+		-EINVAL);
 	zassert_equal(kfsw_csp_interface_stats_read(2, "KISS", 0, &stats), -EINVAL);
 	zassert_equal(kfsw_csp_interface_stats_read(2, "KISS", 50, NULL), -EINVAL);
 	zassert_equal(calls, 0U);

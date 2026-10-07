@@ -3,3 +3,9 @@ tests:
     tags: [unit, modules, radio, crypto]
     platform_allow: [native_sim/native/64]
     integration_platforms: [native_sim/native/64]
+  kfsw.modules.radio_crypto.csp1:
+    tags: [unit, modules, radio, crypto]
+    platform_allow: [native_sim/native/64]
+    integration_platforms: [native_sim/native/64]
+    extra_configs:
+      - CONFIG_KFSW_CSP_VERSION_1=y

@@ -131,5 +131,30 @@ class BridgeTests(unittest.TestCase):
                 list(hk.read_capture(io.StringIO(data)))
 
 
+
+class CspVersionTests(unittest.TestCase):
+    def tearDown(self):
+        hk.csp_version = 2
+
+    def test_csp1_header_is_four_bytes_with_the_source_first(self):
+        hk.csp_version = 1
+        header = hk.csp_header(16, 1, 40, hk.HK_PORT, 1)
+        self.assertEqual(len(header), 4)
+        expected = (2 << 30) | (1 << 25) | (16 << 20) | (40 << 14) | (hk.HK_PORT << 8) | 1
+        self.assertEqual(int.from_bytes(header, 'big'), expected)
+        self.assertEqual(hk.parse_csp_header(header), {
+            'destination': 16, 'source': 1, 'dport': 40, 'sport': hk.HK_PORT, 'flags': 1})
+
+    def test_csp1_frame_carries_a_sample(self):
+        hk.csp_version = 1
+        self.assertEqual(hk.decode_hk_frame(frame(sample()), 1), (sample(), None))
+
+    def test_a_csp2_bridge_does_not_read_csp1_frames(self):
+        hk.csp_version = 1
+        csp1 = frame(sample())
+        hk.csp_version = 2
+        # Read as CSP 2 the fields land elsewhere, so it is not this node's HK.
+        self.assertEqual(hk.decode_hk_frame(csp1, 1), (None, None))
+
 if __name__ == '__main__':
     unittest.main()

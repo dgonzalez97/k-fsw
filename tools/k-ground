@@ -42,8 +42,9 @@ validate_node()
 
 	[[ "$value" =~ ^[1-9][0-9]*$ ]] || \
 		fail "$label must be a positive integer without leading zeros"
-	(( value >= 1 && value <= 16383 )) || \
-		fail "$label must be in the CSP v2 range 1..16383"
+	# The broadcast address (31 in CSP 1, 16383 in CSP 2) is not a node.
+	(( value >= 1 && value <= csp_max_node )) || \
+		fail "$label must be in the CSP $csp_version range 1..$csp_max_node"
 }
 
 validate_ground_node()
@@ -79,7 +80,7 @@ load_role_config()
 	[[ -f "$config_file" ]] || \
 		fail "ground role is not configured: $role_key ($config_file)"
 
-	unset KFSW_ROLE KFSW_CSP_NODE KFSW_CSP_PEER KFSW_CSP_ROUTES \
+	unset KFSW_ROLE KFSW_CSP_NODE KFSW_CSP_PEER KFSW_CSP_ROUTES KFSW_CSP_VERSION \
 		KFSW_RADIO_UHF KFSW_EXTRA_KCONFIG KFSW_EXTRA_OVERLAY KFSW_CAN_INTERFACE
 	# Node files are simple shell environment files.
 	set -a
@@ -92,6 +93,21 @@ load_role_config()
 	ground_peer="${KFSW_CSP_PEER:-}"
 	ground_routes="${KFSW_CSP_ROUTES:-}"
 	ground_radio_uhf="${KFSW_RADIO_UHF:-}"
+	csp_version="${KFSW_CSP_VERSION:-2}"
+	case "$csp_version" in
+	1)
+		csp_max_node=30
+		# A CSP 1 build of a node keeps its own build directory.
+		csp_suffix="-csp1"
+		;;
+	2)
+		csp_max_node=16382
+		csp_suffix=""
+		;;
+	*)
+		fail "$config_file selects unsupported KFSW_CSP_VERSION=$csp_version"
+		;;
+	esac
 
 	validate_role "$ground_role"
 	[[ "$ground_role" == "$role_key" ]] || \
@@ -157,7 +173,7 @@ parse_role_options()
 write_ground_config()
 {
 	local config_dir="$KGROUND_BUILD_ROOT/config"
-	local config_file="$config_dir/node-$ground_node.conf"
+	local config_file="$config_dir/node-$ground_node$csp_suffix.conf"
 
 	mkdir -p "$config_dir" || fail "cannot create ground configuration directory"
 	cp "$KGROUND_PROFILE" "$config_file" || fail "cannot create generated ground configuration"
@@ -169,6 +185,9 @@ write_ground_config()
 		printf 'CONFIG_KFSW_CSP_ADDRESS=%s\n' "$ground_node"
 		printf 'CONFIG_KFSW_CSP_HOSTNAME="%s"\n' "$ground_role"
 		printf 'CONFIG_KFSW_CSP_UART_PEER_ADDRESS=%s\n' "$ground_peer"
+		if [[ "$csp_version" == 1 ]]; then
+			printf 'CONFIG_KFSW_CSP_VERSION_1=y\n'
+		fi
 		if [[ -n "$ground_routes" ]]; then
 			printf 'CONFIG_KFSW_CSP_ROUTE_TABLE="%s"\n' "$ground_routes"
 		fi
@@ -190,7 +209,7 @@ write_ground_config()
 
 build_ground_node()
 {
-	local build_dir="$KGROUND_BUILD_ROOT/node-$ground_node"
+	local build_dir="$KGROUND_BUILD_ROOT/node-$ground_node$csp_suffix"
 	local config_file
 
 	config_file="$(write_ground_config)"
@@ -226,7 +245,7 @@ wait_for_output()
 
 run_ground_node()
 {
-	local build_dir="$KGROUND_BUILD_ROOT/node-$ground_node"
+	local build_dir="$KGROUND_BUILD_ROOT/node-$ground_node$csp_suffix"
 	local executable="$build_dir/zephyr/zephyr.exe"
 	local work_dir
 	local input_fifo

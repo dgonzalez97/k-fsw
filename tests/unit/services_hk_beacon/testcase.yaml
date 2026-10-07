@@ -9,3 +9,14 @@ tests:
       - native_sim/native/64
     integration_platforms:
       - native_sim/native/64
+  kfsw.services.hk.beacon.csp1:
+    tags:
+      - unit
+      - services
+      - hk
+    platform_allow:
+      - native_sim/native/64
+    integration_platforms:
+      - native_sim/native/64
+    extra_configs:
+      - CONFIG_KFSW_CSP_VERSION_1=y

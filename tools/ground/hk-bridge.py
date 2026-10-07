@@ -38,9 +38,22 @@ TFESC = 0xDD
 TNC_DATA = 0x00
 
 # CSP 2.0: 48 bits, big endian. 2 priority, 14 destination, 14 source,
-# 6 destination port, 6 source port, 6 flags.
+# 6 destination port, 6 source port, 6 flags. CSP 1 (--csp-version 1): 32 bits,
+# big endian. 2 priority, 5 source, 5 destination, 6 destination port,
+# 6 source port, 8 flags; source comes before destination.
 CSP_HEADER_BYTES = 6
 CSP_PRIO_NORM = 2
+# Set from --csp-version; every node on the link uses the same one.
+csp_version = 2
+
+
+def csp_header_bytes():
+    return 4 if csp_version == 1 else CSP_HEADER_BYTES
+
+
+def csp_max_node():
+    """Highest CSP address, which is broadcast."""
+    return 31 if csp_version == 1 else 16383
 CSP_FCRC32 = 0x01
 
 HK_PORT = 14
@@ -106,13 +119,17 @@ class KissReader:
                 self._escaped = True
             else:
                 self._frame.append(byte)
-            if len(self._frame) > CSP_HEADER_BYTES + HK_SAMPLE_MAX + 8:
+            if len(self._frame) > csp_header_bytes() + HK_SAMPLE_MAX + 8:
                 self._started = False
                 self._frame.clear()
         return frames
 
 
 def csp_header(destination, source, dport, sport, flags):
+    if csp_version == 1:
+        packed = ((CSP_PRIO_NORM << 30) | (source << 25) | (destination << 20)
+                  | (dport << 14) | (sport << 8) | flags)
+        return packed.to_bytes(4, "big")
     packed = (
         (CSP_PRIO_NORM << 46)
         | (destination << 32)
@@ -125,6 +142,15 @@ def csp_header(destination, source, dport, sport, flags):
 
 
 def parse_csp_header(frame):
+    if csp_version == 1:
+        packed = int.from_bytes(frame[:4], "big")
+        return {
+            "destination": (packed >> 20) & 0x1F,
+            "source": (packed >> 25) & 0x1F,
+            "dport": (packed >> 14) & 0x3F,
+            "sport": (packed >> 8) & 0x3F,
+            "flags": packed & 0xFF,
+        }
     packed = int.from_bytes(b"\x00\x00" + frame[:CSP_HEADER_BYTES], "big")
     return {
         "destination": (packed >> 32) & 0x3FFF,
@@ -172,7 +198,7 @@ def decode_hk_frame(frame, node):
     Frames are matched by their source port, so replies to other requests and
     beacons are recorded too.
     """
-    if len(frame) < CSP_HEADER_BYTES + 4:
+    if len(frame) < csp_header_bytes() + 4:
         return None, "short frame"
 
     header = parse_csp_header(frame)
@@ -183,7 +209,7 @@ def decode_hk_frame(frame, node):
     if header["flags"] not in (0, CSP_FCRC32):
         return None, "unsupported CSP flags"
 
-    body = frame[CSP_HEADER_BYTES:]
+    body = frame[csp_header_bytes():]
     if body[-4:] != crc32(body[:-4]):
         return None, "KISS CRC32 mismatch"
     body = body[:-4]
@@ -292,7 +318,7 @@ def read_capture(stream):
                 raise ValueError("invalid capture fields")
             if type(record["version"]) is not int or record["version"] != 1:
                 raise ValueError("unsupported capture version")
-            if type(record["node"]) is not int or not 0 <= record["node"] <= 16383:
+            if type(record["node"]) is not int or not 0 <= record["node"] <= csp_max_node():
                 raise ValueError("invalid source node")
             if (type(record["received_ms"]) is not int
                     or not 0 <= record["received_ms"] < 2**64):
@@ -325,12 +351,16 @@ def main():
     parser.add_argument("--listen", action="store_true", help="receive without transmitting")
     parser.add_argument("--yamcs", default="127.0.0.1:10015",
                         help="host:port of the UDP link, or 'none'")
+    parser.add_argument("--csp-version", type=int, choices=(1, 2), default=2,
+                        help="CSP header of the link, as the nodes are built")
     args = parser.parse_args()
+    global csp_version
+    csp_version = args.csp_version
     if args.replay and (args.capture or args.listen or args.node is not None):
         parser.error("--replay cannot be combined with --capture, --listen or --node")
-    if args.device and (args.node is None or not 0 <= args.node <= 16383):
-        parser.error("--device requires --node in 0..16383")
-    if not (0 <= args.source <= 16383 and 16 <= args.sport <= 63
+    if args.device and (args.node is None or not 0 <= args.node <= csp_max_node()):
+        parser.error(f"--device requires --node in 0..{csp_max_node()}")
+    if not (0 <= args.source <= csp_max_node() and 16 <= args.sport <= 63
             and 0 <= args.report < 16 and 1 <= args.count <= 255 and args.baud > 0):
         parser.error("invalid address, port, report, count or baud rate")
     if (not math.isfinite(args.timeout) or not 0 < args.timeout <= 3600

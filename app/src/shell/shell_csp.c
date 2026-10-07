@@ -135,8 +135,9 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 		shell_print(sh, "No node given; using this node (%lu)", node);
 	} else {
 		node = shell_strtoul(argv[1], 10, &parse_error);
-		if (parse_error != 0 || node > 16383U) {
-			shell_error(sh, "CSP node must be in range 0..16383");
+		if (parse_error != 0 || node > KFSW_CSP_BROADCAST_ADDRESS) {
+			shell_error(sh, "CSP node must be in range 0..%u",
+				    KFSW_CSP_BROADCAST_ADDRESS);
 			return -EINVAL;
 		}
 	}
@@ -161,8 +162,8 @@ static int cmd_csp_ifstat(const struct shell *sh, size_t argc, char **argv)
 	int result;
 
 	ARG_UNUSED(argc);
-	if ((parse_error != 0) || (node > 16383U)) {
-		shell_error(sh, "CSP node must be in range 0..16383");
+	if ((parse_error != 0) || (node > KFSW_CSP_BROADCAST_ADDRESS)) {
+		shell_error(sh, "CSP node must be in range 0..%u", KFSW_CSP_BROADCAST_ADDRESS);
 		return -EINVAL;
 	}
 	result = kfsw_csp_interface_stats_read((uint16_t)node, argv[2], KFSW_CSP_PING_TIMEOUT_MS,
@@ -256,7 +257,7 @@ static int cmd_csp_ident(const struct shell *sh, size_t argc, char **argv)
 	}
 
 	node = strtoul(argv[1], &end, 0);
-	if ((end == argv[1]) || (*end != '\0') || (node > 16383UL)) {
+	if ((end == argv[1]) || (*end != '\0') || (node > KFSW_CSP_BROADCAST_ADDRESS)) {
 		shell_error(sh, "Invalid node: %s", argv[1]);
 		return -EINVAL;
 	}
@@ -340,7 +341,7 @@ static int cmd_csp_clock(const struct shell *sh, size_t argc, char **argv)
 	}
 
 	node = strtoul(argv[1], &end, 0);
-	if ((end == argv[1]) || (*end != '\0') || (node > 16383UL)) {
+	if ((end == argv[1]) || (*end != '\0') || (node > KFSW_CSP_BROADCAST_ADDRESS)) {
 		shell_error(sh, "Invalid node: %s", argv[1]);
 		return -EINVAL;
 	}

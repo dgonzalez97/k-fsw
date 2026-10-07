@@ -15,8 +15,11 @@ if [[ $# -ne 0 ]]; then
     exit 1
 fi
 
+source "$KFSW_ROOT/k-fsw/tests/csp-version.sh"
+# A CSP 1 run uses its own builds of both nodes.
+[[ -n "$csp_suffix" ]] && KFSW_BUILD_DIR="$KFSW_ROOT/build/linux$csp_suffix"
 node1_executable="$KFSW_BUILD_DIR/zephyr/zephyr.exe"
-node2_build_dir="$KFSW_ROOT/build/tests/linux-node2"
+node2_build_dir="$KFSW_ROOT/build/tests/linux-node2$csp_suffix"
 node2_executable="$node2_build_dir/zephyr/zephyr.exe"
 work_dir="$(mktemp -d /tmp/kfsw-csp-smoke.XXXXXX)"
 node1_pid=""
@@ -82,7 +85,8 @@ fi
 
 if [[ ! -x "$node1_executable" ]]; then
     echo "CSP SMOKE: building node 1"
-    "$KFSW_ROOT/k-fsw/tools/build.sh" linux
+    KFSW_EXTRA_CONF_FILE="$(csp_conf_list "$KFSW_ROOT/k-fsw/tests/config/param-fixtures.conf")" \
+        "$KFSW_ROOT/k-fsw/tools/build.sh" linux
 fi
 
 if [[ ! -x "$node2_executable" ]]; then
@@ -210,7 +214,7 @@ printf '%s\n' \
 	'param set 2 log_remote_format 1' \
 	'log remote 2 4' \
 	'param set 2 log_remote_format 0' \
-	'status 16383' \
+	"status $csp_broadcast" \
 	'csp ping 2' \
 	'param get 2 test_u32' \
 	'csp info' \
@@ -293,11 +297,11 @@ node1_expected=(
     "data: "
     "event_tail: failed, no record at age 999"
     "ready: 1"
-    "Node must be 1..16382: 16383"
+    "Node must be 1..$((csp_broadcast - 1)): $csp_broadcast"
     "CSP node: 1"
     "hostname: kfsw-1"
     "revision: "
-    "LOOP addr=1/14"
+    "LOOP addr=1/$csp_host_bits"
     "KISS addr=1/0"
     "0/0 -> KISS direct"
     "UART transport"
@@ -415,4 +419,4 @@ PYTEST
 
 cat "$work_dir/node1.log"
 cat "$work_dir/node2.log"
-echo "CSP RESULT: PASS"
+echo "CSP RESULT: PASS (CSP $csp_version)"
