@@ -103,7 +103,7 @@ level and truncation status.
 
 `log_remote_format` on the serving node picks text (0) or dictionary (1).
 Dictionary lines show `pkg=<hex>`; `tools/ground/log-decode.py --elf` turns
-them back into text. See [remote log](../services/index.md).
+them back into text. See @ref services, under Logging.
 
 ## UHF radio
 
@@ -392,7 +392,7 @@ Listing `/` also shows these directories when they exist:
 
 | Directory | Holds | Writable |
 | --- | --- | --- |
-| `boot` | firmware slots, see [firmware update](../fwu/README.md) | no |
+| `boot` | firmware slots, see @ref firmware_update | no |
 | `hk` | housekeeping sample files | no |
 | `tmp` | 32 KB of RAM, empty after every boot | yes |
 
