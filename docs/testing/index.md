@@ -12,6 +12,12 @@ Run the checks that cover the change. From the workspace root:
 Robot, Valgrind, UBSan, coverage, @ref footprint, and Doxygen. Test output
 stays in the build directory.
 
+`tools/ci/csp-v1.sh`, part of `all.sh`, repeats the CSP checks under CSP 1: the
+NUCLEO builds with and without CAN, an address CSP 1 cannot carry fails the
+build, the CSP and multi-KISS smokes pass, and a CSP 2 node gets no answer from
+a CSP 1 node. Unit suites that depend on the address width also have a
+`.csp1` scenario.
+
 For a focused native suite:
 
 ```bash

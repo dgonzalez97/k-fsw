@@ -195,6 +195,13 @@ kfsw:~$ csp routes
 11/14 -> KISS_2 via 11
 ```
 
+Under CSP 1 the same table shows `/5` prefixes:
+
+```text
+10/5 -> KISS_1 direct
+11/5 -> KISS_2 via 11
+```
+
 Routes are set at build time and can't be changed from the shell. A node that
 does not answer is logged as a warning, `[WARNING] csp ping: node 5 did not
 answer`, and kept in `log history`; the same goes for every request to another
@@ -482,8 +489,11 @@ receiving node, and 16 log history. Each has a Kconfig option; see
 `resmon`, listed by `param tables`) and 50 to 99 modules (50 `radio-uhf`, 51
 `temp_example`, 67 `hw_test`).
 
-**Node addresses.** CSP v2 addresses are 1 to 16383. Flight nodes use 1 to
-15; ground roles start at 16, which `tools/k-ground` enforces. The reference
+**Node addresses.** Under CSP 2, the default, nodes are 1 to 16382 and 16383
+is broadcast; under CSP 1 nodes are 1 to 30 and 31 is broadcast. A command
+given a node outside that range is refused before anything is sent, for
+example `Node must be 1..30: 31`. Flight nodes use 1 to 15; ground roles start
+at 16, which `tools/k-ground` enforces. The reference
 ground station uses 16 for the gateway and 19 for the operator node.
 
 The name is looked up in the local registry before the request is sent, so

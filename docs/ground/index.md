@@ -18,8 +18,11 @@ These are the reference settings. Each node file sets two addresses:
 
 - `KFSW_CSP_NODE` is the node's own CSP address. Flight nodes use 1 to 15 and
   ground nodes start at 16, so the two never collide; `tools/k-ground`
-  refuses a ground node below 16. CSP v2 addresses are 14 bits, so the
-  launcher accepts up to 16383.
+  refuses a ground node below 16. It accepts up to 16382 under CSP 2 and up
+  to 30 under CSP 1.
+- `KFSW_CSP_VERSION=1` builds the node for CSP 1, to talk to a CSP 1
+  satellite; it is unset or 2 otherwise. A CSP 1 node gets its own
+  configuration file and build directory, with a `-csp1` suffix.
 - `KFSW_CSP_PEER` is the node at the other end of the serial link, the one
   `comms uart test` pings when given no node. It is not a route: where packets go is
   the route table, `KFSW_CSP_ROUTES`.
@@ -93,7 +96,8 @@ for the gateway and
 [kfsw-gnd-can.env](https://github.com/dgonzalez97/k-fsw/blob/main/ground-station/nodes/kfsw-gnd-can.env)
 for one that adds Kconfig and an overlay.
 
-`KFSW_CSP_ROUTES` sets a route table, for example `'2/14 KISS'`.
+`KFSW_CSP_ROUTES` sets a route table, for example `'2 KISS'`, which means
+node 2 in either CSP version.
 `tools/k-ground` checks it and writes it to `CONFIG_KFSW_CSP_ROUTE_TABLE`;
 without it the node keeps `0/0 KISS` from `config/profiles/k-ground.conf`.
 `KFSW_EXTRA_KCONFIG` and `KFSW_EXTRA_OVERLAY` add Kconfig lines and a devicetree overlay, which is how
@@ -197,7 +201,8 @@ Nodes answer housekeeping requests, so the bridge polls them:
 
 The bridge talks CSP over KISS, pulls samples and sends each one to Yamcs on
 UDP port 10015. Point it at a Linux node's `uart_1` PTY, or at the Holybro
-serial device to reach a flight node over the radio.
+serial device to reach a flight node over the radio. It speaks CSP 2; add
+`--csp-version 1` for a node built with `config/profiles/csp-v1.conf`.
 
 ### Beacons
 

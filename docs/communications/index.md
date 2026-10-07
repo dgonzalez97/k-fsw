@@ -15,9 +15,21 @@ services need it.
 ## Terms
 
 **Node.** One CSP endpoint: a flight computer, a subsystem, a process or a
-ground tool. K-FSW uses CSP version 2, with addresses from 1 to 16383, set by
-`CONFIG_KFSW_CSP_ADDRESS`. KFSW-Linux is node 1 by default and the
-NUCLEO-L496ZG node 2. Every node on a network needs its own address.
+ground tool. Its address is set by `CONFIG_KFSW_CSP_ADDRESS`. KFSW-Linux is
+node 1 by default and the NUCLEO-L496ZG node 2. Every node on a network needs
+its own address.
+
+**Protocol version.** K-FSW uses CSP 2 by default: a six-byte header and
+14-bit addresses, so nodes 1 to 16382, with 16383 as broadcast. Adding
+`config/profiles/csp-v1.conf` (`CONFIG_KFSW_CSP_VERSION_1=y`) selects CSP 1
+for talking to older CSP 1 systems: a four-byte header and 5-bit addresses,
+so nodes 1 to 30, with 31 as broadcast. Every node on a link must use the same
+version; a CSP 2 node and a CSP 1 node do not understand each other. An
+address the selected version cannot carry stops the build. `csp info` prints
+the version in use as `protocol: CSP vN`.
+
+CSP 1 in K-FSW is libcsp 2.x running its CSP 1 mode. Its byte compatibility
+with a real libcsp 1.x node has not been tested.
 
 **Port.** A service on a node: "node 2, port 9" is the file transfer service on
 node 2.
@@ -204,10 +216,10 @@ aggregate counters.
 [kfsw-csp-tools](https://github.com/dgonzalez97/kfsw-csp-tools) is an optional
 host dependency pinned in `west.yml`. Its CAN/ZMQ transports, `cspdump` and
 `csp-ping-server` use CSP 1. Their four-byte headers and original Wireshark
-dissector do not match K-FSW's CSP 2 configuration. The adapted `csp-iperf`
-also supports CSP 2 over KISS.
+dissector do not match K-FSW's default CSP 2 configuration. The adapted
+`csp-iperf` also supports CSP 2 over KISS.
 
-The fork's `csp-kiss` entry point supports CSP 2 directly on the native Linux
+The fork's `csp-kiss` entry point supports only CSP 2. It works directly on the native Linux
 PTY or a serial KISS link. It implements ping, CMP interface statistics,
 node discovery, remote log retrieval and passive capture.
 
@@ -289,7 +301,7 @@ exchange and `--budget-ms` bounds the whole inventory. Ctrl-C stops either
 command; flushed records remain, without a successful completion marker.
 
 The source address defaults to 16 and must not be included in the requested
-nodes. Address 16383 is excluded. `discover` observes nodes reachable through
+nodes. The broadcast address, 16383, is excluded. `discover` observes nodes reachable through
 configured CSP routes; it does not implement ARP, build a routing topology,
 or detect duplicate addresses. Queries use the existing ping and CMP services
 and make no configuration or clock changes.
@@ -333,7 +345,7 @@ The multi-interface test runs a router with two links and a node on each:
 node 10                         router                         node 11
   KISS ---- PTY/socat ---- KISS_1 8/14   KISS_2 9/14 ---- PTY/socat ---- KISS
                                   |             |
-                         10/14 -> KISS_1   11/14 -> KISS_2 via 11
+                            10 -> KISS_1   11 -> KISS_2 via 11
 ```
 
 The router's two interfaces have different addresses because libcsp doesn't
@@ -345,11 +357,14 @@ forward a packet between interfaces in the same subnet.
 
 ```text
 destination[/prefix-length] interface [via], next-entry
-10/14 KISS_1,11/14 KISS_2 11
+10 KISS_1,11 KISS_2 11
 ```
 
-Node IDs are 14 bits: `/14` matches one node, `/0` every node, and no prefix
-means `/14`. Two entries with the same destination and prefix are both used,
+The prefix length counts address bits: 14 in CSP 2, 5 in CSP 1. No prefix
+matches one node and `/0` every node, in both versions, so a table written
+without prefixes or with `/0` builds for either; CSP 1 rejects a prefix above
+`/5`. The multi-KISS test router uses `tests/config/multi-kiss-router-csp1.overlay`
+under CSP 1 for the interfaces' own `/5` prefixes. Two entries with the same destination and prefix are both used,
 not tried in order. `via` is the link-layer next hop; KISS ignores it, but
 `csp routes` still shows it.
 
@@ -379,8 +394,10 @@ in the libcsp fork the build uses.
 ## CAN
 
 CAN uses libcsp's CAN interface on the controller chosen with `kfsw,csp-can`.
-K-FSW runs CSP v2, so frames use CFP2, the CAN Fragmentation Protocol for
-14-bit addresses; its fields are the `CFP2_*` definitions in
+Under CSP 2 frames use CFP2, the CAN Fragmentation Protocol for 14-bit
+addresses; under CSP 1 they use CFP1 and its 5-bit addresses, and
+`CONFIG_KFSW_CSP_CAN_PREFIX_LENGTH` defaults to 5. The fields are the `CFP2_*`
+and `CFP_*` definitions in
 [csp_if_can.h](https://github.com/dgonzalez97/kfsw-libcsp/blob/kfsw/include/csp/interfaces/csp_if_can.h).
 The NUCLEO uses CAN1 on PD0/PD1 with an external transceiver, and a Linux node
 uses a SocketCAN interface. Both ends of the bus need the same bitrate; the
