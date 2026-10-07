@@ -173,7 +173,7 @@ parse_role_options()
 write_ground_config()
 {
 	local config_dir="$KGROUND_BUILD_ROOT/config"
-	local config_file="$config_dir/node-$ground_node$csp_suffix.conf"
+	local config_file="$config_dir/${ground_role}-node-$ground_node$csp_suffix.conf"
 
 	mkdir -p "$config_dir" || fail "cannot create ground configuration directory"
 	cp "$KGROUND_PROFILE" "$config_file" || fail "cannot create generated ground configuration"
@@ -209,7 +209,7 @@ write_ground_config()
 
 build_ground_node()
 {
-	local build_dir="$KGROUND_BUILD_ROOT/node-$ground_node$csp_suffix"
+	local build_dir="$KGROUND_BUILD_ROOT/${ground_role}-node-$ground_node$csp_suffix"
 	local config_file
 
 	config_file="$(write_ground_config)"
@@ -245,7 +245,7 @@ wait_for_output()
 
 run_ground_node()
 {
-	local build_dir="$KGROUND_BUILD_ROOT/node-$ground_node$csp_suffix"
+	local build_dir="$KGROUND_BUILD_ROOT/${ground_role}-node-$ground_node$csp_suffix"
 	local executable="$build_dir/zephyr/zephyr.exe"
 	local work_dir
 	local input_fifo

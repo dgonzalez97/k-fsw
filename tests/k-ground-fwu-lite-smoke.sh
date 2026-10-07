@@ -113,12 +113,12 @@ KGROUND_STATION_DIR="$station_dir" \
 KGROUND_STATION_DIR="$station_dir" \
 	"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-ops
 
-node16_executable="$KGROUND_BUILD_ROOT/node-16/zephyr/zephyr.exe"
-node19_executable="$KGROUND_BUILD_ROOT/node-19/zephyr/zephyr.exe"
+node16_executable="$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16/zephyr/zephyr.exe"
+node19_executable="$KGROUND_BUILD_ROOT/kfsw-ops-node-19/zephyr/zephyr.exe"
 [[ -x "$node16_executable" ]] || fail "node 16 executable is missing"
 [[ -x "$node19_executable" ]] || fail "node 19 executable is missing"
 
-for node_config in node-16 node-19; do
+for node_config in kfsw-gnd-uhf-node-16 kfsw-ops-node-19; do
 	grep -Fq 'CONFIG_KFSW_FWU_LITE_CSP=y' \
 		"$KGROUND_BUILD_ROOT/$node_config/zephyr/.config" || \
 		fail "$node_config did not compose the direct upload path"

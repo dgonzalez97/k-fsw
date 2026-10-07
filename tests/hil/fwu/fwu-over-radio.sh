@@ -210,7 +210,7 @@ KGROUND_STATION_DIR="$station_dir" \
 	"$KFSW_REPO_DIR/tools/k-ground" build kfsw-gnd-uhf --peer "$FLIGHT_NODE" \
 	>"$work_dir/ground-build.log" 2>&1 || fail "the ground station did not build"
 
-ground_executable="$KFSW_ROOT/build/k-ground/node-$GROUND_NODE/zephyr/zephyr.exe"
+ground_executable="$KFSW_ROOT/build/k-ground/kfsw-gnd-uhf-node-$GROUND_NODE/zephyr/zephyr.exe"
 [[ -x "$ground_executable" ]] || fail "the ground executable is missing"
 
 mkfifo "$work_dir/ground.in"
