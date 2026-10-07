@@ -55,6 +55,45 @@ cleared with `param clear`, keeps nothing stored, which is the state to recover
 from a bad saved value. Until something saves a snapshot, every restart counts
 as the first; `param save` starts the count.
 
+### Image trials and reverts
+
+Table 32 exposes read-only trial diagnostics. `version` prints them too.
+
+| Offset | Parameter | Meaning |
+| --- | --- | --- |
+| `0x2c` | `boot_attempts` | Unconfirmed boots recorded for the running image; resets to zero on confirmation and saturates at `4294967294`. |
+| `0x29` | `boot_revert_reason` | Last observed revert: 0 none, 1 unconfirmed image replaced with revert pending, 2 unconfirmed image replaced without an observed pending revert. |
+| `0x2a` | `boot_trial_valid` | 1 when recovery and the current save succeeded; otherwise 0. |
+
+The service identifies images by their signed SHA256 TLV and records a boot
+immediately after storage mount. It saves `/kfsw/boot-trial.dat` in the existing
+persistent filesystem, independently of parameter snapshots and autosave. A
+magic and CRC32 validate the record; a synced temporary file is renamed over
+the previous copy. An interrupted write leaves the previous good copy intact.
+The count survives power cuts after a completed save. Boots that fail before
+the service records them cannot be counted, and an interrupted save may lose
+the latest increment.
+
+The reason is the one the service can establish, not a verdict from the
+bootloader: an image previously observed unconfirmed is no longer running.
+Reason 1 additionally records that MCUboot scheduled a revert while that image
+was last recorded; the service had not recorded its confirmation. The previous image
+identity is kept in the same record. It does not establish why confirmation was missed or distinguish a bootloader
+revert from another replacement of an unconfirmed image. The reason remains
+stored when the running image is confirmed; only the attempt count resets.
+Confirming through `boot_confirmed` saves that reset immediately. Confirmation
+through the separate MCUboot shell is reflected at the next service startup.
+
+Without MCUboot, including on native_sim, or if image identity, storage or
+snapshot validation fails, attempts is `4294967295`, reason is `255`, and
+validity is 0. A corrupt record is preserved and reported invalid rather than
+silently restarting the count at one.
+
+Software recovery coverage runs the native_sim ztest image twice against the
+same flash file with `tests/boot-diagnostics-restart.sh <zephyr.exe>`. Physical
+power-cut and MCUboot rollback acceptance require hardware and have not been
+run for this change.
+
 ## Housekeeping
 
 Reports collect local and remote parameters. A periodic report keeps its

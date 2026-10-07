@@ -140,6 +140,8 @@ static int cmd_time(const struct shell *sh, size_t argc, char **argv)
 
 static int cmd_version(const struct shell *sh, size_t argc, char **argv)
 {
+	struct kfsw_boot_diagnostics diagnostic;
+
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 
@@ -149,6 +151,11 @@ static int cmd_version(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "Board: %s", CONFIG_BOARD_TARGET);
 	shell_print(sh, "SoC: %s", CONFIG_SOC);
 	shell_print(sh, "Unit: %s", kfsw_boot_get_hardware_id());
+
+	kfsw_boot_get_diagnostics(&diagnostic);
+	shell_print(sh, "Boot trial: attempts=%u revert_reason=%u valid=%u",
+		    (unsigned int)diagnostic.attempts, diagnostic.revert_reason,
+		    diagnostic.valid ? 1U : 0U);
 
 	return 0;
 }
