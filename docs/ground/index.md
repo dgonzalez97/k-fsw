@@ -67,7 +67,10 @@ command -v socat
 See @ref getting_started for the workspace setup.
 
 The launcher uses `k-fsw/ground-station` and writes to `build/k-ground` by
-default. To use other directories in the current shell:
+default. Each profile uses `<profile>-node-<node>` for its build directory and
+generated configuration basename, with `-csp1` appended for CSP v1. For example,
+`kfsw-gnd-uhf` uses `build/k-ground/kfsw-gnd-uhf-node-16`, keeping it separate
+from other profiles at node 16. To use other directories in the current shell:
 
 ```bash
 export KGROUND_STATION_DIR="$PWD/ground-station"

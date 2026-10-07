@@ -50,7 +50,7 @@ if [[ "${1:-}" != "--no-build" ]]; then
 	sleep 3
 fi
 
-ground_exe="$root/build/k-ground/node-$ground/zephyr/zephyr.exe"
+ground_exe="$root/build/k-ground/kfsw-gnd-can-node-$ground/zephyr/zephyr.exe"
 [[ -x "$ground_exe" ]] || fail "ground node $ground has not been built"
 
 printf '%s\n' \
