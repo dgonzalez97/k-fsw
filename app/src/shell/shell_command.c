@@ -6,6 +6,7 @@
 #include <zephyr/shell/shell.h>
 #include <zephyr/shell/shell_string_conv.h>
 
+#include <kfsw/comms/csp.h>
 #include <kfsw/services/command.h>
 
 #include "shell_command.h"
@@ -19,16 +20,14 @@
  * generic "cmd" front end.
  */
 
-#define CSP_BROADCAST_ADDRESS 16383U
-
 int kfsw_shell_parse_node(const struct shell *sh, const char *text, uint16_t *node)
 {
 	unsigned long parsed;
 	int parse_error = 0;
 
 	parsed = shell_strtoul(text, 10, &parse_error);
-	if ((parse_error != 0) || (parsed == 0U) || (parsed >= CSP_BROADCAST_ADDRESS)) {
-		shell_error(sh, "Node must be 1..%u: %s", CSP_BROADCAST_ADDRESS - 1U, text);
+	if ((parse_error != 0) || (parsed == 0U) || (parsed >= KFSW_CSP_BROADCAST_ADDRESS)) {
+		shell_error(sh, "Node must be 1..%u: %s", KFSW_CSP_BROADCAST_ADDRESS - 1U, text);
 		return -EINVAL;
 	}
 	*node = (uint16_t)parsed;

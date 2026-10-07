@@ -6,6 +6,7 @@
 
 #include <csp/csp_error.h>
 
+#include <kfsw/comms/csp.h>
 #include <kfsw/comms/uart.h>
 
 #include "shell_remote.h"
@@ -49,8 +50,9 @@ static int cmd_uart_test(const struct shell *sh, size_t argc, char **argv)
 
 	if (argc == 2U) {
 		peer = shell_strtoul(argv[1], 10, &parse_error);
-		if (parse_error != 0 || peer > 16383U) {
-			shell_error(sh, "CSP peer must be in range 0..16383");
+		if (parse_error != 0 || peer > KFSW_CSP_BROADCAST_ADDRESS) {
+			shell_error(sh, "CSP peer must be in range 0..%u",
+				    KFSW_CSP_BROADCAST_ADDRESS);
 			return -EINVAL;
 		}
 	}
