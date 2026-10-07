@@ -106,6 +106,25 @@ jobs:
       - name: Run shell, CSP, PARAM, storage, and FTP integration tests
         run: ./k-fsw/tools/ci/integration.sh
 
+  csp-v1:
+    name: INTEGRATION / CSP 1
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out K-FSW
+        uses: actions/checkout@v4
+        with:
+          path: k-fsw
+
+      - name: Set up the workspace
+        uses: ./k-fsw/.github/actions/workspace
+        with:
+          packages: socat
+          requirements: k-fsw/tests/requirements.txt
+
+      - name: Build and run the CSP smokes under CSP 1
+        run: ./k-fsw/tools/ci/csp-v1.sh
+
   valgrind:
     name: MEMORY / Valgrind
     runs-on: ubuntu-24.04

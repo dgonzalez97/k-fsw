@@ -2,7 +2,8 @@
 set -Eeuo pipefail
 
 repo_dir="$(readlink -f "$(dirname "$0")/..")"
-build_root="$(dirname "$repo_dir")/build/tests/multi-kiss"
+source "$repo_dir/tests/csp-version.sh"
+build_root="$(dirname "$repo_dir")/build/tests/multi-kiss$csp_suffix"
 work_dir="$(mktemp -d /tmp/kfsw-multi-kiss.XXXXXX)"
 router_pid=""
 node_a_pid=""
@@ -137,16 +138,16 @@ wait_for_output "$work_dir/router.log" "UART transport: KISS_2" "$router_pid" ||
 	fail "UART diagnostics collapsed the two interfaces"
 sleep 0.1
 
-grep -Fq "10/14 -> KISS_1 direct" "$work_dir/router.log" || \
+grep -Fq "10/$csp_host_bits -> KISS_1 direct" "$work_dir/router.log" || \
 	fail "KISS_1 route is missing"
-grep -Fq "11/14 -> KISS_2 via 11" "$work_dir/router.log" || \
+grep -Fq "11/$csp_host_bits -> KISS_2 via 11" "$work_dir/router.log" || \
 	fail "KISS_2 VIA route is missing or lost its next hop"
 
 kiss_1_stats="$(last_interface_line KISS_1)"
 kiss_2_stats="$(last_interface_line KISS_2)"
-grep -Eq 'KISS_1 addr=8/14 .*tx=[1-9][0-9]* rx=[1-9][0-9]*' <<<"$kiss_1_stats" || \
+grep -Eq "KISS_1 addr=8/$csp_host_bits .*tx=[1-9][0-9]* rx=[1-9][0-9]*" <<<"$kiss_1_stats" || \
 	fail "KISS_1 does not have independent nonzero counters"
-grep -Eq 'KISS_2 addr=9/14 .*tx=[1-9][0-9]* rx=[1-9][0-9]*' <<<"$kiss_2_stats" || \
+grep -Eq "KISS_2 addr=9/$csp_host_bits .*tx=[1-9][0-9]* rx=[1-9][0-9]*" <<<"$kiss_2_stats" || \
 	fail "KISS_2 does not have independent nonzero counters"
 
 echo "$kiss_1_stats"
