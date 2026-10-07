@@ -1,6 +1,6 @@
 <p align="center"><img src="docs/media/title.svg" alt="K-FSW"></p>
 
-# K-FSW - Modular flight software on Zephyr, for small satellites
+# K-FSW (KFSW): modular flight software on Zephyr, for small satellites
 
 [![Software CI](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dgonzalez97/k-fsw/actions/workflows/ci.yml)
 [![Documentation](https://img.shields.io/badge/docs-K--FSW-294c69)](https://dgonzalez97.github.io/k-fsw/)
@@ -78,8 +78,9 @@ other ground roles.
 
 ### Parameters
 
-`param tables` lists local tables; `param table <id>` prints one.
-Use `param tablelist <node>` to inspect another node.
+`param tables` lists the tables, `param table <id>` prints one with its values
+and `param list` prints every parameter. Put a node number first to ask
+another node: `param tables 2`.
 
 Remote access uses [Space Inventor's libparam](https://github.com/spaceinventor/libparam).
 

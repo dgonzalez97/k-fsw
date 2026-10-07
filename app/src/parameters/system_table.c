@@ -109,6 +109,7 @@ static const struct kfsw_param_definition system_param_definitions[] = {
 const struct kfsw_param_definition_set kfsw_system_param_definitions = {
 	.table = KFSW_PARAM_TABLE_SYSTEM,
 	.name = KFSW_PARAM_TABLE_SYSTEM_NAME,
+	.description = "Boot delay, report period, reboot pin",
 	.definitions = system_param_definitions,
 	.count = ARRAY_SIZE(system_param_definitions),
 };

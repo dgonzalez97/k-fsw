@@ -267,6 +267,7 @@ static const struct kfsw_param_definition board_param_definitions[] = {
 const struct kfsw_param_definition_set kfsw_board_param_definitions = {
 	.table = KFSW_PARAM_TABLE_BOARD,
 	.name = KFSW_PARAM_TABLE_BOARD_NAME,
+	.description = "Node identity and what the board carries",
 	.definitions = board_param_definitions,
 	.count = ARRAY_SIZE(board_param_definitions),
 };

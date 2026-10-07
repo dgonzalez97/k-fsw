@@ -38,7 +38,8 @@ def main():
         node.command('gndwdt timeout 7199', 'Timeout refused:')
         node.command('gndwdt timeout 432001', 'Timeout refused:')
         node.command('param set ground_wtd_timeout 7200', 'ground_wtd_timeout = 7200')
-        node.command('cmd ground_wtd KFSWWSFK', 'ground_wtd node=0: denied')
+        # A node does not feed its own watchdog, not even by naming itself.
+        node.command('gndwdt feed 1', 'Node 1 is this node')
         node.command('gndwdt contact', 'Subcommands:')
         with serial.Serial(node.device, 115200, timeout=.02, write_timeout=1) as port:
             count = node.parameter('gndwdt_contacts')
@@ -57,15 +58,18 @@ def main():
                 assert node.parameter('gndwdt_contacts') == count
                 assert node.parameter('gndwdt_last_node') == source
             assert node.parameter('ground_wtd_cnt') <= 7200
-            time.sleep(2)
-            before_get = node.parameter('ground_wtd_cnt')
+            # Wait on the node's clock, not ours: a loaded host runs native_sim behind.
+            deadline = time.monotonic() + 10
+            while (before_get := node.parameter('ground_wtd_cnt')) > 7198:
+                assert time.monotonic() < deadline, 'the countdown did not move'
+                time.sleep(.2)
             reply = exchange(port, request(b'get'))
             assert reply[2] == 0
             remaining = int(reply[12:].split()[0].split(b'=')[1])
             assert 0 < remaining <= before_get <= 7198
             assert reply[12:].endswith(b'ground_wtd_timeout=7200')
             assert node.parameter('gndwdt_contacts') == count
-            node.command('cmd ground_wtd get', r'ground_wtd_cnt=\d+ ground_wtd_timeout=7200')
+            node.command('gndwdt show', r'ground_wtd_timeout: 7200\s+ground_wtd_cnt: \d+')
             since = node.parameter('gndwdt_since_s')
             assert since >= 2
             node.command('gndwdt timeout 7200', 'Ground watchdog timeout_s: 7200')

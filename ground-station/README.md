@@ -6,9 +6,12 @@ role, its CSP address and its peer. There are no drivers or services here.
 | Role | CSP node | Use |
 | --- | --- | --- |
 | `kfsw-gnd-uhf` | 16 | UHF gateway; bridge its KISS PTY to the Holybro radio |
-| `kfsw-gnd-uhf-bench` | 16 | UHF gateway routed to flight node 2 |
 | `kfsw-gnd-can` | 16 | Reaches a flight node over CAN |
 | `kfsw-ops` | 19 | Operator shell |
+
+`KFSW_CSP_NODE` is the node's address and `KFSW_CSP_PEER` the node `uart test`
+pings; routes come from `KFSW_CSP_ROUTES`. A bench variant goes in a file
+ending in `-bench.env`, which git ignores.
 
 ## Yamcs
 
@@ -41,5 +44,5 @@ A node file can set a route table:
 KFSW_CSP_ROUTES='2/14 KISS,16/10 KISS 2'
 ```
 
-Without it the node uses the direct `0/0 KISS` route. Traffic to the node's
+Without it the node keeps the `0/0 KISS` route of the k-ground profile. Traffic to the node's
 own address goes through loopback.

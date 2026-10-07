@@ -9,10 +9,20 @@
 #include <zephyr/shell/shell_string_conv.h>
 #include <zephyr/sys/util.h>
 
+#include <csp/csp_error.h>
 #include <kfsw/comms/csp.h>
 #if CONFIG_KFSW_COMMAND
 #include <kfsw/services/command.h>
+
+#include "shell_command.h"
 #endif
+#include "shell_remote.h"
+
+/* libcsp's own timeout code, as the ping and identity exchanges return it. */
+static int as_errno(int csp_result)
+{
+	return (csp_result == CSP_ERR_TIMEDOUT) ? -ETIMEDOUT : csp_result;
+}
 
 #define KFSW_CSP_PING_TIMEOUT_MS 1000U
 #define KFSW_CSP_PING_PAYLOAD_SIZE 10U
@@ -54,7 +64,8 @@ static int cmd_csp_info(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "hostname: %s", info.hostname);
 	shell_print(sh, "model: %s", info.model);
 	shell_print(sh, "revision: %s", info.revision);
-	shell_print(sh, "date: %s %s", info.build_date, info.build_time);
+	shell_print(sh, "libcsp: %s", info.libcsp);
+	shell_print(sh, "protocol: CSP v%u", info.protocol);
 	shell_print(sh, "free_buffers: %zu", info.free_buffers);
 
 	return 0;
@@ -112,7 +123,7 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 {
 	struct kfsw_csp_info info;
 	unsigned long node;
-	uint32_t round_trip_ms;
+	uint32_t round_trip_us;
 	int parse_error = 0;
 	int result;
 
@@ -124,21 +135,22 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 		shell_print(sh, "No node given; using this node (%lu)", node);
 	} else {
 		node = shell_strtoul(argv[1], 10, &parse_error);
-		if (parse_error != 0 || node > 16383U) {
-			shell_error(sh, "CSP node must be in range 0..16383");
+		if (parse_error != 0 || node > KFSW_CSP_BROADCAST_ADDRESS) {
+			shell_error(sh, "CSP node must be in range 0..%u",
+				    KFSW_CSP_BROADCAST_ADDRESS);
 			return -EINVAL;
 		}
 	}
 
 	/* Pinging this node goes through the loopback interface. */
 	result = kfsw_csp_ping((uint16_t)node, KFSW_CSP_PING_TIMEOUT_MS, KFSW_CSP_PING_PAYLOAD_SIZE,
-			       &round_trip_ms);
+			       &round_trip_us);
 	if (result != 0) {
-		shell_error(sh, "CSP ping %lu: failed (%d)", node, result);
-		return result;
+		return kfsw_shell_remote_failed(sh, "csp ping", (uint16_t)node, as_errno(result));
 	}
 
-	shell_print(sh, "CSP ping %lu: success, rtt_ms=%u", node, round_trip_ms);
+	shell_print(sh, "CSP ping %lu: success", node);
+	shell_print(sh, "rtt_ms: %u.%03u", round_trip_us / 1000U, round_trip_us % 1000U);
 	return 0;
 }
 
@@ -150,22 +162,27 @@ static int cmd_csp_ifstat(const struct shell *sh, size_t argc, char **argv)
 	int result;
 
 	ARG_UNUSED(argc);
-	if ((parse_error != 0) || (node > 16383U)) {
-		shell_error(sh, "CSP node must be in range 0..16383");
+	if ((parse_error != 0) || (node > KFSW_CSP_BROADCAST_ADDRESS)) {
+		shell_error(sh, "CSP node must be in range 0..%u", KFSW_CSP_BROADCAST_ADDRESS);
 		return -EINVAL;
 	}
 	result = kfsw_csp_interface_stats_read((uint16_t)node, argv[2], KFSW_CSP_PING_TIMEOUT_MS,
 					       &stats);
 	if (result != 0) {
-		shell_error(sh, "CSP ifstat node=%lu interface=%s: failed (%d)", node, argv[2],
-			    result);
-		return result;
+		/* A node that carries no such interface does not answer either. */
+		return kfsw_shell_remote_failed(sh, "csp ifstat", (uint16_t)node, result);
 	}
-	shell_print(sh, "CSP ifstat node=%lu interface=%s tx=%u rx=%u txerr=%u rxerr=%u drop=%u",
-		    node, stats.name, stats.tx_packets, stats.rx_packets, stats.tx_errors,
-		    stats.rx_errors, stats.dropped_packets);
-	shell_print(sh, "autherr=%u frame=%u txbytes=%u rxbytes=%u irq=%u", stats.auth_errors,
-		    stats.frame_errors, stats.tx_bytes, stats.rx_bytes, stats.interrupts);
+	shell_print(sh, "CSP ifstat %lu %s", node, stats.name);
+	shell_print(sh, "tx: %u", stats.tx_packets);
+	shell_print(sh, "rx: %u", stats.rx_packets);
+	shell_print(sh, "txerr: %u", stats.tx_errors);
+	shell_print(sh, "rxerr: %u", stats.rx_errors);
+	shell_print(sh, "drop: %u", stats.dropped_packets);
+	shell_print(sh, "autherr: %u", stats.auth_errors);
+	shell_print(sh, "frame: %u", stats.frame_errors);
+	shell_print(sh, "txbytes: %u", stats.tx_bytes);
+	shell_print(sh, "rxbytes: %u", stats.rx_bytes);
+	shell_print(sh, "irq: %u", stats.interrupts);
 	return 0;
 }
 
@@ -234,29 +251,30 @@ static int cmd_csp_ident(const struct shell *sh, size_t argc, char **argv)
 		shell_print(sh, "hostname: %s", info.hostname);
 		shell_print(sh, "model: %s", info.model);
 		shell_print(sh, "revision: %s", info.revision);
-		shell_print(sh, "built: %s %s", info.build_date, info.build_time);
 		kfsw_csp_clock_get(&clock);
 		print_clock(sh, "clock", &clock);
 		return 0;
 	}
 
 	node = strtoul(argv[1], &end, 0);
-	if ((end == argv[1]) || (*end != '\0') || (node > 16383UL)) {
+	if ((end == argv[1]) || (*end != '\0') || (node > KFSW_CSP_BROADCAST_ADDRESS)) {
 		shell_error(sh, "Invalid node: %s", argv[1]);
 		return -EINVAL;
 	}
 
 	result = kfsw_csp_identify((uint16_t)node, KFSW_CSP_PING_TIMEOUT_MS, &identity);
 	if (result != 0) {
-		shell_error(sh, "CSP ident %lu: failed (%d)", node, result);
-		return result;
+		return kfsw_shell_remote_failed(sh, "csp ident", (uint16_t)node, as_errno(result));
 	}
 
 	shell_print(sh, "CSP ident %lu", node);
 	shell_print(sh, "hostname: %s", identity.hostname);
 	shell_print(sh, "model: %s", identity.model);
 	shell_print(sh, "revision: %s", identity.revision);
-	shell_print(sh, "built: %s %s", identity.date, identity.time);
+	/* K-FSW nodes leave it empty; another libcsp node may still send one. */
+	if (identity.date[0] != '\0') {
+		shell_print(sh, "built: %s %s", identity.date, identity.time);
+	}
 
 	/* A second exchange for the clock, which the identity reply doesn't carry. */
 	if (kfsw_csp_clock_read((uint16_t)node, KFSW_CSP_PING_TIMEOUT_MS, &clock) == 0) {
@@ -271,35 +289,13 @@ static int cmd_csp_ident(const struct shell *sh, size_t argc, char **argv)
 /* The pin is checked on the node that restarts. */
 static int cmd_csp_reboot(const struct shell *sh, size_t argc, char **argv)
 {
-	struct kfsw_command_result result = {0};
-	struct kfsw_command_arg args[1];
-	unsigned long node;
-	char *end;
-	int outcome;
+	uint16_t node;
+	int result = kfsw_shell_parse_node(sh, argv[1], &node);
 
-	node = strtoul(argv[1], &end, 0);
-	if ((end == argv[1]) || (*end != '\0') || (node > 16383UL)) {
-		shell_error(sh, "Invalid node: %s", argv[1]);
-		return -EINVAL;
+	if (result != 0) {
+		return result;
 	}
-
-	args[0].type = KFSW_COMMAND_TYPE_TEXT;
-	args[0].value.text = argv[2];
-
-	outcome = kfsw_command_invoke_remote((uint16_t)node, "reboot", args, ARRAY_SIZE(args),
-					     &result);
-	if (outcome != 0) {
-		shell_error(sh, "reboot node=%lu: %d", node, outcome);
-		return outcome;
-	}
-	if (result.status != KFSW_COMMAND_OK) {
-		shell_error(sh, "reboot node=%lu: %s%s%s", node,
-			    kfsw_command_status_name(result.status),
-			    (result.detail[0] != '\0') ? " " : "", result.detail);
-		return -EACCES;
-	}
-	shell_print(sh, "reboot node=%lu: OK %s", node, result.detail);
-	return 0;
+	return kfsw_shell_run_command(sh, node, "reboot", argc - 2U, &argv[2]);
 }
 #endif
 
@@ -345,7 +341,7 @@ static int cmd_csp_clock(const struct shell *sh, size_t argc, char **argv)
 	}
 
 	node = strtoul(argv[1], &end, 0);
-	if ((end == argv[1]) || (*end != '\0') || (node > 16383UL)) {
+	if ((end == argv[1]) || (*end != '\0') || (node > KFSW_CSP_BROADCAST_ADDRESS)) {
 		shell_error(sh, "Invalid node: %s", argv[1]);
 		return -EINVAL;
 	}
@@ -396,10 +392,10 @@ SHELL_STATIC_SUBCMD_SET_CREATE(csp_commands,
 	SHELL_CMD_ARG(ping, NULL, "Ping a node, or this one when no node is given.", cmd_csp_ping,
 		      1, 1),
 #if CONFIG_KFSW_COMMAND && CONFIG_REBOOT
-	SHELL_CMD_ARG(reboot, NULL, "Restart a node: reboot <node> <pin>.", cmd_csp_reboot, 3,
-		      0),
+	SHELL_CMD_ARG(reboot, NULL, "Restart a node: reboot <node> <pin> [--retry].",
+		      cmd_csp_reboot, 3, 1),
 #endif
 	SHELL_CMD_ARG(routes, NULL, "Show the CSP static routing table.", cmd_csp_routes, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(csp, &csp_commands, "K-FSW CSP commands.", NULL);
+SHELL_CMD_REGISTER(csp, &csp_commands, "CSP commands.", NULL);

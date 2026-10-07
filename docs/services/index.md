@@ -1,12 +1,14 @@
-# Services and storage {#services}
+# Services {#services}
 
 [TOC]
 
 ## Services
 
 `kfsw-services` provides boot markers, logging, parameters, persistence,
-files, commands, events, health, housekeeping, file based operations, and
-firmware updates. The application selects and starts them.
+uploadable tables, files, commands, events, health, housekeeping, file based
+operations, and firmware updates. The application selects and starts them. The
+[kfsw-services README](https://github.com/dgonzalez97/kfsw-services#readme)
+lists each one with the Kconfig option that turns it on.
 
 Storage is in `kfsw-platform`. Network services use the router and interfaces
 in `kfsw-comms`. For housekeeping and Yamcs, see @ref ground. For uploads and
@@ -14,7 +16,8 @@ boot recovery, see @ref firmware_update. The API is in @ref kfsw_services.
 
 ## Boot and readiness markers
 
-At startup the boot service reads and clears the reset cause and prints:
+At startup the boot service reads and clears the reset cause and logs these
+markers (see [Logging](#logging) for how markers differ from other messages):
 
 ```text
 @SERVICES ok failures=0
@@ -32,16 +35,64 @@ startup; release builds set the version and source commit explicitly, see
 ### Build revisions
 
 `boot_image` identifies the `k-fsw` revision. `boot_revisions` also lists the
-platform, services, communications and modules revisions used in the build:
+platform, services, communications, modules, libcsp and libparam revisions
+used in the build, eight hex digits each; `status` prints them one a line:
 
 ```text
 kfsw:~$ version
-K-FSW: v1.0.1-26-g1ba9630
-Revisions: app:1ba96309fb plat:31818d2c37 svc:919c4c43ba comms:d35abd4986 mod:b476a0c9ed
+K-FSW: v1.0.4-77-g3516c1a
+Revisions: app:3516c1a1 plat:049b7289 svc:ed838173 comms:b4289702 mod:ad39ef41 csp:d62491f5 param:c8a7c104
 ```
 
 Read `boot_revisions` from table 32. A trailing `+` marks a repository with
 uncommitted changes at build time.
+
+### Restart count
+
+`boot_count` in table 32 counts restarts across the life of the node. It is
+saved only when a parameter snapshot already exists: a new flash, or one
+cleared with `param clear`, keeps nothing stored, which is the state to recover
+from a bad saved value. Until something saves a snapshot, every restart counts
+as the first; `param save` starts the count.
+
+### Image trials and reverts
+
+Table 32 exposes read-only trial diagnostics. `version` prints them too.
+
+| Offset | Parameter | Meaning |
+| --- | --- | --- |
+| `0x2c` | `boot_attempts` | Unconfirmed boots recorded for the running image; resets to zero on confirmation and saturates at `4294967294`. |
+| `0x29` | `boot_revert_reason` | Last observed revert: 0 none, 1 unconfirmed image replaced with revert pending, 2 unconfirmed image replaced without an observed pending revert. |
+| `0x2a` | `boot_trial_valid` | 1 when recovery and the current save succeeded; otherwise 0. |
+
+The service identifies images by their signed SHA256 TLV and records a boot
+immediately after storage mount. It saves `/kfsw/boot-trial.dat` in the existing
+persistent filesystem, independently of parameter snapshots and autosave. A
+magic and CRC32 validate the record; a synced temporary file is renamed over
+the previous copy. An interrupted write leaves the previous good copy intact.
+The count survives power cuts after a completed save. Boots that fail before
+the service records them cannot be counted, and an interrupted save may lose
+the latest increment.
+
+The reason is the one the service can establish, not a verdict from the
+bootloader: an image previously observed unconfirmed is no longer running.
+Reason 1 additionally records that MCUboot scheduled a revert while that image
+was last recorded; the service had not recorded its confirmation. The previous image
+identity is kept in the same record. It does not establish why confirmation was missed or distinguish a bootloader
+revert from another replacement of an unconfirmed image. The reason remains
+stored when the running image is confirmed; only the attempt count resets.
+Confirming through `boot_confirmed` saves that reset immediately. Confirmation
+through the separate MCUboot shell is reflected at the next service startup.
+
+Without MCUboot, including on native_sim, or if image identity, storage or
+snapshot validation fails, attempts is `4294967295`, reason is `255`, and
+validity is 0. A corrupt record is preserved and reported invalid rather than
+silently restarting the count at one.
+
+Software recovery coverage runs the native_sim ztest image twice against the
+same flash file with `tests/boot-diagnostics-restart.sh <zephyr.exe>`. Physical
+power-cut and MCUboot rollback acceptance require hardware and have not been
+run for this change.
 
 ## Housekeeping
 
@@ -58,12 +109,67 @@ fails, the shell says the change is only in RAM; retry with `hk save`. A
 rejected settings file is kept until a save replaces it. Restoring settings
 keeps the existing sample files and their sequence numbers.
 
+### Reading stored samples back
+
+`hk store <report> <ms>` keeps samples in `/kfsw/hk/report<N>.bin`, a ring of
+fixed-size slots where each record is the frame itself: version, report,
+sequence, collection time, entry count, flags and the values. So a stored record
+needs no decoding to be served again, and `hk stored <report>` prints it exactly
+as `hk get` prints a live one.
+
+The record count is what the ring holds, not what was ever collected. Once the
+file is full the oldest slot is overwritten, and the readable window is the last
+`CONFIG_KFSW_HK_STORE_CAPACITY` sequence numbers.
+
+A filter narrows what is read or extracted. Each part is optional and a zero
+means no bound:
+
+| Filter | Selects |
+| --- | --- |
+| `from=<seq>` | records at or after that sequence |
+| `to=<seq>` | records at or before it |
+| `since=<seconds>` | records collected at or after that time |
+| `until=<seconds>` | records collected at or before it |
+| `skip=<flags>` | leaves out records carrying any of those flags |
+
+Sequence numbers wrap at 16 bits, so a window is compared as a signed
+difference and a range across the wrap still selects what it should.
+
+`hk extract <report> <path> [filters]` writes the selected records to a file for
+downlink. It has a 20-byte header (magic `KHKD`, version, report, record size,
+record count, the first and last sequence, and a CRC32 over the whole file with
+those four bytes zeroed), then the records unchanged, so the ground decodes them
+with the report definition it already has. The file is written beside the target
+and renamed over it, so an interrupted extract leaves the previous one.
+
+Written under `/kfsw/hk` it is downloadable straight away, because file transfer
+already serves that directory read-only:
+
+```bash
+hk extract 0 /kfsw/hk/pass.bin since=1790744000
+ftp get 1 /hk/pass.bin ./pass.bin
+```
+
+An extract counts the selection before writing and refuses with `-EAGAIN` if the
+ring moved between the two passes, rather than leaving a file whose header
+disagrees with its records.
+
 ## File based operations
 
 `fbo run <name>` runs the commands in a procedure file, `fbo stop` ends the
-run, and `fbo status` shows what it did. File size, line length and scanned
-bytes are limited, and comments count toward the scan limit. An I/O error
-stops the procedure.
+run, and `fbo status` shows what it did. The file is
+`/procedures/<name>` under the FTP root, `/kfsw/ftp/procedures` on the node,
+so it is uploaded like any file:
+
+```text
+ftp put 2 /procedures/check-in.txt /procedures/check-in.txt
+fbo run check-in.txt
+```
+
+File size, line length and scanned bytes are limited, and comments count toward
+the scan limit. An I/O error stops the procedure. Examples to copy are in
+[tests/procedures/examples](https://github.com/dgonzalez97/k-fsw/tree/main/tests/procedures/examples);
+the FBO smoke test runs each of them.
 
 ```text
 on-error continue
@@ -102,17 +208,17 @@ events must meet `CONFIG_KFSW_JOURNAL_MIN_SEVERITY` (warning by default).
 Text logging and the existing RAM event ring remain separate.
 
 ```text
-cmd journal_stats
-cmd journal_tail 0
-cmd journal_time 0
-cmd 2 journal_tail 0
+journal stats
+journal tail 0
+journal time 0
+journal tail 2 0
 ```
 
-Age 0 is the newest committed record. `journal_tail` returns boot identity,
-source, event ID, severity and the original payload in hex. `journal_time`
+Age 0 is the newest committed record. `journal tail` returns boot identity,
+source, event ID, severity and the original payload in hex. `journal time`
 returns the journal sequence, original event uptime in microseconds, UTC and
 its validity. Uptime is captured with the event; UTC is sampled by the writer.
-New records shift the ages. Read `journal_time` before and after the tail and
+New records shift the ages. Read `journal time` before and after the tail and
 check that the sequence is unchanged.
 The C read API returns all fields from one record. Reads do not consume data.
 
@@ -145,7 +251,43 @@ last error. Records still queued, failed or in progress can be lost at power
 failure. Native fault tests cover these policies; physical power-cut
 qualification remains pending.
 
-## Logging
+## Logging {#logging}
+
+Code reports what happened through the log, not with `printk`. A file names
+its module once and calls the macro for the level:
+
+```c
+#define KFSW_LOG_MODULE KFSW_LOG_MODULE_RADIO
+#include <kfsw/services/log.h>
+
+kfsw_log_info("Radio session to node %u established", peer);
+kfsw_log_error("Radio protection not started: %d", result);
+```
+
+Shell output answers the operator who typed a command; a log records what the
+node did, whether anyone asked or not. Shell handlers print with
+`shell_print`, and everything else logs. A message reaches the console, the
+history described below and, over CSP, the ground.
+
+Two kinds of line go through the log with rules of their own:
+
+- **Markers.** `@SERVICES`, `@BOOT`, `@SOURCE` and `@READY` are written with
+  `kfsw_log_marker()`. No level hides them, and they are printed without a
+  level tag so the line still starts with the marker that scripts look for.
+  The history keeps them like any message.
+- **The CSP packet trace.** With `csp debug on`, libcsp reports every packet;
+  each line is logged at INFO under the `csp` module, without libcsp's
+  colours. Leave it off on a busy link: it fills the history quickly.
+
+A node that starts logs, among others:
+
+```text
+[INFO] CSP initialized as node 1
+[INFO] CSP router started
+[INFO] Ground watchdog started, timeout 86400 s, armed
+@SERVICES ok failures=0
+@READY uptime_ms=0
+```
 
 Messages have four levels: DEBUG, INFO, WARNING and ERROR.
 `CONFIG_KFSW_LOG_MIN_LEVEL` removes the lower levels from the build. At
@@ -158,33 +300,60 @@ and debug dim. The colour codes wrap the whole line, so `[LEVEL] message`
 stays intact for scripts. `log_color` turns colour off.
 
 `CONFIG_KFSW_LOG_HISTORY` keeps the most recent K-FSW messages in a RAM ring
-(32 records by default, configurable from 1 to 128). `log history` prints up
-to 32 records locally. Each has a sequence, uptime in milliseconds, module,
-severity and up to 191 text bytes; longer messages are marked truncated.
-Log filters apply before retention.
-Zephyr logs, driver output and shell responses are not captured.
+(32 records by default, configurable from 1 to 128). Each record keeps the
+message as a cbprintf package: the address of its format string, the
+arguments, and any strings that were in RAM. Text is rebuilt when someone
+reads it, so a record costs 128 bytes instead of its full text. A message too
+long to package is kept as text, cut at 127 bytes and marked truncated.
+`log history` prints up to 32 records locally, with sequence, uptime in
+milliseconds, module, severity and up to 191 text bytes. Log filters apply
+before retention. Zephyr logs, driver output and shell responses are not
+captured.
 
-`CONFIG_KFSW_LOG_HISTORY_CSP` serves the history on CSP port 16 by default.
-Remote records carry at most 190 text bytes to fit encrypted radio links;
-longer records set the truncation flag. Local history keeps up to 191 bytes.
-It is enabled in the Linux composition. Other CSP compositions can use
-`config/profiles/log-history.conf`. Start the server after the CSP router.
-Reads do not remove records or write flash. UTC is not required.
+### Remote log
+
+`CONFIG_KFSW_LOG_REMOTE` serves the history, and the journal when
+`CONFIG_KFSW_JOURNAL` is set, on CSP port 16 with CRC32. Another node reads
+them from its shell:
+
+```text
+kfsw-ground# log remote 1 8          # newest 8 messages of node 1
+kfsw-ground# log remote 1 32 2       # warnings and errors only
+kfsw-ground# journal remote 1 10     # newest 10 journal records
+```
+
+Reads are bounded (1 to 32 records), do not remove anything, and do not need
+UTC. A node that does not answer within `CONFIG_KFSW_LOG_REMOTE_TIMEOUT_MS`
+(3 s) is logged as a warning.
+
+The serving node's `log_remote_format` parameter picks how messages travel:
+
+| Value | Format | On the requesting shell |
+| --- | --- | --- |
+| 0 | text, formatted on the serving node, at most 190 bytes | the message |
+| 1 | dictionary: the package as held | `pkg=<hex>` |
+
+Dictionary records are smaller on a radio link and carry no text. Decode a
+capture on a host with the ELF of the exact image that sent them:
+
+```bash
+./k-fsw/tools/ground/log-decode.py --elf build/nucleo_l496zg/zephyr/zephyr.elf capture.txt
+```
+
+It reads the format strings from the ELF and the package with Zephyr's
+dictionary parser, and prints each line with the text in place of `pkg=`.
+The Linux composition enables the service; other CSP compositions can use
+`config/profiles/log-remote.conf`. Start the server after the CSP router.
 
 `CONFIG_KFSW_LOG_HISTORY_RETAINED`, on by default, keeps the ring outside
 `.bss` so a reset that preserves RAM leaves the messages that explain it
 readable, and sequence numbers continue rather than restarting. The ring
 carries a magic, a version, the depth, the record size and a CRC32, all
-checked on first use; a ring that does not belong to the running image
+checked on first use, together with an identity of the running image, since
+a package points into it. A ring that does not belong to the running image
 starts clean, and a single record whose slot disagrees reads as missing.
 A power cycle clears RAM, so nothing is retained across one. Set the option
 to `n` for a ring that always starts empty.
-
-The host `csp-kiss logs` command reads a bounded window and saves JSON lines;
-see [remote diagnostics](../communications/index.md#remote-text-logs-and-discovery).
-It reports overwritten history, truncation and incomplete transfers. A busy
-writer can overwrite a requested record during transmission; that read fails
-explicitly and can be retried. There is no persistent cursor across resets.
 
 ## Parameters
 
@@ -210,10 +379,11 @@ local-only composition.
 
 ### Tables
 
-A parameter is addressed by table and offset. Table numbers are split in
-bands:
+A parameter is addressed by table and offset. Table numbers are split by the
+layer that defines the table, which `param tables` shows in its `layer`
+column:
 
-| Band | Used by |
+| Numbers | Used by |
 | --- | --- |
 | 0 | Reserved, never valid |
 | 1-24 | Application, platform and comms |
@@ -226,7 +396,11 @@ are unique inside a table. Names are unique on the node and up to
 `KFSW_PARAM_NAME_MAX` (32) characters; a longer name is refused at
 registration.
 
-| ID | Band | Name | Source |
+A definition set can carry a `description`, one short line saying what the
+table holds; `param tables` prints it in its `holds` column. Every table in
+the five repositories has one, and a new table should too.
+
+| ID | Layer | Name | Source |
 | --- | --- | --- | --- |
 | 1 | core | `board` | `k-fsw/app/src/parameters/board_table.c` |
 | 2 | core | `system` | `k-fsw/app/src/parameters/system_table.c` |
@@ -319,8 +493,9 @@ A named read asks the node for that one descriptor and then the value. A node
 that doesn't answer the lookup is read by downloading its whole descriptor
 list. The list is downloaded one indexed descriptor at a time and checked with
 a table CRC, so a failed download leaves no partial cache.
-`CONFIG_KFSW_PARAM_LIST_TIMEOUT_MS` (10 s) limits the download; raise it on
-nodes that list parameters over a slow radio.
+`CONFIG_KFSW_PARAM_LIST_TIMEOUT_MS` (3 s) limits the download, and so how long
+the shell waits for a node that does not answer. The radio compositions raise
+it to 40 s, since a listing takes about 35 s over a 57600 baud radio.
 
 The cache holds `CONFIG_KFSW_PARAM_REMOTE_POOL_SIZE` descriptors. Value requests
 are handled by a worker thread; when its queue is full the request is dropped
@@ -363,11 +538,54 @@ A save writes and syncs the temporary file and then renames it over the active
 file. If a step fails, the temporary file is removed and the previous snapshot
 stays. The CRC catches corruption; it is not authentication.
 
+## Parameter tables as files
+
+A snapshot is written by the node, covers every persistent value across all
+tables, and is adopted at boot. A table file is the other direction: written on
+the ground, addressing one table, and adopted when an operator says so. Both use
+the same value encoding, so one decoder reads either.
+
+```text
+  ground            node
+  edit a file  ->   ftp put   ->  table check <path>   nothing applied yet
+                                  table load  <path>   all of it, or none
+                                  table revert         the replaced values back
+```
+
+The file has a 20-byte header (magic `KTBL`, version 1, payload size, entry
+count, the table identifier and a CRC32) and then one entry per value: the
+offset within the table, the type code, the length and the big-endian value.
+`CONFIG_KFSW_TABLE_MAX_ENTRIES` caps how many entries a file may carry, and sets
+the read buffer and the number of replaced values held for a revert.
+
+A load is refused whole. Before anything is written the service checks the
+header and the CRC, then every entry: the offset has to name a parameter in that
+table, the type code has to be the one that parameter is written as, the length
+has to match it, the parameter must not be read-only, the same offset must not
+appear twice, and the parameter's own range check has to pass. The first entry
+that fails stops the load and is reported by position, offset and errno, so an
+operator knows which line of the file to fix. Nothing is applied, so a file with
+one bad value leaves the table exactly as it was.
+
+A successful load keeps the values it replaced, and `table revert` puts them
+back. Only the most recent load can be undone, and only once; there is no stack
+of loads. The held values do not survive a reset, so a load that needs to outlive
+one is followed by `param save`.
+
+`table dump <table> <path>` writes what is running as a file, so the usual way
+to change a table is to fetch that, edit one value on the ground and upload it
+back rather than composing a file from the manual. Read-only parameters and
+types no file carries are left out, because a load could not write them anyway.
+
+Table 37 reports the state, the last file, and the load, rejection and revert
+counters.
+
 ## Storage
 
-K-FSW mounts one [LittleFS](https://github.com/littlefs-project/littlefs)
-volume at `/kfsw`. The platform layer handles init, mount, unmount and
-capacity. Once it is mounted, services use the normal Zephyr
+K-FSW mounts a [LittleFS](https://github.com/littlefs-project/littlefs)
+volume in flash at `/kfsw` and, where the composition has a RAM disk, a 32 KB
+scratch volume at `/kfsw/tmp` that `kfsw_storage_tmp_mount()` formats at every
+boot. The platform layer handles init, mount, unmount and capacity. Once it is mounted, services use the normal Zephyr
 [filesystem API](https://docs.zephyrproject.org/4.4.0/services/file_system/index.html).
 
 The partition is selected with the `kfsw,storage-partition` devicetree
@@ -410,12 +628,27 @@ FTP path              Zephyr path
 
 Paths are up to 96 bytes. Relative paths, empty components, `.` and `..`,
 backslashes, control characters and embedded NULs are rejected. The sandbox is
-not access control. `/hk` is a second, read-only root with the housekeeping
-sample files.
+not access control. Three more roots sit beside it, and a listing of `/` shows
+each one that exists as a directory:
+
+| Path | Volume | Writable |
+| --- | --- | --- |
+| `/hk` | housekeeping sample files, in flash | no |
+| `/boot` | firmware slots, with `CONFIG_KFSW_FWU_FILES` | no |
+| `/tmp` | `/kfsw/tmp`, RAM, with `CONFIG_KFSW_STORAGE_TMP` | yes |
+
+`/tmp` is LittleFS on a RAM disk, formatted at every boot; nothing in it
+survives a reset. The composition picks the disk with the `kfsw,tmp-disk`
+chosen node: 32 KB in the Linux composition and in SRAM2 on the NUCLEO.
+
+A transfer that would leave less than `CONFIG_KFSW_FTP_SPACE_MARGIN_BYTES`
+(4096 by default) free on its destination volume is refused with `-ENOSPC`
+before the partial file is created. The firmware upload path writes the slot
+and is not checked.
 
 ### The local node
 
-`list`, `stat` and `mkdir` addressed to the node's own CSP address run
+`ls`, `stat` and `mkdir` addressed to the node's own CSP address run
 directly on local storage, without a connection or a route. They need storage
 mounted and the service started, otherwise they return `-EACCES`. `put` and
 `get` need two nodes and return `-ENOTSUP` for the local address.
@@ -489,16 +722,21 @@ space and the link.
 
 ## Command service
 
-`CONFIG_KFSW_COMMAND` enables the command registry used by the `cmd` shell
-command and by remote callers on CSP port 11. A command has a name, a numeric
-ID, up to four typed arguments and a result.
+`CONFIG_KFSW_COMMAND` enables the command registry used by the shell groups
+and by remote callers on CSP port 11. A command has a name, a numeric ID, up to
+four typed arguments and a result.
 
 ```text
-shell    cmd info       found by name
+shell    status 2       finds info by name, asks node 2
 ground   ID 2, port 11  found by ID
              |
    same definition, validation and handler
 ```
+
+There is no shell command that runs any command by name. Each one is reached
+from the group an operator looks in, `status`, `event`, `journal`, `hk`,
+`reboot` or `gndwdt`, so a new command that operators run also needs its place
+in a group.
 
 Commands are registered at build time as sets and the registry is fixed at
 startup. Duplicate IDs or names, missing handlers and too many arguments are
@@ -521,11 +759,24 @@ not commands.
 
 ### Ticketed retries
 
-`CONFIG_KFSW_COMMAND_RETRY` adds `cmd retry <node> <name> [arguments]`.
+`CONFIG_KFSW_COMMAND_RETRY` lets a remote request end in `--retry`, for example
+`csp reboot 2 0000 --retry`.
 It is enabled in the Linux image. Both peers must support it and have working
 entropy. An invocation first reserves a ticket, then executes it;
 up to three attempts per phase reuse the same request bytes. An unsupported
 peer causes the call to fail. There is no fallback to the legacy protocol.
+
+Typing the command again starts a new operation. If all result attempts fail,
+or a handler resets the node, the outcome can remain unknown; inspect the
+node before starting another operation. A request without `--retry` keeps its
+one-shot behaviour.
+
+The node keeps eight tickets for 60 seconds by default. New calls get BUSY when
+all are in use, and an expired or unknown ticket gets UNAVAILABLE. A restart
+discards every ticket. Tickets stop duplicates within their lifetime; they are
+not authentication and do not survive a reset.
+
+#### Wire format
 
 Version 2 adds an eight-byte token to the header (20 bytes total), preserving
 argument encoding. Opcodes 3/4 prepare and return a ticket; opcode 5 executes
@@ -533,19 +784,10 @@ it, and opcode 2 returns the result. Prepare carries a random client nonce;
 execute carries the returned random server ticket. The cache matches source
 node, ticket, command ID, request ID, argument count and the entire payload.
 A repeated prepare within its lifetime returns the same ticket without
-extending its deadline. A repeated execute returns the recorded result.
-
-The default cache holds eight reservations/results for 60 seconds from
-reservation. New calls get BUSY when all slots are live. Expired or unknown
-tickets get UNAVAILABLE and cannot execute. A server restart discards all
-tickets. A failed entropy read prevents allocation. Tickets suppress duplicates
-within their lifetime; they provide no authentication or guarantee across resets.
-
-Typing the command again starts a new operation. If all result attempts fail,
-or a handler resets the node, the outcome can remain unknown; inspect the
-node before starting another operation. Handlers still run synchronously and
-need their own execution bounds. Ordinary `cmd <node> ...` keeps its one-shot
-legacy behavior. Changing clocks does not affect ticket lifetimes.
+extending its deadline. A repeated execute returns the recorded result. A
+failed entropy read prevents allocation. Handlers still run synchronously and
+need their own execution bounds. Changing clocks does not affect ticket
+lifetimes.
 
 ## Resource monitor
 
@@ -581,32 +823,70 @@ stacks, so its reported values do not measure stack headroom.
 `THREAD_NAME`. Measurements use the initial stack fill and the kernel thread
 list. Disable the service if the target cannot afford that overhead.
 
-## Ground watchdog
+## Watchdogs
 
-`ground_wtd` restarts its countdown only on CSP command 16 with the exact text
-`KFSWWSFK`. Any subsystem may send it. Ping, telemetry, parameter traffic and
-local feed attempts do not count. The timeout is 2 hours to 5 days
-(7200–432000 seconds), with a 24-hour default (86400 seconds).
+Three watchdogs answer three different questions. Each resets the node when
+its answer is no.
 
-From another node's console, feed node 2:
+| Watchdog | Proves | Fed by | Timeout | Enabled in |
+| --- | --- | --- | --- | --- |
+| Hardware | the CPU still runs | health, while every watched component reports | 8000 ms on the NUCLEO | `CONFIG_KFSW_WATCHDOG`, NUCLEO |
+| Health | the threads still run | the main loop (`app`) and the CSP router probe (`csp`) | 4000 ms and 8000 ms deadlines | `CONFIG_KFSW_HEALTH`, NUCLEO |
+| Ground | somebody still talks to the node | a ground watchdog feed over CSP | 24 h, from 2 h to 5 days | `CONFIG_KFSW_GNDWDT`, Linux and NUCLEO |
+
+### Hardware watchdog
+
+The MCU's independent watchdog, IWDG on the STM32L4, runs from its own
+low-speed oscillator and cannot be stopped once started. Zephyr drives it
+through its watchdog driver; `kfsw-platform` arms it after the services have
+started, so a slow boot is not reset before the shell is up. native_sim has no
+hardware watchdog. The [NUCLEO target](../targets/index.md#watchdog) explains
+why it is the independent watchdog and not `watchdog0`.
+
+### Health
+
+Health decides when the hardware watchdog is fed. Each watched component has a
+deadline; while all of them report in time, health feeds the watchdog, and when
+one misses its deadline health stops feeding and the hardware watchdog resets
+the board. A board stuck with interrupts running but its threads blocked is
+reset this way. Health needs the hardware watchdog, so it is off on Linux.
+
+### Ground watchdog
+
+The ground watchdog resets a node nobody has talked to for too long, so a
+spacecraft that lost its way out of contact eventually starts again from a
+known state. The countdown restarts only on command 16, `ground_wtd`, carrying
+the exact text `KFSWWSFK`, received over CSP. Any node may send it. Ping,
+telemetry, parameter traffic and local feed attempts do not count. The timeout
+is 2 hours to 5 days (7200–432000 seconds), with a 24-hour default (86400
+seconds).
+
+From another node's console, feed node 2 and read it back:
 
 ```text
-cmd 2 ground_wtd KFSWWSFK
-ground_wtd node=2: OK ground_wtd_cnt=86400 ground_wtd_timeout=86400
+kfsw-ground# gndwdt feed 2
+node: 2
+fed: yes
+ground_wtd_cnt: 86400
+ground_wtd_timeout: 86400
 
-cmd 2 ground_wtd get
-ground_wtd node=2: OK ground_wtd_cnt=86390 ground_wtd_timeout=86400
+kfsw-ground# gndwdt show 2
+node: 2
+ground_wtd_cnt: 86390
+ground_wtd_timeout: 86400
 ```
 
-Both nodes need `CONFIG_KFSW_GNDWDT` and `CONFIG_KFSW_COMMAND_CSP`. The command
-uses port 11 by default. The magic word checks intent; it is not authentication.
-A repeated legacy request feeds again. With `cmd retry`, a duplicate ticket
-returns the saved result without feeding again.
+A node does not feed itself: `gndwdt feed` refuses its own address. Underneath
+it is command 16, `ground_wtd`, with `KFSWWSFK` or `get`, which is what a ground
+tool sends. Both nodes need `CONFIG_KFSW_GNDWDT` and
+`CONFIG_KFSW_COMMAND_CSP`. The command uses port 11 by default. The magic word
+checks intent; it is not authentication. A repeated legacy request feeds again.
+With a ticketed request, a duplicate returns the saved result without feeding
+again.
 
-`get` reads the countdown without feeding, remotely or with `cmd ground_wtd get`
-on the local console. Successful feeds return the same values as the parameters.
-Without the parameter service, a feed replies `ground_wtd restarted`; `get` still
-reads the service state.
+A ground station built with `tools/k-ground` carries the service so it can feed
+others, but its own countdown starts disarmed: nobody feeds the ground. `gndwdt
+on` arms it.
 
 Table 35 exposes:
 
@@ -625,14 +905,10 @@ Set the timeout with `param set ground_wtd_timeout 86400` locally or
 `param set 2 ground_wtd_timeout 86400` remotely. The timeout keeps wire ID
 `35:0x04`; its former name was `gndwdt_timeout_s`. The countdown uses `35:0x18`.
 
-`gndwdt show`, `gndwdt on`, `gndwdt off` and `gndwdt timeout <seconds>` remain
-available locally. Changing the timeout or re-enabling the watchdog does not
-restart its countdown. A node re-enabled after its deadline can reset at the
-next check. Send a valid feed first. A reset already queued is not cancelled.
-
-TODO: define the second watchdog's feed source and timeout. Keep it separate
-from `ground_wtd`; ordinary incoming traffic must not feed the ground watchdog.
-The existing hardware watchdog and component health checks are unchanged.
+`gndwdt show`, `gndwdt on`, `gndwdt off` and `gndwdt timeout <seconds>` act on
+the local countdown. Changing the timeout or re-enabling the watchdog does not
+restart it. A node re-enabled after its deadline can reset at the next check.
+Send a valid feed first. A reset already queued is not cancelled.
 
 ## Event record
 
@@ -641,8 +917,10 @@ monotonic timestamp, a sequence number, a severity and a small payload. Event
 IDs and payloads can be decoded without parsing console text.
 
 ```text
-log    "FTP put node=2 destination=/uplink/test.txt: PASS bytes=256 crc32=0ce9d363"
-event  source=ftp id=1 payload={node:2, bytes:256, crc32:0x0ce9d363}
+console  FTP put 2 /build/test.txt -> /uplink/test.txt: PASS
+         bytes: 256
+         crc32: 0ce9d363
+event    source=ftp id=1 payload={node:2, bytes:256, crc32:0x0ce9d363}
 ```
 
 Sequence gaps identify missing events.
@@ -656,5 +934,19 @@ The ring size is set in Kconfig. When it is full the oldest record is
 overwritten and `events_overwritten` increases. Recording takes a short
 spinlock, so it can be called from any context.
 
-Read another node's events with `cmd <node> event_stats` and
-`cmd <node> event_tail <age>`. The ring does not survive a reset.
+Read another node's events with `event stats <node>` and
+`event tail <node> <age>`. The ring does not survive a reset.
+
+## Modules
+
+`kfsw-modules` holds the code for a specific device or subsystem, built on
+these services. Each module has its own parameter table, numbered 50 to 99.
+
+| Module | Table | What it is |
+| --- | --- | --- |
+| `radio-uhf` | 50 | Holybro SiK UHF radio: identity, status and optional link encryption |
+| `temperature-sensor-example` | 51 | The MCU's die temperature, sampled on a work queue; the module to copy |
+| `boton-test` | 67 | A board button and three LEDs, for bench tests |
+
+The [kfsw-modules README](https://github.com/dgonzalez97/kfsw-modules#readme)
+says how a module is laid out and how to add one.

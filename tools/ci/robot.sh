@@ -7,6 +7,9 @@ KFSW_REPO_DIR="$(dirname "$(dirname "$KFSW_CI_DIR")")"
 KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
 KFSW_ROBOT_RUNNER="$KFSW_REPO_DIR/tests/hil/run.sh"
 
+# The fixtures refuse an existing output directory, so a second run would fail.
+rm -rf "$KFSW_WORKSPACE_ROOT/build/robot/dry-run" "$KFSW_WORKSPACE_ROOT/build/robot/software"
+
 echo "ROBOT: validate all suites without executing hardware actions"
 KFSW_ROBOT_OUT_DIR="$KFSW_WORKSPACE_ROOT/build/robot/dry-run" \
 	"$KFSW_ROBOT_RUNNER" --dryrun

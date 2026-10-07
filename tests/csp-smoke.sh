@@ -15,8 +15,11 @@ if [[ $# -ne 0 ]]; then
     exit 1
 fi
 
+source "$KFSW_ROOT/k-fsw/tests/csp-version.sh"
+# A CSP 1 run uses its own builds of both nodes.
+[[ -n "$csp_suffix" ]] && KFSW_BUILD_DIR="$KFSW_ROOT/build/linux$csp_suffix"
 node1_executable="$KFSW_BUILD_DIR/zephyr/zephyr.exe"
-node2_build_dir="$KFSW_ROOT/build/tests/linux-node2"
+node2_build_dir="$KFSW_ROOT/build/tests/linux-node2$csp_suffix"
 node2_executable="$node2_build_dir/zephyr/zephyr.exe"
 work_dir="$(mktemp -d /tmp/kfsw-csp-smoke.XXXXXX)"
 node1_pid=""
@@ -82,7 +85,8 @@ fi
 
 if [[ ! -x "$node1_executable" ]]; then
     echo "CSP SMOKE: building node 1"
-    "$KFSW_ROOT/k-fsw/tools/build.sh" linux
+    KFSW_EXTRA_CONF_FILE="$(csp_conf_list "$KFSW_ROOT/k-fsw/tests/config/param-fixtures.conf")" \
+        "$KFSW_ROOT/k-fsw/tools/build.sh" linux
 fi
 
 if [[ ! -x "$node2_executable" ]]; then
@@ -140,7 +144,7 @@ if [[ "$mode" == "terminal" ]]; then
 fi
 
 printf 'csp \t\n' >&3
-printf 'uart \t\n' >&3
+printf 'comms uart \t\n' >&3
 printf '%s\n' \
 	'csp info' \
 	'csp counters' \
@@ -160,7 +164,7 @@ printf '%s\n' \
 	$'pa\t g\t 2 test_u32' \
 	'param set 2 log_level 3' \
 	'param get 2 log_level' \
-	'param tablelist 2' \
+	'param tables 2' \
 	'param table 2 32' \
 	'param table 2 1' \
 	'param get 2 uid' \
@@ -174,15 +178,15 @@ printf '%s\n' \
 	'ftp generate /build/single.bin 128' \
 	'ftp generate /build/multi.bin 1024' \
 	'ftp generate /build/large.bin 8192' \
-	'ftp 2 mkdir /flash' \
-	'ftp 2 put /build/empty.bin /flash/empty.bin' \
+	'ftp mkdir 2 /flash' \
+	'ftp put 2 /build/empty.bin /flash/empty.bin' \
 	'ftp put 2 /build/single.bin /flash/single.bin' \
 	$'ftp p\t 2 /build/single.bin /flash/single.bin' \
 	'ftp put 2 /build/multi.bin /flash/multi.bin' \
 	'ftp put 2 /build/large.bin /flash/large.bin' \
 	'ftp stat 2 /flash/large.bin' \
-	'ftp 2 ls /flash' \
-	'ftp 2 get /flash/empty.bin /build/empty-returned.bin' \
+	'ftp ls 2 /flash' \
+	'ftp get 2 /flash/empty.bin /build/empty-returned.bin' \
 	'ftp get 2 /flash/single.bin /build/single-returned.bin' \
 	'ftp get 2 /flash/multi.bin /build/multi-returned.bin' \
 	'ftp get 2 /flash/large.bin /build/large-returned.bin' \
@@ -191,24 +195,36 @@ printf '%s\n' \
 	'ftp verify /build/multi.bin /build/multi-returned.bin' \
 	'ftp verify /build/large.bin /build/large-returned.bin' \
 	'ftp get 2 /flash/missing.bin /build/missing.bin' \
+	'ftp ls 2 /' \
+	'ftp put 2 /build/large.bin /tmp/large.bin' \
+	'ftp get 2 /tmp/large.bin /build/tmp-returned.bin' \
+	'ftp verify /build/large.bin /build/tmp-returned.bin' \
+	'ftp generate /build/huge.bin 32768' \
+	'ftp put 2 /build/huge.bin /tmp/huge.bin' \
+	'ftp ls 2 /tmp' \
 	'ftp stat 2 ../params/parameters.dat' \
-	'cmd list' \
-	'cmd noop' \
-	'cmd 1 noop' \
 	'csp ping 1' \
-	'cmd 2 noop' \
-	'cmd 2 info' \
-	'cmd 2 bogus' \
+	'status 2' \
+	'event stats 2' \
+	'event tail 2 0' \
+	'event tail 2 999' \
+	'journal stats 2' \
+	'journal remote 2 4' \
+	'log remote 2 4' \
+	'param set 2 log_remote_format 1' \
+	'log remote 2 4' \
+	'param set 2 log_remote_format 0' \
+	"status $csp_broadcast" \
 	'csp ping 2' \
 	'param get 2 test_u32' \
 	'csp info' \
-	'uart info' \
-	'uart test' >&3
+	'comms uart info' \
+	'comms uart test' >&3
 
 printf '%s\n' \
 	'csp ping 1' \
-	'uart info' \
-	'uart test' >&4
+	'comms uart info' \
+	'comms uart test' >&4
 
 wait_for_output "$work_dir/node1.log" "CSP ping 2: success" \
     "$node1_pid" || fail "node 1 could not ping CSP node 2"
@@ -263,28 +279,29 @@ wait_for_output "$work_dir/node1.log" \
     "set: parameter 'node_id' is read-only" "$node1_pid" || \
     fail "remote read-only parameter write was not rejected"
 wait_for_output "$work_dir/node1.log" \
-	"FTP verify first=/build/large.bin second=/build/large-returned.bin: PASS" \
+	"FTP verify /build/large.bin /build/large-returned.bin: PASS" \
 	"$node1_pid" || fail "8 KiB FTP round trip did not pass"
 wait_for_output "$work_dir/node1.log" \
-	"FTP get node=2 path=/flash/missing.bin: not found" \
+	"FTP get 2 /flash/missing.bin: not found" \
 	"$node1_pid" || fail "missing remote FTP file was not rejected"
 wait_for_output "$work_dir/node1.log" \
-	"FTP stat node=2 path=../params/parameters.dat: invalid path/request" \
+	"FTP stat 2 ../params/parameters.dat: invalid path/request" \
 	"$node1_pid" || fail "FTP path traversal was not rejected"
 
 node1_expected=(
-    "noop node=0: OK noop from node 0"
-    # Addressed to this node, so it runs locally. Source node 0 means it did not
-    # arrive over CSP.
-    "noop node=1: OK noop from node 0"
     "CSP ping 1: success"
-    "noop node=2: OK noop from node 1"
-    "info node=2: OK uptime_ms="
-    "unknown command 'bogus'"
+    # Remote commands answer one field per line, after the node they came from.
+    "node: 2"
+    "free_bytes: "
+    "recorded: "
+    "data: "
+    "event_tail: failed, no record at age 999"
+    "ready: 1"
+    "Node must be 1..$((csp_broadcast - 1)): $csp_broadcast"
     "CSP node: 1"
     "hostname: kfsw-1"
-    "date: "
-    "LOOP addr=1/14"
+    "revision: "
+    "LOOP addr=1/$csp_host_bits"
     "KISS addr=1/0"
     "0/0 -> KISS direct"
     "UART transport"
@@ -304,22 +321,33 @@ node1_expected=(
     '2:uid = "kfsw-2"'
     "get: parameter 'missing' not found"
     "set: parameter 'node_id' is read-only"
-	"FTP generate path=/build/empty.bin: PASS bytes=0 crc32=00000000"
-	"FTP mkdir node=2 path=/flash: PASS"
-	"FTP put node=2 source=/build/empty.bin destination=/flash/empty.bin: PASS bytes=0"
-	"FTP put node=2 source=/build/single.bin destination=/flash/single.bin: PASS bytes=128"
-	"FTP put node=2 source=/build/multi.bin destination=/flash/multi.bin: PASS bytes=1024"
-	"FTP put node=2 source=/build/large.bin destination=/flash/large.bin: PASS bytes=8192"
-	"FTP stat node=2 path=/flash/large.bin type=file bytes=8192"
-	"FTP list node=2 path=/flash"
-	"FTP list: PASS entries=4"
-	"FTP get node=2 source=/flash/large.bin destination=/build/large-returned.bin: PASS bytes=8192"
-	"FTP verify first=/build/empty.bin second=/build/empty-returned.bin: PASS"
-	"FTP verify first=/build/single.bin second=/build/single-returned.bin: PASS"
-	"FTP verify first=/build/multi.bin second=/build/multi-returned.bin: PASS"
-	"FTP verify first=/build/large.bin second=/build/large-returned.bin: PASS"
-	"FTP get node=2 path=/flash/missing.bin: not found"
-	"FTP stat node=2 path=../params/parameters.dat: invalid path/request"
+	"FTP generate /build/empty.bin: PASS"
+	"crc32: 00000000"
+	"FTP mkdir 2 /flash: PASS"
+	"FTP put 2 /build/empty.bin -> /flash/empty.bin: PASS"
+	"FTP put 2 /build/single.bin -> /flash/single.bin: PASS"
+	"FTP put 2 /build/multi.bin -> /flash/multi.bin: PASS"
+	"FTP put 2 /build/large.bin -> /flash/large.bin: PASS"
+	"bytes: 128"
+	"bytes: 1024"
+	"bytes: 8192"
+	"FTP stat 2 /flash/large.bin"
+	"type: file"
+	"FTP ls 2 /flash"
+	"entries: 4"
+	"FTP get 2 /flash/large.bin -> /build/large-returned.bin: PASS"
+	"FTP verify /build/empty.bin /build/empty-returned.bin: PASS"
+	"FTP verify /build/single.bin /build/single-returned.bin: PASS"
+	"FTP verify /build/multi.bin /build/multi-returned.bin: PASS"
+	"FTP verify /build/large.bin /build/large-returned.bin: PASS"
+	"FTP get 2 /flash/missing.bin: not found"
+	"file       8192 large.bin"
+	"dir           0 tmp"
+	"FTP put 2 /build/large.bin -> /tmp/large.bin: PASS"
+	"FTP verify /build/large.bin /build/tmp-returned.bin: PASS"
+	# 32 KB does not fit the RAM volume with the margin; refused before any data moves.
+	"FTP put 2 /tmp/huge.bin: not enough free space"
+	"FTP stat 2 ../params/parameters.dat: invalid path/request"
     "interface: KISS"
     "  info"
     "  test"
@@ -329,10 +357,18 @@ node1_expected=(
     "routes"
     "last_can_error=0 (none)"
     "CSP counters cleared"
-    "CSP ifstat node=2 interface=KISS tx="
-    "CSP ifstat node=2 interface=LOOP tx="
-    "CSP ifstat node=2 interface=missing: failed ("
-    "autherr=0 frame=0 txbytes="
+    "CSP ifstat 2 KISS"
+    "CSP ifstat 2 LOOP"
+    # No such interface: the node does not answer, which is logged as a warning.
+    "csp ifstat: node 2 did not answer"
+    "format: text"
+    # status 2 lists node 2's revisions, read from its boot_revisions.
+    "  kfsw-services: "
+    "format: dictionary"
+    " pkg="
+    "src=boot id=1"
+    "autherr: 0"
+    "txbytes: "
 )
 
 for expected in "${node1_expected[@]}"; do
@@ -345,13 +381,42 @@ python3 - "$work_dir/node1.log" <<'PYTEST'
 import re
 import sys
 from pathlib import Path
-rows = re.findall(r'CSP ifstat node=2 interface=KISS tx=(\d+) rx=(\d+)',
+rows = re.findall(r'CSP ifstat 2 KISS\s+tx: (\d+)\s+rx: (\d+)',
                   Path(sys.argv[1]).read_text())
 assert len(rows) >= 2, rows
 first, last = tuple(map(int, rows[0])), tuple(map(int, rows[-1]))
 assert last[0] > first[0] and last[1] > first[1], rows
 PYTEST
 
+# A dictionary record, decoded with node 2's image, must read as the text the
+# node itself sends for the same sequence.
+python3 "$KFSW_ROOT/k-fsw/tools/ground/log-decode.py" --elf "$node2_executable" \
+	"$work_dir/node1.log" >"$work_dir/node1-decoded.log" ||
+	fail "a dictionary record of node 2 did not decode"
+python3 - "$work_dir/node1.log" "$work_dir/node1-decoded.log" <<'PYTEST'
+import re
+import sys
+from pathlib import Path
+record = re.compile(r'^(\d+) t=\d+ms \S+ level=\d( truncated)? (.*)$')
+def block(lines, name):
+    start = lines.index(f'format: {name}')
+    out = {}
+    for line in lines[start + 2:]:
+        match = record.match(line)
+        if not match:
+            break
+        out[match.group(1)] = match.group(3)
+    return out
+raw = Path(sys.argv[1]).read_text(errors='replace').splitlines()
+decoded = Path(sys.argv[2]).read_text(errors='replace').splitlines()
+text = block(raw, 'text')
+dictionary = block(decoded, 'dictionary')
+common = set(text) & set(dictionary)
+assert len(common) >= 2, (text, dictionary)
+for sequence in common:
+    assert text[sequence] == dictionary[sequence], (sequence, text[sequence], dictionary[sequence])
+PYTEST
+
 cat "$work_dir/node1.log"
 cat "$work_dir/node2.log"
-echo "CSP RESULT: PASS"
+echo "CSP RESULT: PASS (CSP $csp_version)"

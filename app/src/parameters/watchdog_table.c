@@ -154,6 +154,7 @@ static const struct kfsw_param_definition watchdog_param_definitions[] = {
 const struct kfsw_param_definition_set kfsw_watchdog_param_definitions = {
 	.table = KFSW_PARAM_TABLE_WATCHDOG,
 	.name = KFSW_PARAM_TABLE_WATCHDOG_NAME,
+	.description = "Hardware watchdog timing and feeds",
 	.definitions = watchdog_param_definitions,
 	.count = ARRAY_SIZE(watchdog_param_definitions),
 };

@@ -2,7 +2,8 @@
 set -Eeuo pipefail
 
 repo_dir="$(readlink -f "$(dirname "$0")/..")"
-build_root="$(dirname "$repo_dir")/build/tests/multi-kiss"
+source "$repo_dir/tests/csp-version.sh"
+build_root="$(dirname "$repo_dir")/build/tests/multi-kiss$csp_suffix"
 work_dir="$(mktemp -d /tmp/kfsw-multi-kiss.XXXXXX)"
 router_pid=""
 node_a_pid=""
@@ -113,8 +114,8 @@ wait_for_output "$work_dir/bridge-a.log" "starting data transfer loop" "$bridge_
 wait_for_output "$work_dir/bridge-b.log" "starting data transfer loop" "$bridge_b_pid" || \
 	fail "KISS_2 bridge did not start"
 
-printf '%s\n' 'csp interfaces' 'csp routes' 'csp ping 10' 'uart test 10' \
-	'csp ping 11' 'uart test 11' >&3
+printf '%s\n' 'csp interfaces' 'csp routes' 'csp ping 10' 'comms uart test 10' \
+	'csp ping 11' 'comms uart test 11' >&3
 wait_for_output "$work_dir/router.log" "CSP ping 10: success" "$router_pid" || \
 	fail "router traffic to node A over KISS_1 failed"
 wait_for_output "$work_dir/router.log" "interface: KISS_1" "$router_pid" || \
@@ -132,21 +133,21 @@ wait_for_output "$work_dir/node-a.log" "CSP ping 11: success" "$node_a_pid" || \
 wait_for_output "$work_dir/node-b.log" "CSP ping 10: success" "$node_b_pid" || \
 	fail "node B -> router -> node A transit failed"
 
-printf '%s\n' 'csp interfaces' 'csp routes' 'uart info' >&3
+printf '%s\n' 'csp interfaces' 'csp routes' 'comms uart info' >&3
 wait_for_output "$work_dir/router.log" "UART transport: KISS_2" "$router_pid" || \
 	fail "UART diagnostics collapsed the two interfaces"
 sleep 0.1
 
-grep -Fq "10/14 -> KISS_1 direct" "$work_dir/router.log" || \
+grep -Fq "10/$csp_host_bits -> KISS_1 direct" "$work_dir/router.log" || \
 	fail "KISS_1 route is missing"
-grep -Fq "11/14 -> KISS_2 via 11" "$work_dir/router.log" || \
+grep -Fq "11/$csp_host_bits -> KISS_2 via 11" "$work_dir/router.log" || \
 	fail "KISS_2 VIA route is missing or lost its next hop"
 
 kiss_1_stats="$(last_interface_line KISS_1)"
 kiss_2_stats="$(last_interface_line KISS_2)"
-grep -Eq 'KISS_1 addr=8/14 .*tx=[1-9][0-9]* rx=[1-9][0-9]*' <<<"$kiss_1_stats" || \
+grep -Eq "KISS_1 addr=8/$csp_host_bits .*tx=[1-9][0-9]* rx=[1-9][0-9]*" <<<"$kiss_1_stats" || \
 	fail "KISS_1 does not have independent nonzero counters"
-grep -Eq 'KISS_2 addr=9/14 .*tx=[1-9][0-9]* rx=[1-9][0-9]*' <<<"$kiss_2_stats" || \
+grep -Eq "KISS_2 addr=9/$csp_host_bits .*tx=[1-9][0-9]* rx=[1-9][0-9]*" <<<"$kiss_2_stats" || \
 	fail "KISS_2 does not have independent nonzero counters"
 
 echo "$kiss_1_stats"

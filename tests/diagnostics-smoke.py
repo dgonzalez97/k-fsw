@@ -124,7 +124,7 @@ def main():
         assert reports == {0, 1}, reports
         send('hk beacon 0 16 0', 'hk beacon 1 16 0', 'hk period 0 0', 'hk period 1 0',
              f'csp ifstat {node} KISS')
-        wait_for(read_log, rf'CSP ifstat node={node} interface=KISS tx=\d+ rx=\d+')
+        wait_for(read_log, rf'CSP ifstat {node} KISS\s+tx: \d+\s+rx: \d+')
         bad = subprocess.run(bridge + ['--report', '15', '--timeout', '.2', '--yamcs', 'none'],
                              text=True, capture_output=True, timeout=5)
         assert bad.returncode != 0 and 'requested samples' in bad.stderr, bad

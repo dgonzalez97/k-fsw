@@ -198,8 +198,8 @@ run_shell_command version \
 	"Board: $ZEPHYR_BOARD"
 run_shell_command help \
 	"Available commands:" \
-	"Show basic K-FSW runtime status." \
-	"Show K-FSW build information."
+	"Show basic runtime status." \
+	"Show build information."
 
 cat "$capture_file"
 echo "PHYSICAL SHELL RESULT: PASS"

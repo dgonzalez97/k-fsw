@@ -135,7 +135,7 @@ confirmed_state()
 reboot_board()
 {
 	mark
-	send "cmd reboot"
+	send "reboot ${KFSW_REBOOT_PIN:-0000}"
 	wait_for "@READY " 40 || abort "the board did not come back after reboot ($1)"
 	sleep 1
 }

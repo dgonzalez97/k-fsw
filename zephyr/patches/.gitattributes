@@ -1,0 +1,2 @@
+# Patch context lines start with a space; git must not "fix" them.
+*.patch -whitespace

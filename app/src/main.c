@@ -33,11 +33,17 @@
 #if CONFIG_KFSW_JOURNAL
 #include <kfsw/services/journal.h>
 #endif
+#if CONFIG_KFSW_TABLE
+#include <kfsw/services/table.h>
+#endif
 #include <kfsw/services/boot.h>
 #if CONFIG_KFSW_COMMAND
 #include <kfsw/services/command.h>
 
 #include "commands/command_definitions.h"
+#endif
+#if CONFIG_KFSW_CSP_LIVENESS
+#include "csp_liveness.h"
 #endif
 #if CONFIG_KFSW_EVENT
 #include <kfsw/services/event.h>
@@ -65,8 +71,8 @@
 #endif
 #define KFSW_LOG_MODULE KFSW_LOG_MODULE_APP
 #include <kfsw/services/log.h>
-#if CONFIG_KFSW_LOG_HISTORY_CSP
-#include <kfsw/services/log_history.h>
+#if CONFIG_KFSW_LOG_REMOTE
+#include <kfsw/services/log_remote.h>
 #endif
 #if CONFIG_KFSW_PARAM
 #include <kfsw/services/parameter.h>
@@ -91,7 +97,7 @@ int main(void)
 	uint32_t startup_failures = 0;
 #if CONFIG_KFSW_STORAGE || CONFIG_KFSW_PARAM || CONFIG_KFSW_CSP || CONFIG_KFSW_RADIO_UHF ||        \
 	CONFIG_KFSW_BOTON_TEST || CONFIG_KFSW_COMMAND || CONFIG_KFSW_WATCHDOG ||                   \
-	CONFIG_KFSW_GNDWDT || CONFIG_KFSW_RESMON
+	CONFIG_KFSW_GNDWDT || CONFIG_KFSW_RESMON || CONFIG_BOOTLOADER_MCUBOOT
 	int result;
 #endif
 
@@ -120,6 +126,22 @@ int main(void)
 		kfsw_log_error("Failed to mount storage: %d", result);
 	} else {
 		kfsw_log_info("Storage mounted at %s", KFSW_STORAGE_MOUNT_POINT);
+	}
+#endif
+
+#if CONFIG_BOOTLOADER_MCUBOOT && CONFIG_MCUBOOT_IMG_MANAGER
+	result = kfsw_boot_diagnostics_start();
+	if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Boot trial diagnostics unavailable: %d", result);
+	}
+#endif
+
+#if CONFIG_KFSW_STORAGE_TMP
+	result = kfsw_storage_tmp_mount();
+	if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Failed to mount %s: %d", KFSW_STORAGE_TMP_MOUNT_POINT, result);
 	}
 #endif
 
@@ -168,6 +190,9 @@ int main(void)
 #endif
 #if CONFIG_KFSW_HEALTH
 		&kfsw_health_param_definitions,
+#endif
+#if CONFIG_KFSW_TABLE
+		&kfsw_table_param_definitions,
 #endif
 #if CONFIG_KFSW_RADIO_UHF
 		&kfsw_radio_uhf_param_definitions,
@@ -331,12 +356,12 @@ int main(void)
 		}
 	}
 
-#if CONFIG_KFSW_LOG_HISTORY_CSP
+#if CONFIG_KFSW_LOG_REMOTE
 	if (csp_started) {
-		result = kfsw_log_history_server_start();
+		result = kfsw_log_remote_server_start();
 		if (result != 0) {
 			startup_failures++;
-			kfsw_log_error("Failed to start log history server: %d", result);
+			kfsw_log_error("Failed to start the remote log server: %d", result);
 		}
 	}
 #endif
@@ -477,6 +502,14 @@ int main(void)
 		health_watching = true;
 	}
 
+#if CONFIG_KFSW_CSP_LIVENESS
+	result = kfsw_csp_liveness_start();
+	if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Failed to watch the CSP router for health: %d", result);
+	}
+#endif
+
 	/* Health takes over feeding, so start it after the watchdog is armed. */
 	result = kfsw_health_start();
 	if (result != 0) {
@@ -515,8 +548,8 @@ int main(void)
 	}
 #endif
 
-	printk("@SERVICES %s failures=%u\n", startup_failures == 0U ? "ok" : "degraded",
-	       startup_failures);
+	kfsw_log_marker("@SERVICES %s failures=%u", startup_failures == 0U ? "ok" : "degraded",
+			startup_failures);
 	kfsw_boot_service_start();
 
 	for (;;) {

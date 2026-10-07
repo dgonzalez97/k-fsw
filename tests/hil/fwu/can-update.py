@@ -67,7 +67,7 @@ class Console:
         return text
 
     def reboot(self, pin):
-        self.run(f"cmd reboot {pin}", "rebooting in")
+        self.run(f"reboot {pin}", "rebooting in")
         self.wait_for("@READY ", timeout=60)
         self.run("")
 
@@ -198,7 +198,7 @@ def run_test(arguments, output):
         original_revision = remote_revision(ground)
         if original_revision == arguments.revision:
             raise RuntimeError("Candidate and running revisions must differ")
-        ground.run(f"ftp list {FLIGHT} /boot", "firmware_1.bin")
+        ground.run(f"ftp ls {FLIGHT} /boot", "firmware_1.bin")
         read_slot(ground, 1, "/before.bin")
         ground.run(f"ftp put {FLIGHT} /candidate.bin /boot/firmware_1.bin", "FAIL (-5)")
         read_slot(ground, 1, "/readback.bin")

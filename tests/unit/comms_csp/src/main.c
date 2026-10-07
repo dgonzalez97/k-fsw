@@ -42,11 +42,11 @@ ZTEST(comms_csp_state, test_reports_configured_identity_before_init)
 
 ZTEST(comms_csp_state, test_rejects_operations_before_init)
 {
-	uint32_t round_trip_ms = UINT32_MAX;
+	uint32_t round_trip_us = UINT32_MAX;
 
 	zassert_equal(kfsw_csp_start(), CSP_ERR_INVAL);
-	zassert_equal(kfsw_csp_ping(1U, 10U, 1U, &round_trip_ms), CSP_ERR_INVAL);
-	zassert_equal(round_trip_ms, UINT32_MAX);
+	zassert_equal(kfsw_csp_ping(1U, 10U, 1U, &round_trip_us), CSP_ERR_INVAL);
+	zassert_equal(round_trip_us, UINT32_MAX);
 	struct kfsw_csp_interface_stats stats;
 	zassert_equal(kfsw_csp_interface_stats_read(1, "KISS", 10, &stats), -ENETDOWN);
 }
@@ -95,6 +95,17 @@ ZTEST(comms_csp_state, test_names_error_codes)
 	zassert_equal(strcmp(kfsw_csp_can_error_name(0U), "none"), 0);
 	zassert_equal(strcmp(kfsw_csp_can_error_name(1U), "frame lost"), 0);
 	zassert_equal(strcmp(kfsw_csp_can_error_name(200U), "unknown"), 0);
+}
+
+ZTEST(comms_csp_state, test_clock_refuses_addresses_outside_the_range)
+{
+	struct kfsw_csp_clock clock;
+
+	/* Checked before anything is sent: libcsp does not mask a destination. */
+	zassert_equal(kfsw_csp_clock_read(0U, 10U, &clock), -EINVAL);
+	zassert_equal(kfsw_csp_clock_read(KFSW_CSP_BROADCAST_ADDRESS, 10U, &clock), -EINVAL);
+	zassert_equal(kfsw_csp_clock_write(KFSW_CSP_BROADCAST_ADDRESS + 1U, 10U, &clock), -EINVAL);
+	zassert_equal(kfsw_csp_clock_read(KFSW_CSP_BROADCAST_ADDRESS - 1U, 10U, &clock), -ENETDOWN);
 }
 
 ZTEST_SUITE(comms_csp_state, NULL, NULL, NULL, NULL, NULL);

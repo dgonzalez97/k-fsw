@@ -4,7 +4,12 @@
 #include <zephyr/shell/shell_string_conv.h>
 #include <zephyr/sys/util.h>
 
+#include <csp/csp_error.h>
+
+#include <kfsw/comms/csp.h>
 #include <kfsw/comms/uart.h>
+
+#include "shell_remote.h"
 
 #define KFSW_UART_TEST_TIMEOUT_MS 1000U
 
@@ -45,13 +50,21 @@ static int cmd_uart_test(const struct shell *sh, size_t argc, char **argv)
 
 	if (argc == 2U) {
 		peer = shell_strtoul(argv[1], 10, &parse_error);
-		if (parse_error != 0 || peer > 16383U) {
-			shell_error(sh, "CSP peer must be in range 0..16383");
+		if (parse_error != 0 || peer > KFSW_CSP_BROADCAST_ADDRESS) {
+			shell_error(sh, "CSP peer must be in range 0..%u",
+				    KFSW_CSP_BROADCAST_ADDRESS);
 			return -EINVAL;
 		}
 	}
 
 	result = kfsw_uart_test_peer((uint16_t)peer, KFSW_UART_TEST_TIMEOUT_MS, &test_result);
+	if (result == CSP_ERR_NOTSUP) {
+		shell_error(sh, "UART CSP test: node %lu is not reached through a UART", peer);
+		return -ENOTSUP;
+	}
+	if (result == CSP_ERR_TIMEDOUT) {
+		return kfsw_shell_remote_failed(sh, "comms uart test", (uint16_t)peer, -ETIMEDOUT);
+	}
 	if (result != 0) {
 		shell_error(sh, "UART CSP test: FAIL (%d)", result);
 		return result;
@@ -60,7 +73,8 @@ static int cmd_uart_test(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "UART CSP test: PASS");
 	shell_print(sh, "peer: %u", test_result.peer);
 	shell_print(sh, "interface: %s", test_result.interface_name);
-	shell_print(sh, "rtt_ms: %u", test_result.round_trip_ms);
+	shell_print(sh, "rtt_ms: %u.%03u", test_result.round_trip_us / 1000U,
+		    test_result.round_trip_us % 1000U);
 
 	return 0;
 }
@@ -71,4 +85,4 @@ SHELL_STATIC_SUBCMD_SET_CREATE(uart_commands,
 		      cmd_uart_test, 1, 1),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(uart, &uart_commands, "K-FSW CSP UART commands.", NULL);
+SHELL_SUBCMD_ADD((comms), uart, &uart_commands, "CSP over UART, KISS framed.", NULL, 1, 0);

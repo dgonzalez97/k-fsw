@@ -105,4 +105,4 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 		      cmd_watchdog_status, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(watchdog, &watchdog_commands, "K-FSW hardware watchdog.", NULL);
+SHELL_CMD_REGISTER(watchdog, &watchdog_commands, "Hardware watchdog.", NULL);

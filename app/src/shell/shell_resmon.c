@@ -80,4 +80,4 @@ SHELL_STATIC_SUBCMD_SET_CREATE(resmon_commands,
 	SHELL_CMD_ARG(show, NULL, "Show what the last sweep found.", cmd_resmon_show, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(resmon, &resmon_commands, "K-FSW resource monitor.", NULL);
+SHELL_CMD_REGISTER(resmon, &resmon_commands, "Resource monitor.", NULL);

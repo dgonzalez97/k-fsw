@@ -113,12 +113,12 @@ KGROUND_STATION_DIR="$station_dir" \
 KGROUND_STATION_DIR="$station_dir" \
 	"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-ops
 
-node16_executable="$KGROUND_BUILD_ROOT/node-16/zephyr/zephyr.exe"
-node19_executable="$KGROUND_BUILD_ROOT/node-19/zephyr/zephyr.exe"
+node16_executable="$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16/zephyr/zephyr.exe"
+node19_executable="$KGROUND_BUILD_ROOT/kfsw-ops-node-19/zephyr/zephyr.exe"
 [[ -x "$node16_executable" ]] || fail "node 16 executable is missing"
 [[ -x "$node19_executable" ]] || fail "node 19 executable is missing"
 
-for node_config in node-16 node-19; do
+for node_config in kfsw-gnd-uhf-node-16 kfsw-ops-node-19; do
 	grep -Fq 'CONFIG_KFSW_FWU_LITE_CSP=y' \
 		"$KGROUND_BUILD_ROOT/$node_config/zephyr/.config" || \
 		fail "$node_config did not compose the direct upload path"
@@ -178,10 +178,10 @@ wait_for_output "$work_dir/node16.log" "CSP ping 19: success" "$node16_pid" || \
 
 # The file transfer route needs the image as a file on the sending node.
 printf '%s\n' 'ftp generate /build/image.bin 20000' >&4
-wait_for_output "$work_dir/node19.log" "FTP generate" "$node19_pid" || \
+wait_for_output "$work_dir/node19.log" "crc32: " "$node19_pid" || \
 	fail "the sending node could not produce a stand-in image"
 
-image_crc="$(sed -n 's/.*crc32=\([0-9a-f]*\).*/\1/p' "$work_dir/node19.log" | tail -1)"
+image_crc="$(tr -d '\r' <"$work_dir/node19.log" | sed -n 's/^crc32: \([0-9a-f]*\).*/\1/p' | tail -1)"
 [[ -n "$image_crc" ]] || fail "could not read the image checksum"
 
 printf '%s\n' 'fwu abort' 'fwu status' >&3
@@ -195,13 +195,13 @@ wait_for_output "$work_dir/node19.log" "FTP put" "$node19_pid" "$TRANSFER_LIMIT_
 	fail "the put did not complete"
 
 # The image must go to the update service, not into the transfer root.
-printf '%s\n' 'fwu status' 'ftp 16 ls /' >&3
+printf '%s\n' 'fwu status' 'ftp ls 16 /' >&3
 wait_for_output "$work_dir/node16.log" "received: 20000" "$node16_pid" || \
 	fail "the update service did not receive the image"
 wait_for_output "$work_dir/node16.log" "actual_crc32: $image_crc" "$node16_pid" || \
 	fail "the received image does not match what was sent"
 
-if sed -n '/ftp 16 ls \//,$p' "$work_dir/node16.log" | grep -aq "firmware.bin"; then
+if sed -n '/ftp ls 16 \//,$p' "$work_dir/node16.log" | grep -aq "firmware.bin"; then
 	fail "the image was stored as a file instead of reaching the update service"
 fi
 

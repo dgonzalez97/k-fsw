@@ -112,13 +112,19 @@ a node can report why it went down. `param get last_reason`, `last_detail` and
 The bootloader is not in the default image. Build it with sysbuild:
 
 ```bash
+P="$PWD/k-fsw/config/profiles"
 KFSW_SYSBUILD=1 \
 KFSW_MCUBOOT_KEY="$HOME/.config/kfsw/mcuboot-signing-key.pem" \
-KFSW_EXTRA_CONF_FILE="$PWD/k-fsw/config/profiles/nucleo-mcuboot.conf" \
-KFSW_EXTRA_DTC_OVERLAY_FILE="$PWD/k-fsw/config/profiles/nucleo-mcuboot-flash.overlay;$PWD/k-fsw/config/profiles/nucleo-mcuboot.overlay" \
-KFSW_MCUBOOT_DTC_OVERLAY_FILE="$PWD/k-fsw/config/profiles/nucleo-mcuboot-flash.overlay" \
+KFSW_EXTRA_CONF_FILE="$P/nucleo-mcuboot.conf" \
+KFSW_EXTRA_DTC_OVERLAY_FILE="$P/nucleo-mcuboot-flash.overlay;$P/nucleo-mcuboot.overlay" \
+KFSW_MCUBOOT_DTC_OVERLAY_FILE="$P/nucleo-mcuboot-flash.overlay" \
   ./k-fsw/tools/build.sh nucleo_l496zg
 ```
+
+The profiles are in
+[config/profiles](https://github.com/dgonzalez97/k-fsw/tree/main/config/profiles):
+`nucleo-mcuboot.conf` turns the bootloader on and the two overlays lay out the
+flash for it.
 
 | Partition | Address | Size |
 | --- | --- | --- |
@@ -185,7 +191,7 @@ The scripts build first when the ELF is missing.
 
 The boot test checks that the ST-LINK is there, builds, flashes, captures the
 console and waits for `@BOOT` and `@READY`. The UART/KISS test adds an FTDI
-cable and a KFSW-Linux peer, and checks ping, `uart test`, storage, a remote
+cable and a KFSW-Linux peer, and checks ping, `comms uart test`, storage, a remote
 parameter, 4 KiB and 16 KiB transfers and the KISS counters; see
 @ref communications. The Holybro profile sets USART3 to 57600 baud for the
 radio.
@@ -209,8 +215,8 @@ The test builds, flashes, waits for `kfsw:~$` and runs `status`, `version` and
 
 The `rpi_pico_w` target maps to `rpi_pico/rp2040/w`. Its overlay puts the
 console and shell on USB CDC ACM, and the shell waits for DTR so no output is
-lost before a terminal is open. CSP, parameters, persistence, FTP, storage and
-Wi-Fi are not enabled.
+lost before a terminal is open. CSP, parameters, persistence, FTP and storage
+are not enabled.
 
 ```bash
 ./k-fsw/tools/build.sh rpi_pico_w

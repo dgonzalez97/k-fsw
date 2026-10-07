@@ -84,18 +84,18 @@ KGROUND_STATION_DIR="$station_dir" \
 KGROUND_STATION_DIR="$station_dir" \
 	"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-ops
 
-node16_executable="$KGROUND_BUILD_ROOT/node-16/zephyr/zephyr.exe"
-node19_executable="$KGROUND_BUILD_ROOT/node-19/zephyr/zephyr.exe"
+node16_executable="$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16/zephyr/zephyr.exe"
+node19_executable="$KGROUND_BUILD_ROOT/kfsw-ops-node-19/zephyr/zephyr.exe"
 [[ -x "$node16_executable" ]] || fail "node 16 executable is missing"
 [[ -x "$node19_executable" ]] || fail "node 19 executable is missing"
 grep -Fq 'CONFIG_KFSW_RADIO_UHF_HOLYBRO=y' \
-	"$KGROUND_BUILD_ROOT/node-16/zephyr/.config" || \
+	"$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16/zephyr/.config" || \
 	fail "node 16 did not compose the Holybro UHF module"
 grep -Fq 'CONFIG_KFSW_CSP_ROUTE_TABLE="19/14 KISS"' \
-	"$KGROUND_BUILD_ROOT/node-16/zephyr/.config" || \
+	"$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16/zephyr/.config" || \
 	fail "node 16 did not compose its configured CSP route table"
 grep -Fq '# CONFIG_KFSW_RADIO_UHF is not set' \
-	"$KGROUND_BUILD_ROOT/node-19/zephyr/.config" || \
+	"$KGROUND_BUILD_ROOT/kfsw-ops-node-19/zephyr/.config" || \
 	fail "node 19 unexpectedly has the UHF radio module"
 
 mkfifo "$work_dir/node16.in" "$work_dir/node19.in"
@@ -148,7 +148,7 @@ if [[ "$mode" == "terminal" ]]; then
 	exit 0
 fi
 
-printf '%s\n' 'status' 'version' 'uhf status' 'csp info' 'csp routes' \
+printf '%s\n' 'status' 'version' 'comms uhf status' 'csp info' 'csp routes' \
 	'csp ping 19' >&3
 printf '%s\n' 'status' 'version' 'csp info' 'csp ping 16' >&4
 
@@ -157,7 +157,17 @@ wait_for_output "$work_dir/node16.log" "CSP ping 19: success" \
 wait_for_output "$work_dir/node19.log" "CSP ping 16: success" \
 	"$node19_pid" || fail "node 19 could not ping node 16"
 
+# The ops node feeds the gateway's ground watchdog; it cannot feed its own.
+printf '%s\n' 'gndwdt feed 16' 'gndwdt show 16' 'gndwdt feed 19' >&4
+wait_for_output "$work_dir/node19.log" "is this node" "$node19_pid" || \
+	fail "node 19 fed its own ground watchdog"
+printf '%s\n' 'gndwdt show' >&3
+wait_for_output "$work_dir/node16.log" "last_node: 19" "$node16_pid" || \
+	fail "node 16 did not record the feed from node 19"
+
 node16_expected=(
+	"state: disarmed"
+	"contacts: 1 last_node: 19"
 	"Role: kfsw-gnd-uhf"
 	"Name: kfsw-gnd-uhf"
 	"CSP node: 16"
@@ -169,6 +179,9 @@ node16_expected=(
 	"kfsw-gnd-uhf# "
 )
 node19_expected=(
+	"fed: yes"
+	"ground_wtd_timeout: 86400"
+	"Node 19 is this node"
 	"Role: kfsw-ops"
 	"Name: kfsw-ops"
 	"CSP node: 19"

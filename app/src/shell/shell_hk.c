@@ -1,5 +1,7 @@
 #include <errno.h>
+#include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -11,6 +13,11 @@
 #include <kfsw/services/parameter.h>
 
 #include "hk_entries.h"
+#if CONFIG_KFSW_COMMAND_CSP
+#include <kfsw/services/command.h>
+
+#include "shell_command.h"
+#endif
 
 static int setting_result(const struct shell *sh, int result)
 {
@@ -46,12 +53,74 @@ static int parse_entry(const struct shell *sh, const char *text, struct kfsw_hk_
 	return 0;
 }
 
+#if CONFIG_KFSW_COMMAND_CSP
+/*
+ * A leading node sends the setting to that node, as in "param set [node]".
+ * With --retry last, the request carries a ticket.
+ */
+static bool names_node(size_t argc, char **argv, size_t local_argc)
+{
+	if ((argc > 1U) && (strcmp(argv[argc - 1U], "--retry") == 0)) {
+		argc--;
+	}
+	return argc > local_argc;
+}
+
+static int run_remote(const struct shell *sh, const char *command, size_t argc, char **argv)
+{
+	uint16_t node;
+	int result = kfsw_shell_parse_node(sh, argv[1], &node);
+
+	return (result != 0) ? result
+			     : kfsw_shell_run_command(sh, node, command, argc - 2U, &argv[2]);
+}
+
+/* hk_define carries the entries as one text argument. */
+static int define_remote(const struct shell *sh, size_t argc, char **argv)
+{
+	static char entries[KFSW_COMMAND_MAX_TEXT_SIZE + 1U];
+	char *args[3] = {argv[2], entries, "--retry"};
+	size_t last = argc;
+	size_t used = 0U;
+	uint16_t node;
+	int result;
+
+	result = kfsw_shell_parse_node(sh, argv[1], &node);
+	if (result != 0) {
+		return result;
+	}
+	if (strcmp(argv[argc - 1U], "--retry") == 0) {
+		last--;
+	}
+	entries[0] = '\0';
+	for (size_t index = 3U; index < last; index++) {
+		int written = snprintf(&entries[used], sizeof(entries) - used, "%s%s",
+				       (used == 0U) ? "" : " ", argv[index]);
+
+		if ((written < 0) || ((size_t)written >= (sizeof(entries) - used))) {
+			shell_error(sh, "Entries are longer than %u bytes",
+				    KFSW_COMMAND_MAX_TEXT_SIZE);
+			return -E2BIG;
+		}
+		used += (size_t)written;
+	}
+	return kfsw_shell_run_command(sh, node, "hk_define", (last < argc) ? 3U : 2U, args);
+}
+#endif
+
 static int cmd_hk_define(const struct shell *sh, size_t argc, char **argv)
 {
 	struct kfsw_hk_entry entries[CONFIG_KFSW_HK_ENTRIES];
 	uint32_t report;
 	size_t count = argc - 2U;
 	int result;
+
+#if CONFIG_KFSW_COMMAND_CSP
+	/* Entries hold a ':', so a plain number after the report names a node. */
+	if ((argc > 3U) && (strchr(argv[2], ':') == NULL)) {
+		return define_remote(sh, argc, argv);
+	}
+#endif
 
 	result = parse_u32(sh, argv[1], &report, "report");
 	if (result != 0) {
@@ -87,7 +156,13 @@ static int cmd_hk_clear(const struct shell *sh, size_t argc, char **argv)
 	uint32_t report;
 	int result;
 
+#if CONFIG_KFSW_COMMAND_CSP
+	if (names_node(argc, argv, 2U)) {
+		return run_remote(sh, "hk_clear", argc, argv);
+	}
+#else
 	ARG_UNUSED(argc);
+#endif
 	result = parse_u32(sh, argv[1], &report, "report");
 	if (result != 0) {
 		return result;
@@ -184,6 +259,33 @@ static int cmd_hk_collect(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
+/* One sample, live or read back from the file, printed the same way. */
+static void print_sample(const struct shell *sh, const struct kfsw_hk_sample *sample)
+{
+	char line[3 * 32 + 1];
+	size_t used = 0U;
+
+	/* Name the flags instead of printing the hex byte. */
+	shell_print(sh, "seq %u  at %u%s  %u values%s  %u bytes", sample->sequence, sample->seconds,
+		    ((sample->flags & KFSW_HK_FLAG_CLOCK_UNSET) != 0U) ? " (no clock)" : "",
+		    sample->entry_count,
+		    ((sample->flags & KFSW_HK_FLAG_INCOMPLETE) != 0U) ? " (incomplete)" : "",
+		    sample->length);
+
+	/* The values as they go out, so a bench can compare a frame against the
+	 * parameters it was built from.
+	 */
+	for (size_t index = KFSW_HK_HEADER_SIZE; index < sample->length; index++) {
+		if ((used + 3U) >= sizeof(line)) {
+			break;
+		}
+		used += (size_t)snprintk(&line[used], sizeof(line) - used, "%02x",
+					 sample->data[index]);
+	}
+	line[used] = '\0';
+	shell_print(sh, "  %s", line);
+}
+
 static int cmd_hk_get(const struct shell *sh, size_t argc, char **argv)
 {
 	static struct kfsw_hk_sample sample;
@@ -203,9 +305,6 @@ static int cmd_hk_get(const struct shell *sh, size_t argc, char **argv)
 	}
 
 	for (uint32_t age = 0U; age < wanted; age++) {
-		char line[3 * 32 + 1];
-		size_t used = 0U;
-
 		result = kfsw_hk_get((uint8_t)report, (uint16_t)age, &sample);
 		if (result != 0) {
 			if (age == 0U) {
@@ -213,27 +312,7 @@ static int cmd_hk_get(const struct shell *sh, size_t argc, char **argv)
 			}
 			break;
 		}
-
-		/* Name the flags instead of printing the hex byte. */
-		shell_print(sh, "seq %u  at %u%s  %u values%s  %u bytes", sample.sequence,
-			    sample.seconds,
-			    ((sample.flags & KFSW_HK_FLAG_CLOCK_UNSET) != 0U) ? " (no clock)" : "",
-			    sample.entry_count,
-			    ((sample.flags & KFSW_HK_FLAG_INCOMPLETE) != 0U) ? " (incomplete)" : "",
-			    sample.length);
-
-		/* The values as they go out, so a bench can compare a frame
-		 * against the parameters it was built from.
-		 */
-		for (size_t index = KFSW_HK_HEADER_SIZE; index < sample.length; index++) {
-			if ((used + 3U) >= sizeof(line)) {
-				break;
-			}
-			used += (size_t)snprintk(&line[used], sizeof(line) - used, "%02x",
-						 sample.data[index]);
-		}
-		line[used] = '\0';
-		shell_print(sh, "  %s", line);
+		print_sample(sh, &sample);
 	}
 	return 0;
 }
@@ -244,7 +323,13 @@ static int cmd_hk_period(const struct shell *sh, size_t argc, char **argv)
 	uint32_t period;
 	int result;
 
+#if CONFIG_KFSW_COMMAND_CSP
+	if (names_node(argc, argv, 3U)) {
+		return run_remote(sh, "hk_period", argc, argv);
+	}
+#else
 	ARG_UNUSED(argc);
+#endif
 	result = parse_u32(sh, argv[1], &report, "report");
 	if (result != 0) {
 		return result;
@@ -337,6 +422,11 @@ static int cmd_hk_beacon(const struct shell *sh, size_t argc, char **argv)
 	if (setting_result(sh, result) == KFSW_HK_APPLIED_UNSAVED) {
 		return result;
 	}
+	if (result == -ERANGE) {
+		shell_error(sh, "beacon interval must be 0 or at least %u ms",
+			    CONFIG_KFSW_HK_BEACON_FLOOR_MS);
+		return result;
+	}
 	if (result != 0) {
 		shell_error(sh, "beacon for report %u: %d", report, result);
 		return result;
@@ -366,27 +456,176 @@ static int cmd_hk_save(const struct shell *sh, size_t argc, char **argv)
 }
 #endif
 
+#if CONFIG_KFSW_HK_STORE
+/*
+ * A filter from optional arguments, so the common case is one word. Each
+ * argument is name=value, because an operator during a pass is not going to
+ * remember a positional order.
+ */
+static int parse_filter(const struct shell *sh, size_t argc, char **argv,
+			struct kfsw_hk_store_filter *filter)
+{
+	uint32_t report;
+	int result = parse_u32(sh, argv[1], &report, "report");
+
+	if (result != 0) {
+		return result;
+	}
+	*filter = (struct kfsw_hk_store_filter){.report = (uint8_t)report};
+
+	for (size_t index = 2U; index < argc; index++) {
+		const char *argument = argv[index];
+		const char *value = strchr(argument, '=');
+		uint32_t parsed;
+
+		if (value == NULL) {
+			shell_error(sh, "Expected name=value, got %s", argument);
+			return -EINVAL;
+		}
+		value++;
+		result = parse_u32(sh, value, &parsed, "value");
+		if (result != 0) {
+			return result;
+		}
+
+		if (strncmp(argument, "from=", 5U) == 0) {
+			filter->from_sequence = (uint16_t)parsed;
+		} else if (strncmp(argument, "to=", 3U) == 0) {
+			filter->to_sequence = (uint16_t)parsed;
+		} else if (strncmp(argument, "since=", 6U) == 0) {
+			filter->from_seconds = parsed;
+		} else if (strncmp(argument, "until=", 6U) == 0) {
+			filter->to_seconds = parsed;
+		} else if (strncmp(argument, "skip=", 5U) == 0) {
+			filter->without_flags = (uint8_t)parsed;
+		} else {
+			shell_error(sh, "Unknown filter: %s", argument);
+			return -EINVAL;
+		}
+	}
+	return 0;
+}
+
+static int cmd_hk_stored(const struct shell *sh, size_t argc, char **argv)
+{
+	static struct kfsw_hk_sample sample;
+	struct kfsw_hk_store_filter filter;
+	struct kfsw_hk_store_info info;
+	uint16_t matching = 0U;
+	int result = parse_filter(sh, argc, argv, &filter);
+
+	if (result != 0) {
+		return result;
+	}
+
+	result = kfsw_hk_store_query(filter.report, &info);
+	if (result != 0) {
+		shell_error(sh, "report %u has no stored history: %d", filter.report, result);
+		return result;
+	}
+	shell_print(sh, "file: %u of %u slots, %u bytes each, every %u ms", info.records,
+		    info.capacity, info.record_size, info.interval_ms);
+	if (info.records != 0U) {
+		shell_print(sh, "held: seq %u..%u", info.oldest, info.newest);
+	}
+
+	result = kfsw_hk_store_count(&filter, &matching);
+	if (result != 0) {
+		shell_error(sh, "count failed: %d", result);
+		return result;
+	}
+	shell_print(sh, "selected: %u", matching);
+
+	for (uint16_t index = 0U; index < matching; index++) {
+		if (kfsw_hk_store_read(&filter, index, &sample) != 0) {
+			break;
+		}
+		print_sample(sh, &sample);
+	}
+	return 0;
+}
+
+static int cmd_hk_extract(const struct shell *sh, size_t argc, char **argv)
+{
+	struct kfsw_hk_store_filter filter;
+	uint16_t records = 0U;
+	int result;
+
+	/* The path is the second argument; the filter starts after it, so it is
+	 * parsed from a list with the path taken out.
+	 */
+	char *filter_argv[CONFIG_KFSW_HK_ENTRIES + 2U];
+	size_t filter_argc = 1U;
+
+	if (argc > ARRAY_SIZE(filter_argv)) {
+		shell_error(sh, "Too many filters");
+		return -EINVAL;
+	}
+	filter_argv[0] = argv[0];
+	filter_argv[filter_argc] = argv[1];
+	filter_argc++;
+	for (size_t index = 3U; index < argc; index++) {
+		filter_argv[filter_argc] = argv[index];
+		filter_argc++;
+	}
+
+	result = parse_filter(sh, filter_argc, filter_argv, &filter);
+	if (result != 0) {
+		return result;
+	}
+
+	result = kfsw_hk_store_extract(&filter, argv[2], &records);
+	if (result != 0) {
+		shell_error(sh, "extract failed: %d", result);
+		return result;
+	}
+
+	shell_print(sh, "Extracted %u records to %s", records, argv[2]);
+	return 0;
+}
+#endif
+
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	hk_commands,
 #if CONFIG_KFSW_HK_PERSISTENCE
 	SHELL_CMD_ARG(save, NULL, "Save settings; replace a rejected snapshot.", cmd_hk_save, 1, 0),
 #endif
+#if CONFIG_KFSW_COMMAND_CSP
+	SHELL_CMD_ARG(define, NULL,
+		      "Name what a report collects: define [node] <report> [node:]table:offset ...",
+		      cmd_hk_define, 3, CONFIG_KFSW_HK_ENTRIES + 2),
+	SHELL_CMD_ARG(clear, NULL, "Forget a report: clear [node] <report>.", cmd_hk_clear, 2, 2),
+#else
 	SHELL_CMD_ARG(define, NULL, "Name what a report collects: define <report> [node:]table:offset ...",
 		      cmd_hk_define, 3, CONFIG_KFSW_HK_ENTRIES),
 	SHELL_CMD_ARG(clear, NULL, "Forget a report: clear <report>.", cmd_hk_clear, 2, 0),
+#endif
 	SHELL_CMD_ARG(show, NULL, "Show the reports and the counters.", cmd_hk_show, 1, 0),
 	SHELL_CMD_ARG(collect, NULL, "Collect now: collect <report>.", cmd_hk_collect, 2, 0),
 	SHELL_CMD_ARG(get, NULL, "Read samples back: get <report> [count].", cmd_hk_get, 2, 1),
+#if CONFIG_KFSW_COMMAND_CSP
+	SHELL_CMD_ARG(period, NULL, "Collect repeatedly: period [node] <report> <ms>, 0 to stop.",
+		      cmd_hk_period, 3, 2),
+#else
 	SHELL_CMD_ARG(period, NULL, "Collect repeatedly: period <report> <ms>, 0 to stop.",
 		      cmd_hk_period, 3, 0),
+#endif
 #if CONFIG_KFSW_HK_STORE
 	SHELL_CMD_ARG(store, NULL, "Keep samples in a file: store <report> <ms>, 0 to stop.",
 		      cmd_hk_store, 3, 0),
 	SHELL_CMD_ARG(store_clear, NULL, "Stop storing and delete the file: store_clear <report>.",
 		      cmd_hk_store_clear, 2, 0),
+	SHELL_CMD_ARG(stored, NULL,
+		      "Read stored samples: stored <report> [from=|to=|since=|until=|skip=]...",
+		      cmd_hk_stored, 2, CONFIG_KFSW_HK_ENTRIES),
+	SHELL_CMD_ARG(extract, NULL,
+		      "Write selected stored samples to a file: extract <report> <path> [filters]",
+		      cmd_hk_extract, 3, CONFIG_KFSW_HK_ENTRIES),
 #endif
 #if CONFIG_KFSW_HK_BEACON
-	SHELL_CMD_ARG(beacon, NULL, "Send unprompted: beacon <report> <node> <ms>, 0 to stop.",
+	SHELL_CMD_ARG(beacon, NULL,
+		      "Send unprompted: beacon <report> <node> <ms>, 0 to stop, "
+		      STRINGIFY(CONFIG_KFSW_HK_BEACON_FLOOR_MS) " at least.",
 		      cmd_hk_beacon, 4, 0),
 #endif
 	SHELL_SUBCMD_SET_END);

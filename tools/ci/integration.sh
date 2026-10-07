@@ -50,6 +50,9 @@ echo "INTEGRATION: storage"
 echo "INTEGRATION: PARAM persistence"
 "$KFSW_REPO_DIR/tests/param-persistence-smoke.sh"
 
+echo "INTEGRATION: a parameter table uploaded as a file"
+"$KFSW_REPO_DIR/tests/table-file-smoke.sh"
+
 echo "INTEGRATION: housekeeping collection"
 "$KFSW_REPO_DIR/tests/hk-smoke.sh"
 

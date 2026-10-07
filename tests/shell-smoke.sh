@@ -26,13 +26,15 @@ fi
 	printf 'param set echo_enabled 1\n'
 	sleep 0.2
 	printf 'pa\t g\t test_u32\n'
+	# Two matches: Tab lists them one per line with their help.
+	printf 'st\t\n'
 	printf '%s\n' \
 		'help' \
 		'status' \
 		'time' \
 		'version' \
 		'resmon show' \
-		'uart info' \
+		'comms uart info' \
 		'param tables' \
 		'param get uid' \
 		'param set route_table "9/9 KISS"' \
@@ -55,10 +57,11 @@ fi
 		'storage test' \
 		'ftp' \
 		'ftp generate' \
-		'ftp 1 mkdir /selfnode' \
-		'ftp 1 ls /' \
+		'ftp mkdir /selfnode' \
+		'ftp ls /' \
+		'ftp mkdir /tmp/scratch' \
 		'ftp stat 1 /selfnode' \
-		'ftp 1 ls /missing' \
+		'ftp ls 1 /missing' \
 		'ftp put 1 /selfnode/a.bin /selfnode/b.bin' \
 		'log test'
 } |
@@ -68,6 +71,8 @@ fi
 cat "$capture_file"
 
 expected_output=(
+	"  status   : Show status, here or on a node: status [node]."
+	"  storage  : Filesystem storage commands."
     '@BOOT '
     '@READY '
     # Not anchored to the prompt, which has colour codes.
@@ -75,13 +80,16 @@ expected_output=(
     # Off by default, and the test turned it on for the completion check above.
     'echo_enabled = 1'
 	'Available commands:'
-	'csp      : K-FSW CSP commands.'
-	'ftp      : K-FSW file transfer:'
-	'param    : K-FSW parameter commands.'
-	'status   : Show basic K-FSW runtime status.'
-	'storage  : K-FSW filesystem storage commands.'
-	'version  : Show K-FSW build information.'
+	'csp      : CSP commands.'
+	'ftp      : File transfer. Without a node, this node.'
+	'param    : Parameter commands.'
+	'status   : Show status, here or on a node: status [node].'
+	'storage  : Filesystem storage commands.'
+	'version  : Show build information.'
     'K-FSW status'
+    'revisions:'
+    '  kfsw-libcsp: '
+    '  kfsw-libparam: '
 	'Role: flight'
 	'Name: kfsw'
     'board: native_sim/native/64'
@@ -127,7 +135,7 @@ expected_output=(
     'uid = "kfsw-1"'
     # Runtime writes are rejected; the compiled route remains active.
     "set: parameter 'route_table' is read-only"
-    'route_table = ""'
+    'route_table = "0/0 KISS"'
     '0/0 -> KISS direct'
 	'Parameter snapshot save: PASS'
 	'Parameter defaults: PASS (saved snapshot unchanged)'
@@ -140,14 +148,20 @@ expected_output=(
 	'ready: yes'
 	'total_bytes: '
 	'Storage test: PASS'
-	'  mkdir     : Create a directory: mkdir <node> <path>; <node> may be this node.'
+	'  mkdir     : Create a directory: mkdir [node] <path>.'
 	'generate: wrong parameter count'
 	'generate - Create deterministic local data: generate <path> <bytes 0..32768>.'
-	'FTP mkdir node=1 path=/selfnode: PASS'
-	'FTP list: PASS entries='
-	'FTP stat node=1 path=/selfnode type=directory'
-	'FTP list node=1 path=/missing: not found'
-	'FTP put node=1: transfers need two nodes'
+	'FTP mkdir 1 /selfnode: PASS'
+	# The firmware slots and the RAM volume show in a listing of the root.
+	'dir           0 boot'
+	'dir           0 tmp'
+	'FTP mkdir 1 /tmp/scratch: PASS'
+	'tmp_total_bytes: 32768'
+	'entries: '
+	'FTP stat 1 /selfnode'
+	'type: dir'
+	'FTP ls 1 /missing: not found'
+	'FTP put 1: transfers need two nodes'
     '[ERROR] K-FSW shell log test: error'
     '[WARNING] K-FSW shell log test: warning'
     '[INFO] K-FSW shell log test: info'

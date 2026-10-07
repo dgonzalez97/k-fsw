@@ -3,7 +3,7 @@
 #include <csp/csp.h>
 #include <kfsw/comms/csp.h>
 #include <kfsw/services/fwu_lite.h>
-#include <kfsw/services/log_history.h>
+#include <kfsw/services/log_remote.h>
 
 ZTEST(fwu_lite_start, test_occupied_port_fails_synchronously_and_retry_works)
 {
@@ -12,7 +12,7 @@ ZTEST(fwu_lite_start, test_occupied_port_fails_synchronously_and_retry_works)
 	zassert_equal(kfsw_fwu_lite_server_start(), -EACCES);
 	zassert_ok(kfsw_csp_init());
 	zassert_ok(kfsw_csp_start());
-	zassert_ok(kfsw_log_history_server_start());
+	zassert_ok(kfsw_log_remote_server_start());
 	zassert_ok(csp_listen(&occupied, 1));
 	zassert_ok(csp_bind(&occupied, CONFIG_KFSW_FWU_LITE_CSP_PORT));
 	zassert_equal(kfsw_fwu_lite_server_start(), -EADDRINUSE);

@@ -52,6 +52,7 @@ static const struct kfsw_param_definition test_param_definitions[] = {
 const struct kfsw_param_definition_set kfsw_test_param_definitions = {
 	.table = 24U,
 	.name = "test",
+	.description = "Fixtures for the parameter tests",
 	.definitions = test_param_definitions,
 	.count = ARRAY_SIZE(test_param_definitions),
 };

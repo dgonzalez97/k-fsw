@@ -40,6 +40,7 @@ expect()
 	sleep 10
 	printf 'fbo status\n'
 	printf 'fbo run absent.txt\n'
+	printf 'ftp ls /procedures\n'
 	sleep 3
 } | timeout 40 "$executable" --uart_stdinout --no-color \
 	-flash="$work_dir/flash.bin" --stop_at=25 >"$work_dir/out.log" 2>&1 || true
@@ -48,7 +49,33 @@ sed -i 's/\x1b\[[0-9;]*m//g' "$work_dir/out.log"
 tr -d '\r' <"$work_dir/out.log" >"$work_dir/clean.log"
 mv "$work_dir/clean.log" "$work_dir/out.log"
 
+# The examples are what people copy, so each must run to its end.
+for example in "$KFSW_TESTS_DIR"/procedures/examples/*.txt; do
+	name="$(basename "$example")"
+	rm -f -- "$work_dir/example.bin"
+	"$python" "$KFSW_REPO_DIR/tools/ground/stage-file.py" \
+		--flash "$work_dir/example.bin" --offset 0xfc000 --size 0x40000 \
+		"$example" "/ftp/procedures/$name" >/dev/null
+	{
+		printf 'fbo run %s\n' "$name"
+		sleep 3
+	} | timeout 20 "$executable" --uart_stdinout --no-color \
+		-flash="$work_dir/example.bin" --stop_at=6 2>&1 |
+		sed 's/\x1b\[[0-9;]*m//g' | tr -d '\r' >>"$work_dir/examples.log" || true
+done
+
 echo "FBO SMOKE"
+
+for example in "$KFSW_TESTS_DIR"/procedures/examples/*.txt; do
+	name="$(basename "$example")"
+	if grep -aqE "FBO: $name finished at line [0-9]+ \(0\)" "$work_dir/examples.log"; then
+		printf '  [ok]   the example %s runs to its end\n' "$name"
+	else
+		printf '  [FAIL] the example %s did not run to its end\n' "$name" >&2
+		grep -a "FBO: $name" "$work_dir/examples.log" >&2 || true
+		failures=$((failures + 1))
+	fi
+done
 
 expect 'FBO: smoke.txt started' 'the procedure starts'
 # -2 is -ENOENT: the line names a command that is not registered.
@@ -59,6 +86,12 @@ expect 'lines skipped: 1' 'if-event skipped a line whose event never happened'
 # Seven lines run and one skipped: a skipped line isn't counted as run.
 expect 'lines run: 7' 'blanks and comments are not lines'
 expect 'run absent.txt: -2' 'a procedure that does not exist is refused'
+if grep -aEq '^proc +[0-9]+ smoke\.txt' "$work_dir/out.log"; then
+	printf '  [ok]   %s\n' 'ftp ls names it a procedure'
+else
+	printf '  [FAIL] %s\n' 'ftp ls names it a procedure' >&2
+	failures=$((failures + 1))
+fi
 
 if [[ "$failures" -eq 0 ]]; then
 	echo "FBO SMOKE RESULT: PASS"

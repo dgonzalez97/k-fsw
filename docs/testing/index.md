@@ -9,14 +9,54 @@ Run the checks that cover the change. From the workspace root:
 ```
 
 `tools/ci/all.sh` runs the software sequence. Individual entry points also cover
-Robot, Valgrind, UBSan, coverage, and Doxygen. Test output stays in the build
-directory.
+Robot, Valgrind, UBSan, coverage, @ref footprint, and Doxygen. Test output
+stays in the build directory.
+
+Read `all.sh`'s own exit status to tell whether it passed. Every stage prints
+`<STAGE> RESULT: PASS`, so a log with no `FAIL` and a tail that reaches
+`DOCS RESULT` is a good sign, but the exit status is the verdict. Doxygen writes
+its warnings to `build/docs/doxygen-warnings.log` rather than the console, with
+`WARN_AS_ERROR` set, so a failing documentation build prints nothing unusual and
+simply stops before its result line. When any stage fails, `set -Eeuo pipefail`
+ends the run there and the log stops mid-stage.
+
+`tools/ci/csp-v1.sh`, part of `all.sh`, repeats the CSP checks under CSP 1: the
+NUCLEO builds with and without CAN, an address CSP 1 cannot carry fails the
+build, the CSP and multi-KISS smokes pass, and a CSP 2 node gets no answer from
+a CSP 1 node. Unit suites that depend on the address width also have a
+`.csp1` scenario.
 
 For a focused native suite:
 
 ```bash
 ./k-fsw/tools/ci/unit.sh -s kfsw.services.fwu
 ```
+
+## Analysis
+
+These stages are not part of `all.sh`; run them before a release or after a
+change that touches memory handling. Each prints `<STAGE> RESULT: PASS` or
+`FAIL` and keeps its output under `build/`.
+
+| Stage | Finds | Time on a desktop |
+| --- | --- | --- |
+| `sca.sh` | GCC's `-fanalyzer`: null dereferences, leaks, use after free, along paths through the code. The NUCLEO image, plus the services only Linux carries, built with the board's compiler | under a minute |
+| `asan.sh` | AddressSanitizer and LeakSanitizer over the unit suites, 64-bit native_sim | about 5 minutes |
+| `codechecker.sh` | clang-tidy through CodeChecker, the same sources as `sca.sh`; HTML report in `build/codechecker/html` | under a minute |
+| `sbom.sh` | SPDX 2.3 bill of materials for the NUCLEO image, in `build/sbom/spdx` | under a minute |
+| `ubsan.sh` | Undefined behaviour in the unit suites | about 5 minutes |
+| `footprint.sh` | Flash and RAM per symbol, see @ref footprint | under a minute |
+
+`sca.sh` and `codechecker.sh` fail on a finding in a K-FSW repository; Zephyr,
+its modules and the libcsp and libparam forks are left out. A finding reviewed
+as a false positive is marked where it is, with a `codechecker_false_positive`
+or `codechecker_intentional` comment and the reason. CodeChecker needs
+`./.venv/bin/pip install codechecker clang-tidy`.
+
+Not in place yet: clang as a second compiler and sparse, which need system
+packages, and LTO, which shrinks the NUCLEO image by about 20 KB but needs
+`CONFIG_SHARED_INTERRUPTS=n` (no interrupt is shared today) and a run on the
+board before it changes a flight image.
 
 ## Linux diagnostics
 

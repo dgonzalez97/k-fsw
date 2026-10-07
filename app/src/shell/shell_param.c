@@ -10,10 +10,20 @@
 #include <zephyr/sys/util.h>
 
 #include <kfsw/services/parameter.h>
+#if CONFIG_KFSW_PARAM_CSP
+#include <kfsw/comms/csp.h>
+
+#include "shell_remote.h"
+#endif
+
+/* Node 0 in this file is the local parameter table. */
+#define THIS_NODE 0U
 
 /* Column widths. Names longer than the name column are refused at registration. */
 /* Wide enough for the longest table name in any composition. */
 #define KFSW_PARAM_TABLE_COLUMN 10
+/* Table names in the tables listing; module tables have longer names. */
+#define TABLE_NAME_COLUMN 12
 #define KFSW_PARAM_NAME_COLUMN ((int)KFSW_PARAM_NAME_MAX)
 #define KFSW_PARAM_TYPE_COLUMN 6
 #define KFSW_PARAM_MODE_COLUMN 4
@@ -124,6 +134,11 @@ static bool print_param_info(const struct kfsw_param_info *info, void *context)
 	return true;
 }
 
+static const char *table_holds(const struct kfsw_param_table_info *info)
+{
+	return (info->description != NULL) ? info->description : "";
+}
+
 static bool print_table_info(const struct kfsw_param_table_info *info, void *context)
 {
 	const struct param_list_context *list_context = context;
@@ -132,13 +147,13 @@ static bool print_table_info(const struct kfsw_param_table_info *info, void *con
 
 	/* How many of the table's values are saved. */
 	(void)kfsw_param_persist_table_count(info->id, &kept);
-	shell_print(list_context->shell, "%3" PRIu8 "  %-7s  %-*s  %6" PRIu16 "  %6" PRIu16,
-		    info->id, kfsw_param_band_name(info->id), KFSW_PARAM_TABLE_COLUMN, info->name,
-		    info->count, kept);
+	shell_print(list_context->shell, "%3" PRIu8 "  %-7s  %-*s  %6" PRIu16 "  %4" PRIu16 "  %s",
+		    info->id, kfsw_param_band_name(info->id), TABLE_NAME_COLUMN, info->name,
+		    info->count, kept, table_holds(info));
 #else
-	shell_print(list_context->shell, "%3" PRIu8 "  %-7s  %-*s  %6" PRIu16, info->id,
-		    kfsw_param_band_name(info->id), KFSW_PARAM_TABLE_COLUMN, info->name,
-		    info->count);
+	shell_print(list_context->shell, "%3" PRIu8 "  %-7s  %-*s  %6" PRIu16 "  %s", info->id,
+		    kfsw_param_band_name(info->id), TABLE_NAME_COLUMN, info->name, info->count,
+		    table_holds(info));
 #endif
 	return true;
 }
@@ -146,16 +161,19 @@ static bool print_table_info(const struct kfsw_param_table_info *info, void *con
 #if CONFIG_KFSW_PARAM_CSP
 static int parse_param_node(const struct shell *sh, const char *text, uint16_t *node)
 {
+	struct kfsw_csp_info info;
 	unsigned long parsed;
 	int parse_error = 0;
 
 	parsed = shell_strtoul(text, 10, &parse_error);
-	if ((parse_error != 0) || (parsed == 0U) || (parsed > 16383U)) {
-		shell_error(sh, "CSP node must be in range 1..16383");
+	if ((parse_error != 0) || (parsed == 0U) || (parsed > KFSW_CSP_BROADCAST_ADDRESS)) {
+		shell_error(sh, "CSP node must be in range 1..%u", KFSW_CSP_BROADCAST_ADDRESS);
 		return -EINVAL;
 	}
 
-	*node = (uint16_t)parsed;
+	/* This node's own address means the local table, as no node at all does. */
+	kfsw_csp_get_info(&info);
+	*node = (parsed == info.address) ? THIS_NODE : (uint16_t)parsed;
 	return 0;
 }
 #endif
@@ -251,7 +269,7 @@ static void print_param_value(const struct shell *sh, uint16_t node, const char 
 	char text[KFSW_PARAM_VALUE_TEXT_SIZE];
 
 	format_param_value(text, sizeof(text), value);
-	if (node == 0U) {
+	if (node == THIS_NODE) {
 		shell_print(sh, "%s = %s", name, text);
 	} else {
 		shell_print(sh, "%" PRIu16 ":%s = %s", node, name, text);
@@ -419,8 +437,15 @@ static int cmd_param_list(const struct shell *sh, size_t argc, char **argv)
 		if (result != 0) {
 			return result;
 		}
-		context.local = false;
-		result = kfsw_param_remote_visit(node, print_param_info, &context);
+		if (node == THIS_NODE) {
+			result = kfsw_param_visit(print_param_info, &context);
+		} else {
+			context.local = false;
+			result = kfsw_param_remote_visit(node, print_param_info, &context);
+			if (kfsw_shell_no_answer(result)) {
+				return kfsw_shell_remote_failed(sh, "param list", node, result);
+			}
+		}
 	}
 #else
 	ARG_UNUSED(argc);
@@ -457,7 +482,8 @@ static int cmd_param_get(const struct shell *sh, size_t argc, char **argv)
 			return result;
 		}
 		name = argv[2];
-		result = kfsw_param_remote_get(node, name, &value);
+		result = (node == THIS_NODE) ? kfsw_param_get(name, &value)
+					     : kfsw_param_remote_get(node, name, &value);
 	}
 #else
 	ARG_UNUSED(argc);
@@ -465,6 +491,9 @@ static int cmd_param_get(const struct shell *sh, size_t argc, char **argv)
 	result = kfsw_param_get(name, &value);
 #endif
 
+	if ((node != THIS_NODE) && kfsw_shell_no_answer(result)) {
+		return kfsw_shell_remote_failed(sh, "param get", node, result);
+	}
 	if (result != 0) {
 		return print_param_error(sh, "get", name, result);
 	}
@@ -492,7 +521,8 @@ static int cmd_param_set(const struct shell *sh, size_t argc, char **argv)
 		}
 		name = argv[2];
 		text = argv[3];
-		result = kfsw_param_remote_get(node, name, &value);
+		result = (node == THIS_NODE) ? kfsw_param_get(name, &value)
+					     : kfsw_param_remote_get(node, name, &value);
 	}
 #else
 	ARG_UNUSED(argc);
@@ -500,6 +530,9 @@ static int cmd_param_set(const struct shell *sh, size_t argc, char **argv)
 	text = argv[2];
 	result = kfsw_param_get(name, &value);
 #endif
+	if ((node != THIS_NODE) && kfsw_shell_no_answer(result)) {
+		return kfsw_shell_remote_failed(sh, "param set", node, result);
+	}
 	if (result != 0) {
 		return print_param_error(sh, "set", name, result);
 	}
@@ -511,7 +544,7 @@ static int cmd_param_set(const struct shell *sh, size_t argc, char **argv)
 		return result;
 	}
 
-	if (node == 0U) {
+	if (node == THIS_NODE) {
 		result = kfsw_param_set(name, &value);
 		if (result == 0) {
 			/* Print the stored value. Write-only inputs may already be cleared. */
@@ -521,6 +554,9 @@ static int cmd_param_set(const struct shell *sh, size_t argc, char **argv)
 #if CONFIG_KFSW_PARAM_CSP
 	else {
 		result = kfsw_param_remote_set(node, name, &value);
+		if (kfsw_shell_no_answer(result)) {
+			return kfsw_shell_remote_failed(sh, "param set", node, result);
+		}
 	}
 #endif
 	if (result != 0) {
@@ -529,7 +565,7 @@ static int cmd_param_set(const struct shell *sh, size_t argc, char **argv)
 	print_param_value(sh, node, name, &value);
 
 	/* Say whether the value applies now or at the next boot. */
-	if (node == 0U) {
+	if (node == THIS_NODE) {
 		struct kfsw_param_info info;
 
 		if ((kfsw_param_get_info(name, &info) == 0) &&
@@ -556,6 +592,20 @@ static int parse_table_id(const struct shell *sh, const char *text, uint8_t *tab
 	return 0;
 }
 
+static int print_local_table(const struct shell *sh, struct param_list_context *context)
+{
+	int result = kfsw_param_visit(print_param_info, context);
+
+	if (result != 0) {
+		shell_error(sh, "parameter table failed (%d)", result);
+		return result;
+	}
+	if (!context->header_printed) {
+		shell_print(sh, "table %u holds no parameters here", context->table);
+	}
+	return 0;
+}
+
 /*
  * One table, local or remote. A node's descriptors are fetched once.
  */
@@ -575,7 +625,7 @@ static int cmd_param_table(const struct shell *sh, size_t argc, char **argv)
 		if (result != 0) {
 			return result;
 		}
-		result = kfsw_param_visit(print_param_info, &context);
+		return print_local_table(sh, &context);
 	} else {
 		uint16_t node;
 
@@ -587,11 +637,13 @@ static int cmd_param_table(const struct shell *sh, size_t argc, char **argv)
 		if (result != 0) {
 			return result;
 		}
+		if (node == THIS_NODE) {
+			return print_local_table(sh, &context);
+		}
 		/* Names first, then one request for the values. */
 		result = kfsw_param_remote_visit(node, collect_table_names, &context);
 		if (result != 0) {
-			shell_error(sh, "parameter table failed (%d)", result);
-			return result;
+			return kfsw_shell_remote_failed(sh, "param table", node, result);
 		}
 		if (context.name_count == 0U) {
 			shell_print(sh, "node %u carries no table %u", node, context.table);
@@ -607,10 +659,15 @@ static int cmd_param_table(const struct shell *sh, size_t argc, char **argv)
 		for (size_t base = 0U; base < context.name_count;
 		     base += KFSW_PARAM_REMOTE_WINDOW) {
 			size_t span = MIN(context.name_count - base, KFSW_PARAM_REMOTE_WINDOW);
-			bool read_ok;
+			int read_result = kfsw_param_remote_get_many(node, &context.names[base],
+								     span, window);
+			bool read_ok = (read_result == 0);
 
-			read_ok = (kfsw_param_remote_get_many(node, &context.names[base], span,
-							      window) == 0);
+			/* The names are listed anyway, with "-" for missing values. */
+			if (!read_ok) {
+				(void)kfsw_shell_remote_failed(sh, "param table", node,
+							       read_result);
+			}
 
 			for (size_t offset = 0U; offset < span; offset++) {
 				size_t index = base + offset;
@@ -642,63 +699,63 @@ static int cmd_param_table(const struct shell *sh, size_t argc, char **argv)
 	if (result != 0) {
 		return result;
 	}
-	result = kfsw_param_visit(print_param_info, &context);
 #endif
+	return print_local_table(sh, &context);
+}
 
-	if (result != 0) {
-		shell_error(sh, "parameter table failed (%d)", result);
-		return result;
+#if CONFIG_KFSW_PARAM_CSP
+struct table_search {
+	uint8_t id;
+	struct kfsw_param_table_info found;
+	bool known;
+};
+
+static bool find_table(const struct kfsw_param_table_info *info, void *context)
+{
+	struct table_search *search = context;
+
+	if (info->id != search->id) {
+		return true;
 	}
-	if (!context.header_printed) {
-		shell_print(sh, "table %u holds no parameters here", context.table);
-	}
-	return 0;
+	search->found = *info;
+	search->known = true;
+	return false;
 }
 
 /*
- * The tables a node has, without values. Remote tables show their number and band.
+ * Table names are not sent over the link. Table IDs are fixed per component, so
+ * a table this build also carries is named from here; another shows "-".
  */
-static int cmd_param_tablelist(const struct shell *sh, size_t argc, char **argv)
+static int print_remote_tables(const struct shell *sh, uint16_t node)
 {
-	struct param_list_context context = {.shell = sh, .local = true};
+	struct param_list_context context = {.shell = sh, .local = false};
 	int result;
 
-#if CONFIG_KFSW_PARAM_CSP
-	if (argc == 1U) {
-		result = kfsw_param_visit(tally_table, &context);
-	} else {
-		uint16_t node;
-
-		result = parse_param_node(sh, argv[1], &node);
-		if (result != 0) {
-			return result;
-		}
-		context.local = false;
-		result = kfsw_param_remote_visit(node, tally_table, &context);
-	}
-#else
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-	result = kfsw_param_visit(tally_table, &context);
-#endif
-
+	result = kfsw_param_remote_visit(node, tally_table, &context);
 	if (result != 0) {
-		shell_error(sh, "parameter tablelist failed (%d)", result);
-		return result;
+		return kfsw_shell_remote_failed(sh, "param tables", node, result);
 	}
 
-	shell_print(sh, "%3s  %-7s  %6s", " id", "band", "params");
-	shell_print(sh, "%.3s  %.7s  %.6s", "---------", "---------", "---------");
+	shell_print(sh, "%3s  %-7s  %-*s  %6s  %s", " id", "layer", TABLE_NAME_COLUMN, "name",
+		    "params", "holds");
+	shell_print(sh, "%.3s  %.7s  %.*s  %.6s  %.5s", "---------", "---------", TABLE_NAME_COLUMN,
+		    "--------------------------------", "---------", "---------");
 	for (unsigned int table = KFSW_PARAM_TABLE_CORE_FIRST;
 	     table <= KFSW_PARAM_TABLE_MODULE_LAST; table++) {
+		struct table_search search = {.id = (uint8_t)table};
+
 		if (context.counts[table] == 0U) {
 			continue;
 		}
-		shell_print(sh, "%3u  %-7s  %6u", table, kfsw_param_band_name((uint8_t)table),
-			    context.counts[table]);
+		(void)kfsw_param_visit_tables(find_table, &search);
+		shell_print(sh, "%3u  %-7s  %-*s  %6u  %s", table,
+			    kfsw_param_band_name((uint8_t)table), TABLE_NAME_COLUMN,
+			    search.known ? search.found.name : "-", context.counts[table],
+			    search.known ? table_holds(&search.found) : "");
 	}
 	return 0;
 }
+#endif
 
 static int cmd_param_tables(const struct shell *sh, size_t argc, char **argv)
 {
@@ -709,20 +766,34 @@ static int cmd_param_tables(const struct shell *sh, size_t argc, char **argv)
 	};
 	int result;
 
+#if CONFIG_KFSW_PARAM_CSP
+	if (argc == 2U) {
+		uint16_t node;
+
+		result = parse_param_node(sh, argv[1], &node);
+		if (result != 0) {
+			return result;
+		}
+		if (node != THIS_NODE) {
+			return print_remote_tables(sh, node);
+		}
+	}
+#else
 	ARG_UNUSED(argc);
+#endif
 	ARG_UNUSED(argv);
 
 #if CONFIG_KFSW_PARAM_PERSISTENCE
-	shell_print(sh, "%3s  %-7s  %-*s  %6s  %6s", " id", "band", KFSW_PARAM_TABLE_COLUMN, "name",
-		    "params", "kept");
-	shell_print(sh, "%.3s  %.7s  %.*s  %.6s  %.6s", "---------", "---------",
-		    KFSW_PARAM_TABLE_COLUMN, "--------------------------------", "---------",
+	shell_print(sh, "%3s  %-7s  %-*s  %6s  %4s  %s", " id", "layer", TABLE_NAME_COLUMN, "name",
+		    "params", "kept", "holds");
+	shell_print(sh, "%.3s  %.7s  %.*s  %.6s  %.4s  %.5s", "---------", "---------",
+		    TABLE_NAME_COLUMN, "--------------------------------", "---------", "---------",
 		    "---------");
 #else
-	shell_print(sh, "%3s  %-7s  %-*s  %6s", " id", "band", KFSW_PARAM_TABLE_COLUMN, "name",
-		    "params");
-	shell_print(sh, "%.3s  %.7s  %.*s  %.6s", "---------", "---------", KFSW_PARAM_TABLE_COLUMN,
-		    "--------------------------------", "---------");
+	shell_print(sh, "%3s  %-7s  %-*s  %6s  %s", " id", "layer", TABLE_NAME_COLUMN, "name",
+		    "params", "holds");
+	shell_print(sh, "%.3s  %.7s  %.*s  %.6s  %.5s", "---------", "---------", TABLE_NAME_COLUMN,
+		    "--------------------------------", "---------", "---------");
 #endif
 
 	result = kfsw_param_visit_tables(print_table_info, &context);
@@ -863,9 +934,10 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 #endif
 	SHELL_CMD_ARG(list, NULL,
 #if CONFIG_KFSW_PARAM_CSP
-		      "List local or remote parameters: list [node].", cmd_param_list, 1, 1),
+		      "Every parameter of a node, with its value: list [node].", cmd_param_list,
+		      1, 1),
 #else
-		      "List local parameters.", cmd_param_list, 1, 0),
+		      "Every parameter, with its value.", cmd_param_list, 1, 0),
 #endif
 #if CONFIG_KFSW_PARAM_PERSISTENCE
 	SHELL_CMD_ARG(persist, NULL,
@@ -881,19 +953,19 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 #endif
 	SHELL_CMD_ARG(table, NULL,
 #if CONFIG_KFSW_PARAM_CSP
-		      "Show one table: table [node] <table>.", cmd_param_table, 2, 1),
+		      "The parameters of one table, with values: table [node] <id>.",
+		      cmd_param_table, 2, 1),
 #else
-		      "Show one table: table <table>.", cmd_param_table, 2, 0),
+		      "The parameters of one table, with values: table <id>.", cmd_param_table,
+		      2, 0),
 #endif
-	SHELL_CMD_ARG(tablelist, NULL,
+	SHELL_CMD_ARG(tables, NULL,
 #if CONFIG_KFSW_PARAM_CSP
-		      "Summarise the tables a node carries: tablelist [node].",
-		      cmd_param_tablelist, 1, 1),
+		      "The tables a node carries, without values: tables [node].",
+		      cmd_param_tables, 1, 1),
 #else
-		      "Summarise the local tables.", cmd_param_tablelist, 1, 0),
+		      "The tables, without values.", cmd_param_tables, 1, 0),
 #endif
-	SHELL_CMD_ARG(tables, NULL, "List registered local tables with their names.",
-		      cmd_param_tables, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(param, &param_commands, "K-FSW parameter commands.", NULL);
+SHELL_CMD_REGISTER(param, &param_commands, "Parameter commands.", NULL);

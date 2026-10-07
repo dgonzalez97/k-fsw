@@ -19,3 +19,5 @@ west twister \
 	--testsuite-root "$KFSW_REPO_DIR/tests/unit" \
 	--testsuite-root "$KFSW_ROOT/kfsw-modules/tests" \
 	"$@"
+
+echo "UNIT RESULT: PASS ($twister_out_dir)"

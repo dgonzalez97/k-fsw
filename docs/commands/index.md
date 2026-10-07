@@ -12,7 +12,9 @@ kfsw:~$ status
 
 Wait for `@READY` before using services. `help` lists the commands in the
 build and `<command> -h` shows the syntax. Tab completes command and
-subcommand names, but not arguments such as a node or a path. A command with
+subcommand names, but not arguments such as a node or a path. When more than
+one name fits, Tab lists them one per line with their help, the same way
+`<command> -h` does. A command with
 the wrong number of arguments prints its usage:
 
 ```text
@@ -30,12 +32,14 @@ service:
 | --- | --- |
 | `status`, `version`, `time`, `log` | always |
 | `csp` | `CONFIG_KFSW_CSP` |
-| `uart` | `CONFIG_KFSW_CSP_KISS_UART` |
+| `comms uart` | `CONFIG_KFSW_CSP_KISS_UART` |
+| `comms can` | `CONFIG_KFSW_CSP_CAN` |
 | `param` | `CONFIG_KFSW_PARAM`; saving needs `CONFIG_KFSW_PARAM_PERSISTENCE` |
 | `storage` | `CONFIG_KFSW_STORAGE` |
 | `ftp` | `CONFIG_KFSW_FTP` |
-| `cmd` | `CONFIG_KFSW_COMMAND` |
 | `event` | `CONFIG_KFSW_EVENT` |
+| `journal` | `CONFIG_KFSW_JOURNAL` |
+| `reboot` | `CONFIG_KFSW_COMMAND` and `CONFIG_REBOOT` |
 | `hk` | `CONFIG_KFSW_HK` |
 | `fbo` | `CONFIG_KFSW_FBO` |
 | `fwu` | `CONFIG_KFSW_FWU` |
@@ -43,7 +47,7 @@ service:
 | `health` | `CONFIG_KFSW_HEALTH` |
 | `gndwdt` | `CONFIG_KFSW_GNDWDT` |
 | `resmon` | `CONFIG_KFSW_RESMON` |
-| `uhf` | `CONFIG_KFSW_RADIO_UHF_SHELL` |
+| `comms uhf` | `CONFIG_KFSW_RADIO_UHF_SHELL` |
 | `temp` | `CONFIG_KFSW_TEMP_EXAMPLE_SHELL` |
 | `boton_test`, `test` | `CONFIG_KFSW_BOTON_TEST_SHELL` |
 
@@ -51,7 +55,7 @@ service:
 
 | Command | Prints |
 | --- | --- |
-| `status` | Role, name, CSP node, board, hardware ID and uptime |
+| `status [node]` | Role, name, CSP node, board, hardware ID, uptime, and the revision of each repository |
 | `version` | K-FSW version, Zephyr version, board, SoC and hardware ID |
 | `time` | Milliseconds and microseconds since boot |
 
@@ -64,10 +68,24 @@ CSP node: 1
 board: native_sim/native/64
 unit: 007f0101
 uptime_ms: 10
+revisions:
+  k-fsw: 3516c1a1
+  kfsw-platform: 049b7289
+  kfsw-services: ed838173
+  kfsw-comms: b4289702
+  kfsw-modules: ad39ef41
+  kfsw-libcsp: d62491f5
+  kfsw-libparam: c8a7c104
 ```
 
+A trailing `+` marks a repository with uncommitted changes at build time.
+`status 2` asks node 2 for the same, its revisions read from its
+`boot_revisions` parameter.
+
 Role and name are labels set in the build. `time` is time since boot; wall
-time is in `csp clock`.
+time is in `csp clock`. An image is identified by its revision, the `git
+describe` of the build; no compile date is reported, because the date a file
+was compiled says little about the image it ends up in.
 
 ## Logging
 
@@ -76,17 +94,25 @@ time is in `csp clock`.
 
 `log history` shows up to 32 recent retained messages when
 `CONFIG_KFSW_LOG_HISTORY` is enabled. It includes sequence, uptime, module,
-level and truncation status. To retrieve them over CSP, use the host
-`csp-kiss logs` command described in [communications](../communications/index.md#remote-text-logs-and-discovery).
+level and truncation status.
+
+| Command | Arguments | Meaning |
+| --- | --- | --- |
+| `log remote` | `<node> [count] [min level]` | Another node's newest messages, text or dictionary |
+| `journal remote` | `<node> [count]` | Another node's newest journal records, in one read |
+
+`log_remote_format` on the serving node picks text (0) or dictionary (1).
+Dictionary lines show `pkg=<hex>`; `tools/ground/log-decode.py --elf` turns
+them back into text. See @ref services, under Logging.
 
 ## UHF radio
 
-`uhf status` prints the radio implementation, the expected hardware and serial
-settings, and the link state. With `CONFIG_KFSW_RADIO_UHF_CRYPTO`, `uhf connect`
+`comms uhf status` prints the radio implementation, the expected hardware and serial
+settings, and the link state. With `CONFIG_KFSW_RADIO_UHF_CRYPTO`, `comms uhf connect`
 starts new encrypted sessions with the configured peer.
 
 ```text
-kfsw-gnd-uhf# uhf status
+kfsw-gnd-uhf# comms uhf status
 UHF radio
 enabled: yes
 implementation: holybro-sik
@@ -98,7 +124,7 @@ hardware status: unavailable
 RF link: unknown
 ```
 
-`uhf status` doesn't talk to the modem. Traffic and errors are in `uart info`
+`comms uhf status` doesn't talk to the modem. Traffic and errors are in `comms uart info`
 and `csp interfaces`.
 
 ## Button and LED example
@@ -128,13 +154,13 @@ and its read counters.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `csp info` | none | Local address, identity, build date and free buffers |
-| `csp ident` | `[node]` | Hostname, model, revision, build date and clock |
+| `csp info` | none | Local address, identity, revision, libcsp tag, CSP protocol version and free buffers |
+| `csp ident` | `[node]` | Hostname, model, revision and clock |
 | `csp interfaces` | none | Interfaces with addresses and packet, error and drop counters |
 | `csp ifstat` | `<node> <interface>` | Remote interface packet/byte/error counters |
 | `csp routes` | none | Route table |
 | `csp ping` | `[node]` | Ping with CRC32 and a one-second timeout |
-| `csp debug` | `[on\|off]` | Print every packet in and out |
+| `csp debug` | `[on\|off]` | Log every packet in and out |
 | `csp clock` | `[set <utc>]` or `<node> [sync]` | Read or set wall time |
 | `csp reboot` | `<node> <pin>` | Restart a node |
 
@@ -142,20 +168,22 @@ and its read counters.
 kfsw:~$ csp routes
 0/0 -> KISS direct
 kfsw:~$ csp ping 2
-CSP ping 2: success, rtt_ms=...
+CSP ping 2: success
+rtt_ms: ...
 ```
 
-`csp debug on` prints each packet's source and destination node and port,
-priority, flags, size and interface. It is off by default and only affects the
-node where it is turned on.
+`csp debug on` logs each packet's source and destination node and port,
+priority, flags, size and interface, so the trace also lands in `log history`.
+It is off by default and only affects the node where it is turned on.
 
 ```text
 kfsw:~$ csp debug on
 CSP packet trace: on
 kfsw:~$ csp ping 2
-[DEBUG] OUT: S 33, D 2, Dp 1, Sp 17, Pr 2, Fl 0x01, Sz 10 VIA: CAN (2), Tms 51060
-[DEBUG] INP: S 2, D 33, Dp 17, Sp 1, Pr 2, Fl 0x01, Sz 14 VIA: CAN, Tms 51120
-CSP ping 2: success, rtt_ms=60
+[INFO] OUT: S 33, D 2, Dp 1, Sp 17, Pr 2, Fl 0x01, Sz 10 VIA: CAN (2), Tms 51060
+[INFO] INP: S 2, D 33, Dp 17, Sp 1, Pr 2, Fl 0x01, Sz 14 VIA: CAN, Tms 51120
+CSP ping 2: success
+rtt_ms: 60.000
 ```
 
 With several links, `csp routes` shows the interface and next hop of each
@@ -167,20 +195,32 @@ kfsw:~$ csp routes
 11/14 -> KISS_2 via 11
 ```
 
-Routes are set at build time and can't be changed from the shell. A ping
-timeout can mean no peer, a wrong address or route, framing errors or no free
-buffers; check `csp interfaces`, `csp routes` and `uart info`.
+Under CSP 1 the same table shows `/5` prefixes:
+
+```text
+10/5 -> KISS_1 direct
+11/5 -> KISS_2 via 11
+```
+
+Routes are set at build time and can't be changed from the shell. A node that
+does not answer is logged as a warning, `[WARNING] csp ping: node 5 did not
+answer`, and kept in `log history`; the same goes for every request to another
+node, `param`, `status`, `ftp` and the rest. No answer can mean no peer, a wrong
+address or route, framing errors or no free buffers; check `csp interfaces`,
+`csp routes` and `comms uart info`.
 
 ### Restarting a node
 
-`csp reboot <node> <pin>` restarts a node if the pin matches:
+`csp reboot <node> <pin>` restarts a node if the pin matches, and `reboot <pin>`
+restarts this one:
 
 ```text
 kfsw:~$ csp reboot 2 1234
-reboot node=2: denied wrong pin
+reboot: denied, wrong pin
 
 kfsw:~$ csp reboot 2 0000
-reboot node=2: OK rebooting in 500 ms
+node: 2
+rebooting in 500 ms
 ```
 
 The pin is `reboot_pin` in the system table: `0000` by default, persistent,
@@ -201,38 +241,52 @@ All three at zero means no valid reset note was found. Power loss is one
 possible cause; a reset before a note was written gives the same result.
 Check the hardware reset cause as well.
 
-## UART/KISS
+## Links: `comms`
+
+Each link a composition carries is a subcommand of `comms`; the radio module
+adds `uhf` the same way.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `uart info` | none | Each CSP UART with baud, state, KISS name, address and counters |
-| `uart test` | `[node]` | Check that the route uses a UART/KISS link, then ping with a 128-byte payload |
+| `comms uart info` | none | Each CSP UART with baud, state, KISS name, address and counters |
+| `comms uart test` | `[node]` | Check that the route uses a UART/KISS link, then ping with a 128-byte payload |
+| `comms can info` | none | The CSP CAN interface: bitrate, address and counters |
+| `comms can test` | `<node>` | Check that the route uses CAN, then ping with a 64-byte payload |
+| `comms uhf status` | none | See [UHF radio](#commands) |
 
-Give the node to test one link out of several, for example `uart test 10` and
-`uart test 11`. On the NUCLEO these commands run on the ST-LINK console and the
+A test refuses this node's own address, whose packets never reach the link,
+and a peer that does not answer is logged as a warning.
+
+Give the node to test one link out of several, for example `comms uart test 10` and
+`comms uart test 11`. On the NUCLEO these commands run on the ST-LINK console and the
 packets leave on USART3; don't connect the shell terminal to the CSP UART.
 
 ## Parameters
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `param tables` | none | Local tables with ID, band, size and saved values |
-| `param tablelist` | `[node]` | Tables of a node |
-| `param list` | `[node]` | All parameters |
-| `param table` | `[node] <table>` | One table |
+| `param tables` | `[node]` | The tables a node carries, without values |
+| `param table` | `[node] <id>` | The parameters of one table, with values |
+| `param list` | `[node]` | Every parameter of a node, with values |
 | `param get` | `[node] <name>` | Read a value |
 | `param set` | `[node] <name> <value>` | Write a value |
 
+Three views of the same parameters, from the widest to the most detailed:
+`tables` says which tables exist, `table` shows one, `list` shows them all. `layer` says which part of K-FSW defines the table, `kept` how many of its
+values are saved, and `holds` what is in it. Table names are not sent over the
+link, so for another node the names and descriptions come from this build,
+whose table numbers are the same.
+
 ```text
 kfsw:~$ param tables
- id  band     name        params    kept
----  -------  ----------  ------  ------
-  1  core     board           11       0
-  2  core     system           3       3
-  3  core     telemetry        5       0
-  4  core     csp              8       0
-  5  core     storage          4       0
- 25  service  log              5       2
+ id  layer    name          params  kept  holds
+---  -------  ------------  ------  ----  -----
+  1  core     board             11     0  Node identity and what the board carries
+  2  core     system             3     3  Boot delay, report period, reboot pin
+  3  core     telemetry          5     0  Uptime, storage and CSP buffers
+  4  core     csp               15     0  CSP counters and the route table
+  5  core     storage            4     0  Filesystem size, free space, mount
+ 25  service  log                5     2  Log levels, colour and counters
 ```
 
 ```text
@@ -306,9 +360,14 @@ mount_point: /kfsw
 ready: yes
 total_bytes: 262144
 free_bytes: 237568
+tmp_mount_point: /kfsw/tmp
+tmp_ready: yes
+tmp_total_bytes: 32768
+tmp_free_bytes: 31744
 ```
 
-`storage test` writes to flash. `storage info` only reads.
+`storage test` writes to flash. `storage info` only reads. The `tmp_` lines
+are the RAM volume, formatted at every boot.
 
 ## File transfer
 
@@ -316,21 +375,49 @@ Paths are virtual and rooted at `/kfsw/ftp` on the node.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `ftp <node> ls` | `[directory]` | List a directory; `list` also works |
-| `ftp <node> stat` | `<path>` | Type, size and CRC |
-| `ftp <node> mkdir` | `<directory>` | Create a directory |
-| `ftp <node> put` | `<local> <remote>` | Upload a file |
-| `ftp <node> get` | `<remote> <local>` | Download a file |
+| `ftp ls` | `[node] [directory]` | List a directory |
+| `ftp stat` | `[node] <path>` | Kind, size and CRC |
+| `ftp mkdir` | `[node] <directory>` | Create a directory |
+| `ftp put` | `<node> <local> <remote>` | Upload a file |
+| `ftp get` | `<node> <remote> <local>` | Download a file |
 | `ftp generate` | `<path> <bytes>` | Create a test file of up to 32768 bytes |
 | `ftp verify` | `<first> <second>` | Compare two local files |
 
-The verb can also go first, `ftp put <node> ...`, which is the form Tab
-completion shows. `ls`, `stat` and `mkdir` work on the node's own address
-without a connection; `put` and `get` need another node.
+Without a node, `ls`, `stat` and `mkdir` act on this node, without a
+connection; `put` and `get` need another node. A transfer that would leave
+less than `CONFIG_KFSW_FTP_SPACE_MARGIN_BYTES` (4096) free on its volume is
+refused before any data moves: `not enough free space`.
+
+Listing `/` also shows these directories when they exist:
+
+| Directory | Holds | Writable |
+| --- | --- | --- |
+| `boot` | firmware slots, see @ref firmware_update | no |
+| `hk` | housekeeping sample files | no |
+| `tmp` | 32 KB of RAM, empty after every boot | yes |
+
+Each entry starts with its kind:
+
+| Kind | Meaning |
+| --- | --- |
+| `dir` | directory |
+| `file` | file |
+| `img` | firmware image, in `/boot` |
+| `hk` | housekeeping samples, in `/hk` |
+| `proc` | procedure, in `/procedures` |
+
+```text
+kfsw:~$ ftp ls /
+FTP ls 1 /
+dir           0 build
+dir           0 boot
+dir           0 tmp
+entries: 3
+```
 
 ```text
 kfsw:~$ ftp generate /build/sample.bin 1024
-kfsw:~$ ftp 2 mkdir /exchange
+kfsw:~$ ftp mkdir 2 /exchange
 kfsw:~$ ftp put 2 /build/sample.bin /exchange/sample.bin
 kfsw:~$ ftp stat 2 /exchange/sample.bin
 kfsw:~$ ftp get 2 /exchange/sample.bin /build/returned.bin
@@ -339,46 +426,46 @@ kfsw:~$ ftp verify /build/sample.bin /build/returned.bin
 
 Paths must start with `/` and can't contain `..` or empty components.
 
-## Commands
+## Another node
+
+Groups that can ask another node take the node first, as `param` does:
+`status 2`, `event stats 2`, `journal tail 2 0`, `hk period 2 0 1000`. A node
+gets 3 seconds to answer; one that does not is logged as a warning. The reply
+comes back one field per line, after the node it came from:
+
+```text
+kfsw:~$ status 2
+node: 2
+uptime_ms: 4140
+storage: ready
+free_bytes: 12288
+```
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `cmd list` | none | Registered commands with ID, arguments and description |
-| `cmd <name>` | `[arguments]` | Run a command on this node |
-| `cmd <node> <name>` | `[arguments]` | Run a command on another node over CSP |
-| `cmd retry <node> <name>` | `[arguments]` | Reserve a ticket and retry lost exchanges within this invocation |
-| `cmd <node> ground_wtd` | `KFSWWSFK` | Feed the ground watchdog and return countdown/timeout (ID 16) |
-| `cmd [node] ground_wtd` | `get` | Read countdown/timeout without feeding |
-| `cmd journal_stats` | none | Persistent journal status |
-| `cmd journal_tail` | `<age>` | Committed event fields and payload; newest is 0 |
-| `cmd journal_time` | `<age>` | Sequence, event uptime and writer UTC |
+| `status` | `[node]` | Uptime and storage of a node |
+| `event stats` | `[node]` | Event record counters |
+| `event tail` | `[node] <age>` | One event record, newest is 0 |
+| `journal stats` | `[node]` | Persistent journal state |
+| `journal tail` | `[node] <age>` | One saved event, newest is 0 |
+| `journal time` | `[node] <age>` | When a saved event happened |
+| `hk define`, `hk period`, `hk clear` | `[node] ...` | Set up a node's housekeeping |
+| `reboot` | `<pin>` | Restart this node |
+| `csp reboot` | `<node> <pin>` | Restart another node |
+| `gndwdt feed`, `gndwdt show` | `<node>` | Its ground watchdog |
 
-```text
-kfsw:~$ cmd list
- ID NAME         ARGS   DESCRIPTION
-  9 journal_stats 0 args Read persistent journal status.
- 10 journal_tail 1 arg  Read a journal event by age, newest is 0.
- 11 journal_time 1 arg  Read a journal event's sequence and time by age.
-  1 noop         0 args Round trip with no effect.
-  2 info         0 args Report uptime and storage state.
-  4 event_stats  0 args Report event record counters.
-  5 event_tail   1 arg  Read one recorded event by age, newest is 0.
-  6 hk_define    2 args Name what a report collects: <report> "[node:]table:offset ...".
-  7 hk_period    2 args Collect repeatedly: hk_period <report> <ms>, 0 to stop.
-  8 hk_clear     1 arg  Forget a report: hk_clear <report>.
-  3 reboot       1 arg  [mutating] Reset this node after a short delay: reboot <pin>.
- 16 ground_wtd   1 arg  [mutating] Ground watchdog: get, or KFSWWSFK to feed over CSP.
+Underneath, each of these is a command of the command service, sent over CSP
+port 11; the commands are the wire protocol a ground tool speaks. A node only
+asks another for commands it knows itself, so both run the same IDs, listed in
+the table below. A remote request that changes the node can end in `--retry`,
+for example `csp reboot 2 0000 --retry`; see Scripts, below.
 
-kfsw:~$ cmd 2 info
-info node=2: OK uptime_ms=4140 storage=ready free_bytes=12288
-```
+### Identifiers
 
-The order is registration order, not ID order.
+Four kinds of number are part of the wire contract: two nodes must agree on
+each, and none is reused for something else once it has been given out.
 
-### Identifier allocation
-
-An ID is part of the wire contract: two nodes must agree on it, so an ID is
-never reused for a different command. Composition commands are defined in
+**Command IDs.** Composition commands are defined in
 `app/src/commands/command_definitions.c`; a command that belongs to a service
 is defined by that service and carries its ID in its own header.
 
@@ -391,8 +478,26 @@ is defined by that service and carries its ID in its own header.
 | 12 to 15 | free | — |
 | 16 | `ground_wtd` | `kfsw-services`, `gndwdt.h` |
 
+**CSP ports.** 0 is management (CMP) and 1 ping, both from libcsp. K-FSW
+serves 9 file transfer, 10 parameter values, 11 commands, 12 parameter
+descriptors, 13 FWU lite, 14 housekeeping, 15 housekeeping beacons on the
+receiving node, and 16 log history. Each has a Kconfig option; see
+@ref communications.
+
+**Parameter tables.** 1 to 24 are core (1 `board`, 2 `system`, 3
+`telemetry`, 4 `csp`, 5 `storage`), 25 to 49 services (25 `log` through 36
+`resmon`, listed by `param tables`) and 50 to 99 modules (50 `radio-uhf`, 51
+`temp_example`, 67 `hw_test`).
+
+**Node addresses.** Under CSP 2, the default, nodes are 1 to 16382 and 16383
+is broadcast; under CSP 1 nodes are 1 to 30 and 31 is broadcast. A command
+given a node outside that range is refused before anything is sent, for
+example `Node must be 1..30: 31`. Flight nodes use 1 to 15; ground roles start
+at 16, which `tools/k-ground` enforces. The reference
+ground station uses 16 for the gateway and 19 for the operator node.
+
 The name is looked up in the local registry before the request is sent, so
-both nodes need the same command IDs. `[mutating]` commands change the node.
+both nodes need the same command IDs. `reboot` and `ground_wtd` change the node.
 Remote commands need `CONFIG_KFSW_COMMAND_CSP` (port 11). The command service
 does not authenticate callers. Radio encryption can protect that link;
 other interfaces need their own access policy.
@@ -402,7 +507,8 @@ other interfaces need their own access policy.
 | Command | Meaning |
 | --- | --- |
 | `event list` | Held records, oldest first |
-| `event stats` | Held, capacity, recorded, overwritten and rejected counts |
+| `event stats [node]` | Held, capacity, recorded, overwritten and rejected counts |
+| `event tail [node] <age>` | One record by age, newest is 0 |
 | `event clear` | Discard held records; counters are kept |
 
 ```text
@@ -417,28 +523,35 @@ in `SEQ` means records were overwritten, and `event stats` shows how many. The
 record is lost at reset. For another node:
 
 ```text
-kfsw:~$ cmd 2 event_stats
-event_stats node=2: OK held=9/32 recorded=9 overwritten=0 rejected=0
-kfsw:~$ cmd 2 event_tail 0
-event_tail node=2: OK seq=8 t=8120ms ftp/1 sev=0 0002000001000ce9d363
+kfsw:~$ event tail 2 0
+node: 2
+seq: 8
+t_ms: 8120
+src: ftp
+id: 1
+sev: 0
+data: 0002000001000ce9d363
 ```
 
 ## Housekeeping
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `hk define` | `<report> [node:]table:offset ...` | Set what a report collects |
-| `hk clear` | `<report>` | Delete a report |
+| `hk define` | `[node] <report> [node:]table:offset ...` | Set what a report collects |
+| `hk clear` | `[node] <report>` | Delete a report |
 | `hk show` | none | Reports and counters |
 | `hk collect` | `<report>` | Collect now |
 | `hk get` | `<report> [count]` | Print collected samples |
-| `hk period` | `<report> <ms>` | Collect periodically, 0 to stop |
+| `hk period` | `[node] <report> <ms>` | Collect periodically, 0 to stop |
 | `hk store` | `<report> <ms>` | Also write samples to a file, 0 to stop |
 | `hk store_clear` | `<report>` | Stop storing and delete the file |
 | `hk beacon` | `<report> <node> <ms>` | Send the latest sample periodically, 0 to stop |
 | `hk save` | none | Save the report settings |
 
-See @ref ground for Yamcs and the ground bridge.
+A leading node sets up that node's reports: `hk define 2 0 3:0 3:8` asks node 2
+to collect its own uptime and free storage as report 0. An entry always holds a
+`:`, so the node is told apart from the report. See @ref ground for Yamcs and
+the ground bridge.
 
 ## File based operations
 
@@ -467,6 +580,16 @@ MCUboot has nothing to swap and boots the old image. See
 @ref firmware_update.
 
 ## Watchdog and health
+
+What each of the three watchdogs proves, and what feeds it, is in
+@ref services, under Watchdogs.
+
+```text
+gndwdt show [node]                 ground watchdog countdown, here or on a node
+gndwdt feed <node>                 feed another node's ground watchdog
+gndwdt on | off                    arm or disarm the local countdown
+gndwdt timeout <seconds>           silence allowed before a reset
+```
 
 ```text
 watchdog status                    configuration and activity
@@ -497,8 +620,9 @@ The raw mask is printed as well because several causes can be latched at once;
 
 ## Scripts
 
-Ordinary commands are not retried. `cmd retry` uses a ticket to suppress
-duplicates within that invocation when `CONFIG_KFSW_COMMAND_RETRY` is enabled.
+Remote requests are not retried. Ending one with `--retry` sends it with a
+ticket that suppresses duplicates within that invocation, when
+`CONFIG_KFSW_COMMAND_RETRY` is enabled.
 A new invocation is a new operation. A timeout can mean the reply was lost
 after the command ran, so check the state before sending it again.
 

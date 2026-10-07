@@ -34,6 +34,14 @@ static int cmd_storage_info(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "ready: %s", info.ready ? "yes" : "no");
 	shell_print(sh, "total_bytes: %" PRIu64, info.total_bytes);
 	shell_print(sh, "free_bytes: %" PRIu64, info.free_bytes);
+#if CONFIG_KFSW_STORAGE_TMP
+	if (kfsw_storage_get_tmp_info(&info) == 0) {
+		shell_print(sh, "tmp_mount_point: %s", info.mount_point);
+		shell_print(sh, "tmp_ready: %s", info.ready ? "yes" : "no");
+		shell_print(sh, "tmp_total_bytes: %" PRIu64, info.total_bytes);
+		shell_print(sh, "tmp_free_bytes: %" PRIu64, info.free_bytes);
+	}
+#endif
 	return 0;
 }
 
@@ -119,10 +127,10 @@ static int cmd_storage_test(const struct shell *sh, size_t argc, char **argv)
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	storage_commands,
-	SHELL_CMD_ARG(info, NULL, "Show K-FSW filesystem storage status.", cmd_storage_info, 1,
+	SHELL_CMD_ARG(info, NULL, "Show filesystem storage status.", cmd_storage_info, 1,
 		      0),
 	SHELL_CMD_ARG(test, NULL, "Run storage test: test [write|read <value>].",
 		      cmd_storage_test, 1, 2),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(storage, &storage_commands, "K-FSW filesystem storage commands.", NULL);
+SHELL_CMD_REGISTER(storage, &storage_commands, "Filesystem storage commands.", NULL);

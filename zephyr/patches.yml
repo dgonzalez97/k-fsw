@@ -1,0 +1,13 @@
+# Patches applied to the pinned projects with "west patch apply".
+patches:
+  - path: zephyr/shell-tab-one-per-line.patch
+    sha256sum: 27c3655ca847d1984a8f68840bf753d6b014b5ea7a4b3e5534cdc8212bb5fe19
+    module: zephyr
+    author: dgonzalez97
+    email: 103115570+dgonzalez97@users.noreply.github.com
+    date: 2026-10-02
+    upstreamable: false
+    comments: |
+      Tab lists one option per line with the first line of its help, the
+      way "<command> -h" does, instead of a grid. Upstream would want it
+      behind a Kconfig option.

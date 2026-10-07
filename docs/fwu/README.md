@@ -21,7 +21,7 @@ The previous image remains in the secondary slot until the next upload or
 `fwu abort` erases it. These names identify slots, not firmware versions.
 
 ```text
-ftp list 2 /boot
+ftp ls 2 /boot
 ftp get 2 /boot/firmware_1.bin /build/running.bin
 ftp get 2 /boot/firmware_2.bin /build/previous.bin
 ```
@@ -52,7 +52,61 @@ Successful completion checks the IEEE CRC32, flushes the image to flash and
 schedules a trial boot. Read it back through `/boot/firmware_2.bin` before
 resetting the board.
 
-## FWU lite upload
+## Boot, check, confirm
+
+On the flight console:
+
+```text
+fwu status
+reboot 0000
+mcuboot
+```
+
+Check the running version over the link with `csp ident 2`. A completed upload
+does not prove that the candidate booted. Check node health and read back the
+previous image before accepting the candidate:
+
+```text
+mcuboot confirm
+```
+
+To revert, reset without confirming. Upload and abort requests return `busy`
+while MCUboot needs the secondary image for trial rollback.
+
+## CAN profile
+
+The NUCLEO updates over CAN with the MCUboot, update and CAN profiles combined,
+and FWU lite if wanted. The exact build, signed with the same key as the
+installed bootloader, and the upload, readback, revert and confirmation tests
+are in [tests/hil/fwu/README.md](https://github.com/dgonzalez97/k-fsw/blob/main/tests/hil/fwu/README.md). The image to
+send is `build/<target>/app/zephyr/zephyr.signed.bin`.
+
+The host adapter and flight node use 500 kbit/s. The radio uses the same
+services; match the UART baud rate at each radio end. When radio encryption is
+enabled, establish both sessions with `comms uhf connect` before uploading. See
+@ref communications for key setup. Firmware signatures and radio keys serve
+separate purposes; keep separate keys for them.
+
+## Errors
+
+| Result | Action |
+| --- | --- |
+| `busy` | Wait for the current upload or slot reader to finish |
+| `-EFBIG` | Check `max_image_bytes` in `fwu status` |
+| `-ESPIPE` | Send the next expected offset |
+| `-EAGAIN` | Finish sending the declared image size |
+| `-EILSEQ` | Check the whole-image IEEE CRC32 |
+| `-EIO` when scheduling | Check MCUboot configuration and the write offset |
+| `fwu abort` fails | Read the flash error and retry cleanup; the slot may still contain bytes |
+
+`fwu abort` erases the secondary slot, including any previous image kept there.
+A failed erase leaves the service in `failed` with its transfer details intact.
+
+## FWU lite
+
+FWU lite is a second, smaller upload path for links where FTP and RDP cost too
+much. It ends in the same slot, readback and confirmation as above.
+
 
 FWU lite accepts a node file, or a host file on builds with
 `CONFIG_KFSW_FWU_LITE_HOST_FILES`. Use an absolute host path outside `/kfsw/`:
@@ -70,67 +124,6 @@ Both upload paths leave the same slot file available for readback.
 Blocks carry an IEEE CRC32. Lost replies are retried; all blocks except the
 last must have the configured size. Both ends need the same
 `CONFIG_KFSW_FWU_LITE_BLOCK_SIZE`. RDP is optional and off by default.
-
-## Boot, check, confirm
-
-On the flight console:
-
-```text
-fwu status
-cmd reboot 0000
-mcuboot
-```
-
-Check the running version over the link with `csp ident 2`. A completed upload
-does not prove that the candidate booted. Check node health and read back the
-previous image before accepting the candidate:
-
-```text
-mcuboot confirm
-```
-
-To revert, reset without confirming. Upload and abort requests return `busy`
-while MCUboot needs the secondary image for trial rollback.
-
-## CAN profile
-
-Combine the MCUboot, update and CAN profiles for the NUCLEO. FWU lite is optional.
-Use the same signing key as the installed bootloader.
-
-```bash
-cd /path/to/k-fsw-workspace
-source .venv/bin/activate
-P="$PWD/k-fsw/config/profiles"
-
-KFSW_SYSBUILD=1 \
-KFSW_MCUBOOT_KEY="$HOME/.config/kfsw/mcuboot-signing-key.pem" \
-KFSW_EXTRA_CONF_FILE="$P/nucleo-mcuboot.conf;$P/nucleo-mcuboot-fwu.conf;$P/nucleo-mcuboot-fwu-lite.conf;$P/nucleo-can.conf" \
-KFSW_EXTRA_DTC_OVERLAY_FILE="$P/nucleo-mcuboot-flash.overlay;$P/nucleo-mcuboot.overlay;$P/nucleo-mcuboot-fwu.overlay;$P/nucleo-can.overlay" \
-KFSW_MCUBOOT_DTC_OVERLAY_FILE="$P/nucleo-mcuboot-flash.overlay" \
-  ./k-fsw/tools/build.sh nucleo_l496zg
-```
-
-The host adapter and flight node use 500 kbit/s. See
-`tests/hil/fwu/README.md` for upload, readback, revert and confirmation tests.
-The radio uses the same services; match the UART baud rate at each radio end.
-When radio encryption is enabled, establish both sessions with `uhf connect`
-before uploading. See @ref communications for key setup. Firmware signatures
-and radio keys serve separate purposes; keep separate keys for them.
-
-## Errors
-
-| Result | Action |
-| --- | --- |
-| `busy` | Wait for the current upload or slot reader to finish |
-| `-EFBIG` | Check `max_image_bytes` in `fwu status` |
-| `-ESPIPE` | Send the next expected offset |
-| `-EAGAIN` | Finish sending the declared image size |
-| `-EILSEQ` | Check the whole-image IEEE CRC32 |
-| `-EIO` when scheduling | Check MCUboot configuration and the write offset |
-| `fwu abort` fails | Read the flash error and retry cleanup; the slot may still contain bytes |
-
-`fwu abort` erases the secondary slot, including any previous image kept there.
-A failed erase leaves the service in `failed` with its transfer details intact.
 
 ## Related
 

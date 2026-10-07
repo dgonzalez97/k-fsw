@@ -12,6 +12,7 @@ west manifest --validate
 "$KFSW_CI_DIR/quality.sh"
 "$KFSW_CI_DIR/unit.sh"
 "$KFSW_CI_DIR/integration.sh"
+"$KFSW_CI_DIR/csp-v1.sh"
 "$KFSW_CI_DIR/valgrind.sh"
 "$KFSW_CI_DIR/robot.sh"
 "$KFSW_CI_DIR/docs.sh"

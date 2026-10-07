@@ -111,10 +111,15 @@ if(CONFIG_KFSW_DEBUG_SHELL)
     )
 
     target_sources_ifdef(CONFIG_KFSW_CSP app PRIVATE
+        src/shell/shell_comms.c
         src/shell/shell_csp.c
+        src/shell/shell_remote.c
     )
     target_sources_ifdef(CONFIG_KFSW_CSP_KISS_UART app PRIVATE
         src/shell/shell_uart.c
+    )
+    target_sources_ifdef(CONFIG_KFSW_CSP_CAN app PRIVATE
+        src/shell/shell_can.c
     )
     target_sources_ifdef(CONFIG_KFSW_PARAM app PRIVATE
         src/shell/shell_param.c
@@ -145,6 +150,9 @@ if(CONFIG_KFSW_DEBUG_SHELL)
     target_sources_ifdef(CONFIG_KFSW_EVENT app PRIVATE
         src/shell/shell_event.c
     )
+    if(CONFIG_KFSW_JOURNAL AND CONFIG_KFSW_COMMAND)
+        target_sources(app PRIVATE src/shell/shell_journal.c)
+    endif()
     target_sources_ifdef(CONFIG_KFSW_WATCHDOG app PRIVATE
         src/shell/shell_watchdog.c
     )
@@ -154,7 +162,12 @@ if(CONFIG_KFSW_DEBUG_SHELL)
     target_sources_ifdef(CONFIG_KFSW_HEALTH app PRIVATE
         src/shell/shell_health.c
     )
+    target_sources_ifdef(CONFIG_KFSW_TABLE app PRIVATE
+        src/shell/shell_table.c
+    )
 endif()
+
+target_sources_ifdef(CONFIG_KFSW_CSP_LIVENESS app PRIVATE src/csp_liveness.c)
 
 target_sources_ifdef(CONFIG_KFSW_HK app PRIVATE src/hk_entries.c)
 

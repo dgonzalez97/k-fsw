@@ -7,6 +7,11 @@
 
 #include <kfsw/services/gndwdt.h>
 
+#include "shell_command.h"
+#if CONFIG_KFSW_COMMAND_CSP
+#include "shell_remote.h"
+#endif
+
 static const char *state_name(const struct kfsw_gndwdt_status *status)
 {
 	if (!status->running) {
@@ -15,12 +20,9 @@ static const char *state_name(const struct kfsw_gndwdt_status *status)
 	return status->enabled ? "armed" : "disarmed";
 }
 
-static int cmd_gndwdt_show(const struct shell *sh, size_t argc, char **argv)
+static int show_local(const struct shell *sh)
 {
 	struct kfsw_gndwdt_status status;
-
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
 
 	kfsw_gndwdt_get_status(&status);
 	shell_print(sh, "state: %s", state_name(&status));
@@ -30,6 +32,63 @@ static int cmd_gndwdt_show(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "contacts: %u last_node: %u", status.contacts, status.last_node);
 	shell_print(sh, "expiries: %u", status.expiries);
 	return 0;
+}
+
+#if CONFIG_KFSW_COMMAND_CSP
+static int remote(const struct shell *sh, const char *node_text, bool feed)
+{
+	struct kfsw_command_result result;
+	uint16_t node;
+	int outcome;
+
+	outcome = kfsw_shell_parse_node(sh, node_text, &node);
+	if (outcome != 0) {
+		return outcome;
+	}
+	outcome = kfsw_gndwdt_remote(node, feed, &result);
+	if ((outcome == -EINVAL) && !feed) {
+		return show_local(sh);
+	}
+	if (outcome == -EINVAL) {
+		shell_error(sh, "Node %u is this node; its watchdog is fed from elsewhere", node);
+		return outcome;
+	}
+	if (outcome != 0) {
+		return kfsw_shell_remote_failed(sh, feed ? "gndwdt feed" : "gndwdt show", node,
+						outcome);
+	}
+	if (result.status != KFSW_COMMAND_OK) {
+		shell_error(sh, "Node %u refused: %s", node,
+			    kfsw_command_status_name(result.status));
+		return -EIO;
+	}
+	shell_print(sh, "node: %u", node);
+	if (feed) {
+		shell_print(sh, "fed: yes");
+	}
+	kfsw_shell_print_fields(sh, result.detail);
+	return 0;
+}
+
+static int cmd_gndwdt_feed(const struct shell *sh, size_t argc, char **argv)
+{
+	ARG_UNUSED(argc);
+
+	return remote(sh, argv[1], true);
+}
+#endif
+
+static int cmd_gndwdt_show(const struct shell *sh, size_t argc, char **argv)
+{
+#if CONFIG_KFSW_COMMAND_CSP
+	if (argc == 2U) {
+		return remote(sh, argv[1], false);
+	}
+#else
+	ARG_UNUSED(argc);
+#endif
+	ARG_UNUSED(argv);
+	return show_local(sh);
 }
 
 static int cmd_gndwdt_arm(const struct shell *sh, size_t argc, char **argv)
@@ -66,11 +125,20 @@ static int cmd_gndwdt_timeout(const struct shell *sh, size_t argc, char **argv)
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(gndwdt_commands,
-	SHELL_CMD_ARG(off, NULL, "Disarm the countdown.", cmd_gndwdt_arm, 1, 0),
-	SHELL_CMD_ARG(on, NULL, "Arm the countdown.", cmd_gndwdt_arm, 1, 0),
+#if CONFIG_KFSW_COMMAND_CSP
+	SHELL_CMD_ARG(feed, NULL, "Feed another node's ground watchdog: feed <node>.",
+		      cmd_gndwdt_feed, 2, 0),
+#endif
+	SHELL_CMD_ARG(off, NULL, "Disarm this node's countdown.", cmd_gndwdt_arm, 1, 0),
+	SHELL_CMD_ARG(on, NULL, "Arm this node's countdown.", cmd_gndwdt_arm, 1, 0),
+#if CONFIG_KFSW_COMMAND_CSP
+	SHELL_CMD_ARG(show, NULL, "Show the countdown, here or on another node: show [node].",
+		      cmd_gndwdt_show, 1, 1),
+#else
 	SHELL_CMD_ARG(show, NULL, "Show the countdown and its counters.", cmd_gndwdt_show, 1, 0),
+#endif
 	SHELL_CMD_ARG(timeout, NULL, "Set the silence allowed: timeout <seconds>.",
 		      cmd_gndwdt_timeout, 2, 0),
 	SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(gndwdt, &gndwdt_commands, "K-FSW ground watchdog.", NULL);
+SHELL_CMD_REGISTER(gndwdt, &gndwdt_commands, "Ground watchdog.", NULL);

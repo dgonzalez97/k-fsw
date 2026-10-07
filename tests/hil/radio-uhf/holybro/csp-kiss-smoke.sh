@@ -12,7 +12,7 @@ debug_serial="${KFSW_DEBUG_SERIAL:-$KFSW_SERIAL}"
 radio_baud="${KGROUND_HOLYBRO_BAUD:-57600}"
 ground_build_root="$KFSW_ROOT/build/hil/holybro/k-ground"
 nucleo_build_dir="$KFSW_ROOT/build/hil/holybro/nucleo_l496zg"
-ground_executable="$ground_build_root/node-16/zephyr/zephyr.exe"
+ground_executable="$ground_build_root/kfsw-gnd-uhf-node-16/zephyr/zephyr.exe"
 work_dir="$(mktemp -d /tmp/k-ground-holybro-csp.XXXXXX)"
 ground_pid=""
 debug_capture_pid=""
@@ -205,7 +205,7 @@ wait_for_output "$work_dir/nucleo.log" "@READY " "$debug_capture_pid" || \
 printf '%s\r\n' 'param set echo_enabled 1' >"$debug_serial"
 sleep 1
 
-printf '%s\r\n' 'status' 'uhf status' 'uart info' 'csp interfaces' 'csp routes' \
+printf '%s\r\n' 'status' 'comms uhf status' 'comms uart info' 'csp interfaces' 'csp routes' \
 	>"$debug_serial"
 wait_for_output "$work_dir/nucleo.log" "CSP node: 2" "$debug_capture_pid" || \
 	fail "NUCLEO did not report CSP node 2"
@@ -247,7 +247,7 @@ bridge_pid=$!
 wait_for_output "$work_dir/socat.log" "starting data transfer loop" \
 	"$bridge_pid" || fail "the PTY-to-Holybro bridge did not become ready"
 
-printf '%s\n' 'status' 'uhf status' 'uart info' 'csp interfaces' 'csp routes' \
+printf '%s\n' 'status' 'comms uhf status' 'comms uart info' 'csp interfaces' 'csp routes' \
 	'csp ping 2' >&3
 wait_for_output "$work_dir/ground.log" "Role: kfsw-gnd-uhf" "$ground_pid" || \
 	fail "the UHF gateway did not report its role"
@@ -343,7 +343,7 @@ wait_for_output_count "$work_dir/ground.log" \
 	fail "invalid remote log_level did not restore the compiled default"
 wait_for_output "$work_dir/ground.log" "get: parameter 'missing' not found" \
 	"$ground_pid" || fail "missing remote parameter was not rejected"
-wait_for_output "$work_dir/ground.log" "CSP ping 3: failed" "$ground_pid" || \
+wait_for_output "$work_dir/ground.log" "csp ping: node 3 did not answer" "$ground_pid" || \
 	fail "a nonexistent CSP node did not fail cleanly"
 wait_for_output_count "$work_dir/ground.log" "K-FSW status" \
 	"$((ground_status_count_before + 1))" "$ground_pid" || \
@@ -358,34 +358,25 @@ fi
 # Commanding and the event record across the radio, and a node reaching itself.
 printf '%s\n' \
 	'csp ping 16' \
-	'cmd 16 noop' \
-	'cmd list' \
-	'cmd 2 noop' \
-	'cmd 2 info' \
-	'cmd 2 event_stats' \
-	'cmd 2 event_tail 0' \
-	'cmd 2 bogus' >&3
+	'status 2' \
+	'event stats 2' \
+	'event tail 2 0' \
+	'event tail 2 999' >&3
 
 # Node 16 pinging itself needs no link, so no round-trip time is printed.
 wait_for_output "$work_dir/ground.log" "CSP ping 16: success" \
 	"$ground_pid" || fail "the ground node did not answer for itself"
-# Addressed to this node, so it runs locally. Source node 0 means it did not
-# arrive over CSP.
-wait_for_output "$work_dir/ground.log" "noop node=16: OK noop from node 0" \
-	"$ground_pid" || fail "a self-addressed command was not run locally"
-wait_for_output "$work_dir/ground.log" "noop node=2: OK noop from node 16" \
-	"$ground_pid" || fail "NUCLEO node 2 did not answer a command over Holybro"
-wait_for_output "$work_dir/ground.log" "info node=2: OK uptime_ms=" "$ground_pid" || \
-	fail "NUCLEO node 2 did not report info over Holybro"
-wait_for_output "$work_dir/ground.log" "event_stats node=2: OK held=" "$ground_pid" || \
+wait_for_output "$work_dir/ground.log" "free_bytes: " "$ground_pid" || \
+	fail "NUCLEO node 2 did not report its status over Holybro"
+wait_for_output "$work_dir/ground.log" "rejected: " "$ground_pid" || \
 	fail "NUCLEO node 2 did not report event counters over Holybro"
-wait_for_output "$work_dir/ground.log" "event_tail node=2: OK seq=" "$ground_pid" || \
+wait_for_output "$work_dir/ground.log" "data: " "$ground_pid" || \
 	fail "NUCLEO node 2 did not return a recorded event over Holybro"
-wait_for_output "$work_dir/ground.log" "unknown command 'bogus'" "$ground_pid" || \
-	fail "an unknown command was not rejected"
+wait_for_output "$work_dir/ground.log" "no record at age 999" "$ground_pid" || \
+	fail "a record that does not exist was not refused"
 
 # The flight node records the commands it served.
-printf '%s\r\n' 'event stats' 'cmd 2 event_stats' >"$debug_serial"
+printf '%s\r\n' 'event stats' >"$debug_serial"
 wait_for_output "$work_dir/nucleo.log" "recorded: " "$debug_capture_pid" || \
 	fail "NUCLEO did not report its event counters"
 
@@ -393,49 +384,51 @@ wait_for_output "$work_dir/nucleo.log" "recorded: " "$debug_capture_pid" || \
 # run; the upload replaces the file.
 printf '%s\n' \
 	'ftp generate /build/test.txt 256' \
-	'ftp 2 mkdir /uplink' \
+	'ftp mkdir 2 /uplink' \
 	'ftp put 2 /build/test.txt /uplink/test.txt' \
 	'ftp stat 2 /uplink/test.txt' \
-	'ftp 2 ls /uplink' \
+	'ftp ls 2 /uplink' \
 	'ftp get 2 /uplink/test.txt /build/test-returned.txt' \
 	'ftp verify /build/test.txt /build/test-returned.txt' \
 	'ftp get 2 /uplink/missing.txt /build/missing.txt' >&3
 
 wait_for_output "$work_dir/ground.log" \
-	"FTP generate path=/build/test.txt: PASS bytes=256" "$ground_pid" || \
+	"FTP generate /build/test.txt: PASS" "$ground_pid" || \
 	fail "the ground fixture file was not generated"
-uploaded_crc="$(tr -d '\r' <"$work_dir/ground.log" | \
-	sed -n 's/^FTP generate path=\/build\/test\.txt: PASS bytes=256 crc32=\([0-9a-f]*\)$/\1/p' |
-	head -1)"
+uploaded_crc="$(tr -d '\r' <"$work_dir/ground.log" |
+	awk '/FTP generate \/build\/test.txt: PASS/ { found = 1 }
+	     found && /^crc32: / { print $2; exit }')"
 [[ -n "$uploaded_crc" ]] || fail "the generated fixture did not report a CRC"
 
 wait_for_output "$work_dir/ground.log" \
-	"FTP put node=2 source=/build/test.txt destination=/uplink/test.txt: PASS bytes=256 crc32=$uploaded_crc" \
+	"FTP put 2 /build/test.txt -> /uplink/test.txt: PASS" \
 	"$ground_pid" || fail "the file upload to NUCLEO node 2 over Holybro failed"
 wait_for_output "$work_dir/ground.log" \
-	"FTP stat node=2 path=/uplink/test.txt type=file bytes=256 crc32=$uploaded_crc" \
-	"$ground_pid" || fail "NUCLEO reports different metadata for the uploaded file"
-wait_for_output "$work_dir/ground.log" "FTP list: PASS entries=" "$ground_pid" || \
+	"FTP stat 2 /uplink/test.txt" \
+	"$ground_pid" || fail "NUCLEO did not report the uploaded file"
+wait_for_output "$work_dir/ground.log" "entries: " "$ground_pid" || \
 	fail "the remote uplink directory could not be listed over Holybro"
 wait_for_output "$work_dir/ground.log" \
-	"FTP get node=2 source=/uplink/test.txt destination=/build/test-returned.txt: PASS bytes=256 crc32=$uploaded_crc" \
+	"FTP get 2 /uplink/test.txt -> /build/test-returned.txt: PASS" \
 	"$ground_pid" || fail "the file download from NUCLEO node 2 over Holybro failed"
 wait_for_output "$work_dir/ground.log" \
-	"FTP verify first=/build/test.txt second=/build/test-returned.txt: PASS" \
+	"FTP verify /build/test.txt /build/test-returned.txt: PASS" \
 	"$ground_pid" || fail "the uploaded and downloaded copies differ"
+# Generated, uploaded, stated and downloaded: four reports of the same CRC.
+[[ "$(grep -c "crc32: $uploaded_crc" "$work_dir/ground.log")" -ge 4 ]] || \
+	fail "the upload, the stat or the download report a different CRC"
 wait_for_output "$work_dir/ground.log" \
-	"FTP get node=2 path=/uplink/missing.txt: not found" "$ground_pid" || \
+	"FTP get 2 /uplink/missing.txt: not found" "$ground_pid" || \
 	fail "a missing remote file was not reported as not found"
 
 # The flight node sees the committed file in its own FTP root.
-printf '%s\r\n' 'ftp 2 ls /uplink' 'ftp stat 2 /uplink/test.txt' >"$debug_serial"
-wait_for_output "$work_dir/nucleo.log" \
-	"FTP stat node=2 path=/uplink/test.txt type=file bytes=256 crc32=$uploaded_crc" \
+printf '%s\r\n' 'ftp ls 2 /uplink' 'ftp stat 2 /uplink/test.txt' >"$debug_serial"
+wait_for_output "$work_dir/nucleo.log" "crc32: $uploaded_crc" \
 	"$debug_capture_pid" || \
 	fail "NUCLEO does not report the received file in its own FTP root"
 
-printf '%s\r\n' 'uart info' 'csp interfaces' >"$debug_serial"
-printf '%s\n' 'uart info' 'csp interfaces' >&3
+printf '%s\r\n' 'comms uart info' 'csp interfaces' >"$debug_serial"
+printf '%s\n' 'comms uart info' 'csp interfaces' >&3
 wait_for_clean_transport_stats "$work_dir/ground.log" "$ground_pid" || \
 	fail "k-ground does not have clean, nonzero post-traffic KISS counters"
 wait_for_clean_transport_stats "$work_dir/nucleo.log" "$debug_capture_pid" || \

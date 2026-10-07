@@ -21,6 +21,11 @@ ground="${KFSW_CAN_GROUND_NODE:-16}"
 fail() { echo "CAN SMOKE RESULT: FAIL - $*"; exit 1; }
 skip() { echo "CAN SMOKE RESULT: NOT RUN - $*"; exit 0; }
 
+read_bus_errors() {
+	ip -details link show "$interface" |
+		awk '/berr-counter/ {gsub(/[()]/, ""); print "tx" $6 "/rx" $8; exit}'
+}
+
 command -v ip >/dev/null || skip "ip is not available"
 ip link show "$interface" >/dev/null 2>&1 || skip "no $interface; is the adapter plugged in?"
 
@@ -50,7 +55,7 @@ if [[ "${1:-}" != "--no-build" ]]; then
 	sleep 3
 fi
 
-ground_exe="$root/build/k-ground/node-$ground/zephyr/zephyr.exe"
+ground_exe="$root/build/k-ground/kfsw-gnd-can-node-$ground/zephyr/zephyr.exe"
 [[ -x "$ground_exe" ]] || fail "ground node $ground has not been built"
 
 printf '%s\n' \
@@ -61,12 +66,19 @@ printf '%s\n' \
 	"param get $flight uid" \
 	> "$work/commands"
 
+errors_before="$(read_bus_errors)" || fail "could not read bus error counters before traffic"
+[[ "$errors_before" =~ ^tx[0-9]+/rx[0-9]+$ ]] || fail "invalid bus error counters before traffic: $errors_before"
+
 timeout 90 "$ground_exe" --uart_stdinout "--can-if=$interface" --stop_at=45.0 --no-color \
 	-flash="$work/ground.bin" < "$work/commands" > "$work/session.log" 2>&1 || true
+errors_after="$(read_bus_errors)" || fail "could not read bus error counters after traffic; berr_before=$errors_before"
+echo "CAN SMOKE: berr_before=$errors_before berr_after=$errors_after"
 sed -i 's/\x1b\[[0-9;]*[A-Za-z]//g' "$work/session.log"
 
 grep -q "^CAN addr=" "$work/session.log" || fail "the ground node registered no CAN interface"
-rtt="$(sed -n "s/^CSP ping $flight: success, rtt_ms=\([0-9]*\).*/\1/p" "$work/session.log" | head -1)"
+rtt="$(tr -d '\r' <"$work/session.log" |
+	awk -v head="CSP ping $flight: success" '$0 == head { found = 1; next }
+	     found && /^rtt_ms: / { print $2; exit }')"
 [[ -n "$rtt" ]] || fail "no ping reply from node $flight over CAN"
 grep -q "hostname: kfsw-$flight" "$work/session.log" ||
 	fail "node $flight did not identify itself"
@@ -77,8 +89,9 @@ grep -q "^$flight:uid = " "$work/session.log" || fail "no string parameter read 
 # Frames counted by the adapter, to show the bus carried traffic.
 read -r rx tx < <(ip -s link show "$interface" |
 	awk '/RX:/{getline; r=$2} /TX:/{getline; t=$2} END{print r, t}')
-errors="$(ip -details link show "$interface" |
-	awk '/berr-counter/ {gsub(/[()]/, ""); print "tx" $6 "/rx" $8; exit}')"
+[[ "$errors_after" =~ ^tx[0-9]+/rx[0-9]+$ ]] || fail "invalid bus error counters after traffic: $errors_after"
+[[ "$errors_before" == "$errors_after" ]] ||
+	fail "bus error counters changed: berr_before=$errors_before berr_after=$errors_after"
 
 echo "CAN SMOKE RESULT: PASS interface=$interface bitrate=$bitrate rtt_ms=$rtt" \
-	"ident=yes params=yes packets=rx:$rx/tx:$tx berr=$errors"
+	"ident=yes params=yes packets=rx:$rx/tx:$tx berr_before=$errors_before berr_after=$errors_after berr_unchanged=yes"

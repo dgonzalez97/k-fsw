@@ -192,8 +192,9 @@ static int command_event_tail(const struct kfsw_command_arg *args, size_t arg_co
 	}
 	payload_text[record.payload_size * 2U] = '\0';
 
-	(void)snprintf(result->detail, sizeof(result->detail), "seq=%u t=%ums %s/%u sev=%u %s",
-		       record.sequence, (unsigned int)(record.monotonic_us / 1000U),
+	(void)snprintf(result->detail, sizeof(result->detail),
+		       "seq=%u t_ms=%u src=%s id=%u sev=%u data=%s", record.sequence,
+		       (unsigned int)(record.monotonic_us / 1000U),
 		       kfsw_event_source_name((enum kfsw_event_source)record.source), record.id,
 		       record.severity, payload_text);
 	result->status = KFSW_COMMAND_OK;
@@ -365,9 +366,15 @@ static int journal_record(const struct kfsw_command_arg *args, struct kfsw_journ
 			      ? kfsw_journal_get((uint16_t)args[0].value.u32, record)
 			      : -EINVAL;
 
-	result->status = outcome == 0 ? KFSW_COMMAND_OK : KFSW_COMMAND_UNAVAILABLE;
-	if (outcome != 0) {
+	if (outcome == -ENOENT) {
+		result->status = KFSW_COMMAND_FAILED;
+		(void)snprintf(result->detail, sizeof(result->detail), "no record at age %u",
+			       args[0].value.u32);
+	} else if (outcome != 0) {
+		result->status = KFSW_COMMAND_UNAVAILABLE;
 		(void)snprintf(result->detail, sizeof(result->detail), "journal read: %d", outcome);
+	} else {
+		result->status = KFSW_COMMAND_OK;
 	}
 	return outcome;
 }
@@ -391,8 +398,10 @@ static int command_journal_tail(const struct kfsw_command_arg *args, size_t coun
 	}
 	data[2U * record.event.payload_size] = '\0';
 	(void)snprintf(result->detail, sizeof(result->detail),
-		       "boot=%" PRIu64 " src=%u id=%u sev=%u data=%s", record.boot,
-		       record.event.source, record.event.id, record.event.severity, data);
+		       "seq=%" PRIu64 " boot=%" PRIu64 " src=%s id=%u sev=%u data=%s",
+		       record.sequence, record.boot,
+		       kfsw_event_source_name((enum kfsw_event_source)record.event.source),
+		       record.event.id, record.event.severity, data);
 	return 0;
 }
 

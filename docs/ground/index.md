@@ -11,15 +11,29 @@ build options.
 | Role | CSP address | Use |
 | --- | --- | --- |
 | `kfsw-gnd-uhf` | 16 | Opens the UHF radio for the ground network |
-| `kfsw-gnd-uhf-bench` | 16 | The same, routed to flight node 2 on the radio bench |
 | `kfsw-gnd-can` | 16 | Reaches a flight node over a SocketCAN interface |
 | `kfsw-ops` | 19 | Operator shell; doesn't open the radio |
 
-These are the reference settings. CSP v2 addresses are 14 bits, so the
-launcher accepts ground nodes from 16 to 16383 and peers from 1 to 16383.
+These are the reference settings. Each node file sets two addresses:
+
+- `KFSW_CSP_NODE` is the node's own CSP address. Flight nodes use 1 to 15 and
+  ground nodes start at 16, so the two never collide; `tools/k-ground`
+  refuses a ground node below 16. It accepts up to 16382 under CSP 2 and up
+  to 30 under CSP 1.
+- `KFSW_CSP_VERSION=1` builds the node for CSP 1, to talk to a CSP 1
+  satellite; it is unset or 2 otherwise. A CSP 1 node gets its own
+  configuration file and build directory, with a `-csp1` suffix.
+- `KFSW_CSP_PEER` is the node at the other end of the serial link, the one
+  `comms uart test` pings when given no node. It is not a route: where packets go is
+  the route table, `KFSW_CSP_ROUTES`.
+
+A bench usually needs its own variant of a role, for example the UHF gateway
+routed to flight node 2. Copy the role to a file ending in `-bench.env`, such
+as `kfsw-gnd-uhf-bench.env`; git ignores those, so device paths and bench
+routes stay on the machine they belong to.
 
 The node file sets the role, name, prompt, address, peer, radio and build
-directory. Use `status` for node identity and `uhf status` for radio settings:
+directory. Use `status` for node identity and `comms uhf status` for radio settings:
 
 ```text
 kfsw-gnd-uhf# status
@@ -53,7 +67,10 @@ command -v socat
 See @ref getting_started for the workspace setup.
 
 The launcher uses `k-fsw/ground-station` and writes to `build/k-ground` by
-default. To use other directories in the current shell:
+default. Each profile uses `<profile>-node-<node>` for its build directory and
+generated configuration basename, with `-csp1` appended for CSP v1. For example,
+`kfsw-gnd-uhf` uses `build/k-ground/kfsw-gnd-uhf-node-16`, keeping it separate
+from other profiles at node 16. To use other directories in the current shell:
 
 ```bash
 export KGROUND_STATION_DIR="$PWD/ground-station"
@@ -72,24 +89,21 @@ ground-station/
 |-- reports/
 `-- nodes/
     |-- kfsw-gnd-can.env
-    |-- kfsw-gnd-uhf-bench.env
     |-- kfsw-gnd-uhf.env
     `-- kfsw-ops.env
 ```
 
-A node file is a shell environment file:
+A node file is a shell environment file; see
+[kfsw-gnd-uhf.env](https://github.com/dgonzalez97/k-fsw/blob/main/ground-station/nodes/kfsw-gnd-uhf.env)
+for the gateway and
+[kfsw-gnd-can.env](https://github.com/dgonzalez97/k-fsw/blob/main/ground-station/nodes/kfsw-gnd-can.env)
+for one that adds Kconfig and an overlay.
 
-```text
-KFSW_ROLE=kfsw-gnd-uhf
-KFSW_CSP_NODE=16
-KFSW_CSP_PEER=19
-KFSW_RADIO_UHF=holybro
-```
-
-`KFSW_CSP_ROUTES` sets a route table, for example `'2/14 KISS'`.
+`KFSW_CSP_ROUTES` sets a route table, for example `'2 KISS'`, which means
+node 2 in either CSP version.
 `tools/k-ground` checks it and writes it to `CONFIG_KFSW_CSP_ROUTE_TABLE`;
-without it the node uses `0/0 -> KISS direct`. `KFSW_EXTRA_KCONFIG` and
-`KFSW_EXTRA_OVERLAY` add Kconfig lines and a devicetree overlay, which is how
+without it the node keeps `0/0 KISS` from `config/profiles/k-ground.conf`.
+`KFSW_EXTRA_KCONFIG` and `KFSW_EXTRA_OVERLAY` add Kconfig lines and a devicetree overlay, which is how
 `kfsw-gnd-can` enables CAN. `KFSW_RADIO_UHF=holybro` selects the radio module.
 
 To copy the reference configuration into your workspace:
@@ -117,10 +131,12 @@ Start the UHF gateway and the operator shell in two terminals:
 
 ```text
 kfsw-ops# csp ping 16
-CSP ping 16: success, rtt_ms=...
+CSP ping 16: success
+rtt_ms: ...
 
 kfsw-gnd-uhf# csp ping 19
-CSP ping 19: success, rtt_ms=...
+CSP ping 19: success
+rtt_ms: ...
 ```
 
 `k-ground demo` starts both and opens the operator shell. `k-ground test`
@@ -137,26 +153,39 @@ Ground nodes include the file transfer service. From the operator shell:
 
 ```text
 kfsw-ops# ftp generate /build/test.txt 256
-FTP generate path=/build/test.txt: PASS bytes=256 crc32=0ce9d363
-kfsw-ops# ftp 16 mkdir /uplink
-FTP mkdir node=16 path=/uplink: PASS
+FTP generate /build/test.txt: PASS
+bytes: 256
+crc32: 0ce9d363
+kfsw-ops# ftp mkdir 16 /uplink
+FTP mkdir 16 /uplink: PASS
 kfsw-ops# ftp put 16 /build/test.txt /uplink/test.txt
-FTP put node=16 source=/build/test.txt destination=/uplink/test.txt: PASS bytes=256 crc32=0ce9d363 ...
+FTP put 16 /build/test.txt -> /uplink/test.txt: PASS
+bytes: 256
+crc32: 0ce9d363
+duration_ms: 190
+throughput_Bps: 1347
 kfsw-ops# ftp stat 16 /uplink/test.txt
-FTP stat node=16 path=/uplink/test.txt type=file bytes=256 crc32=0ce9d363
+FTP stat 16 /uplink/test.txt
+type: file
+bytes: 256
+crc32: 0ce9d363
 kfsw-ops# ftp get 16 /uplink/test.txt /build/test-returned.txt
-FTP get node=16 source=/uplink/test.txt destination=/build/test-returned.txt: PASS bytes=256 ...
+FTP get 16 /uplink/test.txt -> /build/test-returned.txt: PASS
+bytes: 256
+crc32: 0ce9d363
+...
 kfsw-ops# ftp verify /build/test.txt /build/test-returned.txt
-FTP verify first=/build/test.txt second=/build/test-returned.txt: PASS
+FTP verify /build/test.txt /build/test-returned.txt: PASS
 ```
 
 The same CRC on both nodes and on the returned copy means the file came back
 unchanged. The gateway can list its own files without a connection:
 
 ```text
-kfsw-gnd-uhf# ftp 16 ls /uplink
-f        256 test.txt
-FTP list: PASS entries=1
+kfsw-gnd-uhf# ftp ls 16 /uplink
+FTP ls 16 /uplink
+file        256 test.txt
+entries: 1
 ```
 
 `tests/k-ground-ftp-smoke.sh` runs this sequence, including a missing file.
@@ -175,7 +204,8 @@ Nodes answer housekeeping requests, so the bridge polls them:
 
 The bridge talks CSP over KISS, pulls samples and sends each one to Yamcs on
 UDP port 10015. Point it at a Linux node's `uart_1` PTY, or at the Holybro
-serial device to reach a flight node over the radio.
+serial device to reach a flight node over the radio. It speaks CSP 2; add
+`--csp-version 1` for a node built with `config/profiles/csp-v1.conf`.
 
 ### Beacons
 
@@ -271,19 +301,21 @@ If nothing arrives, look at the frames with `--yamcs none`, check that
 
 ### Commanding
 
-Yamcs only records telemetry. Housekeeping is configured with K-FSW commands;
-`hk_define`, `hk_period` and `hk_clear` work over CSP/KISS or CAN:
+Yamcs only records telemetry. Housekeeping is configured from a ground shell
+with the node first; `hk define`, `hk period` and `hk clear` work over CSP/KISS
+or CAN:
 
 ```text
-kfsw-ops# cmd 2 hk_define 0 "51:0x00 51:0x10 3:0x00"
-hk_define node=2: OK report 0 defines 3 values
+kfsw-ops# hk define 2 0 51:0x00 51:0x10 3:0x00
+node: 2
+report 0 defines 3 values
 ```
 
 ### Report definitions
 
 Housekeeping frames carry the values in report order, without names.
 `hk-report.py` generates the node command and the Yamcs XTCE database from one
-YAML file:
+YAML file. Put the node number after `hk define` to send it from the ground:
 
 ```bash
 report=k-fsw/ground-station/reports/nucleo-temperature.yaml
