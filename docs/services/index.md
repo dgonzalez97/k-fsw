@@ -212,7 +212,7 @@ last error. Records still queued, failed or in progress can be lost at power
 failure. Native fault tests cover these policies; physical power-cut
 qualification remains pending.
 
-## Logging
+## Logging {#logging}
 
 Code reports what happened through the log, not with `printk`. A file names
 its module once and calls the macro for the level:
