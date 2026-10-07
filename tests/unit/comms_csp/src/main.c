@@ -97,4 +97,15 @@ ZTEST(comms_csp_state, test_names_error_codes)
 	zassert_equal(strcmp(kfsw_csp_can_error_name(200U), "unknown"), 0);
 }
 
+ZTEST(comms_csp_state, test_clock_refuses_addresses_outside_the_range)
+{
+	struct kfsw_csp_clock clock;
+
+	/* Checked before anything is sent: libcsp does not mask a destination. */
+	zassert_equal(kfsw_csp_clock_read(0U, 10U, &clock), -EINVAL);
+	zassert_equal(kfsw_csp_clock_read(KFSW_CSP_BROADCAST_ADDRESS, 10U, &clock), -EINVAL);
+	zassert_equal(kfsw_csp_clock_write(KFSW_CSP_BROADCAST_ADDRESS + 1U, 10U, &clock), -EINVAL);
+	zassert_equal(kfsw_csp_clock_read(KFSW_CSP_BROADCAST_ADDRESS - 1U, 10U, &clock), -ENETDOWN);
+}
+
 ZTEST_SUITE(comms_csp_state, NULL, NULL, NULL, NULL, NULL);

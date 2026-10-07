@@ -6,6 +6,7 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/ztest.h>
 
+#include <kfsw/comms/csp.h>
 #include <kfsw/platform/storage.h>
 #include <kfsw/services/ftp.h>
 
@@ -16,7 +17,7 @@
 #define STORAGE_PARTITION_ID DT_FIXED_PARTITION_ID(STORAGE_PARTITION_NODE)
 #define LOCAL_NODE 1U
 #define PEER_NODE 2U
-#define MAX_NODE 16383U
+#define MAX_NODE KFSW_CSP_BROADCAST_ADDRESS
 #define TEST_PAYLOAD 64U
 #define MAX_SCRIPTED 8
 

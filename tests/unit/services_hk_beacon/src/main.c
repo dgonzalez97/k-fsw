@@ -6,6 +6,7 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/ztest.h>
 
+#include <kfsw/comms/csp.h>
 #include <kfsw/services/hk.h>
 #include <kfsw/services/parameter.h>
 
@@ -140,13 +141,17 @@ ZTEST(kfsw_hk_beacon, test_the_floor_itself_is_allowed)
 		   "the floor was refused by its own limit");
 }
 
-/* Address 0 and addresses above 16383 are refused. */
+/* Address 0, and the broadcast address or above, are refused. */
 ZTEST(kfsw_hk_beacon, test_an_address_that_cannot_exist_is_refused)
 {
 	zassert_equal(kfsw_hk_set_beacon(0U, 0U, CONFIG_KFSW_HK_BEACON_FLOOR_MS), -EINVAL,
 		      "node 0 was accepted");
-	zassert_equal(kfsw_hk_set_beacon(0U, 16384U, CONFIG_KFSW_HK_BEACON_FLOOR_MS), -EINVAL,
-		      "an address past the CSP range was accepted");
+	zassert_equal(
+		kfsw_hk_set_beacon(0U, KFSW_CSP_BROADCAST_ADDRESS, CONFIG_KFSW_HK_BEACON_FLOOR_MS),
+		-EINVAL, "the broadcast address was accepted");
+	zassert_equal(kfsw_hk_set_beacon(0U, KFSW_CSP_BROADCAST_ADDRESS + 1U,
+					 CONFIG_KFSW_HK_BEACON_FLOOR_MS),
+		      -EINVAL, "an address past the CSP range was accepted");
 }
 
 ZTEST(kfsw_hk_beacon, test_an_unknown_report_is_refused)
@@ -166,9 +171,9 @@ ZTEST(kfsw_hk_beacon, test_what_was_set_reads_back)
 	uint16_t node = 0U;
 	uint32_t interval = 0U;
 
-	zassert_ok(kfsw_hk_set_beacon(1U, 42U, 7000U), "the beacon was refused");
+	zassert_ok(kfsw_hk_set_beacon(1U, 12U, 7000U), "the beacon was refused");
 	zassert_ok(kfsw_hk_get_beacon(1U, &node, &interval), "the beacon could not be read back");
-	zassert_equal(node, 42U, "the destination changed");
+	zassert_equal(node, 12U, "the destination changed");
 	zassert_equal(interval, 7000U, "the interval changed");
 }
 
@@ -177,8 +182,8 @@ ZTEST(kfsw_hk_beacon, test_zero_stops_it)
 	uint32_t interval = 7000U;
 	uint16_t node = 0U;
 
-	zassert_ok(kfsw_hk_set_beacon(0U, 42U, 7000U), "the beacon was refused");
-	zassert_ok(kfsw_hk_set_beacon(0U, 42U, 0U), "the beacon could not be stopped");
+	zassert_ok(kfsw_hk_set_beacon(0U, 12U, 7000U), "the beacon was refused");
+	zassert_ok(kfsw_hk_set_beacon(0U, 12U, 0U), "the beacon could not be stopped");
 	zassert_ok(kfsw_hk_get_beacon(0U, &node, &interval), "the beacon could not be read back");
 	zassert_equal(interval, 0U, "a stopped beacon still reports an interval");
 
