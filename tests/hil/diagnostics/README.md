@@ -80,3 +80,8 @@ Protocol fault tests use private PTYs and optional loopback ZMQ. Build
 `csp-ping-server` with Cargo and install PyZMQ in the test environment to run
 the legacy interoperability case, then run `unittest discover -s tests/ground`
 with `KFSW_CSP_IPERF_TEST_BINARY` set. Missing PyZMQ skips that case explicitly.
+
+The optional host binaries can be fetched and built with `tools/host-tools.sh`
+(Rust required). `KFSW_HOST_TOOLS=1 tools/ci/robot.sh` opts into building them;
+prebuilt binaries are detected automatically. Set `KFSW_OUTPUT_ROOT=/tmp/kfsw-ci`
+to keep generated CI builds and reports outside the workspace.

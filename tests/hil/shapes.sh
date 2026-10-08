@@ -11,7 +11,7 @@ KFSW_SHAPES=(software terminal board board-uart board-can radio)
 
 kfsw_shape_needs() {
 	case "$1" in
-	software) echo "nothing; this is what software CI runs" ;;
+	software) echo "hosted images, socat and tmux; optional host tools and vcan0" ;;
 	terminal) echo "tmux and the robot-terminal-runner submodule" ;;
 	board) echo "a NUCLEO-L496ZG on its ST-LINK debug UART" ;;
 	board-uart) echo "the board, plus a second serial adapter on the CSP UART" ;;
