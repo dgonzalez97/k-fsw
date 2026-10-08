@@ -9,6 +9,13 @@ KGROUND_REPO_DIR="$(dirname "$KGROUND_TESTS_DIR")"
 KGROUND_WORKSPACE_ROOT="$(dirname "$KGROUND_REPO_DIR")"
 KGROUND_BUILD_ROOT="${KGROUND_BUILD_ROOT:-${KFSW_OUTPUT_ROOT:-$KGROUND_WORKSPACE_ROOT/build}/k-ground}"
 
+csp_version="${KFSW_CSP_VERSION:-2}"
+case "$csp_version" in
+1) csp_suffix="-csp1" ;;
+2) csp_suffix="" ;;
+*) echo "ERROR: unsupported CSP version: $csp_version"; exit 1 ;;
+esac
+
 lossy_link=0
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -100,11 +107,13 @@ CONFIG_KFSW_FWU_LITE_TIMEOUT_MS=1500
 CONFIG_KFSW_FWU_LITE_BLOCK_RETRIES=12'
 
 {
-	printf '%s\n' "KFSW_CSP_ROUTES='19/14 KISS'"
+	printf '%s\n' "KFSW_CSP_ROUTES='19 KISS'"
+	printf 'KFSW_CSP_VERSION=%s\n' "$csp_version"
 	printf "KFSW_EXTRA_KCONFIG='%s'\n" "$fwu_kconfig"
 } >>"$station_dir/nodes/kfsw-gnd-uhf.env"
 {
-	printf '%s\n' "KFSW_CSP_ROUTES='16/14 KISS'"
+	printf '%s\n' "KFSW_CSP_ROUTES='16 KISS'"
+	printf 'KFSW_CSP_VERSION=%s\n' "$csp_version"
 	printf "KFSW_EXTRA_KCONFIG='%s'\n" "$fwu_kconfig"
 } >>"$station_dir/nodes/kfsw-ops.env"
 
@@ -113,12 +122,15 @@ KGROUND_STATION_DIR="$station_dir" \
 KGROUND_STATION_DIR="$station_dir" \
 	"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-ops
 
-node16_executable="$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16/zephyr/zephyr.exe"
-node19_executable="$KGROUND_BUILD_ROOT/kfsw-ops-node-19/zephyr/zephyr.exe"
+node16_executable="$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16$csp_suffix/zephyr/zephyr.exe"
+node19_executable="$KGROUND_BUILD_ROOT/kfsw-ops-node-19$csp_suffix/zephyr/zephyr.exe"
 [[ -x "$node16_executable" ]] || fail "node 16 executable is missing"
 [[ -x "$node19_executable" ]] || fail "node 19 executable is missing"
 
-for node_config in kfsw-gnd-uhf-node-16 kfsw-ops-node-19; do
+for node_config in kfsw-gnd-uhf-node-16$csp_suffix kfsw-ops-node-19$csp_suffix; do
+	grep -Fq "CONFIG_KFSW_CSP_VERSION_$csp_version=y" \
+		"$KGROUND_BUILD_ROOT/$node_config/zephyr/.config" || \
+		fail "$node_config did not compose CSP $csp_version"
 	grep -Fq 'CONFIG_KFSW_FWU_LITE_CSP=y' \
 		"$KGROUND_BUILD_ROOT/$node_config/zephyr/.config" || \
 		fail "$node_config did not compose the direct upload path"
@@ -161,7 +173,7 @@ fi
 python3 "$KGROUND_REPO_DIR/tests/support/lossy-link.py" \
 	--left "$node16_pty" --right "$node19_pty" \
 	--drop-every "$drop_every" --drop-bytes 32 \
-	--ftp-stats "$work_dir/ftp-stats.json" \
+	--csp-version "$csp_version" --ftp-stats "$work_dir/ftp-stats.json" \
 	--ready-file "$work_dir/bridge.ready" \
 	>"$work_dir/socat.log" 2>&1 &
 bridge_pid=$!
@@ -213,6 +225,19 @@ print(stats['blocks'], stats['resent'], stats['dropped'])
 PYSTATS
 )
 [[ "$blocks" -eq 105 ]] || fail "the bridge did not observe all 105 image blocks"
+# Read the receiver's state through PARAM on the sending ground node.
+for field in fwu_received fwu_actual_crc fwu_expected_crc; do
+	printf 'param get 16 %s\n' "$field" >&4
+done
+wait_for_output "$work_dir/node19.log" "16:fwu_received = 20000" "$node19_pid" || \
+	fail "ground did not receive the remote byte count"
+for field in fwu_actual_crc fwu_expected_crc; do
+	wait_for_output "$work_dir/node19.log" "16:$field = 0x$image_crc" "$node19_pid" || \
+		fail "ground did not receive the matching remote checksum"
+done
+# Expose only validated reply rows for the Robot assertions.
+tr -d '\r' <"$work_dir/node19.log" | sed -n '/^16:fwu_.* = /p'
+
 if [[ "$lossy_link" -eq 1 ]]; then
 	[[ "$resent" -gt 0 && "$dropped" -gt 0 ]] || fail "loss did not cause a retransmission"
 	echo "K-GROUND FWU-FTP RESULT: PASS crc32=$image_crc bytes=20000 blocks=$blocks lossy=yes resent=$resent"

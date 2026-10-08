@@ -26,12 +26,16 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=1,
                         help="fixed so a failure can be reproduced")
     parser.add_argument("--ready-file", help="written once both endpoints are open")
-    parser.add_argument("--ftp-stats", help="record observed PUT blocks and retransmissions before loss")
+    stats_options = parser.add_mutually_exclusive_group()
+    stats_options.add_argument("--ftp-stats", help="record observed PUT blocks and retransmissions before loss")
+    stats_options.add_argument("--lite-stats", help="record observed FWU lite blocks before loss")
+    parser.add_argument("--csp-version", type=int, choices=(1, 2), default=2)
     arguments = parser.parse_args()
 
-    if arguments.ftp_stats:
+    if arguments.ftp_stats or arguments.lite_stats:
         sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
         from firmware_fixture import wire
+        wire.csp_version = arguments.csp_version
         readers = {}
         blocks = set()
         resent = 0
@@ -65,17 +69,24 @@ def main() -> int:
                 if not chunk:
                     continue
 
-                if arguments.ftp_stats:
+                if arguments.ftp_stats or arguments.lite_stats:
                     reader = readers.setdefault(source, wire.KissReader())
                     for frame in reader.feed(chunk):
-                        if len(frame) < 38:
+                        if len(frame) < wire.csp_header_bytes() + 12:
                             continue
                         header = wire.parse_csp_header(frame)
-                        payload = frame[6:]
-                        # FTP v1 PUT_DATA, from the ops node to the target.
-                        if header['source'] != 19 or header['dport'] != 9 or payload[:2] != b'\x01\x0a':
+                        payload = frame[wire.csp_header_bytes():]
+                        # Image blocks from the ops node to the target.
+                        if header['source'] != 19:
                             continue
-                        block = bytes(payload[4:12])  # request ID and offset
+                        if arguments.ftp_stats:
+                            if header['dport'] != 9 or payload[:2] != b'\x01\x0a':
+                                continue
+                            block = bytes(payload[4:12])  # request ID and offset
+                        else:
+                            if header['dport'] != 13 or payload[:1] != b'\x02':
+                                continue
+                            block = bytes(payload[2:4])  # block index
                         if block in blocks:
                             resent += 1
                         else:
@@ -95,8 +106,8 @@ def main() -> int:
 
                 if output:
                     os.write(destination, bytes(output))
-                if arguments.ftp_stats:
-                    stats = Path(arguments.ftp_stats)
+                if arguments.ftp_stats or arguments.lite_stats:
+                    stats = Path(arguments.ftp_stats or arguments.lite_stats)
                     temporary = stats.with_suffix('.tmp')
                     temporary.write_text(json.dumps({
                         'blocks': len(blocks), 'resent': resent, 'dropped': dropped}))

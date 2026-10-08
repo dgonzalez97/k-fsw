@@ -87,3 +87,8 @@ CSP Services Keep Their Remote Regression Checks
     [Documentation]    Two hosted nodes over PTY KISS; no physical UART evidence.
     [Tags]    software    csp    param    ftp    log
     Run Hosted Fixture    csp-smoke.sh    CSP RESULT: PASS
+
+CSP 1 Nodes Exchange Remote Parameters
+    [Documentation]    Reuses the two-node smoke and its remote PARAM reply checks.
+    [Tags]    software    csp1    csp    param
+    Run Hosted Fixture    csp-smoke.sh    CSP RESULT: PASS    env:KFSW_CSP_VERSION=1
