@@ -1,6 +1,7 @@
 *** Settings ***
 Documentation    Operator-style command execution through robot-terminal-runner.
 Resource         resources/terminal.resource
+Resource         resources/ground.resource
 Test Teardown    Close KFSW Terminal
 Test Tags        software
 
@@ -78,3 +79,20 @@ KFSW Linux Persists Parameters Across Restart
     Execute KFSW Command    param clear    RAM unchanged
     Restart KFSW Persistence Console
     Execute KFSW Command    param get test_u32    test_u32 = 42
+
+Operator Commands The Flight Node From The Ground Shell
+    [Documentation]    Hosted k-ground sends over PTY KISS; no physical UART or RF evidence.
+    [Tags]    terminal    ground    csp
+    Require Hosted Ground Dependencies
+    Open KFSW Ground Console
+    Execute KFSW Command    status 1    k-fsw:
+    KFSW Terminal Output Should Contain    kfsw-platform:
+    KFSW Terminal Output Should Contain    kfsw-services:
+    KFSW Terminal Output Should Contain    kfsw-comms:
+    KFSW Terminal Output Should Contain    kfsw-modules:
+    KFSW Terminal Output Should Contain    kfsw-libcsp:
+    KFSW Terminal Output Should Contain    kfsw-libparam:
+    Execute KFSW Command    csp ping 1    CSP ping 1: success
+    Execute KFSW Command    event tail 1 999    event_tail: failed, no record at age 999
+    Execute KFSW Command    param tables 1    Uploaded table files, adoptions and reverts
+    Execute KFSW Command    csp reboot 1 1234    denied

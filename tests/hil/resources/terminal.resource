@@ -62,3 +62,12 @@ Reset KFSW Terminal Output
 Close KFSW Terminal
     Run Keyword And Ignore Error    TerminalRunner.Close Program
     Sleep    500ms
+
+Open KFSW Ground Console
+    Reset KFSW Terminal Output
+    TerminalRunner.Start Program
+    ...    ${KFSW_REPO_DIR}/../.venv/bin/python
+    ...    params=${KFSW_REPO_DIR}/tests/k-ground-flight-terminal.py
+    ...    wait_time=0
+    Wait Until Keyword Succeeds    90s    250ms
+    ...    KFSW Terminal Output Should Contain    K-GROUND FLIGHT TERMINAL: READY
