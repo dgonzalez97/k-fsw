@@ -17,9 +17,9 @@ fi
 
 source "$KFSW_ROOT/k-fsw/tests/csp-version.sh"
 # A CSP 1 run uses its own builds of both nodes.
-[[ -n "$csp_suffix" ]] && KFSW_BUILD_DIR="$KFSW_ROOT/build/linux$csp_suffix"
+[[ -n "$csp_suffix" ]] && KFSW_BUILD_DIR="${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}/linux$csp_suffix"
 node1_executable="$KFSW_BUILD_DIR/zephyr/zephyr.exe"
-node2_build_dir="$KFSW_ROOT/build/tests/linux-node2$csp_suffix"
+node2_build_dir="${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}/tests/linux-node2$csp_suffix"
 node2_executable="$node2_build_dir/zephyr/zephyr.exe"
 work_dir="$(mktemp -d /tmp/kfsw-csp-smoke.XXXXXX)"
 node1_pid=""

@@ -11,8 +11,8 @@ KFSW_REPO_DIR="$(dirname "$KFSW_TESTS_DIR")"
 KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
 
 interface="${KFSW_CAN_INTERFACE:-vcan0}"
-node2_build_dir="$KFSW_WORKSPACE_ROOT/build/tests/linux-can"
-node16_build_dir="$KFSW_WORKSPACE_ROOT/build/k-ground/kfsw-gnd-can-node-16"
+node2_build_dir="${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/tests/linux-can"
+node16_build_dir="${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/k-ground/kfsw-gnd-can-node-16"
 node2_executable="$node2_build_dir/zephyr/zephyr.exe"
 node16_executable="$node16_build_dir/zephyr/zephyr.exe"
 

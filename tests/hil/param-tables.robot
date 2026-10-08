@@ -2,7 +2,7 @@
 Documentation    Parameter tables: every table of the composition is registered
 ...              with its ID and band, and parameters are addressed by table and
 ...              offset. The NUCLEO case runs the same check over the debug UART.
-Resource         resources/common.resource
+Resource         resources/ground.resource
 
 *** Test Cases ***
 Every Core Table Is Registered On The Hosted Image
@@ -38,3 +38,30 @@ NUCLEO Reports Its Tables Over The Debug UART
     [Tags]    param    tables    nucleo    physical
     ${result}=    Run Param Tables Smoke On Serial
     HIL Command Should Pass    ${result}    PARAM TABLES RESULT: PASS
+
+Remote Tables Describe Their Layer And Contents
+    [Documentation]    k-ground requests flight descriptors over PTY KISS; no physical UART evidence.
+    [Tags]    software    param    tables    ground
+    Require Hosted Ground Dependencies
+    Open Ground Pair    ${OUTPUT DIR}/ground-tables
+    TRY
+        ${out}=    Ground Command    param tables 1    Uploaded table files, adoptions and reverts
+        Should Match Regexp    ${out}    id +layer +name +params +holds
+        Should Match Regexp    ${out}    37 +service .*Uploaded table files, adoptions and reverts
+    FINALLY
+        Close Ground Pair
+    END
+
+Hosted Boot Diagnostics Are Explicitly Unavailable Remotely
+    [Documentation]    k-ground reads hosted diagnostics over PTY KISS; u8 zero is false.
+    ...    No MCUboot or reset evidence.
+    [Tags]    software    boot    param    ground
+    Require Hosted Ground Dependencies
+    Open Ground Pair    ${OUTPUT DIR}/ground-boot-diagnostics
+    TRY
+        Ground Command    param get 1 boot_attempts    1:boot_attempts = 4294967295
+        Ground Command    param get 1 boot_revert_reason    1:boot_revert_reason = 255
+        Ground Command    param get 1 boot_trial_valid    1:boot_trial_valid = 0
+    FINALLY
+        Close Ground Pair
+    END
