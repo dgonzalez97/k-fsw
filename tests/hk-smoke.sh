@@ -11,7 +11,7 @@ KFSW_TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KFSW_REPO_DIR="$(dirname "$KFSW_TESTS_DIR")"
 KFSW_ROOT="$(dirname "$KFSW_REPO_DIR")"
 
-executable="$KFSW_ROOT/build/linux/zephyr/zephyr.exe"
+executable="${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}/linux/zephyr/zephyr.exe"
 serial=""
 work_dir="$(mktemp -d)"
 failures=0

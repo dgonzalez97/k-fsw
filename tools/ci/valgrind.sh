@@ -12,13 +12,13 @@ if ! command -v valgrind >/dev/null 2>&1; then
 	exit 1
 fi
 
-output_dir="$KFSW_ROOT/build/valgrind"
+output_dir="${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}/valgrind"
 program_log="$output_dir/kfsw-linux.log"
 valgrind_log="$output_dir/valgrind.log"
 corrupt_program_log="$output_dir/kfsw-linux-corrupt-snapshot.log"
 corrupt_valgrind_log="$output_dir/valgrind-corrupt-snapshot.log"
 corrupt_flash="$output_dir/kfsw-corrupt-storage.bin"
-executable="$KFSW_ROOT/build/linux/zephyr/zephyr.exe"
+executable="${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}/linux/zephyr/zephyr.exe"
 
 mkdir -p "$output_dir"
 

@@ -16,17 +16,17 @@ Linux Preserves Both HK Reports And Replays Their Bytes
     [Tags]    software    diagnostics    hk
     ${result}=    Run Process
     ...    ${DIAGNOSTICS_PYTHON}    ${DIAGNOSTICS_SCRIPT}
-    ...    --executable    ${KFSW_REPO_DIR}/../build/linux/zephyr/zephyr.exe
+    ...    --executable    ${KFSW_BUILD_ROOT}/linux/zephyr/zephyr.exe
     ...    --output    ${OUTPUT DIR}/diagnostics-native
     ...    stderr=STDOUT    timeout=60
     HIL Command Should Pass    ${result}    DIAGNOSTICS SMOKE RESULT: PASS
 
 CSP Tools Diagnose A Linux Node Through KISS
     [Tags]    software    diagnostics    csp    host-tools    discover
-    Skip If    not $CSP_TOOL    Set KFSW_CSP_TOOLS_TEST_BINARY to the built csp-kiss binary.
+    Skip If    not $CSP_TOOL or not __import__('os').access($CSP_TOOL, 1)    Install Rust and run tools/host-tools.sh, then set KFSW_CSP_TOOLS_TEST_BINARY to the built csp-kiss binary.
     ${result}=    Run Process
     ...    ${DIAGNOSTICS_PYTHON}    ${DIAGNOSTICS_SCRIPT}
-    ...    --executable    ${KFSW_REPO_DIR}/../build/linux/zephyr/zephyr.exe
+    ...    --executable    ${KFSW_BUILD_ROOT}/linux/zephyr/zephyr.exe
     ...    --csp-tool    ${CSP_TOOL}
     ...    --output    ${OUTPUT DIR}/diagnostics-tools
     ...    stderr=STDOUT    timeout=60

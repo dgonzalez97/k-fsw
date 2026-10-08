@@ -7,7 +7,7 @@ KGROUND_TEST="$(readlink -f "${BASH_SOURCE[0]}")"
 KGROUND_TESTS_DIR="$(dirname "$KGROUND_TEST")"
 KGROUND_REPO_DIR="$(dirname "$KGROUND_TESTS_DIR")"
 KGROUND_WORKSPACE_ROOT="$(dirname "$KGROUND_REPO_DIR")"
-KGROUND_BUILD_ROOT="${KGROUND_BUILD_ROOT:-$KGROUND_WORKSPACE_ROOT/build/k-ground}"
+KGROUND_BUILD_ROOT="${KGROUND_BUILD_ROOT:-${KFSW_OUTPUT_ROOT:-$KGROUND_WORKSPACE_ROOT/build}/k-ground}"
 
 lossy_link=0
 while [[ $# -gt 0 ]]; do
@@ -154,23 +154,19 @@ node16_pty="$(sed -n 's/^uart_1 connected to pseudotty: //p' \
 node19_pty="$(sed -n 's/^uart_1 connected to pseudotty: //p' \
 	"$work_dir/node19.log" | head -1)"
 
+drop_every=1000000000
 if [[ "$lossy_link" -eq 1 ]]; then
-	# Drop bytes in runs, like lost packets.
-	python3 "$KGROUND_REPO_DIR/tests/support/lossy-link.py" \
-		--left "$node16_pty" --right "$node19_pty" \
-		--drop-every 3000 --drop-bytes 32 \
-		--ready-file "$work_dir/bridge.ready" \
-		>"$work_dir/socat.log" 2>&1 &
-	bridge_pid=$!
-	wait_for_output "$work_dir/bridge.ready" "lossy link ready" "$bridge_pid" || \
-		fail "the lossy bridge did not become ready"
-else
-	socat -d -d "$node16_pty,raw,echo=0" "$node19_pty,raw,echo=0" \
-		>"$work_dir/socat.log" 2>&1 &
-	bridge_pid=$!
-	wait_for_output "$work_dir/socat.log" "starting data transfer loop" \
-		"$bridge_pid" || fail "the ground CSP UART bridge did not become ready"
+	drop_every=3000
 fi
+python3 "$KGROUND_REPO_DIR/tests/support/lossy-link.py" \
+	--left "$node16_pty" --right "$node19_pty" \
+	--drop-every "$drop_every" --drop-bytes 32 \
+	--ftp-stats "$work_dir/ftp-stats.json" \
+	--ready-file "$work_dir/bridge.ready" \
+	>"$work_dir/socat.log" 2>&1 &
+bridge_pid=$!
+wait_for_output "$work_dir/bridge.ready" "lossy link ready" "$bridge_pid" || \
+	fail "the PTY bridge did not become ready"
 
 printf '%s\n' 'csp ping 19' >&3
 wait_for_output "$work_dir/node16.log" "CSP ping 19: success" "$node16_pid" || \
@@ -191,7 +187,7 @@ wait_for_output "$work_dir/node16.log" "state: idle" "$node16_pid" || \
 # An ordinary put, addressed to the reserved name. Nothing about the wire
 # protocol changes; only where the bytes land.
 printf '%s\n' 'ftp put 16 /build/image.bin firmware.bin' >&4
-wait_for_output "$work_dir/node19.log" "FTP put" "$node19_pid" "$TRANSFER_LIMIT_S" || \
+wait_for_output "$work_dir/node19.log" "FTP put 16 /build/image.bin -> firmware.bin: PASS" "$node19_pid" "$TRANSFER_LIMIT_S" || \
 	fail "the put did not complete"
 
 # The image must go to the update service, not into the transfer root.
@@ -201,13 +197,25 @@ wait_for_output "$work_dir/node16.log" "received: 20000" "$node16_pid" || \
 wait_for_output "$work_dir/node16.log" "actual_crc32: $image_crc" "$node16_pid" || \
 	fail "the received image does not match what was sent"
 
+wait_for_output "$work_dir/node16.log" "state: ready" "$node16_pid" || \
+	fail "the update slot was not finalized"
+wait_for_output "$work_dir/node16.log" "entries: " "$node16_pid" || \
+	fail "the reserved-path directory read did not complete"
+
 if sed -n '/ftp ls 16 \//,$p' "$work_dir/node16.log" | grep -aq "firmware.bin"; then
 	fail "the image was stored as a file instead of reaching the update service"
 fi
 
+read -r blocks resent dropped < <(python3 - "$work_dir/ftp-stats.json" <<'PYSTATS'
+import json, sys
+stats = json.load(open(sys.argv[1]))
+print(stats['blocks'], stats['resent'], stats['dropped'])
+PYSTATS
+)
+[[ "$blocks" -eq 105 ]] || fail "the bridge did not observe all 105 image blocks"
 if [[ "$lossy_link" -eq 1 ]]; then
-	# The lossy run must show resent blocks.
-	echo "K-GROUND FWU-FTP RESULT: PASS crc32=$image_crc bytes=20000 lossy=yes"
+	[[ "$resent" -gt 0 && "$dropped" -gt 0 ]] || fail "loss did not cause a retransmission"
+	echo "K-GROUND FWU-FTP RESULT: PASS crc32=$image_crc bytes=20000 blocks=$blocks lossy=yes resent=$resent"
 else
-	echo "K-GROUND FWU-FTP RESULT: PASS crc32=$image_crc bytes=20000"
+	echo "K-GROUND FWU-FTP RESULT: PASS crc32=$image_crc bytes=20000 blocks=$blocks resent=$resent"
 fi

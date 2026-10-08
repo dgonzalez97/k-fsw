@@ -447,3 +447,8 @@ remote parameter and checks the KISS counters.
 Only the encrypted radio link is authenticated. libcsp HMAC is not enabled,
 CRC32 only detects accidental corruption, and commands have no per-node
 authorization.
+
+The optional host binaries can be fetched and built with `tools/host-tools.sh`
+(Rust required). `KFSW_HOST_TOOLS=1 tools/ci/robot.sh` opts into building them;
+prebuilt binaries are detected automatically. Set `KFSW_OUTPUT_ROOT=/tmp/kfsw-ci`
+to keep generated CI builds and reports outside the workspace.

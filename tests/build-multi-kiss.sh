@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 repo_dir="$(readlink -f "$(dirname "$0")/..")"
 source "$repo_dir/tests/csp-version.sh"
-build_root="$(dirname "$repo_dir")/build/tests/multi-kiss$csp_suffix"
+build_root="${KFSW_OUTPUT_ROOT:-$(dirname "$repo_dir")/build}/tests/multi-kiss$csp_suffix"
 router_overlay="$repo_dir/tests/config/multi-kiss-router.overlay"
 [[ "$csp_version" == 1 ]] && router_overlay="$repo_dir/tests/config/multi-kiss-router-csp1.overlay"
 

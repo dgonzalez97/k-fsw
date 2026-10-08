@@ -3,6 +3,8 @@
 """
 
 import argparse
+import json
+from pathlib import Path
 import os
 import random
 import selectors
@@ -24,7 +26,15 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=1,
                         help="fixed so a failure can be reproduced")
     parser.add_argument("--ready-file", help="written once both endpoints are open")
+    parser.add_argument("--ftp-stats", help="record observed PUT blocks and retransmissions before loss")
     arguments = parser.parse_args()
+
+    if arguments.ftp_stats:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        from firmware_fixture import wire
+        readers = {}
+        blocks = set()
+        resent = 0
 
     random.seed(arguments.seed)
 
@@ -55,6 +65,22 @@ def main() -> int:
                 if not chunk:
                     continue
 
+                if arguments.ftp_stats:
+                    reader = readers.setdefault(source, wire.KissReader())
+                    for frame in reader.feed(chunk):
+                        if len(frame) < 38:
+                            continue
+                        header = wire.parse_csp_header(frame)
+                        payload = frame[6:]
+                        # FTP v1 PUT_DATA, from the ops node to the target.
+                        if header['source'] != 19 or header['dport'] != 9 or payload[:2] != b'\x01\x0a':
+                            continue
+                        block = bytes(payload[4:12])  # request ID and offset
+                        if block in blocks:
+                            resent += 1
+                        else:
+                            blocks.add(block)
+
                 output = bytearray()
                 for byte in chunk:
                     if skip_remaining > 0:
@@ -69,6 +95,12 @@ def main() -> int:
 
                 if output:
                     os.write(destination, bytes(output))
+                if arguments.ftp_stats:
+                    stats = Path(arguments.ftp_stats)
+                    temporary = stats.with_suffix('.tmp')
+                    temporary.write_text(json.dumps({
+                        'blocks': len(blocks), 'resent': resent, 'dropped': dropped}))
+                    temporary.replace(stats)
     except KeyboardInterrupt:
         pass
     finally:

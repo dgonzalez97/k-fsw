@@ -192,6 +192,19 @@ missing_for() {
 
 report() {
 	echo "PREFLIGHT: what this bench has"
+	local host_tools="${CARGO_TARGET_DIR:-${KFSW_CSP_TOOLS_DIR:-$KFSW_WORKSPACE_ROOT/tools/kfsw-csp-tools}/target}/release"
+	for tool in csp-kiss csp-iperf; do
+		if [[ -x "$host_tools/$tool" ]]; then
+			echo "  $tool: built"
+		else
+			echo "  $tool: missing; run tools/host-tools.sh (requires Rust)"
+		fi
+	done
+	if ip link show vcan0 >/dev/null 2>&1; then
+		echo "  vcan0: available"
+	else
+		echo "  vcan0: unavailable; run sudo k-fsw/tests/vcan-up.sh"
+	fi
 	printf '  %-22s %s\n' "debug UART" "${found_debug:-not found}"
 	printf '  %-22s %s\n' "second serial" "${found_second_serial:-not found}"
 	printf '  %-22s %s\n' "radio serial" "${found_radio:-not set; say which serial port it is}"

@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 repo_dir="$(readlink -f "$(dirname "$0")/..")"
 source "$repo_dir/tests/csp-version.sh"
-build_root="$(dirname "$repo_dir")/build/tests/multi-kiss$csp_suffix"
+build_root="${KFSW_OUTPUT_ROOT:-$(dirname "$repo_dir")/build}/tests/multi-kiss$csp_suffix"
 work_dir="$(mktemp -d /tmp/kfsw-multi-kiss.XXXXXX)"
 router_pid=""
 node_a_pid=""

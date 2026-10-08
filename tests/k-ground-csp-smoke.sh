@@ -5,7 +5,7 @@ KGROUND_TEST="$(readlink -f "${BASH_SOURCE[0]}")"
 KGROUND_TESTS_DIR="$(dirname "$KGROUND_TEST")"
 KGROUND_REPO_DIR="$(dirname "$KGROUND_TESTS_DIR")"
 KGROUND_WORKSPACE_ROOT="$(dirname "$KGROUND_REPO_DIR")"
-KGROUND_BUILD_ROOT="${KGROUND_BUILD_ROOT:-$KGROUND_WORKSPACE_ROOT/build/k-ground}"
+KGROUND_BUILD_ROOT="${KGROUND_BUILD_ROOT:-${KFSW_OUTPUT_ROOT:-$KGROUND_WORKSPACE_ROOT/build}/k-ground}"
 
 mode="smoke"
 if [[ "${1:-}" == "--terminal" ]]; then
@@ -200,4 +200,5 @@ done
 
 cat "$work_dir/node16.log"
 cat "$work_dir/node19.log"
+echo "node 19 UHF module: absent"
 echo "K-GROUND CSP RESULT: PASS"

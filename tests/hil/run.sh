@@ -29,7 +29,7 @@ fi
 export KFSW_REPO_DIR
 export PYTHONPATH="$KFSW_TERMINAL_RUNNER/src${PYTHONPATH:+:$PYTHONPATH}"
 
-output_dir="${KFSW_ROBOT_OUT_DIR:-$KFSW_WORKSPACE_ROOT/build/robot}"
+output_dir="${KFSW_ROBOT_OUT_DIR:-${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/robot}"
 
 # shellcheck source=tests/hil/shapes.sh
 source "$KFSW_HIL_DIR/shapes.sh"
