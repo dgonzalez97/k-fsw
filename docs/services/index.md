@@ -871,6 +871,112 @@ failed entropy read prevents allocation. Handlers still run synchronously and
 need their own execution bounds. Changing clocks does not affect ticket
 lifetimes.
 
+## Remote shell execution
+
+`CONFIG_KFSW_REMEXEC` lets an operator read which shell commands a node offers
+and run one of them, on CSP port 8, with its output coming back to the node
+that asked. The Linux image enables it. It is not composed into the NUCLEO
+image yet: capturing output costs a shell instance, and that footprint has not
+been measured on the board.
+
+**The allowlist is the security boundary.** A command is unreachable until the
+composition marks it in the list handed to `kfsw_remexec_init()`, and the
+listing reports exactly the marked commands. Discovery and permission are one
+list, so they cannot disagree. There is no wildcard, no debug mode and no PIN.
+A composition that marks nothing answers the listing with an empty reply and
+refuses every execution, which is what a node that never opted in should do.
+
+### How a composition marks a command
+
+The list lives beside the composition, in
+`k-fsw/app/src/remexec/remexec_allowlist.c`, not in the service:
+
+```c
+static const struct kfsw_remexec_entry remexec_entries[] = {
+	{.command = "storage info", .help = "Filesystem totals and mount state"},
+};
+```
+
+`command` is the shell command as typed, with its subcommand and without
+arguments. `help` is the line the listing shows. Marking a command marks its
+arguments too, so mark only commands whose whole argument space is safe to run
+from the ground: the reference list is read-only commands that finish promptly
+and print little.
+
+`kfsw_remexec_init()` refuses a list rather than serving part of one. It
+rejects more entries than `CONFIG_KFSW_REMEXEC_MAX_ENTRIES` (16), an entry
+without a command or help text, a command longer than 64 bytes, a command
+holding a byte that is not printable, and a repeated command. A rejected list
+leaves the node offering nothing.
+
+### What an operator sees
+
+A refusal names the command and says it is not offered, never a generic
+failure:
+
+```text
+remexec: 'storage test' is not offered for remote execution
+```
+
+A command line is at most 64 bytes and must be printable ASCII; a longer or
+malformed one is refused with its own reason. Only one execution runs at a
+time: a second request is refused BUSY rather than queued.
+
+### The output cap and what truncation looks like
+
+A reply carries at most `CONFIG_KFSW_REMEXEC_OUTPUT_MAX` bytes, 200 by
+default, which keeps one reply inside a single CSP buffer on the narrowest
+link. The service counts every byte the command printed, keeps the first cap
+bytes and reports the rest as dropped, so the count is exact:
+
+```text
+node: 2
+command: version
+output: 200 of 264 bytes, truncated, 64 dropped
+K-FSW: v1.1.0
+...
+```
+
+Whether the command succeeded is separate from whether its output fitted. A
+command that returns zero and overruns the cap reports `status: ok` with
+`truncated`; a command that fails and prints two bytes reports the failure and
+no truncation. The listing shares the cap: a long allowlist comes back
+truncated, and `remexec <node> get <command>` narrows it.
+
+### Limits
+
+Execution runs on the remote execution server thread, so a slow handler cannot
+stall the CSP router. A shell handler runs to completion and cannot be
+aborted, so `CONFIG_KFSW_REMEXEC_TIMEOUT_MS` (5000) is the budget the serving
+node measures an execution against and reports as `timeout` afterwards, and
+the client's own wait for a reply. A handler that never returns holds the
+executor and every later request is refused BUSY; the allowlist is the control
+for that, not the timeout.
+
+If the requesting node goes away mid-execution, the command still runs to
+completion. The reply is sent on the connection and discarded by the link,
+nothing is queued and nothing is retried, and the serving node's counters
+still record the execution. A client that timed out therefore does not know
+whether the command ran; read table 38 or the log on the next pass.
+
+Capturing output costs a second shell instance, so composing the service adds
+one thread of `CONFIG_SHELL_STACK_SIZE`. A node cannot be asked to run its own
+commands through `remexec`: the capture shell cannot be driven from the shell
+that asked, so a request addressed to the local node is refused.
+
+Table 38 publishes what the service counted, so a refusal is visible without
+reading a log:
+
+| Parameter | Access | Meaning |
+| --- | --- | --- |
+| `remexec_accepted` | r | Requests whose command was allowed and run |
+| `remexec_refused` | r | Requests refused before any command ran |
+| `remexec_truncated` | r | Replies that could not carry all the output |
+| `remexec_offered` | r | Commands marked for remote execution |
+| `remexec_refusal` | r | Why the most recent request was refused |
+
+See @ref kfsw_services_remexec.
+
 ## Resource monitor
 
 The resource monitor periodically reads the kernel's thread list and records

@@ -46,6 +46,7 @@ node 2.
 | --- | --- | --- |
 | 0 | CSP management (CMP), which answers `csp ident` and `csp ifstat` | libcsp |
 | 1 | Ping | libcsp |
+| 8 | Remote shell execution | `KFSW_REMEXEC_CSP_PORT` |
 | 9 | File transfer | `KFSW_FTP_CSP_PORT` |
 | 10 | libparam values | `KFSW_PARAM_PORT` |
 | 11 | Commands | `KFSW_COMMAND_CSP_PORT` |
@@ -55,7 +56,9 @@ node 2.
 | 16 | Remote log (log history and journal) | `KFSW_LOG_REMOTE_PORT` |
 
 Every node serves ports 0 and 1; libcsp's ports 2 to 6 are not served. Both
-ends of a link must use the same port numbers.
+ends of a link must use the same port numbers. `CSP_PORT_MAX_BIND` is 16 and
+raising it costs connection slots, so 7 and 8 are the room left for a new
+service rather than 17 and up.
 
 **Packet.** A CSP header (addresses, ports and flags such as CRC32 or RDP) and
 a payload. Packets come from a fixed buffer pool and stay datagrams, also with
