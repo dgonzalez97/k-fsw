@@ -16,7 +16,18 @@ if [[ -n "${KFSW_OUTPUT_ROOT:-}" ]]; then
 fi
 
 echo "UNIT: Twister output: $twister_out_dir"
+# Twister runs this many builds at once and each one compiles in parallel, so
+# the two multiply: --jobs 8 with eight-way builds measured a peak of 36
+# compilers and a load of 28 on a 16-core machine. Give Twister the job count
+# and build each instance serially, which keeps the peak at the job count.
+twister_jobs=()
+if [[ "${KFSW_JOBS:-0}" != "0" ]]; then
+	twister_jobs=(--jobs "$KFSW_JOBS")
+	export CMAKE_BUILD_PARALLEL_LEVEL=1
+fi
+
 west twister \
+	"${twister_jobs[@]}" \
 	--inline-logs \
 	--outdir "$twister_out_dir" \
 	--platform native_sim/native/64 \
