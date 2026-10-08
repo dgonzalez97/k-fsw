@@ -28,16 +28,12 @@ version; a CSP 2 node and a CSP 1 node do not understand each other. An
 address the selected version cannot carry stops the build. `csp info` prints
 the version in use as `protocol: CSP vN`.
 
-CSP 1 support is a build option for the Linux and NUCLEO profiles with
-`config/profiles/csp-v1.conf`, so a node can talk to older hardware. It is
-not very advanced and is less exercised than CSP 2; it is not a first-class
-path. Software coverage includes two-node exchange, remote PARAM, multi-KISS,
-and firmware upload through FWU lite and FTP, with clean and lossy PTY links.
-NUCLEO builds with and without CAN are checked; CSP 1 physical CAN, RF,
-bootloader swaps, rollback and confirmation are not covered by those tests.
-
-CSP 1 in K-FSW is libcsp 2.x running its CSP 1 mode. Its byte compatibility
-with a real libcsp 1.x node has not been tested.
+CSP 1 is less exercised than CSP 2. What the tests cover: a two-node exchange,
+remote PARAM, multi-KISS, and firmware upload through FWU lite and FTP over
+clean and lossy pseudo-terminal links, plus NUCLEO builds with and without
+CAN. What they do not: physical CAN, RF, bootloader swaps, rollback and
+confirmation. And this is libcsp 2.x in its CSP 1 mode, so byte compatibility
+with a real libcsp 1.x node is untested.
 
 **Port.** A service on a node: "node 2, port 9" is the file transfer service on
 node 2.

@@ -76,10 +76,9 @@ the latest increment.
 
 The reason is the one the service can establish, not a verdict from the
 bootloader: an image previously observed unconfirmed is no longer running.
-Reason 1 additionally records that MCUboot scheduled a revert while that image
-was last recorded; the service had not recorded its confirmation. The previous image
-identity is kept in the same record. It does not establish why confirmation was missed or distinguish a bootloader
-revert from another replacement of an unconfirmed image. The reason remains
+Reason 1 also means MCUboot had scheduled a revert while that image was last
+recorded, and that the service had not recorded its confirmation. The previous
+image identity is kept in the same record. The reason remains
 stored when the running image is confirmed; only the attempt count resets.
 Confirming through `boot_confirmed` saves that reset immediately. Confirmation
 through the separate MCUboot shell is reflected at the next service startup.
@@ -879,12 +878,11 @@ that asked. The Linux image enables it. It is not composed into the NUCLEO
 image yet: capturing output costs a shell instance, and that footprint has not
 been measured on the board.
 
-**The allowlist is the security boundary.** A command is unreachable until the
-composition marks it in the list handed to `kfsw_remexec_init()`, and the
-listing reports exactly the marked commands. Discovery and permission are one
-list, so they cannot disagree. There is no wildcard, no debug mode and no PIN.
-A composition that marks nothing answers the listing with an empty reply and
-refuses every execution, which is what a node that never opted in should do.
+**Allowlist.** A command is unreachable until the composition marks it in the
+list handed to `kfsw_remexec_init()`. The listing reads the same array the
+executor checks, so there is nothing to keep in step. There is no wildcard, no
+debug mode and no PIN, and a composition that marks nothing lists nothing and
+refuses every execution.
 
 ### How a composition marks a command
 
@@ -920,7 +918,7 @@ remexec: 'storage test' is not offered for remote execution
 
 A command line is at most 64 bytes and must be printable ASCII; a longer or
 malformed one is refused with its own reason. Only one execution runs at a
-time: a second request is refused BUSY rather than queued.
+time: a second request is refused `busy` rather than queued.
 
 ### The output cap and what truncation looks like
 
@@ -943,14 +941,14 @@ command that returns zero and overruns the cap reports `status: ok` with
 no truncation. The listing shares the cap: a long allowlist comes back
 truncated, and `remexec <node> get <command>` narrows it.
 
-### Limits
+### Execution and timeout
 
 Execution runs on the remote execution server thread, so a slow handler cannot
 stall the CSP router. A shell handler runs to completion and cannot be
 aborted, so `CONFIG_KFSW_REMEXEC_TIMEOUT_MS` (5000) is the budget the serving
 node measures an execution against and reports as `timeout` afterwards, and
 the client's own wait for a reply. A handler that never returns holds the
-executor and every later request is refused BUSY; the allowlist is the control
+executor and every later request is refused `busy`; the allowlist is the control
 for that, not the timeout.
 
 If the requesting node goes away mid-execution, the command still runs to

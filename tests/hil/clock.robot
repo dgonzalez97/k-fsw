@@ -1,10 +1,7 @@
 *** Settings ***
-Documentation    The board's clock across a reset.
-...
-...              Everything gated on a valid clock stays quiet without one, so
-...              a node that reboots between passes would sit silent until a
-...              ground station came into view to tell it the time. This is the
-...              case that says it does not have to.
+Documentation    The board's clock across a reset. Everything gated on a valid
+...              clock stays quiet without one, so a node that reboots out of
+...              contact stays silent until told the time. Needs hardware.
 Resource         resources/common.resource
 
 *** Test Cases ***

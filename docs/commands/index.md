@@ -476,7 +476,7 @@ is defined by that service and carries its ID in its own header.
 | 4, 5 | `event_stats`, `event_tail` | `k-fsw` composition |
 | 6 to 8 | `hk_define`, `hk_period`, `hk_clear` | `k-fsw` composition |
 | 9 to 11 | `journal_stats`, `journal_tail`, `journal_time` | `k-fsw` composition |
-| 12 to 15 | free | — |
+| 12 to 15 | free | |
 | 16 | `ground_wtd` | `kfsw-services`, `gndwdt.h` |
 
 **CSP ports.** 0 is management (CMP) and 1 ping, both from libcsp. K-FSW
@@ -547,23 +547,20 @@ command: storage test
 remexec: 'storage test' is not offered for remote execution
 ```
 
-There is no way to run an unmarked command: no wildcard, no debug mode, no
-PIN. A node whose composition marks nothing lists nothing and refuses
-everything. Marking a command marks its arguments as well, so a composition
-marks only commands whose whole argument space is safe from the ground. The
-list lives in `app/src/remexec/remexec_allowlist.c`; see @ref services.
+Marking a command marks its arguments as well, so a composition marks only
+commands whose whole argument space is safe from the ground. The list lives in
+`app/src/remexec/remexec_allowlist.c`; @ref services has the allowlist, the
+output cap and the limits.
 
-Output is capped at 200 bytes per execution by default. A reply that could
-not carry everything says so and says how much went missing, and that is
-reported separately from whether the command itself succeeded:
+A reply that could not carry everything says how much went missing, separately
+from whether the command itself succeeded:
 
 ```text
 output: 200 of 264 bytes, truncated, 64 dropped
 ```
 
-One execution runs at a time; a second request is refused rather than queued.
-A command line is at most 64 bytes of printable ASCII. A node cannot be asked
-to run its own commands this way, so `remexec` always names another node.
+A node cannot be asked to run its own commands this way, so `remexec` always
+names another node.
 Table 38 (`param get <node> remexec_refused`, `remexec_refusal`) shows what a
 node refused and why without reading its log.
 
