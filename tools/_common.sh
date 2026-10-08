@@ -45,6 +45,19 @@ fi
 
 export KFSW_BUILD_DIR="${KFSW_BUILD_DIR:-${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}/$KFSW_TARGET}"
 
+# Nothing capped compilation, so a 16-core desktop ran 16 Twister builds of 16
+# compilers each and the machine spent the run swapping with the fan at full
+# tilt. Leave half the cores to the person using the computer; KFSW_JOBS
+# overrides it, and 0 means take everything.
+if [[ -z "${KFSW_JOBS:-}" ]]; then
+	KFSW_JOBS="$(( $(nproc 2>/dev/null || echo 2) / 2 ))"
+	[[ "$KFSW_JOBS" -ge 1 ]] || KFSW_JOBS=1
+fi
+export KFSW_JOBS
+if [[ "$KFSW_JOBS" != "0" ]]; then
+	export CMAKE_BUILD_PARALLEL_LEVEL="$KFSW_JOBS"
+fi
+
 mkdir -p "${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}"
 
 cd "$KFSW_ROOT"
