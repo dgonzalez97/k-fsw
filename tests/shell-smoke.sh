@@ -39,6 +39,7 @@ fi
 		'param get uid' \
 		'param set route_table "9/9 KISS"' \
 		'csp routes' \
+		'csp ping' \
 		'param set route_table bad-table' \
 		'param get route_table' \
 		'param list' \
@@ -137,6 +138,9 @@ expected_output=(
     "set: parameter 'route_table' is read-only"
     'route_table = "0/0 KISS"'
     '0/0 -> KISS direct'
+    '1/14 -> LOOP direct'
+    'CSP ping 1: success'
+    'rtt_ms: '
 	'Parameter snapshot save: PASS'
 	'Parameter defaults: PASS (saved snapshot unchanged)'
 	'test_u32 = 42'
