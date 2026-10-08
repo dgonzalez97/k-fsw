@@ -43,8 +43,8 @@ if [[ -n "${ZEPHYR_SDK_INSTALL_DIR:-}" ]]; then
     export PATH="$ZEPHYR_SDK_INSTALL_DIR/gnu/arm-zephyr-eabi/bin:$PATH"
 fi
 
-export KFSW_BUILD_DIR="${KFSW_BUILD_DIR:-$KFSW_ROOT/build/$KFSW_TARGET}"
+export KFSW_BUILD_DIR="${KFSW_BUILD_DIR:-${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}/$KFSW_TARGET}"
 
-mkdir -p "$KFSW_ROOT/build"
+mkdir -p "${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}"
 
 cd "$KFSW_ROOT"

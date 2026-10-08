@@ -8,7 +8,12 @@ KFSW_REPO_DIR="$(dirname "$KFSW_TOOLS_DIR")"
 
 source "$KFSW_TOOLS_DIR/_common.sh" linux
 
-twister_out_dir="${KFSW_TWISTER_OUT_DIR:-$KFSW_ROOT/build/twister}"
+twister_out_dir="${KFSW_TWISTER_OUT_DIR:-${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}/twister}"
+
+cache_args=()
+if [[ -n "${KFSW_OUTPUT_ROOT:-}" ]]; then
+	cache_args+=("--extra-args=USER_CACHE_DIR=$KFSW_OUTPUT_ROOT/cache")
+fi
 
 echo "UNIT: Twister output: $twister_out_dir"
 west twister \
@@ -18,6 +23,6 @@ west twister \
 	--platform native_sim/native \
 	--testsuite-root "$KFSW_REPO_DIR/tests/unit" \
 	--testsuite-root "$KFSW_ROOT/kfsw-modules/tests" \
-	"$@"
+	"${cache_args[@]}" "$@"
 
 echo "UNIT RESULT: PASS ($twister_out_dir)"

@@ -7,7 +7,7 @@ KFSW_REPO_DIR="$(dirname "$(dirname "$KFSW_CI_DIR")")"
 
 "$KFSW_REPO_DIR/tools/docs/build.sh"
 
-index_file="$(dirname "$KFSW_REPO_DIR")/build/docs/html/index.html"
+index_file="${KFSW_OUTPUT_ROOT:-$(dirname "$KFSW_REPO_DIR")/build}/docs/html/index.html"
 if [[ ! -s "$index_file" ]]; then
 	echo "DOCS RESULT: FAIL (missing $index_file)"
 	exit 1

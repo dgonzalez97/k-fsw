@@ -6,7 +6,7 @@ KFSW_DOCS_TOOLS_DIR="$(dirname "$KFSW_DOCS_TOOL")"
 KFSW_TOOLS_DIR="$(dirname "$KFSW_DOCS_TOOLS_DIR")"
 KFSW_REPO_DIR="$(dirname "$KFSW_TOOLS_DIR")"
 KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
-KFSW_DOCS_OUTPUT="$KFSW_WORKSPACE_ROOT/build/docs"
+export KFSW_DOCS_OUTPUT="${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/docs"
 
 if ! command -v doxygen >/dev/null 2>&1; then
 	echo "ERROR: Doxygen is required to build the K-FSW manual."
