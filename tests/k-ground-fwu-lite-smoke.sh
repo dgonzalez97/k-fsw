@@ -235,14 +235,24 @@ PYSTATS
 )
 [[ "$blocks" -eq 105 ]] || fail "the bridge did not observe all 105 image blocks"
 
-# Read the receiver's state through PARAM on the sending ground node.
-for field in fwu_received fwu_actual_crc fwu_expected_crc; do
-	printf 'param get 16 %s\n' "$field" >&4
-done
-wait_for_output "$work_dir/node19.log" "16:fwu_received = 20000" "$node19_pid" || \
+# Read the receiver's state through PARAM on the sending ground node. PARAM has
+# no --retry, unlike the command, csp and hk paths, so a dropped reply on the
+# lossy run is simply lost: ask again rather than call the update a failure,
+# since what this case proves is the upload under loss, not PARAM under loss.
+read_remote_field() # field, expected text
+{
+	local attempt
+	for attempt in 1 2 3; do
+		printf 'param get 16 %s\n' "$1" >&4
+		wait_for_output "$work_dir/node19.log" "$2" "$node19_pid" && return 0
+	done
+	return 1
+}
+
+read_remote_field fwu_received "16:fwu_received = 20000" || \
 	fail "ground did not receive the remote byte count"
 for field in fwu_actual_crc fwu_expected_crc; do
-	wait_for_output "$work_dir/node19.log" "16:$field = 0x$image_crc" "$node19_pid" || \
+	read_remote_field "$field" "16:$field = 0x$image_crc" || \
 		fail "ground did not receive the matching remote checksum"
 done
 # Expose only validated reply rows for the Robot assertions.
