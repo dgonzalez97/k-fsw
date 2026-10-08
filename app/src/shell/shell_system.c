@@ -218,6 +218,7 @@ static bool print_remote_message(const struct kfsw_log_remote_message *message, 
 {
 	const struct shell *sh = context;
 	char hex[(KFSW_LOG_ENCODED_SIZE * 2U) + 1U];
+	char crc[sizeof(" crc32=00000000")] = {0};
 
 	if (!message->package) {
 		shell_print(sh, "%llu t=%llums %s level=%u%s %s",
@@ -233,10 +234,15 @@ static bool print_remote_message(const struct kfsw_log_remote_message *message, 
 		(void)snprintk(&hex[i * 2U], 3U, "%02x", message->data[i]);
 	}
 	hex[MIN(message->size, KFSW_LOG_ENCODED_SIZE) * 2U] = '\0';
-	shell_print(sh, "%llu t=%llums %s level=%u%s pkg=%s", (unsigned long long)message->sequence,
-		    (unsigned long long)message->uptime_ms,
+	/* The four-byte guard is too short for legacy host decoders to render. */
+	if (message->text_crc_present) {
+		(void)snprintk(crc, sizeof(crc), " crc32=%08x", message->text_crc);
+	}
+	shell_print(sh, "%llu t=%llums %s level=%u%s pkg=%s%s%s",
+		    (unsigned long long)message->sequence, (unsigned long long)message->uptime_ms,
 		    kfsw_log_module_name((enum kfsw_log_module)message->module), message->severity,
-		    message->truncated ? " truncated" : "", hex);
+		    message->truncated ? " truncated" : "",
+		    message->text_crc_present ? "00000000:" : "", hex, crc);
 	return true;
 }
 

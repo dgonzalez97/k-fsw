@@ -340,7 +340,7 @@ The serving node's `log_remote_format` parameter picks how messages travel:
 | Value | Format | On the requesting shell |
 | --- | --- | --- |
 | 0 | text, formatted on the serving node, at most 190 bytes | the message |
-| 1 | dictionary: the package as held | `pkg=<hex>` |
+| 1 | dictionary: the package as held plus a four-byte IEEE CRC32 | `pkg=00000000:<hex> crc32=<hex>` |
 
 Dictionary records are smaller on a radio link and carry no text. Decode a
 capture on a host with the ELF of the exact image that sent them:
@@ -350,7 +350,21 @@ capture on a host with the ELF of the exact image that sent them:
 ```
 
 It reads the format strings from the ELF and the package with Zephyr's
-dictionary parser, and prints each line with the text in place of `pkg=`.
+dictionary parser, and prints each line with the text in place of the package
+and CRC only when the CRC agrees with the node-rendered string. The CRC covers
+at most 191 bytes, with CR/LF replaced by spaces and without the terminating NUL.
+A missing, malformed or different CRC leaves the record marked `not decoded`
+and returns exit 1. This checks rendered text agreement, not ELF identity:
+another image rendering byte-identical text still passes, as can a CRC32
+collision.
+
+An old node sends packages without a CRC; a new decoder refuses to decode them.
+Text mode remains usable. A new node's dictionary reply has a four-byte trailer
+that an old requesting node rejects as malformed. A new requesting node prints
+`pkg=00000000:<hex>`: the `00000000:` guard makes an old host decoder attempt
+a four-byte package and fail explicitly. Upgrade the requester and decoder for
+dictionary mode; text mode remains compatible in both directions.
+
 The Linux composition enables the service; other CSP compositions can use
 `config/profiles/log-remote.conf`. Start the server after the CSP router.
 

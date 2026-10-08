@@ -67,16 +67,21 @@ Remote Log Reads As Text And As A Dictionary
     ${events_dictionary}=    Evaluate    __import__('re').findall(r'seq=.*', $journal_dictionary)
     Should Be Equal    ${events_text}    ${events_dictionary}
 
-Decoder Accepts Records Without Verifying Their Image
-    [Documentation]    The decoder does not verify the image it decodes against.
-    ...    For these hosted images it exits zero without a not-decoded diagnostic.
+Decoder Rejects A Mismatched Rendered Message
+    [Documentation]    CRC32 checks agreement with the node-rendered text, not ELF identity.
+    ...    Different text from a mismatched image is not decoded and exits nonzero.
+    ...    Another ELF rendering byte-identical text, or a CRC32 collision, can pass.
     [Tags]    software    ground    log
     Open Ground Pair    ${OUTPUT DIR}/ground-wrong-image
     Ground Command    param set 1 log_remote_format 1    1:log_remote_format = 1
     ${capture}=    Ground Command    log remote 1 4    pkg=
-    ${rc}    ${decoded}=    Decode Ground Capture    ${capture}    ${TRUE}
+    ${rc}    ${decoded}=    Decode Ground Capture    ${capture}
     Should Be Equal As Integers    ${rc}    0
-    Should Not Contain    ${decoded}    not decoded
+    Should Not Contain    ${decoded}    pkg=
+    ${rc}    ${decoded}=    Decode Ground Capture    ${capture}    ${TRUE}
+    Should Be Equal As Integers    ${rc}    1
+    Should Contain    ${decoded}    not decoded
+    Should Contain    ${decoded}    pkg=
 
 CSP Services Keep Their Remote Regression Checks
     [Documentation]    Two hosted nodes over PTY KISS; no physical UART evidence.
