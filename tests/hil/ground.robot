@@ -9,11 +9,11 @@ Test Teardown    Close Ground Pair
 The Ground Pair Comes Up With Its Roles And Routes
     [Tags]    software    ground    csp
     ${out}=    Run Hosted Fixture    k-ground-csp-smoke.sh    K-GROUND CSP RESULT: PASS
-    Should Contain    ${out}    CSP node: 16
-    Should Contain    ${out}    19/14 -> KISS direct
+    Response Should Contain    ${out}    CSP node: 16
+    Response Should Contain    ${out}    19/14 -> KISS direct
     Should Contain    ${out}    implementation: holybro-sik
-    Should Contain    ${out}    CSP node: 19
-    Should Contain    ${out}    node 19 UHF module: absent
+    Response Should Contain    ${out}    CSP node: 19
+    Response Should Contain    ${out}    node 19 UHF module: absent
 
 Ground Watchdog Accepts A Peer And Refuses Itself
     [Documentation]    The hosted flight peer arms its watchdog; ground feeds it over PTY KISS.
@@ -21,10 +21,10 @@ Ground Watchdog Accepts A Peer And Refuses Itself
     Open Ground Pair    ${OUTPUT DIR}/ground-watchdog
     Ground Command    gndwdt feed 1    fed: yes
     ${remote}=    Ground Command    gndwdt show 1    ground_wtd_timeout: 86400
-    Should Contain    ${remote}    node: 1
+    Response Should Contain    ${remote}    node: 1
     Should Match Regexp    ${remote}    ground_wtd_cnt: [1-9][0-9]*
     ${out}=    Flight Command    gndwdt show    last_node: 19
-    Should Contain    ${out}    contacts: 1
+    Response Should Contain    ${out}    contacts: 1
     Should Contain    ${out}    state: armed
     Ground Command    gndwdt feed 19    Node 19 is this node
 
@@ -36,7 +36,7 @@ A File Crosses The Ground Pair Both Ways
 A File Crosses A Link That Drops Bytes
     [Tags]    software    ground    ftp    lossy
     ${out}=    Run Hosted Fixture    k-ground-ftp-smoke.sh    K-GROUND FTP RESULT: PASS    --lossy
-    Should Match Regexp    ${out}    crc32=[0-9a-f]{8} bytes=32768 lossy=yes
+    Should Match Regexp    ${out}    crc32=[0-9a-f]{8} bytes=32768 lossy=yes dropped=[1-9][0-9]* resent=[1-9][0-9]*
 
 Remote Log Reads As Text And As A Dictionary
     [Tags]    software    ground    log    journal
@@ -80,7 +80,7 @@ Decoder Rejects A Mismatched Rendered Message
     Should Not Contain    ${decoded}    pkg=
     ${rc}    ${decoded}=    Decode Ground Capture    ${capture}    ${TRUE}
     Should Be Equal As Integers    ${rc}    1
-    Should Contain    ${decoded}    not decoded
+    Should Contain    ${decoded}    rendered-text CRC32 mismatch
     Should Contain    ${decoded}    pkg=
 
 CSP Services Keep Their Remote Regression Checks

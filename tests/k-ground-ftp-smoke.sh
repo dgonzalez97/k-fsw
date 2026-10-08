@@ -136,6 +136,7 @@ if [[ "$lossy_link" -eq 1 ]]; then
 	python3 "$KGROUND_REPO_DIR/tests/support/lossy-link.py" \
 		--left "$node16_pty" --right "$node19_pty" \
 		--drop-every 9000 --drop-bytes 6 \
+		--ftp-stats "$work_dir/ftp-stats.json" \
 		--ready-file "$work_dir/bridge.ready" \
 		>"$work_dir/socat.log" 2>&1 &
 	bridge_pid=$!
@@ -209,6 +210,18 @@ uploaded_crc="$(tr -d '\r' <"$work_dir/node19.log" |
 grep -Fq "crc32: $uploaded_crc" "$work_dir/node16.log" || \
 	fail "node 16 reports a different CRC than node 19 generated"
 
+resent=0
+dropped=0
+if [[ "$lossy_link" -eq 1 ]]; then
+	read -r resent dropped < <(python3 - "$work_dir/ftp-stats.json" <<'PYSTATS'
+import json, sys
+stats = json.load(open(sys.argv[1]))
+print(stats['resent'], stats['dropped'])
+PYSTATS
+)
+	[[ "$resent" -gt 0 && "$dropped" -gt 0 ]] || fail "loss did not cause a retransmission"
+fi
+
 cat "$work_dir/node19.log"
 cat "$work_dir/node16.log"
-echo "K-GROUND FTP RESULT: PASS crc32=$uploaded_crc bytes=$bytes lossy=$([[ "$lossy_link" -eq 1 ]] && echo yes || echo no)"
+echo "K-GROUND FTP RESULT: PASS crc32=$uploaded_crc bytes=$bytes lossy=$([[ "$lossy_link" -eq 1 ]] && echo yes || echo no) dropped=$dropped resent=$resent"
