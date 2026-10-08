@@ -1,0 +1,9 @@
+common:
+  tags: [unit, services, log, shell]
+  platform_allow: [native_sim/native/64]
+  integration_platforms: [native_sim/native/64]
+tests:
+  kfsw.services.log_shell.disabled: {}
+  kfsw.services.log_shell.enabled:
+    extra_configs:
+      - CONFIG_KFSW_LOG_SHELL=y

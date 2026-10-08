@@ -122,6 +122,7 @@ static int cmd_csp_routes(const struct shell *sh, size_t argc, char **argv)
 static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 {
 	struct kfsw_csp_info info;
+	struct kfsw_csp_route_info route;
 	unsigned long node;
 	uint32_t round_trip_us;
 	int parse_error = 0;
@@ -140,6 +141,13 @@ static int cmd_csp_ping(const struct shell *sh, size_t argc, char **argv)
 				    KFSW_CSP_BROADCAST_ADDRESS);
 			return -EINVAL;
 		}
+	}
+
+	result = kfsw_csp_route_lookup((uint16_t)node, &route);
+	if (result == 0) {
+		(void)print_csp_route(&route, (void *)sh);
+	} else {
+		shell_print(sh, "CSP route %lu: unavailable (%d)", node, result);
 	}
 
 	/* Pinging this node goes through the loopback interface. */
