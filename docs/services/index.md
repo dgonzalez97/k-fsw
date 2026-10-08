@@ -641,6 +641,12 @@ FTP, FTPS, SFTP or TFTP. It supports list, stat, mkdir, put and get. The server
 listens on CSP port 9 and requires RDP and CRC32. Each message has a 24-byte
 header with the request ID, offset, total size and file CRC.
 
+Remote FTP read-only refusals (`/hk` and `/boot`) use wire status 13 and
+return `-EROFS`, like local refusals. Existing status numbers are unchanged;
+older clients map the new status to `-EIO`. The FTP client returns this errno
+to shell callers. Failed put/get transfers also record positive errno 30 in
+transfer failure events and increment failure counters. Mkdir has no transfer event.
+
 Paths are virtual and rooted at `/kfsw/ftp` on each node:
 
 ```text

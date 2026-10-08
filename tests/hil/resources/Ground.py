@@ -61,23 +61,26 @@ class Ground:
             self.stack.close()
 
     def response_should_contain(self, text, expected):
-        """Compare numeric fields as integers; otherwise match bounded numbers."""
-        numeric = re.fullmatch(r'(.*?[:=] )(-?\d+)', expected)
-        if numeric:
-            field, value = numeric.groups()
-            found = re.findall(r'(?<![\w])' + re.escape(field) + r'(-?\d+)(?=\s|$)',
-                               text, re.MULTILINE)
-            assert found and all(int(item) == int(value) for item in found), (expected, text)
-        else:
-            pattern = re.escape(expected)
-            if re.search(r'\d', expected):
-                pattern = r'(?<![0-9])' + pattern + r'(?![0-9])'
-            assert re.search(pattern, text), (expected, text)
+        """Match literal reply fragments with complete numeric tokens."""
+        text = re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]', '', text)
+        # Bound every numeric token, including tokens inside compound replies.
+        # A captured block may contain several nodes; accept the exact requested
+        # field occurrence rather than requiring every node to have that value.
+        parts = re.split(r'(0x[0-9a-fA-F]+|-?\d+)', expected)
+        pattern = ''
+        for part in parts:
+            if re.fullmatch(r'0x[0-9a-fA-F]+', part):
+                pattern += r'(?<![0-9-])' + re.escape(part) + r'(?![0-9a-fA-F])'
+            elif re.fullmatch(r'-?\d+', part):
+                pattern += r'(?<![0-9-])' + re.escape(part) + r'(?![0-9]|\.[0-9])'
+            else:
+                pattern += re.escape(part)
+        if expected and expected[0].isalnum():
+            pattern = r'(?<![\w])' + pattern
+        assert re.search(pattern, text), (expected, text)
 
     def node_command(self, node, prompt, command, expected, timeout):
         offset = node.send(command)
-        node.wait(re.escape(expected.split('=')[0]) if '= ' in expected else
-                  re.escape(expected), offset, float(timeout))
         node.wait(prompt, offset, float(timeout))
         text = node.log.read_text()[offset:]
         self.response_should_contain(text, expected)

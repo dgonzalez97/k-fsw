@@ -67,7 +67,11 @@ def main():
             with NativeNode(pair.flight_image, Path(directory) / 'reopened', pair.flight.flash) as node:
                 node.command('hk define 0 1:0', 'report 0')
                 offset = node.send('ftp ls 1 /hk')
-                node.wait('entries: 0', offset)
+                node.wait(r'kfsw:~\$ ', offset)
+                listing = node.log.read_text()[offset:]
+                pair.response_should_contain(listing, 'entries: 2')
+                assert 'report0.bin' not in listing, listing
+                assert 'dataset.bin' in listing and 'reports.dat' in listing, listing
             print('  [ok]   a redefinition takes the file away')
         finally:
             pair.close_ground_pair()

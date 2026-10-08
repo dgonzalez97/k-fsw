@@ -1,5 +1,6 @@
 *** Settings ***
-Documentation    Firmware batch checks; physical cases require explicit bench ports.
+Documentation    Native_sim console and PTY KISS checks prove software behavior, not wiring or RF.
+...              Physical cases use explicit debug UART and KISS devices; no RF range evidence.
 Resource         resources/ground.resource
 
 *** Variables ***

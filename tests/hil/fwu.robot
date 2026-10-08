@@ -2,6 +2,7 @@
 Documentation    Firmware update over both routes: a put to the reserved name
 ...              through file transfer, and block by block through FWU lite.
 ...              Hosted cases use PTY KISS, proving software exchange, not flash swaps or RF.
+...              The physical CAN case checks the wired bus and slots, not a radio path.
 Resource         resources/ground.resource
 
 *** Variables ***
@@ -35,7 +36,7 @@ Direct Upload Carries An Image Between Two Nodes
     Require Hosted Ground Dependencies
     ${result}=    Run FWU Lite Smoke
     HIL Command Should Pass    ${result}    K-GROUND FWU-LITE RESULT: PASS
-    Should Match Regexp    ${result.stdout}    crc32=[0-9a-f]{8} bytes=20000 blocks=105 resent=[0-9]+
+    Should Match Regexp    ${result.stdout}    crc32=[0-9a-f]{8} bytes=20000(?![0-9]) blocks=105(?![0-9]) resent=[0-9]+
 
 Direct Upload Recovers From A Link That Drops Bytes
     [Documentation]    The same transfer over a bridge that drops runs of bytes.
@@ -44,7 +45,7 @@ Direct Upload Recovers From A Link That Drops Bytes
     Require Hosted Ground Dependencies
     ${result}=    Run FWU Lite Smoke    --lossy
     HIL Command Should Pass    ${result}    K-GROUND FWU-LITE RESULT: PASS
-    Should Match Regexp    ${result.stdout}    crc32=[0-9a-f]{8} bytes=20000 blocks=105 lossy=yes resent=[1-9][0-9]*
+    Should Match Regexp    ${result.stdout}    crc32=[0-9a-f]{8} bytes=20000(?![0-9]) blocks=105(?![0-9]) lossy=yes resent=[1-9][0-9]*
     Should Not Contain    ${result.stdout}    resent=0
 
 File Transfer Route Reaches The Update Service
@@ -54,7 +55,7 @@ File Transfer Route Reaches The Update Service
     Require Hosted Ground Dependencies
     ${result}=    Run FWU FTP Route Smoke
     HIL Command Should Pass    ${result}    K-GROUND FWU-FTP RESULT: PASS
-    Should Match Regexp    ${result.stdout}    crc32=[0-9a-f]{8} bytes=20000 blocks=105 resent=[0-9]+
+    Should Match Regexp    ${result.stdout}    crc32=[0-9a-f]{8} bytes=20000(?![0-9]) blocks=105(?![0-9]) resent=[0-9]+
 
 File Transfer Update Recovers From A Link That Drops Bytes
     [Documentation]    FTP retries preserve the image over a PTY bridge dropping bytes.
@@ -62,4 +63,4 @@ File Transfer Update Recovers From A Link That Drops Bytes
     Require Hosted Ground Dependencies
     ${result}=    Run FWU FTP Route Smoke    --lossy
     HIL Command Should Pass    ${result}    K-GROUND FWU-FTP RESULT: PASS
-    Should Match Regexp    ${result.stdout}    crc32=[0-9a-f]{8} bytes=20000 blocks=105 lossy=yes resent=[1-9][0-9]*
+    Should Match Regexp    ${result.stdout}    crc32=[0-9a-f]{8} bytes=20000(?![0-9]) blocks=105(?![0-9]) lossy=yes resent=[1-9][0-9]*

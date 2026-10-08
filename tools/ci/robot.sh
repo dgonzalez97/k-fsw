@@ -21,9 +21,10 @@ if [[ -x "$host_tools/csp-kiss" && -x "$host_tools/csp-iperf" ]]; then
 	export KFSW_CSP_IPERF_TEST_BINARY="${KFSW_CSP_IPERF_TEST_BINARY:-$host_tools/csp-iperf}"
 fi
 
-# Acceptance must execute all software cases. Interactive bench selections may
-# still skip unavailable fixtures, but that is not an acceptance result.
-"$robot_python" "$KFSW_REPO_DIR/tests/hil/software-preflight.py"
+# Optional host tools and vcan remain opt-in. Acceptance requires all cases.
+if [[ "${KFSW_ROBOT_ACCEPTANCE:-0}" == 1 ]]; then
+	"$robot_python" "$KFSW_REPO_DIR/tests/hil/software-preflight.py"
+fi
 
 # The fixtures refuse an existing output directory, so a second run would fail.
 rm -rf "${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/robot/dry-run" "${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/robot/software"
@@ -43,6 +44,7 @@ KFSW_ROBOT_OUT_DIR="${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/robot/softwa
 	"$KFSW_ROBOT_RUNNER" --exclude physical || robot_status=$?
 
 "$robot_python" - "${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/robot/software/output.xml" <<'PYCOUNTS'
+import os
 import sys
 import xml.etree.ElementTree as ET
 statuses = [test.find('status').get('status') for test in ET.parse(sys.argv[1]).iter('test')]
@@ -50,7 +52,8 @@ skipped = statuses.count('SKIP')
 failed = statuses.count('FAIL')
 executed = len(statuses) - skipped
 print(f'ROBOT COUNTS: executed={executed} skipped={skipped} failed={failed}')
-if skipped or failed or not executed:
+acceptance = os.environ.get('KFSW_ROBOT_ACCEPTANCE', '0') == '1'
+if failed or (acceptance and (skipped or not executed)):
     sys.exit(1)
 PYCOUNTS
 [[ "$robot_status" -eq 0 ]] || exit "$robot_status"

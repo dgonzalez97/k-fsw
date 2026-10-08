@@ -31,7 +31,7 @@ Ground Watchdog Accepts A Peer And Refuses Itself
 A File Crosses The Ground Pair Both Ways
     [Tags]    software    ground    ftp
     ${out}=    Run Hosted Fixture    k-ground-ftp-smoke.sh    K-GROUND FTP RESULT: PASS
-    Should Match Regexp    ${out}    crc32=[0-9a-f]{8} bytes=256
+    Should Match Regexp    ${out}    crc32=[0-9a-f]{8} bytes=256(?![0-9])
 
 A File Crosses A Link That Drops Bytes
     [Tags]    software    ground    ftp    lossy
@@ -80,7 +80,7 @@ Decoder Rejects A Mismatched Rendered Message
     Should Not Contain    ${decoded}    pkg=
     ${rc}    ${decoded}=    Decode Ground Capture    ${capture}    ${TRUE}
     Should Be Equal As Integers    ${rc}    1
-    Should Contain    ${decoded}    rendered-text CRC32 mismatch
+    Response Should Contain    ${decoded}    rendered-text CRC32 mismatch
     Should Contain    ${decoded}    pkg=
 
 CSP Services Keep Their Remote Regression Checks

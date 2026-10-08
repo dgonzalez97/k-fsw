@@ -1,7 +1,6 @@
 *** Settings ***
 Resource    common.resource
 Library     OperatingSystem
-Library     Ground.py
 
 *** Keywords ***
 Require Hosted Ground Dependencies

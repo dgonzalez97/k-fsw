@@ -2,6 +2,7 @@
 Documentation     CSP over CAN between a NUCLEO-L496ZG and a host CAN adapter.
 ...               The physical case needs a transceiver and adapter on the same bus.
 ...               The hosted case uses vcan0 and proves no physical wiring.
+Resource          resources/common.resource
 Library           Process
 Library           OperatingSystem
 
@@ -33,7 +34,7 @@ CSP Reaches A Node Over A Virtual CAN Bus
     Log    ${result.stdout}
     Should Be Equal As Integers    ${result.rc}    0    msg=${result.stdout}
     Should Contain    ${result.stdout}    CAN RESULT: PASS
-    Should Contain    ${result.stdout}    CSP ping 2: success
-    Should Contain    ${result.stdout}    CSP ping 16: success
-    Should Contain    ${result.stdout}    2:node_id = 2
-    Should Contain    ${result.stdout}    last_can_error=0 (none)
+    Response Should Contain    ${result.stdout}    CSP ping 2: success
+    Response Should Contain    ${result.stdout}    CSP ping 16: success
+    Response Should Contain    ${result.stdout}    2:node_id = 2
+    Response Should Contain    ${result.stdout}    last_can_error=0 (none)

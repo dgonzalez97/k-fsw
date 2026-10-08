@@ -1,5 +1,7 @@
 *** Settings ***
-Documentation    NUCLEO-L496ZG boot and readiness behavior.
+Documentation    Boot readiness over native_sim console or NUCLEO physical debug UART.
+...              Hosted LittleFS checks do not prove silicon reset behavior.
+...              UART readiness does not prove CSP links or RF delivery.
 Resource         resources/common.resource
 
 *** Test Cases ***
@@ -17,7 +19,7 @@ Hosted Image Reports Boot And Ready
     ...    --executable    ${KFSW_BUILD_ROOT}/linux/zephyr/zephyr.exe
     ...    --output    ${OUTPUT DIR}/hosted-boot    stderr=STDOUT    timeout=45
     HIL Command Should Pass    ${result}    HOSTED BOOT RESULT: PASS
-    Should Contain    ${result.stdout}    markers ordered; table 32 readable
+    Response Should Contain    ${result.stdout}    markers ordered; table 32 readable
 
 Restart Count Advances On A Hosted Restart
     [Documentation]    Re-execution with one flash file proves the saved counter, not reset cause.
