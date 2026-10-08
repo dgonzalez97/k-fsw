@@ -1,5 +1,6 @@
 *** Settings ***
-Documentation    Firmware batch checks; physical cases require explicit bench ports.
+Documentation    Native_sim console and PTY KISS checks prove software behavior, not wiring or RF.
+...              Physical cases use explicit debug UART and KISS devices; no RF range evidence.
 Resource         resources/ground.resource
 
 *** Variables ***
@@ -79,8 +80,8 @@ A Procedure Staged Through The Ground Node Runs On Flight
         Flight Command    fbo run smoke.txt    smoke.txt started
         Sleep    2s
         ${out}=    Flight Command    fbo status    lines skipped: 1
-        Should Contain    ${out}    lines run: 7
-        Should Contain    ${out}    lines failed: 1
+        Response Should Contain    ${out}    lines run: 7
+        Response Should Contain    ${out}    lines failed: 1
         Flight Command    fbo run absent.txt    run absent.txt: -2
     FINALLY
         Close Ground Pair

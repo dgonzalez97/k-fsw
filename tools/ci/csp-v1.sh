@@ -74,6 +74,17 @@ KFSW_CSP_VERSION=1 "$KFSW_REPO_DIR/tests/build-multi-kiss.sh" >"$out_dir/multi-k
 KFSW_CSP_VERSION=1 "$KFSW_REPO_DIR/tests/multi-kiss-smoke.sh" >"$out_dir/multi-kiss.log" 2>&1 ||
 	fail "the multi-KISS smoke failed, see $out_dir/multi-kiss.log"
 
+echo "CSP V1: firmware update over FWU lite and FTP, clean and lossy"
+for route in lite ftp; do
+	for variant in clean lossy; do
+		options=()
+		[[ "$variant" == clean ]] || options+=(--lossy)
+		KFSW_CSP_VERSION=1 "$KFSW_REPO_DIR/tests/k-ground-fwu-$route-smoke.sh" "${options[@]}" \
+			>"$out_dir/fwu-$route-$variant.log" 2>&1 || \
+			fail "FWU $route $variant failed, see $out_dir/fwu-$route-$variant.log"
+	done
+done
+
 # A CSP 2 node 1 and a CSP 1 node 2 on one link: the ping goes unanswered.
 echo "CSP V1: a CSP 2 node and a CSP 1 node do not understand each other"
 KFSW_BUILD_DIR="$out_dir/linux-v2" "$KFSW_TOOLS_DIR/build.sh" linux >"$out_dir/linux-v2.log" 2>&1 ||

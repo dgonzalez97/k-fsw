@@ -1,6 +1,7 @@
 *** Settings ***
 Library    Collections
 Library    Process
+Library    Ground.py
 
 *** Variables ***
 ${KFSW_REPO_DIR}      %{KFSW_REPO_DIR}
@@ -95,23 +96,51 @@ Run FWU Over Radio
     RETURN    ${result}
 
 Run FWU Lite Smoke
-    [Arguments]    @{options}
-    ${result}=    Run Process
-    ...    ${KFSW_REPO_DIR}/tests/k-ground-fwu-lite-smoke.sh
-    ...    @{options}
-    ...    stdout=${OUTPUT DIR}/${TEST NAME}.out
-    ...    stderr=STDOUT
-    ...    timeout=900
+    [Documentation]    csp_version selects the wire version. It is a keyword
+    ...                argument rather than an env: option because Robot only
+    ...                honours name=value as a named argument when it is
+    ...                literal in the test data, never through a variable.
+    [Arguments]    @{options}    ${csp_version}=${EMPTY}
+    IF    $csp_version
+        ${result}=    Run Process
+        ...    ${KFSW_REPO_DIR}/tests/k-ground-fwu-lite-smoke.sh
+        ...    @{options}
+        ...    env:KFSW_CSP_VERSION=${csp_version}
+        ...    stdout=${OUTPUT DIR}/${TEST NAME}.out
+        ...    stderr=STDOUT
+        ...    timeout=900
+    ELSE
+        ${result}=    Run Process
+        ...    ${KFSW_REPO_DIR}/tests/k-ground-fwu-lite-smoke.sh
+        ...    @{options}
+        ...    stdout=${OUTPUT DIR}/${TEST NAME}.out
+        ...    stderr=STDOUT
+        ...    timeout=900
+    END
     RETURN    ${result}
 
 Run FWU FTP Route Smoke
-    [Arguments]    @{options}
-    ${result}=    Run Process
-    ...    ${KFSW_REPO_DIR}/tests/k-ground-fwu-ftp-smoke.sh
-    ...    @{options}
-    ...    stdout=${OUTPUT DIR}/${TEST NAME}.out
-    ...    stderr=STDOUT
-    ...    timeout=900
+    [Documentation]    csp_version selects the wire version. It is a keyword
+    ...                argument rather than an env: option because Robot only
+    ...                honours name=value as a named argument when it is
+    ...                literal in the test data, never through a variable.
+    [Arguments]    @{options}    ${csp_version}=${EMPTY}
+    IF    $csp_version
+        ${result}=    Run Process
+        ...    ${KFSW_REPO_DIR}/tests/k-ground-fwu-ftp-smoke.sh
+        ...    @{options}
+        ...    env:KFSW_CSP_VERSION=${csp_version}
+        ...    stdout=${OUTPUT DIR}/${TEST NAME}.out
+        ...    stderr=STDOUT
+        ...    timeout=900
+    ELSE
+        ${result}=    Run Process
+        ...    ${KFSW_REPO_DIR}/tests/k-ground-fwu-ftp-smoke.sh
+        ...    @{options}
+        ...    stdout=${OUTPUT DIR}/${TEST NAME}.out
+        ...    stderr=STDOUT
+        ...    timeout=900
+    END
     RETURN    ${result}
 
 Run Param Tables Smoke

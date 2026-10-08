@@ -102,8 +102,8 @@ level and truncation status.
 | `journal remote` | `<node> [count]` | Another node's newest journal records, in one read |
 
 `log_remote_format` on the serving node picks text (0) or dictionary (1).
-Dictionary lines show `pkg=<hex>`; `tools/ground/log-decode.py --elf` turns
-them back into text. See @ref services, under Logging.
+Dictionary lines show `pkg=00000000:<hex> crc32=<hex>`;
+`tools/ground/log-decode.py --elf` turns them back into text. See @ref services, under Logging.
 
 ## UHF radio
 

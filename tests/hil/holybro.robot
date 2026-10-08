@@ -1,5 +1,6 @@
 *** Settings ***
-Documentation    Physical Holybro raw and CSP/KISS acceptance paths.
+Documentation    Physical Holybro raw and CSP/KISS over the bench radio path.
+...              This does not prove range or link-budget performance.
 Resource         resources/common.resource
 
 *** Test Cases ***
@@ -34,4 +35,4 @@ A Node Beacons Over The Radio Without Being Asked
     Skip If    not $HOLYBRO_RADIO    KGROUND_HOLYBRO_DEVICE is not configured
     ${result}=    Run Holybro Beacon Smoke
     HIL Command Should Pass    ${result}    HOLYBRO BEACON RESULT: PASS
-    Should Contain    ${result.stdout}    skipped=0
+    Response Should Contain    ${result.stdout}    skipped=0

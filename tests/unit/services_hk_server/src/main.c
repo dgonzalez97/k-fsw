@@ -293,3 +293,29 @@ ZTEST(kfsw_hk_server, test_the_request_is_always_given_back)
 
 	zassert_equal(link.frees, 1U, "a served request was freed %u times", link.frees);
 }
+
+ZTEST(kfsw_hk_server, test_mask_request_returns_selected_frames_in_class_order)
+{
+	const struct kfsw_hk_entry entry = {.param_id = KFSW_PARAM_ID(TEST_TABLE, 0)};
+	csp_packet_t *request;
+
+	zassert_ok(kfsw_hk_define_class(0, &entry, 1, 1));
+	zassert_ok(kfsw_hk_define_class(1, &entry, 1, 6));
+	zassert_ok(kfsw_hk_collect(0));
+	zassert_ok(kfsw_hk_collect(1));
+	request = make_request(1, 255, 8, 0, 6);
+	request->data[5] = 0x42;
+	kfsw_hk_serve_request(NULL, request);
+	zassert_equal(link.replies, 2);
+	zassert_equal(link.payload[0][1], 0);
+	zassert_equal(link.payload[1][1], 1);
+	memset(&link, 0, sizeof(link));
+	request = make_request(1, 255, 8, 0, 6);
+	request->data[5] = 0x40;
+	kfsw_hk_serve_request(NULL, request);
+	zassert_equal(link.replies, 1);
+	zassert_equal(link.payload[0][1], 1);
+	memset(&link, 0, sizeof(link));
+	kfsw_hk_serve_request(NULL, make_request(1, 255, 8, 0, 5));
+	zassert_equal(link.replies, 0);
+}

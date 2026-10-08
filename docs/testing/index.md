@@ -23,7 +23,17 @@ ends the run there and the log stops mid-stage.
 `tools/ci/csp-v1.sh`, part of `all.sh`, repeats the CSP checks under CSP 1: the
 NUCLEO builds with and without CAN, an address CSP 1 cannot carry fails the
 build, the CSP and multi-KISS smokes pass, and a CSP 2 node gets no answer from
-a CSP 1 node. Unit suites that depend on the address width also have a
+a CSP 1 node. It also reuses the FWU lite and FTP update smokes under CSP 1,
+each with clean and lossy links: receiver CRC32 and byte count, 105 observed
+blocks for 20000 bytes, and retransmissions after loss. Robot's `fwu` suite
+has the same exchanges tagged `software` and `csp1`; its byte-count and CRC
+assertions check remote PARAM replies received by ground, not a local send
+message. Nodes 16 and 19 are legal under CSP 1 and stay unchanged; the fixtures
+use exact-node routes instead of `/14` (CSP 1 has only five address bits),
+and separate `-csp1` builds. These are software exchanges, not physical update
+or bootloader evidence. CSP 1 is a limited compatibility build option, less
+exercised than the default CSP 2. Unit suites that depend on the address width
+also have a
 `.csp1` scenario.
 
 For a focused native suite:

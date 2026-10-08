@@ -95,3 +95,27 @@ int kfsw_app_hk_parse_entries(const char *text, struct kfsw_hk_entry *entries, s
 	*count = parsed;
 	return 0;
 }
+
+int kfsw_app_hk_parse_class(const char **text, uint8_t *retrieval_class)
+{
+	char *end;
+	unsigned long value;
+
+	*retrieval_class = KFSW_HK_CLASS_DEFAULT;
+	if (strncmp(*text, "class=", 6U) != 0) {
+		return 0;
+	}
+	value = strtoul(*text + 6U, &end, 0);
+	if (end == *text + 6U || (*end != ' ' && *end != '\0')) {
+		return -EINVAL;
+	}
+	if (value > KFSW_HK_CLASS_MAX) {
+		return -ERANGE;
+	}
+	*retrieval_class = (uint8_t)value;
+	while (*end == ' ') {
+		end++;
+	}
+	*text = end;
+	return 0;
+}

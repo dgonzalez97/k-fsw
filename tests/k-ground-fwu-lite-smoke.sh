@@ -9,6 +9,13 @@ KGROUND_REPO_DIR="$(dirname "$KGROUND_TESTS_DIR")"
 KGROUND_WORKSPACE_ROOT="$(dirname "$KGROUND_REPO_DIR")"
 KGROUND_BUILD_ROOT="${KGROUND_BUILD_ROOT:-${KFSW_OUTPUT_ROOT:-$KGROUND_WORKSPACE_ROOT/build}/k-ground}"
 
+csp_version="${KFSW_CSP_VERSION:-2}"
+case "$csp_version" in
+1) csp_suffix="-csp1" ;;
+2) csp_suffix="" ;;
+*) echo "ERROR: unsupported CSP version: $csp_version"; exit 1 ;;
+esac
+
 lossy_link=0
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -100,11 +107,13 @@ CONFIG_KFSW_FWU_LITE_TIMEOUT_MS=1500
 CONFIG_KFSW_FWU_LITE_BLOCK_RETRIES=12'
 
 {
-	printf '%s\n' "KFSW_CSP_ROUTES='19/14 KISS'"
+	printf '%s\n' "KFSW_CSP_ROUTES='19 KISS'"
+	printf 'KFSW_CSP_VERSION=%s\n' "$csp_version"
 	printf "KFSW_EXTRA_KCONFIG='%s'\n" "$fwu_kconfig"
 } >>"$station_dir/nodes/kfsw-gnd-uhf.env"
 {
-	printf '%s\n' "KFSW_CSP_ROUTES='16/14 KISS'"
+	printf '%s\n' "KFSW_CSP_ROUTES='16 KISS'"
+	printf 'KFSW_CSP_VERSION=%s\n' "$csp_version"
 	printf "KFSW_EXTRA_KCONFIG='%s'\n" "$fwu_kconfig"
 } >>"$station_dir/nodes/kfsw-ops.env"
 
@@ -113,12 +122,15 @@ KGROUND_STATION_DIR="$station_dir" \
 KGROUND_STATION_DIR="$station_dir" \
 	"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-ops
 
-node16_executable="$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16/zephyr/zephyr.exe"
-node19_executable="$KGROUND_BUILD_ROOT/kfsw-ops-node-19/zephyr/zephyr.exe"
+node16_executable="$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16$csp_suffix/zephyr/zephyr.exe"
+node19_executable="$KGROUND_BUILD_ROOT/kfsw-ops-node-19$csp_suffix/zephyr/zephyr.exe"
 [[ -x "$node16_executable" ]] || fail "node 16 executable is missing"
 [[ -x "$node19_executable" ]] || fail "node 19 executable is missing"
 
-for node_config in kfsw-gnd-uhf-node-16 kfsw-ops-node-19; do
+for node_config in kfsw-gnd-uhf-node-16$csp_suffix kfsw-ops-node-19$csp_suffix; do
+	grep -Fq "CONFIG_KFSW_CSP_VERSION_$csp_version=y" \
+		"$KGROUND_BUILD_ROOT/$node_config/zephyr/.config" || \
+		fail "$node_config did not compose CSP $csp_version"
 	grep -Fq 'CONFIG_KFSW_FWU_LITE_CSP=y' \
 		"$KGROUND_BUILD_ROOT/$node_config/zephyr/.config" || \
 		fail "$node_config did not compose the direct upload path"
@@ -158,23 +170,16 @@ node16_pty="$(sed -n 's/^uart_1 connected to pseudotty: //p' \
 node19_pty="$(sed -n 's/^uart_1 connected to pseudotty: //p' \
 	"$work_dir/node19.log" | head -1)"
 
-if [[ "$lossy_link" -eq 1 ]]; then
-	# Drop bytes in runs, like lost packets.
-	python3 "$KGROUND_REPO_DIR/tests/support/lossy-link.py" \
-		--left "$node16_pty" --right "$node19_pty" \
-		--drop-every 9000 --drop-bytes 6 \
-		--ready-file "$work_dir/bridge.ready" \
-		>"$work_dir/socat.log" 2>&1 &
-	bridge_pid=$!
-	wait_for_output "$work_dir/bridge.ready" "lossy link ready" "$bridge_pid" || \
-		fail "the lossy bridge did not become ready"
-else
-	socat -d -d "$node16_pty,raw,echo=0" "$node19_pty,raw,echo=0" \
-		>"$work_dir/socat.log" 2>&1 &
-	bridge_pid=$!
-	wait_for_output "$work_dir/socat.log" "starting data transfer loop" \
-		"$bridge_pid" || fail "the ground CSP UART bridge did not become ready"
-fi
+drop_every=1000000000
+[[ "$lossy_link" -eq 0 ]] || drop_every=9000
+python3 "$KGROUND_REPO_DIR/tests/support/lossy-link.py" \
+	--left "$node16_pty" --right "$node19_pty" \
+	--drop-every "$drop_every" --drop-bytes 6 \
+	--csp-version "$csp_version" --lite-stats "$work_dir/lite-stats.json" \
+	--ready-file "$work_dir/bridge.ready" >"$work_dir/socat.log" 2>&1 &
+bridge_pid=$!
+wait_for_output "$work_dir/bridge.ready" "lossy link ready" "$bridge_pid" || \
+	fail "the PTY bridge did not become ready"
 
 printf '%s\n' 'csp ping 19' >&3
 wait_for_output "$work_dir/node16.log" "CSP ping 19: success" "$node16_pid" || \
@@ -214,23 +219,57 @@ wait_for_output "$work_dir/node16.log" "expected_crc32: $image_crc" \
 wait_for_output "$work_dir/node16.log" "state: verified" "$node16_pid" || \
 	fail "node 16 should hold a verified image until it is told to flash"
 
-printf '%s\n' 'fwu flash 16' >&4
-wait_for_output "$work_dir/node19.log" "scheduled a swap" "$node19_pid" || \
-	fail "node 16 did not accept the instruction to flash"
+# Scheduling a swap twice leaves the same state, and this fixture deliberately
+# sets a 1500 ms reply timeout so the lossy run stays quick, which a loaded
+# machine can exceed. Ask again rather than report a flashing failure.
+flash_attempt=1
+while true; do
+	printf '%s\n' 'fwu flash 16' >&4
+	wait_for_output "$work_dir/node19.log" "scheduled a swap" "$node19_pid" && break
+	[[ "$flash_attempt" -lt 3 ]] || fail "node 16 did not accept the instruction to flash"
+	flash_attempt=$((flash_attempt + 1))
+done
 
 printf '%s\n' 'fwu status' >&3
 wait_for_output "$work_dir/node16.log" "state: ready" "$node16_pid" || \
 	fail "node 16 did not reach the ready state after being told to flash"
 
-resent="$(sed -n 's/.*verified; \([0-9]*\) block(s) resent.*/\1/p' \
-	"$work_dir/node19.log" | tail -1)"
-resent="${resent:-0}"
+read -r blocks resent dropped < <(python3 - "$work_dir/lite-stats.json" <<'PYSTATS'
+import json, sys
+stats = json.load(open(sys.argv[1]))
+print(stats['blocks'], stats['resent'], stats['dropped'])
+PYSTATS
+)
+[[ "$blocks" -eq 105 ]] || fail "the bridge did not observe all 105 image blocks"
+
+# Read the receiver's state through PARAM on the sending ground node. PARAM has
+# no --retry, unlike the command, csp and hk paths, so a dropped reply on the
+# lossy run is simply lost: ask again rather than call the update a failure,
+# since what this case proves is the upload under loss, not PARAM under loss.
+read_remote_field() # field, expected text
+{
+	local attempt
+	for attempt in 1 2 3; do
+		printf 'param get 16 %s\n' "$1" >&4
+		wait_for_output "$work_dir/node19.log" "$2" "$node19_pid" && return 0
+	done
+	return 1
+}
+
+read_remote_field fwu_received "16:fwu_received = 20000" || \
+	fail "ground did not receive the remote byte count"
+for field in fwu_actual_crc fwu_expected_crc; do
+	read_remote_field "$field" "16:$field = 0x$image_crc" || \
+		fail "ground did not receive the matching remote checksum"
+done
+# Expose only validated reply rows for the Robot assertions.
+tr -d '\r' <"$work_dir/node19.log" | sed -n '/^16:fwu_.* = /p'
 
 if [[ "$lossy_link" -eq 1 ]]; then
 	# The lossy run must show resent blocks.
-	[[ "$resent" -gt 0 ]] || \
+	[[ "$resent" -gt 0 && "$dropped" -gt 0 ]] || \
 		fail "the link dropped bytes but no block was resent; the loss never reached the transfer"
-	echo "K-GROUND FWU-LITE RESULT: PASS crc32=$image_crc bytes=20000 blocks=105 lossy=yes resent=$resent"
+	echo "K-GROUND FWU-LITE RESULT: PASS crc32=$image_crc bytes=20000 blocks=$blocks lossy=yes resent=$resent"
 else
-	echo "K-GROUND FWU-LITE RESULT: PASS crc32=$image_crc bytes=20000 blocks=105 resent=$resent"
+	echo "K-GROUND FWU-LITE RESULT: PASS crc32=$image_crc bytes=20000 blocks=$blocks resent=$resent"
 fi
