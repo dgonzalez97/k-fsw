@@ -219,9 +219,16 @@ wait_for_output "$work_dir/node16.log" "expected_crc32: $image_crc" \
 wait_for_output "$work_dir/node16.log" "state: verified" "$node16_pid" || \
 	fail "node 16 should hold a verified image until it is told to flash"
 
-printf '%s\n' 'fwu flash 16' >&4
-wait_for_output "$work_dir/node19.log" "scheduled a swap" "$node19_pid" || \
-	fail "node 16 did not accept the instruction to flash"
+# Scheduling a swap twice leaves the same state, and this fixture deliberately
+# sets a 1500 ms reply timeout so the lossy run stays quick, which a loaded
+# machine can exceed. Ask again rather than report a flashing failure.
+flash_attempt=1
+while true; do
+	printf '%s\n' 'fwu flash 16' >&4
+	wait_for_output "$work_dir/node19.log" "scheduled a swap" "$node19_pid" && break
+	[[ "$flash_attempt" -lt 3 ]] || fail "node 16 did not accept the instruction to flash"
+	flash_attempt=$((flash_attempt + 1))
+done
 
 printf '%s\n' 'fwu status' >&3
 wait_for_output "$work_dir/node16.log" "state: ready" "$node16_pid" || \

@@ -91,4 +91,4 @@ CSP Services Keep Their Remote Regression Checks
 CSP 1 Nodes Exchange Remote Parameters
     [Documentation]    Reuses the two-node smoke and its remote PARAM reply checks.
     [Tags]    software    csp1    csp    param
-    Run Hosted Fixture    csp-smoke.sh    CSP RESULT: PASS    env:KFSW_CSP_VERSION=1
+    Run Hosted Fixture    csp-smoke.sh    CSP RESULT: PASS    csp_version=1

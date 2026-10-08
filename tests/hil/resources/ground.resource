@@ -10,8 +10,14 @@ Require Hosted Ground Dependencies
     Skip If    ${littlefs.rc} != 0    Install littlefs-python in the Robot Python environment.
 
 Run Hosted Fixture
-    [Arguments]    ${name}    ${marker}    @{options}
-    ${result}=    Run Process    ${KFSW_REPO_DIR}/tests/${name}    @{options}
-    ...    stdout=${OUTPUT DIR}/${TEST NAME}.out    stderr=STDOUT    timeout=900
+    [Arguments]    ${name}    ${marker}    @{options}    ${csp_version}=${EMPTY}
+    IF    $csp_version
+        ${result}=    Run Process    ${KFSW_REPO_DIR}/tests/${name}    @{options}
+        ...    env:KFSW_CSP_VERSION=${csp_version}
+        ...    stdout=${OUTPUT DIR}/${TEST NAME}.out    stderr=STDOUT    timeout=900
+    ELSE
+        ${result}=    Run Process    ${KFSW_REPO_DIR}/tests/${name}    @{options}
+        ...    stdout=${OUTPUT DIR}/${TEST NAME}.out    stderr=STDOUT    timeout=900
+    END
     HIL Command Should Pass    ${result}    ${marker}
     RETURN    ${result.stdout}
