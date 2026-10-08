@@ -131,6 +131,14 @@ ZTEST(services_ftp, test_protocol_round_trip_and_portable_encoding)
 	zassert_mem_equal(decoded.data, data, sizeof(data));
 }
 
+ZTEST(services_ftp, test_read_only_status_survives_the_wire)
+{
+	zassert_equal(kfsw_ftp_errno_to_wire_status(-EROFS), KFSW_FTP_STATUS_READ_ONLY);
+	zassert_equal(kfsw_ftp_wire_status_to_errno(KFSW_FTP_STATUS_READ_ONLY), -EROFS);
+	zassert_equal(kfsw_ftp_wire_status_to_errno(KFSW_FTP_STATUS_IO_ERROR), -EIO);
+	zassert_equal(kfsw_ftp_wire_status_to_errno(UINT8_MAX), -EIO);
+}
+
 ZTEST(services_ftp, test_boot_paths_select_the_read_only_slot_mount)
 {
 	char resolved[KFSW_FTP_FULL_PATH_SIZE];

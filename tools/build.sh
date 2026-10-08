@@ -27,6 +27,9 @@ echo
 
 west_args=()
 cmake_args=()
+if [[ -n "${KFSW_OUTPUT_ROOT:-}" ]]; then
+	cmake_args+=("-DUSER_CACHE_DIR=$KFSW_OUTPUT_ROOT/cache")
+fi
 
 # Sysbuild is off by default; only the MCUboot composition turns it on.
 if [[ -n "${KFSW_SYSBUILD:-}" ]]; then

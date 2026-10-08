@@ -112,12 +112,15 @@ static int cmd_hk_define(const struct shell *sh, size_t argc, char **argv)
 {
 	struct kfsw_hk_entry entries[CONFIG_KFSW_HK_ENTRIES];
 	uint32_t report;
-	size_t count = argc - 2U;
+	uint8_t retrieval_class = KFSW_HK_CLASS_DEFAULT;
+	size_t first_entry = 2U;
+	size_t count;
 	int result;
 
 #if CONFIG_KFSW_COMMAND_CSP
 	/* Entries hold a ':', so a plain number after the report names a node. */
-	if ((argc > 3U) && (strchr(argv[2], ':') == NULL)) {
+	if ((argc > 3U) && (strchr(argv[2], ':') == NULL) &&
+	    (strncmp(argv[2], "class=", 6U) != 0)) {
 		return define_remote(sh, argc, argv);
 	}
 #endif
@@ -126,6 +129,19 @@ static int cmd_hk_define(const struct shell *sh, size_t argc, char **argv)
 	if (result != 0) {
 		return result;
 	}
+	if (strncmp(argv[2], "class=", 6U) == 0) {
+		const char *text = argv[2];
+		result = kfsw_app_hk_parse_class(&text, &retrieval_class);
+		if (result != 0 || *text != '\0') {
+			shell_error(sh, "Class must be 0..7");
+			return result != 0 ? result : -EINVAL;
+		}
+		first_entry++;
+	}
+	if (report >= CONFIG_KFSW_HK_REPORTS || argc <= first_entry) {
+		return -EINVAL;
+	}
+	count = argc - first_entry;
 	if (count > ARRAY_SIZE(entries)) {
 		shell_error(sh, "A report holds at most %u values",
 			    (unsigned int)ARRAY_SIZE(entries));
@@ -133,13 +149,13 @@ static int cmd_hk_define(const struct shell *sh, size_t argc, char **argv)
 	}
 
 	for (size_t index = 0U; index < count; index++) {
-		result = parse_entry(sh, argv[index + 2U], &entries[index]);
+		result = parse_entry(sh, argv[index + first_entry], &entries[index]);
 		if (result != 0) {
 			return result;
 		}
 	}
 
-	result = kfsw_hk_define((uint8_t)report, entries, count);
+	result = kfsw_hk_define_class((uint8_t)report, entries, count, retrieval_class);
 	if (setting_result(sh, result) == KFSW_HK_APPLIED_UNSAVED) {
 		return result;
 	}
@@ -210,12 +226,15 @@ static int cmd_hk_show(const struct shell *sh, size_t argc, char **argv)
 		size_t count = ARRAY_SIZE(entries);
 		uint32_t period = 0U;
 		uint16_t depth = 0U;
+		uint8_t retrieval_class = KFSW_HK_CLASS_DEFAULT;
 
 		if (kfsw_hk_get_definition(report, entries, &count) != 0) {
 			continue;
 		}
 		(void)kfsw_hk_get_period(report, &period);
 		(void)kfsw_hk_depth(report, &depth);
+		(void)kfsw_hk_get_class(report, &retrieval_class);
+		shell_print(sh, "report %u class %u", report, retrieval_class);
 		shell_print(sh, "report %u: %u values, period %u ms, %u samples held", report,
 			    (unsigned int)count, period, depth);
 #if CONFIG_KFSW_HK_BEACON
@@ -592,12 +611,12 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 #endif
 #if CONFIG_KFSW_COMMAND_CSP
 	SHELL_CMD_ARG(define, NULL,
-		      "Name what a report collects: define [node] <report> [node:]table:offset ...",
-		      cmd_hk_define, 3, CONFIG_KFSW_HK_ENTRIES + 2),
+		      "Name what a report collects: define [node] <report> [class=N] [node:]table:offset ...",
+		      cmd_hk_define, 3, CONFIG_KFSW_HK_ENTRIES + 3),
 	SHELL_CMD_ARG(clear, NULL, "Forget a report: clear [node] <report>.", cmd_hk_clear, 2, 2),
 #else
-	SHELL_CMD_ARG(define, NULL, "Name what a report collects: define <report> [node:]table:offset ...",
-		      cmd_hk_define, 3, CONFIG_KFSW_HK_ENTRIES),
+	SHELL_CMD_ARG(define, NULL, "Name what a report collects: define <report> [class=N] [node:]table:offset ...",
+		      cmd_hk_define, 3, CONFIG_KFSW_HK_ENTRIES + 1),
 	SHELL_CMD_ARG(clear, NULL, "Forget a report: clear <report>.", cmd_hk_clear, 2, 0),
 #endif
 	SHELL_CMD_ARG(show, NULL, "Show the reports and the counters.", cmd_hk_show, 1, 0),

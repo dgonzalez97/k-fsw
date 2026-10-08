@@ -29,13 +29,10 @@ KFSW_PRISTINE=always "$KFSW_REPO_DIR/tests/build-linux-node2.sh"
 
 echo "INTEGRATION: ground tools and HK capture/replay"
 "$kfsw_python" -m unittest discover -s "$KFSW_REPO_DIR/tests/ground" -v
-diagnostics_output="$(mktemp -d /tmp/kfsw-diagnostics.XXXXXX)/run"
-"$kfsw_python" "$KFSW_REPO_DIR/tests/diagnostics-smoke.py" \
-	--executable "$KFSW_REPO_DIR/../build/linux/zephyr/zephyr.exe" --output "$diagnostics_output"
 echo "INTEGRATION: explicit ground watchdog command"
 gndwdt_output="$(mktemp -d /tmp/kfsw-gndwdt.XXXXXX)"
 "$kfsw_python" "$KFSW_REPO_DIR/tests/gndwdt-smoke.py" \
-	--executable "$KFSW_REPO_DIR/../build/linux/zephyr/zephyr.exe" \
+	--executable "${KFSW_OUTPUT_ROOT:-$KFSW_REPO_DIR/../build}/linux/zephyr/zephyr.exe" \
 	--output "$gndwdt_output/run"
 rm -rf -- "$gndwdt_output"
 echo "INTEGRATION: shell and local PARAM"
@@ -59,38 +56,8 @@ echo "INTEGRATION: housekeeping collection"
 echo "INTEGRATION: a procedure run from a file"
 "$KFSW_REPO_DIR/tests/fbo-smoke.sh"
 
-echo "INTEGRATION: housekeeping samples kept in a file"
-"$KFSW_REPO_DIR/tests/hk-store-smoke.sh"
-
-echo "INTEGRATION: the ground bridge agrees with the node about a sample"
-"$KFSW_REPO_DIR/tests/hk-yamcs-smoke.sh"
-
-echo "INTEGRATION: a node beacons and the ground hears it without asking"
-"$KFSW_REPO_DIR/tests/hk-beacon-smoke.sh"
-
-echo "INTEGRATION: CSP, remote PARAM, storage, and FTP"
-"$KFSW_REPO_DIR/tests/csp-smoke.sh"
-
 echo "INTEGRATION: multi-interface CSP/KISS routing and transit"
 "$KFSW_REPO_DIR/tests/build-multi-kiss.sh"
 "$KFSW_REPO_DIR/tests/multi-kiss-smoke.sh"
-
-echo "INTEGRATION: k-ground UHF node 16 and ops node 19"
-"$KFSW_REPO_DIR/tests/k-ground-csp-smoke.sh"
-
-echo "INTEGRATION: k-ground file transfer between node 19 and node 16"
-"$KFSW_REPO_DIR/tests/k-ground-ftp-smoke.sh"
-
-echo
-echo "INTEGRATION: firmware upload between two nodes"
-"$KFSW_REPO_DIR/tests/k-ground-fwu-lite-smoke.sh"
-
-echo
-echo "INTEGRATION: firmware upload over a link that drops bytes"
-"$KFSW_REPO_DIR/tests/k-ground-fwu-lite-smoke.sh" --lossy
-
-echo
-echo "INTEGRATION: firmware upload through the file transfer route"
-"$KFSW_REPO_DIR/tests/k-ground-fwu-ftp-smoke.sh"
 
 echo "INTEGRATION RESULT: PASS"

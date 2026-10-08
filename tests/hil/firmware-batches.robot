@@ -1,6 +1,7 @@
 *** Settings ***
-Documentation    Firmware batch checks; physical cases require explicit bench ports.
-Resource         resources/common.resource
+Documentation    Native_sim console and PTY KISS checks prove software behavior, not wiring or RF.
+...              Physical cases use explicit debug UART and KISS devices; no RF range evidence.
+Resource         resources/ground.resource
 
 *** Variables ***
 ${BATCH_SHELL}    %{KFSW_DIAGNOSTICS_SHELL=}
@@ -13,7 +14,7 @@ Command Retries Execute Once Despite Lost Replies
     [Tags]    software    firmware-batches    command-retry
     ${result}=    Run Process
     ...    ${KFSW_PYTHON}    ${KFSW_REPO_DIR}/tests/command-retry-smoke.py
-    ...    --executable    ${KFSW_REPO_DIR}/../build/linux/zephyr/zephyr.exe
+    ...    --executable    ${KFSW_BUILD_ROOT}/linux/zephyr/zephyr.exe
     ...    --output    ${OUTPUT DIR}/command-retry-native
     ...    stderr=STDOUT    timeout=45
     HIL Command Should Pass    ${result}    COMMAND RETRY SMOKE RESULT: PASS
@@ -33,7 +34,7 @@ UTC Procedures Run And Cancel On Linux
     [Tags]    software    firmware-batches    fbo-utc
     ${result}=    Run Process
     ...    ${KFSW_PYTHON}    ${KFSW_REPO_DIR}/tests/fbo-utc-smoke.py
-    ...    --executable    ${KFSW_REPO_DIR}/../build/linux/zephyr/zephyr.exe
+    ...    --executable    ${KFSW_BUILD_ROOT}/linux/zephyr/zephyr.exe
     ...    --output    ${OUTPUT DIR}/fbo-utc-native
     ...    stderr=STDOUT    timeout=45
     HIL Command Should Pass    ${result}    FBO UTC SMOKE RESULT: PASS
@@ -51,7 +52,7 @@ Journal Retains Events Across Linux Process Restarts
     [Tags]    software    firmware-batches    journal
     ${result}=    Run Process
     ...    ${KFSW_PYTHON}    ${KFSW_REPO_DIR}/tests/journal-smoke.py
-    ...    --executable    ${KFSW_REPO_DIR}/../build/linux/zephyr/zephyr.exe
+    ...    --executable    ${KFSW_BUILD_ROOT}/linux/zephyr/zephyr.exe
     ...    --output    ${OUTPUT DIR}/journal-native
     ...    stderr=STDOUT    timeout=45
     HIL Command Should Pass    ${result}    JOURNAL SMOKE RESULT: PASS
@@ -66,3 +67,30 @@ Board Commits And Returns An Important Event
     ...    --output    ${OUTPUT DIR}/journal-board
     ...    stderr=STDOUT    timeout=45
     HIL Command Should Pass    ${result}    JOURNAL SMOKE RESULT: PASS
+
+A Procedure Staged Through The Ground Node Runs On Flight
+    [Documentation]    Ground LittleFS staging and FTP over PTY KISS to hosted flight;
+    ...    flight executes locally, so this proves transfer and execution, not a board or remote start.
+    [Tags]    software    firmware-batches    fbo    ground
+    Require Hosted Ground Dependencies
+    Open Ground Pair    ${OUTPUT DIR}/ground-fbo-smoke    smoke.txt
+    TRY
+        Ground Command    ftp mkdir 1 /procedures    : PASS
+        Ground Command    ftp put 1 /procedures/smoke.txt /procedures/smoke.txt    : PASS
+        Flight Command    fbo run smoke.txt    smoke.txt started
+        Sleep    2s
+        ${out}=    Flight Command    fbo status    lines skipped: 1
+        Response Should Contain    ${out}    lines run: 7
+        Response Should Contain    ${out}    lines failed: 1
+        Flight Command    fbo run absent.txt    run absent.txt: -2
+    FINALLY
+        Close Ground Pair
+    END
+    Open Ground Pair    ${OUTPUT DIR}/ground-fbo-check-in    examples/check-in.txt
+    TRY
+        Ground Command    ftp mkdir 1 /procedures    : PASS
+        Ground Command    ftp put 1 /procedures/check-in.txt /procedures/check-in.txt    : PASS
+        Flight Command    fbo run check-in.txt    finished at line 4 (0)
+    FINALLY
+        Close Ground Pair
+    END

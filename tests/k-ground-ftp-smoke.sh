@@ -9,8 +9,15 @@ KGROUND_TEST="$(readlink -f "${BASH_SOURCE[0]}")"
 KGROUND_TESTS_DIR="$(dirname "$KGROUND_TEST")"
 KGROUND_REPO_DIR="$(dirname "$KGROUND_TESTS_DIR")"
 KGROUND_WORKSPACE_ROOT="$(dirname "$KGROUND_REPO_DIR")"
-KGROUND_BUILD_ROOT="${KGROUND_BUILD_ROOT:-$KGROUND_WORKSPACE_ROOT/build/k-ground}"
+KGROUND_BUILD_ROOT="${KGROUND_BUILD_ROOT:-${KFSW_OUTPUT_ROOT:-$KGROUND_WORKSPACE_ROOT/build}/k-ground}"
 
+lossy_link=0
+bytes=256
+if [[ "${1:-}" == --lossy ]]; then
+	lossy_link=1
+	bytes=32768
+	shift
+fi
 if [[ $# -ne 0 ]]; then
 	echo "ERROR: unknown argument: $1"
 	exit 1
@@ -53,7 +60,7 @@ wait_for_output()
 	local expected="$2"
 	local process_pid="$3"
 
-	for _ in {1..600}; do
+	for _ in {1..2400}; do
 		grep -Fq "$expected" "$file" 2>/dev/null && return 0
 		kill -0 "$process_pid" 2>/dev/null || return 1
 		sleep 0.05
@@ -124,11 +131,24 @@ node16_pty="$(sed -n 's/^uart_1 connected to pseudotty: //p' \
 node19_pty="$(sed -n 's/^uart_1 connected to pseudotty: //p' \
 	"$work_dir/node19.log" | head -1)"
 
-socat -d -d "$node16_pty,raw,echo=0" "$node19_pty,raw,echo=0" \
-	>"$work_dir/socat.log" 2>&1 &
-bridge_pid=$!
-wait_for_output "$work_dir/socat.log" "starting data transfer loop" \
-	"$bridge_pid" || fail "the ground CSP UART bridge did not become ready"
+if [[ "$lossy_link" -eq 1 ]]; then
+	# Drop bytes in runs, like lost packets.
+	python3 "$KGROUND_REPO_DIR/tests/support/lossy-link.py" \
+		--left "$node16_pty" --right "$node19_pty" \
+		--drop-every 9000 --drop-bytes 6 \
+		--ftp-stats "$work_dir/ftp-stats.json" \
+		--ready-file "$work_dir/bridge.ready" \
+		>"$work_dir/socat.log" 2>&1 &
+	bridge_pid=$!
+	wait_for_output "$work_dir/bridge.ready" "lossy link ready" "$bridge_pid" || \
+		fail "the lossy bridge did not become ready"
+else
+	socat -d -d "$node16_pty,raw,echo=0" "$node19_pty,raw,echo=0" \
+		>"$work_dir/socat.log" 2>&1 &
+	bridge_pid=$!
+	wait_for_output "$work_dir/socat.log" "starting data transfer loop" \
+		"$bridge_pid" || fail "the ground CSP UART bridge did not become ready"
+fi
 
 printf '%s\n' 'csp ping 19' >&3
 wait_for_output "$work_dir/node16.log" "CSP ping 19: success" "$node16_pid" || \
@@ -136,7 +156,7 @@ wait_for_output "$work_dir/node16.log" "CSP ping 19: success" "$node16_pid" || \
 
 # The operator node drives the whole round trip.
 printf '%s\n' \
-	'ftp generate /build/test.txt 256' \
+	"ftp generate /build/test.txt $bytes" \
 	'ftp mkdir 16 /uplink' \
 	'ftp put 16 /build/test.txt /uplink/test.txt' \
 	'ftp stat 16 /uplink/test.txt' \
@@ -164,13 +184,13 @@ node19_expected=(
 	'FTP put 16 /build/test.txt -> /uplink/test.txt: PASS'
 	'FTP stat 16 /uplink/test.txt'
 	'type: file'
-	'bytes: 256'
-	'file        256 test.txt'
+	"bytes: $bytes"
+	"$(printf 'file %10d test.txt' "$bytes")"
 	'FTP get 16 /uplink/test.txt -> /build/test-returned.txt: PASS'
 )
 node16_expected=(
 	'FTP stat 16 /uplink/test.txt'
-	'file        256 test.txt'
+	"$(printf 'file %10d test.txt' "$bytes")"
 )
 
 for expected in "${node19_expected[@]}"; do
@@ -190,6 +210,18 @@ uploaded_crc="$(tr -d '\r' <"$work_dir/node19.log" |
 grep -Fq "crc32: $uploaded_crc" "$work_dir/node16.log" || \
 	fail "node 16 reports a different CRC than node 19 generated"
 
+resent=0
+dropped=0
+if [[ "$lossy_link" -eq 1 ]]; then
+	read -r resent dropped < <(python3 - "$work_dir/ftp-stats.json" <<'PYSTATS'
+import json, sys
+stats = json.load(open(sys.argv[1]))
+print(stats['resent'], stats['dropped'])
+PYSTATS
+)
+	[[ "$resent" -gt 0 && "$dropped" -gt 0 ]] || fail "loss did not cause a retransmission"
+fi
+
 cat "$work_dir/node19.log"
 cat "$work_dir/node16.log"
-echo "K-GROUND FTP RESULT: PASS crc32=$uploaded_crc bytes=256"
+echo "K-GROUND FTP RESULT: PASS crc32=$uploaded_crc bytes=$bytes lossy=$([[ "$lossy_link" -eq 1 ]] && echo yes || echo no) dropped=$dropped resent=$resent"

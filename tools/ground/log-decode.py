@@ -4,12 +4,17 @@
 A node whose log_remote_format is 1 sends each message as a cbprintf package:
 the address of its format string, the arguments, and any strings that were in
 RAM. The format strings stay in the image, so decoding needs the ELF of the
-exact image that produced the lines. Other lines pass through unchanged.
+image that produced the lines. A four-byte IEEE CRC32 checks the node-rendered
+text before it is printed. Missing or different CRCs leave the package marked
+not decoded and return exit 1. This checks text agreement, not image identity;
+identical text from another ELF and CRC32 collisions can pass. Other lines pass
+through unchanged.
 
     tools/ground/log-decode.py --elf build/nucleo_l496zg/zephyr/zephyr.elf capture.txt
 """
 
 import argparse
+import binascii
 import pathlib
 import re
 import struct
@@ -25,7 +30,9 @@ from dictionary_parser.log_database import LogDatabase  # noqa: E402
 from dictionary_parser.log_parser import formalize_fmt_string  # noqa: E402
 from dictionary_parser.log_parser_v3 import LogParserV3  # noqa: E402
 
-PACKAGE = re.compile(r"\bpkg=([0-9a-fA-F]+)")
+PACKAGE = re.compile(r"\bpkg=(\S*)")
+VERIFIED_PACKAGE = re.compile(r"00000000:([0-9a-fA-F]+) crc32=([0-9a-fA-F]{8})(?=\s|$)")
+TEXT_SIZE = 192
 
 
 class ElfStrings(LogDatabase):
@@ -80,6 +87,23 @@ def decode(parser, database, package):
     return formalize_fmt_string(fmt) % args
 
 
+def decode_line(parser, database, line):
+    """Replace a package only after its rendered text agrees with the node CRC."""
+    match = PACKAGE.search(line)
+    if not match:
+        return line
+    verified = VERIFIED_PACKAGE.match(line, match.start(1))
+    if not verified:
+        raise ValueError("missing or malformed rendered-text CRC32")
+    text = decode(parser, database, bytes.fromhex(verified.group(1)))
+    # Match log_history_format: replace CR/LF, retain at most 191 bytes, omit NUL.
+    rendered = text.encode("utf-8").replace(b"\r", b" ").replace(b"\n", b" ")
+    rendered = rendered.split(b"\0", 1)[0][: TEXT_SIZE - 1]
+    if binascii.crc32(rendered) != int(verified.group(2), 16):
+        raise ValueError("rendered-text CRC32 mismatch; is this the right ELF?")
+    return line[: match.start()] + rendered.decode("utf-8", errors="replace") + line[verified.end() :]
+
+
 def main() -> int:
     argparser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -96,14 +120,11 @@ def main() -> int:
     with source:
         for line in source:
             line = line.rstrip("\r\n")
-            match = PACKAGE.search(line)
-            if match:
-                try:
-                    text = decode(parser, database, bytes.fromhex(match.group(1)))
-                    line = line[: match.start()] + text + line[match.end() :]
-                except (ValueError, struct.error, TypeError) as error:
-                    failures += 1
-                    line += f"  # not decoded: {error}"
+            try:
+                line = decode_line(parser, database, line)
+            except (ValueError, struct.error, TypeError, IndexError, OverflowError) as error:
+                failures += 1
+                line += f"  # not decoded: {error}"
             print(line)
     return 1 if failures else 0
 

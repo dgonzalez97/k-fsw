@@ -12,7 +12,7 @@ KFSW_REPO_DIR="$(dirname "$KFSW_TOOLS_DIR")"
 source "$KFSW_TOOLS_DIR/_common.sh" linux
 
 profile="$KFSW_REPO_DIR/config/profiles/csp-v1.conf"
-out_dir="$KFSW_ROOT/build/csp-v1"
+out_dir="${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}/csp-v1"
 work_dir="$(mktemp -d /tmp/kfsw-csp-v1.XXXXXX)"
 pids=()
 
@@ -54,12 +54,12 @@ grep -q "outside the active range (\[1, 30\])" "$out_dir/address-40.log" ||
 	fail "address 40 failed the build for another reason, see $out_dir/address-40.log"
 
 echo "CSP V1: the Linux nodes"
-KFSW_BUILD_DIR="$KFSW_ROOT/build/linux-csp1" \
+KFSW_BUILD_DIR="${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}/linux-csp1" \
 	KFSW_EXTRA_CONF_FILE="$KFSW_REPO_DIR/tests/config/param-fixtures.conf;$KFSW_REPO_DIR/config/profiles/linux-temperature.conf;$profile" \
 	KFSW_PRISTINE=always "$KFSW_TOOLS_DIR/build.sh" linux >"$out_dir/linux.log" 2>&1 ||
 	fail "node 1 did not build, see $out_dir/linux.log"
 # _common.sh exports KFSW_BUILD_DIR, so name node 2's directory explicitly.
-KFSW_BUILD_DIR="$KFSW_ROOT/build/tests/linux-node2-csp1" KFSW_CSP_VERSION=1 KFSW_PRISTINE=always \
+KFSW_BUILD_DIR="${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}/tests/linux-node2-csp1" KFSW_CSP_VERSION=1 KFSW_PRISTINE=always \
 	"$KFSW_REPO_DIR/tests/build-linux-node2.sh" \
 	>"$out_dir/linux-node2.log" 2>&1 || fail "node 2 did not build, see $out_dir/linux-node2.log"
 
@@ -74,6 +74,17 @@ KFSW_CSP_VERSION=1 "$KFSW_REPO_DIR/tests/build-multi-kiss.sh" >"$out_dir/multi-k
 KFSW_CSP_VERSION=1 "$KFSW_REPO_DIR/tests/multi-kiss-smoke.sh" >"$out_dir/multi-kiss.log" 2>&1 ||
 	fail "the multi-KISS smoke failed, see $out_dir/multi-kiss.log"
 
+echo "CSP V1: firmware update over FWU lite and FTP, clean and lossy"
+for route in lite ftp; do
+	for variant in clean lossy; do
+		options=()
+		[[ "$variant" == clean ]] || options+=(--lossy)
+		KFSW_CSP_VERSION=1 "$KFSW_REPO_DIR/tests/k-ground-fwu-$route-smoke.sh" "${options[@]}" \
+			>"$out_dir/fwu-$route-$variant.log" 2>&1 || \
+			fail "FWU $route $variant failed, see $out_dir/fwu-$route-$variant.log"
+	done
+done
+
 # A CSP 2 node 1 and a CSP 1 node 2 on one link: the ping goes unanswered.
 echo "CSP V1: a CSP 2 node and a CSP 1 node do not understand each other"
 KFSW_BUILD_DIR="$out_dir/linux-v2" "$KFSW_TOOLS_DIR/build.sh" linux >"$out_dir/linux-v2.log" 2>&1 ||
@@ -83,7 +94,7 @@ mkfifo "$work_dir/v2.in" "$work_dir/v1.in"
 exec 3<>"$work_dir/v2.in" 4<>"$work_dir/v1.in"
 "$v2_node" --uart_stdinout --no-color -flash="$work_dir/v2.bin" <&3 >"$work_dir/v2.log" 2>&1 &
 pids+=($!)
-"$KFSW_ROOT/build/tests/linux-node2-csp1/zephyr/zephyr.exe" --uart_stdinout --no-color \
+"${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}/tests/linux-node2-csp1/zephyr/zephyr.exe" --uart_stdinout --no-color \
 	-flash="$work_dir/v1.bin" <&4 >"$work_dir/v1.log" 2>&1 &
 pids+=($!)
 for log in v2 v1; do

@@ -106,7 +106,14 @@ jobs:
       - name: Run shell, CSP, PARAM, storage, and FTP integration tests
         run: ./k-fsw/tools/ci/integration.sh
 
+  # Keep fast feedback on every PR; run the expensive acceptance and analysis
+  # jobs for integration branches, main pushes, and explicit manual runs.
   csp-v1:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+       (github.base_ref == 'develop' || github.base_ref == 'main')) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     name: INTEGRATION / CSP 1
     runs-on: ubuntu-24.04
 
@@ -126,6 +133,11 @@ jobs:
         run: ./k-fsw/tools/ci/csp-v1.sh
 
   valgrind:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+       (github.base_ref == 'develop' || github.base_ref == 'main')) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     name: MEMORY / Valgrind
     runs-on: ubuntu-24.04
 
@@ -152,6 +164,11 @@ jobs:
           if-no-files-found: ignore
 
   ubsan:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+       (github.base_ref == 'develop' || github.base_ref == 'main')) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     name: UNDEFINED / UBSan
     runs-on: ubuntu-24.04
 
@@ -178,6 +195,11 @@ jobs:
           if-no-files-found: ignore
 
   robot:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+       (github.base_ref == 'develop' || github.base_ref == 'main')) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     name: ROBOT / dry-run + software
     runs-on: ubuntu-24.04
 

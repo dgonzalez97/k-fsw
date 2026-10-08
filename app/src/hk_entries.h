@@ -5,6 +5,11 @@
 
 #include <kfsw/services/hk.h>
 
+/** Parse an optional leading class=N token; absent means class 4.
+ * Advances text to the entries, returns -ERANGE for class >7.
+ */
+int kfsw_app_hk_parse_class(const char **text, uint8_t *retrieval_class);
+
 /**
  * @brief Parse one housekeeping entry written as [node:]table:offset.
  *

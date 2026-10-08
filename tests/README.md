@@ -24,7 +24,10 @@ Run them from the west workspace root:
   images and runs the shell, CSP, parameter, persistence, storage, FTP,
   multi-KISS, housekeeping, ground watchdog and k-ground scripts.
 - `tools/ci/robot.sh` checks every Robot suite and runs the cases that are not
-  tagged `physical`.
+  tagged `physical`. It reports executed, skipped and failed counts; unavailable
+  optional host tools or vcan cases skip by default. Set
+  `KFSW_ROBOT_ACCEPTANCE=1` to require all software prerequisites and zero skips.
+  `KFSW_HOST_TOOLS=1` separately opts into building the Rust host tools.
 - `tools/ci/all.sh` runs all of these plus the build, quality and
   documentation checks.
 

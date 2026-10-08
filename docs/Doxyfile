@@ -2,7 +2,7 @@ PROJECT_NAME           = "K-FSW"
 PROJECT_NUMBER         = $(KFSW_DOCS_VERSION)
 PROJECT_BRIEF          = "KFSW: modular flight software on Zephyr, for small satellites"
 
-OUTPUT_DIRECTORY       = ../build/docs
+OUTPUT_DIRECTORY       = $(KFSW_DOCS_OUTPUT)
 CREATE_SUBDIRS         = NO
 ALLOW_UNICODE_NAMES    = NO
 OUTPUT_LANGUAGE        = English
@@ -73,7 +73,7 @@ WARN_IF_UNDOCUMENTED   = NO
 WARN_IF_DOC_ERROR      = YES
 WARN_NO_PARAMDOC       = NO
 WARN_AS_ERROR          = YES
-WARN_LOGFILE           = ../build/docs/doxygen-warnings.log
+WARN_LOGFILE           = $(KFSW_DOCS_OUTPUT)/doxygen-warnings.log
 
 LAYOUT_FILE            = docs/DoxygenLayout.xml
 

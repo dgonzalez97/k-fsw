@@ -1,7 +1,8 @@
 *** Settings ***
 Documentation     CSP over CAN between a NUCLEO-L496ZG and a host CAN adapter.
-...               Physical only: it needs the board, a transceiver and an
-...               adapter on the same bus, so there is no software-tagged half.
+...               The physical case needs a transceiver and adapter on the same bus.
+...               The hosted case uses vcan0 and proves no physical wiring.
+Resource          resources/common.resource
 Library           Process
 Library           OperatingSystem
 
@@ -21,3 +22,19 @@ CSP Reaches A Node Over CAN
     Should Contain    ${result.stdout}    ident=yes
     Should Contain    ${result.stdout}    params=yes
     Should Contain    ${result.stdout}    berr_unchanged=yes
+
+CSP Reaches A Node Over A Virtual CAN Bus
+    [Documentation]    Hosted SocketCAN framing on vcan0; no transceiver or physical bitrate evidence.
+    [Tags]    software    csp    can-virtual
+    ${ready}=    Run Process    sh    -c    command -v ip >/dev/null && ip link show vcan0    stderr=STDOUT
+    Skip If    ${ready.rc} != 0    Install iproute2 and create vcan0 with sudo k-fsw/tests/vcan-up.sh.
+    ${result}=    Run Process    ${CURDIR}/../can-smoke.sh
+    ...    stdout=${OUTPUT DIR}/virtual-can.out    stderr=STDOUT
+    ...    timeout=300    env:KFSW_CAN_INTERFACE=vcan0
+    Log    ${result.stdout}
+    Should Be Equal As Integers    ${result.rc}    0    msg=${result.stdout}
+    Should Contain    ${result.stdout}    CAN RESULT: PASS
+    Response Should Contain    ${result.stdout}    CSP ping 2: success
+    Response Should Contain    ${result.stdout}    CSP ping 16: success
+    Response Should Contain    ${result.stdout}    2:node_id = 2
+    Response Should Contain    ${result.stdout}    last_can_error=0 (none)

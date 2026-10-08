@@ -7,7 +7,7 @@ KFSW_REPO_DIR="$(dirname "$KFSW_TESTS_DIR")"
 KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
 source "$KFSW_TESTS_DIR/csp-version.sh"
 
-node2_build_dir="${KFSW_BUILD_DIR:-$KFSW_WORKSPACE_ROOT/build/tests/linux-node2$csp_suffix}"
+node2_build_dir="${KFSW_BUILD_DIR:-${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/tests/linux-node2$csp_suffix}"
 
 KFSW_BUILD_DIR="$node2_build_dir" \
 	KFSW_EXTRA_CONF_FILE="$(csp_conf_list "$KFSW_TESTS_DIR/config/linux-node2.conf")" \

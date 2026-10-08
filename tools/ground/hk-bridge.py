@@ -180,13 +180,15 @@ def crc32(data):
     return struct.pack(">I", value ^ 0xFFFFFFFF)
 
 
-def build_request(source, destination, sport, report, count, first_age):
+def build_request(source, destination, sport, report, count, first_age, class_mask=None):
     """Frame one request with the CSP CRC32C and the outer KISS CRC32C.
 
     libcsp computes both before prepending the CSP header. The outer checksum
     also covers the inner checksum. Receive handling verifies and removes both.
     """
     payload = struct.pack(">BBBH", HK_PROTOCOL_VERSION, report, count, first_age)
+    if class_mask is not None:
+        payload = struct.pack(">BBBHB", HK_PROTOCOL_VERSION, 255, count, first_age, class_mask)
     payload += crc32(payload)
     body = payload + crc32(payload)
     return kiss_encode(csp_header(destination, source, HK_PORT, sport, CSP_FCRC32) + body)
@@ -260,7 +262,8 @@ def validate_sample(sample):
 def collect(link, reader, args, sport, count, ask):
     """Yield received samples; only this request's distinct replies count."""
     if ask:
-        link.write(build_request(args.source, args.node, sport, args.report, count, 0))
+        link.write(build_request(args.source, args.node, sport, args.report, count, 0,
+                                 getattr(args, "class_mask", None)))
         link.flush()
     matched = set()
     deadline = time.monotonic() + args.timeout
@@ -275,7 +278,9 @@ def collect(link, reader, args, sport, count, ask):
             elif sample:
                 header = parse_csp_header(frame)
                 matching = (header["destination"] == args.source
-                            and header["dport"] == sport and sample[1] == args.report)
+                            and header["dport"] == sport
+                            and (getattr(args, "class_mask", None) is not None
+                                 or sample[1] == args.report))
                 if ask and matching:
                     matched.add(sample)
                 yield sample, int(time.time() * 1000), matching
@@ -344,6 +349,8 @@ def main():
     parser.add_argument("--source", type=int, default=16)
     parser.add_argument("--sport", type=int, default=40)
     parser.add_argument("--report", type=int, default=0)
+    parser.add_argument("--class-mask", type=lambda text: int(text, 0),
+                        help="K-FSW eight-bit class selection across reports")
     parser.add_argument("--count", type=int, default=1)
     parser.add_argument("--interval", type=float, default=5.0)
     parser.add_argument("--timeout", type=float, default=2.0)
@@ -363,6 +370,8 @@ def main():
     if not (0 <= args.source <= csp_max_node() and 16 <= args.sport <= 63
             and 0 <= args.report < 16 and 1 <= args.count <= 255 and args.baud > 0):
         parser.error("invalid address, port, report, count or baud rate")
+    if args.class_mask is not None and not 0 <= args.class_mask <= 255:
+        parser.error("class mask must be 0..255")
     if (not math.isfinite(args.timeout) or not 0 < args.timeout <= 3600
             or not math.isfinite(args.interval) or not 0 <= args.interval <= 3600):
         parser.error("timeout must be in (0,3600], interval in [0,3600]")
