@@ -27,3 +27,8 @@ The Ground Bridge Agrees With The Node About A Sample
     ${out}=    Run Hosted Fixture    hk-yamcs-smoke.sh    HK YAMCS BRIDGE SMOKE RESULT: PASS
     Should Contain    ${out}    the bridge and the shell read the same values
     Should Contain    ${out}    the frame is header plus values
+
+The Ground Selects Classes And Receives Them In Priority Order
+    [Tags]    software    hk    classes
+    ${out}=    Run Hosted Fixture    hk-class-smoke.sh    HK CLASS SMOKE RESULT: PASS
+    Response Should Contain    ${out}    ground received mask 0x42 replies: report/sequence 0/1, 0/0, 1/0; values 42, 42, -7

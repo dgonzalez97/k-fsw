@@ -314,9 +314,9 @@ ZTEST(kfsw_hk_persistence, test_a_report_naming_what_is_gone_does_not_come_back)
 	 * like a file left by an older image.
 	 *
 	 * 12 bytes of file header, then 16 for the report, its period and settings,
-	 * then node and ID entries: the first ID is at 30.
+	 * then node and ID entries: the first ID is at 31.
 	 */
-	sys_put_be16(KFSW_PARAM_ID(TEST_TABLE, 0x7F), &blob[30]);
+	sys_put_be16(KFSW_PARAM_ID(TEST_TABLE, 0x7F), &blob[31]);
 	sys_put_be32(0U, &blob[crc_offset]);
 	crc = crc32_ieee(blob, size);
 	sys_put_be32(crc, &blob[crc_offset]);
@@ -418,8 +418,8 @@ ZTEST(kfsw_hk_persistence, test_a_version_one_file_is_still_read)
 	memcpy(v1, blob, 12U);
 	v1[4] = 1U;
 	memcpy(&v1[12], &blob[12], 6U);
-	memcpy(&v1[18], &blob[28], size - 28U);
-	v1_size = 18U + (size - 28U);
+	memcpy(&v1[18], &blob[29], size - 29U);
+	v1_size = 18U + (size - 29U);
 	sys_put_be32(0U, &v1[8]);
 	crc = crc32_ieee(v1, v1_size);
 	sys_put_be32(crc, &v1[8]);
@@ -435,7 +435,7 @@ ZTEST(kfsw_hk_persistence, test_a_version_one_file_is_still_read)
 }
 
 /* An unknown version is refused. */
-ZTEST(kfsw_hk_persistence, test_a_version_three_file_is_refused)
+ZTEST(kfsw_hk_persistence, test_a_version_four_file_is_refused)
 {
 	uint8_t blob[256];
 	size_t size;
@@ -444,7 +444,7 @@ ZTEST(kfsw_hk_persistence, test_a_version_three_file_is_refused)
 	zassert_ok(kfsw_hk_persist_save(), "the definitions were not saved");
 	size = read_file(blob, sizeof(blob));
 
-	blob[4] = 3U;
+	blob[4] = 4U;
 	restart_with(blob, size);
 
 	zassert_equal(kfsw_hk_persist_load(), -EPROTONOSUPPORT,
@@ -560,7 +560,7 @@ ZTEST(kfsw_hk_persistence, test_invalid_late_report_applies_nothing_and_preserve
 	size_t size = read_file(saved, sizeof(saved));
 
 	/* The second report reuses the first ID; keep the CRC valid. */
-	saved[12 + 16 + 2 * 4] = 0;
+	saved[12 + 17 + 2 * 4] = 0;
 	sys_put_be32(0, &saved[8]);
 	sys_put_be32(crc32_ieee(saved, size), &saved[8]);
 	restart_with(saved, size);
@@ -639,4 +639,50 @@ ZTEST(kfsw_hk_persistence, test_restore_preserves_samples_and_continues_sequence
 	zassert_equal(fs_read(&file, after, size), size);
 	zassert_mem_equal(after, saved, size);
 	zassert_ok(fs_close(&file));
+}
+
+ZTEST(kfsw_hk_persistence, test_definitions_predating_class_default_to_four)
+{
+	/* Independent v1 and v2 fixtures: one U16 entry, no class field. */
+	for (uint8_t version = 1; version <= 2; version++) {
+		uint8_t legacy[32] = {'K', 'H', 'K', 'R', 0, 0, 0, 1};
+		size_t header = version == 1 ? 6 : 16;
+		size_t size = 12 + header + 4;
+		uint8_t cls = 0;
+		struct kfsw_hk_sample sample;
+
+		legacy[4] = version;
+		legacy[12] = 0;
+		legacy[13] = 1;
+		sys_put_be16(KFSW_PARAM_ID(TEST_TABLE, 0), &legacy[12 + header + 2]);
+		sys_put_be32(crc32_ieee(legacy, size), &legacy[8]);
+		restart_with(legacy, size);
+		zassert_ok(kfsw_hk_persist_load());
+		zassert_ok(kfsw_hk_get_class(0, &cls));
+		zassert_equal(cls, 4);
+		zassert_ok(kfsw_hk_collect(0));
+		zassert_ok(kfsw_hk_get_selected(16, 0, &sample));
+		zassert_equal(sys_get_be16(&sample.data[10]), counter_u16);
+		zassert_equal(kfsw_hk_get_selected(1, 0, &sample), -ENOENT);
+	}
+}
+
+ZTEST(kfsw_hk_persistence, test_class_survives_snapshot_and_bad_class_is_refused)
+{
+	const struct kfsw_hk_entry entry = {.param_id = KFSW_PARAM_ID(TEST_TABLE, 0)};
+	uint8_t saved[256];
+	uint8_t cls;
+
+	zassert_ok(kfsw_hk_define_class(0, &entry, 1, 2));
+	size_t size = read_file(saved, sizeof(saved));
+	restart_with(saved, size);
+	zassert_ok(kfsw_hk_persist_load());
+	zassert_ok(kfsw_hk_get_class(0, &cls));
+	zassert_equal(cls, 2);
+	saved[28] = 8;
+	sys_put_be32(0, &saved[8]);
+	sys_put_be32(crc32_ieee(saved, size), &saved[8]);
+	restart_with(saved, size);
+	zassert_equal(kfsw_hk_persist_load(), -ERANGE);
+	zassert_equal(kfsw_hk_get_class(0, &cls), -ENOENT);
 }

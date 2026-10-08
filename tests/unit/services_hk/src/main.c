@@ -310,3 +310,94 @@ ZTEST(kfsw_hk, test_disabling_stops_the_schedule_and_keeps_the_history)
 	kfsw_hk_set_enabled(true);
 	zassert_true(kfsw_hk_enabled());
 }
+
+static void collect_class(uint8_t report, uint8_t cls, uint16_t value)
+{
+	const struct kfsw_hk_entry entry = {.param_id = KFSW_PARAM_ID(TEST_TABLE, 0)};
+
+	zassert_ok(kfsw_hk_define_class(report, &entry, 1, cls));
+	counter_u16 = value;
+	zassert_ok(kfsw_hk_collect(report));
+}
+
+ZTEST(kfsw_hk, test_classes_order_before_age_and_newest_within_class)
+{
+	struct kfsw_hk_sample sample;
+
+	collect_class(0, 0, 10);
+	counter_u16 = 11;
+	zassert_ok(kfsw_hk_collect(0));
+	collect_class(1, 7, 70);
+	zassert_ok(kfsw_hk_get_selected(255, 0, &sample));
+	zassert_equal(sample.data[1], 0);
+	zassert_equal(sys_get_be16(&sample.data[10]), 11);
+	zassert_ok(kfsw_hk_get_selected(255, 1, &sample));
+	zassert_equal(sys_get_be16(&sample.data[10]), 10);
+	zassert_ok(kfsw_hk_get_selected(255, 2, &sample));
+	zassert_equal(sample.data[1], 1);
+	/* Two reports in one class: latest collection wins across reports too. */
+	collect_class(1, 0, 12);
+	zassert_ok(kfsw_hk_get_selected(1, 0, &sample));
+	zassert_equal(sample.data[1], 1);
+	counter_u16 = 13;
+	zassert_ok(kfsw_hk_collect(0));
+	zassert_ok(kfsw_hk_get_selected(1, 0, &sample));
+	zassert_equal(sample.data[1], 0);
+	zassert_equal(sys_get_be16(&sample.data[10]), 13);
+}
+
+ZTEST(kfsw_hk, test_mask_selects_several_classes_and_excludes_the_rest)
+{
+	struct kfsw_hk_sample sample;
+
+	collect_class(0, 1, 10);
+	collect_class(1, 6, 60);
+	zassert_ok(kfsw_hk_get_selected(0x42, 0, &sample));
+	zassert_equal(sample.data[1], 0);
+	zassert_ok(kfsw_hk_get_selected(0x42, 1, &sample));
+	zassert_equal(sample.data[1], 1);
+	zassert_equal(kfsw_hk_get_selected(0x42, 2, &sample), -ENOENT);
+	zassert_equal(kfsw_hk_get_selected(0x10, 0, &sample), -ENOENT);
+	zassert_equal(kfsw_hk_get_selected(0, 0, &sample), -ENOENT);
+	zassert_ok(kfsw_hk_get_selected(0x40, 0, &sample));
+	zassert_equal(sample.data[1], 1);
+	zassert_equal(kfsw_hk_get_selected(0x40, 1, &sample), -ENOENT);
+}
+
+ZTEST(kfsw_hk, test_legacy_define_defaults_to_class_four)
+{
+	const struct kfsw_hk_entry entry = {.param_id = KFSW_PARAM_ID(TEST_TABLE, 0)};
+	uint8_t cls = 0;
+
+	zassert_ok(kfsw_hk_define(0, &entry, 1));
+	zassert_ok(kfsw_hk_get_class(0, &cls));
+	zassert_equal(cls, 4);
+}
+
+ZTEST(kfsw_hk, test_class_above_seven_is_refused_without_changing_definition)
+{
+	const struct kfsw_hk_entry entry = {.param_id = KFSW_PARAM_ID(TEST_TABLE, 0)};
+	struct kfsw_hk_sample sample;
+	uint8_t cls;
+
+	collect_class(0, 7, 77);
+	zassert_equal(kfsw_hk_define_class(0, &entry, 1, 8), -ERANGE);
+	zassert_equal(kfsw_hk_define_class(0, &entry, 1, 255), -ERANGE);
+	zassert_ok(kfsw_hk_get_class(0, &cls));
+	zassert_equal(cls, 7);
+	zassert_ok(kfsw_hk_get_selected(0x80, 0, &sample));
+	zassert_equal(sys_get_be16(&sample.data[10]), 77);
+}
+
+ZTEST(kfsw_hk, test_class_redefinition_discards_previous_history)
+{
+	struct kfsw_hk_sample sample;
+	const struct kfsw_hk_entry entry = {.param_id = KFSW_PARAM_ID(TEST_TABLE, 0)};
+
+	collect_class(0, 0, 10);
+	zassert_ok(kfsw_hk_define_class(0, &entry, 1, 7));
+	zassert_equal(kfsw_hk_get_selected(255, 0, &sample), -ENOENT);
+	zassert_ok(kfsw_hk_collect(0));
+	zassert_ok(kfsw_hk_get_selected(128, 0, &sample));
+	zassert_equal(kfsw_hk_get_selected(1, 0, &sample), -ENOENT);
+}

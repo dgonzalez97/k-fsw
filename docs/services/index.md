@@ -109,6 +109,59 @@ fails, the shell says the change is only in RAM; retry with `hk save`. A
 rejected settings file is kept until a save replaces it. Restoring settings
 keeps the existing sample files and their sequence numbers.
 
+### Retrieval classes
+
+K-FSW uses its own eight-class scheme, not Space Inventor's representation.
+A report definition carries a three-bit class value, 0..7, alongside the schema
+it already holds. Class **4** is the default for existing definitions, older
+saved definitions (versions 1 and 2), and compositions that set no class.
+The class only orders retrieval: it changes neither what is collected nor when.
+
+Lower numbers come down first. Assign reports by the decision the operator must
+make, rather than by the device that produced the values:
+
+| Class | Operational use |
+| --- | --- |
+| 0 | Survival now: battery voltage, battery current and power-bus state. With eight minutes of pass left, retrieve this first to decide whether loads must be shed. |
+| 1 | Immediate fault diagnosis: reset cause, watchdog faults, safe-mode state and critical temperatures. Read this before commanding recovery. |
+| 2 | Whether the recovery worked: power-switch states, subsystem health and command outcome. Get this during the same pass. |
+| 3 | Link and resource margins: radio errors, packet drops and free storage. Use this to plan the rest of the pass. |
+| 4 | Routine platform telemetry. The default keeps an unchanged composition's newest-first behaviour. |
+| 5 | Payload status and recent science summaries. Retrieve after the vehicle and link are understood. |
+| 6 | Engineering trends: detailed temperatures and long performance histories. Defer to a later pass when bandwidth is short. |
+| 7 | Bulk diagnostics and commissioning detail that can wait a week, provided the configured history retains it. This is not a retention guarantee. |
+
+Define locally with `hk define 0 class=0 3:0`, or remotely with
+`hk define 1 0 class=0 3:0` (node 1, report 0). `class=N` must precede the
+entries; values above 7 are refused. Omit it to use class 4. The remote command
+`hk_define` carries the same prefix in its entry-list text argument.
+`hk show` prints each definition's class. Parameter table 33 (`hk`), offset
+`0x30`, publishes read-only `hk_classes`: one byte per report, 255 when
+undefined. Read it locally or through remote PARAM; use `hk define` to change
+the definition and its class together. With HK persistence composed, the
+version-3 settings snapshot saves the class on each accepted definition change.
+
+Retrieval uses a separate eight-bit selection mask: bit n selects class n.
+`0x01` requests survival telemetry; `0x0f` selects classes 0..3; `0xff`
+selects all eight; zero selects nothing. For example, the ground bridge's
+`--class-mask 0x0f --count 12` asks for up to twelve selected RAM samples.
+It returns lower classes first and newest collection first within each class,
+including across reports. A requested count larger than available history can
+produce fewer packets (the bridge reports its timeout). Collection order is
+used even if UTC steps backwards. Count and starting index apply to the
+selected, ordered stream. This path reads RAM history; file extraction keeps
+its existing per-report filters and oldest-first order.
+
+On CSP port 14, the existing five-byte request remains version, report, count,
+starting age (big-endian u16). Class retrieval uses report 255 and adds a sixth
+byte, the selection mask. Replies remain one unchanged sample frame per packet;
+the frame's report number identifies its schema. The mask is a retrieval
+selection, not the report's class value or a CSP packet priority.
+
+Replacing a definition, including its class, discards its RAM history and
+removes its store file. A collection already in progress is cancelled. A sample
+recorded under the old definition is never read back using the new schema.
+
 ### Reading stored samples back
 
 `hk store <report> <ms>` keeps samples in `/kfsw/hk/report<N>.bin`, a ring of

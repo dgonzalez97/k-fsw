@@ -216,6 +216,8 @@ static int command_hk_define(const struct kfsw_command_arg *args, size_t arg_cou
 {
 	struct kfsw_hk_entry entries[CONFIG_KFSW_HK_ENTRIES];
 	size_t count = 0U;
+	uint8_t retrieval_class;
+	const char *text = args[1].value.text;
 	int outcome;
 
 	ARG_UNUSED(arg_count);
@@ -226,11 +228,16 @@ static int command_hk_define(const struct kfsw_command_arg *args, size_t arg_cou
 		return -EINVAL;
 	}
 
-	outcome =
-		kfsw_app_hk_parse_entries(args[1].value.text, entries, ARRAY_SIZE(entries), &count);
+	outcome = kfsw_app_hk_parse_class(&text, &retrieval_class);
+	if (outcome == 0) {
+		outcome = kfsw_app_hk_parse_entries(text, entries, ARRAY_SIZE(entries), &count);
+	}
 	if (outcome != 0) {
 		result->status = KFSW_COMMAND_INVALID_ARGUMENT;
-		if (outcome == -E2BIG) {
+		if (outcome == -ERANGE) {
+			(void)snprintf(result->detail, sizeof(result->detail),
+				       "class must be 0..7");
+		} else if (outcome == -E2BIG) {
 			(void)snprintf(result->detail, sizeof(result->detail),
 				       "more than %u entries", (unsigned int)ARRAY_SIZE(entries));
 		} else {
@@ -244,7 +251,7 @@ static int command_hk_define(const struct kfsw_command_arg *args, size_t arg_cou
 		return outcome;
 	}
 
-	outcome = kfsw_hk_define((uint8_t)args[0].value.u32, entries, count);
+	outcome = kfsw_hk_define_class((uint8_t)args[0].value.u32, entries, count, retrieval_class);
 	if (outcome == KFSW_HK_APPLIED_UNSAVED) {
 		struct kfsw_hk_stats stats;
 
@@ -476,7 +483,8 @@ static const struct kfsw_command_definition app_commands[] = {
 	{
 		.id = KFSW_COMMAND_ID_HK_DEFINE,
 		.name = "hk_define",
-		.help = "Name what a report collects: <report> \"[node:]table:offset ...\".",
+		.help = "Name what a report collects: <report> \"[class=N] [node:]table:offset "
+			"...\".",
 		.arg_count = 2U,
 		.arg_types = hk_define_args,
 		.handler = command_hk_define,
