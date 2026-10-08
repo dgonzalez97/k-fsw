@@ -299,6 +299,15 @@ spaces. Lines are coloured by level: errors red, warnings yellow, info white
 and debug dim. The colour codes wrap the whole line, so `[LEVEL] message`
 stays intact for scripts. `log_color` turns colour off.
 
+`CONFIG_KFSW_LOG_SHELL=y` also sends messages and markers to active shell
+sessions. The option defaults off; Linux and NUCLEO keep it disabled unless an
+extra configuration enables it. `config/profiles/log-shell.conf` enables the
+capability through `KFSW_EXTRA_CONF_FILE`. With PARAM built, `param set log_shell 0`
+stops mirroring and `param set log_shell 1` resumes it immediately. This u8
+parameter is table 25 offset `0x0d`, live and not persistent; it starts at 1
+when the capability is built. Messages before the shell is ready and messages
+from interrupt context still reach only the existing console backend.
+
 `CONFIG_KFSW_LOG_HISTORY` keeps the most recent K-FSW messages in a RAM ring
 (32 records by default, configurable from 1 to 128). Each record keeps the
 message as a cbprintf package: the address of its format string, the
