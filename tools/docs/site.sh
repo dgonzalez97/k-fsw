@@ -63,7 +63,13 @@ PYTHON
 add_worktree() # repository, ref, destination
 {
 	if ! git -C "$1" rev-parse --verify --quiet "$2^{commit}" >/dev/null; then
-		return 1
+		# A CI checkout is narrow, so the revision a manifest pins may not
+		# be here yet. Ask for it once before giving up on the version.
+		git -C "$1" fetch --quiet --tags origin "$2" 2>/dev/null ||
+			git -C "$1" fetch --quiet --tags origin 2>/dev/null || true
+		if ! git -C "$1" rev-parse --verify --quiet "$2^{commit}" >/dev/null; then
+			return 1
+		fi
 	fi
 	git -C "$1" worktree add --detach --quiet "$3" "$2"
 	worktrees+=("$1:$3")
@@ -116,12 +122,15 @@ rm -rf -- "$KFSW_SITE_OUTPUT"
 mkdir -p "$KFSW_SITE_OUTPUT"
 
 built=()
+skipped=()
 default=""
 while IFS=$'\t' read -r slug label ref; do
 	if build_version "$slug" "$ref"; then
 		inject_selector "$slug"
 		built+=("$slug:$label")
 		[[ -z "$default" ]] && default="$slug"
+	else
+		skipped+=("$slug")
 	fi
 done < <(versions_to_build)
 
@@ -150,4 +159,9 @@ PYTHON
 cp "$KFSW_REPO_DIR/docs/theme/kfsw-versions.js" "$KFSW_SITE_OUTPUT/kfsw-versions.js"
 
 echo "SITE: versions: ${built[*]}"
+# A reader cannot tell a version that was never offered from one that does not
+# exist, so say which were left out rather than publishing a short list quietly.
+if [[ ${#skipped[@]} -gt 0 ]]; then
+	echo "SITE: not published: ${skipped[*]}"
+fi
 echo "SITE RESULT: PASS ($KFSW_SITE_OUTPUT/index.html)"
