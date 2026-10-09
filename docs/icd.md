@@ -13,7 +13,6 @@ The mode column is what the parameter service enforces: `r` is read only, `w` is
 | 3 | core | `telemetry` | 5 | 0 | Uptime, storage and CSP buffers |
 | 4 | core | `csp` | 15 | 0 | CSP counters and the route table |
 | 5 | core | `storage` | 4 | 0 | Filesystem size, free space, mount |
-| 24 | core | `test` | 4 | 3 | Fixtures for the parameter tests |
 | 25 | service | `log` | 6 | 3 | Log levels, colour and counters |
 | 26 | service | `param` | 9 | 1 | Parameter counts and snapshot saves |
 | 27 | service | `event` | 5 | 0 | Event record counters |
@@ -27,7 +26,6 @@ The mode column is what the parameter service enforces: `r` is read only, `w` is
 | 36 | service | `resmon` | 10 | 0 | Thread stack use |
 | 37 | service | `table` | 7 | 0 | Uploaded table files, adoptions and reverts |
 | 38 | service | `remexec` | 5 | 0 | Remote shell execution and its refusals |
-| 51 | module | `temp_example` | 5 | 0 | Die temperature readings |
 
 ### board (1)
 
@@ -91,15 +89,6 @@ The mode column is what the parameter service enforces: `r` is read only, `w` is
 | 0x04 | `free_kb` | u32 | r | kB | Filesystem space available, or zero while unmounted |
 | 0x08 | `used_pct` | u8 | r | % | Filesystem space in use, or zero while unmounted |
 | 0x09 | `mounted` | u8 | r | - | Whether the volume is mounted and usable |
-
-### test (24)
-
-| Offset | Name | Type | Mode | Unit | Description |
-| --- | --- | --- | --- | --- | --- |
-| 0x08 | `test_u32` | u32 | wpb | - | Writable unsigned integration value |
-| 0x0c | `test_i32` | i32 | wpb | - | Writable signed integration value |
-| 0x10 | `test_float` | float | wpb | - | Writable floating-point integration value |
-| 0x14 | `test_read_only` | u8 | r | - | Read-only parameter fixture |
 
 ### log (25)
 

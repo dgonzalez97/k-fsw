@@ -186,6 +186,16 @@ def main():
         print("Build it with ./k-fsw/tools/build.sh linux")
         return 1
 
+    # An incremental build keeps whatever was configured before it, and a test
+    # build carries parameter fixtures. Either one produces a document that
+    # describes something nobody ships, so refuse the image instead.
+    configuration = image.parent / ".config"
+    if configuration.is_file():
+        if "CONFIG_KFSW_PARAM_TEST_DEFINITIONS=y" in configuration.read_text():
+            print("ERROR: this image carries the parameter test fixtures")
+            print("Rebuild it clean: KFSW_PRISTINE=always ./k-fsw/tools/build.sh linux")
+            return 1
+
     with tempfile.TemporaryDirectory() as scratch:
         flash = pathlib.Path(scratch) / "icd-flash.bin"
         tables = parse_tables(ask(image, flash, "param tables", arguments.seconds))
