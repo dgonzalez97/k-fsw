@@ -96,3 +96,36 @@ Operator Commands The Flight Node From The Ground Shell
     Execute KFSW Command    event tail 1 999    event_tail: failed, no record at age 999
     Execute KFSW Command    param tables 1    Uploaded table files, adoptions and reverts
     Execute KFSW Command    csp reboot 1 1234    denied
+
+KFSW Linux Releases A Scheduled Command When Its Deadline Passes
+    [Documentation]    What an operator does with no pass in sight: leave a
+    ...    command behind and come back to find out whether it ran.
+    [Tags]    terminal    shell    fbo    schedule
+    Open KFSW Linux CSP Console
+    Execute KFSW Command    fbo sched status    entries: 0/8
+    Execute KFSW Command    fbo sched add +3 0 "noop"    fbo_sched_add: ok
+    Execute KFSW Command    fbo sched list    node=0 scheduled noop
+    Execute KFSW Command    param get fbo_sched_entries    fbo_sched_entries = 1
+    Wait Until Keyword Succeeds
+    ...    30s
+    ...    2s
+    ...    Execute KFSW Command
+    ...    fbo sched status
+    ...    releases: 1
+    Execute KFSW Command    fbo sched list    node=0 completed noop
+    Execute KFSW Command    param get fbo_sched_releases    fbo_sched_releases = 1
+
+KFSW Linux Refuses A Repeated Upload And Cancels An Entry
+    [Documentation]    An uplink that arrives twice must not queue the command
+    ...    twice, and a cancel must never claim to have stopped something that
+    ...    already finished.
+    [Tags]    terminal    shell    fbo    schedule
+    Open KFSW Linux CSP Console
+    Execute KFSW Command    fbo sched add +600 0 "noop"    fbo_sched_add: ok (index=0
+    Execute KFSW Command    fbo sched add +600 0 "noop"    repeated=yes
+    Execute KFSW Command    param get fbo_sched_entries    fbo_sched_entries = 1
+    Execute KFSW Command    fbo sched cancel 0    cancelled=0
+    Execute KFSW Command    fbo sched list    cancelled noop
+    Execute KFSW Command    fbo sched cancel 0    fbo_sched_cancel: busy
+    Execute KFSW Command    fbo sched clear    dropped=1
+    Execute KFSW Command    fbo sched status    entries: 0/8
