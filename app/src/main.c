@@ -51,6 +51,11 @@
 #if CONFIG_KFSW_GNDWDT
 #include <kfsw/services/gndwdt.h>
 #endif
+#if CONFIG_KFSW_REMEXEC
+#include <kfsw/services/remexec.h>
+
+#include "remexec/remexec_allowlist.h"
+#endif
 #if CONFIG_KFSW_RESMON
 #include <kfsw/services/resmon.h>
 #endif
@@ -193,6 +198,9 @@ int main(void)
 #endif
 #if CONFIG_KFSW_TABLE
 		&kfsw_table_param_definitions,
+#endif
+#if CONFIG_KFSW_REMEXEC
+		&kfsw_remexec_param_definitions,
 #endif
 #if CONFIG_KFSW_RADIO_UHF
 		&kfsw_radio_uhf_param_definitions,
@@ -399,6 +407,26 @@ int main(void)
 		} else {
 			kfsw_log_info("Firmware upload server started on CSP port %d",
 				      CONFIG_KFSW_FWU_LITE_CSP_PORT);
+		}
+	}
+#endif
+
+#if CONFIG_KFSW_REMEXEC
+	/* The allowlist is adopted whether or not CSP came up: a node that
+	 * cannot be reached must still refuse by the same list if it is.
+	 */
+	result = kfsw_remexec_init(&kfsw_app_remexec_allowlist);
+	if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Remote execution allowlist refused: %d", result);
+	} else if (csp_started) {
+		result = kfsw_remexec_server_start();
+		if (result != 0) {
+			startup_failures++;
+			kfsw_log_error("Failed to start the remote execution server: %d", result);
+		} else {
+			kfsw_log_info("Remote execution server started on CSP port %d",
+				      CONFIG_KFSW_REMEXEC_CSP_PORT);
 		}
 	}
 #endif

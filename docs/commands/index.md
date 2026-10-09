@@ -47,6 +47,7 @@ service:
 | `health` | `CONFIG_KFSW_HEALTH` |
 | `gndwdt` | `CONFIG_KFSW_GNDWDT` |
 | `resmon` | `CONFIG_KFSW_RESMON` |
+| `remexec` | `CONFIG_KFSW_REMEXEC` |
 | `comms uhf` | `CONFIG_KFSW_RADIO_UHF_SHELL` |
 | `temp` | `CONFIG_KFSW_TEMP_EXAMPLE_SHELL` |
 | `boton_test`, `test` | `CONFIG_KFSW_BOTON_TEST_SHELL` |
@@ -475,18 +476,18 @@ is defined by that service and carries its ID in its own header.
 | 4, 5 | `event_stats`, `event_tail` | `k-fsw` composition |
 | 6 to 8 | `hk_define`, `hk_period`, `hk_clear` | `k-fsw` composition |
 | 9 to 11 | `journal_stats`, `journal_tail`, `journal_time` | `k-fsw` composition |
-| 12 to 15 | free | — |
+| 12 to 15 | free | |
 | 16 | `ground_wtd` | `kfsw-services`, `gndwdt.h` |
 
 **CSP ports.** 0 is management (CMP) and 1 ping, both from libcsp. K-FSW
-serves 9 file transfer, 10 parameter values, 11 commands, 12 parameter
-descriptors, 13 FWU lite, 14 housekeeping, 15 housekeeping beacons on the
-receiving node, and 16 log history. Each has a Kconfig option; see
-@ref communications.
+serves 8 remote shell execution, 9 file transfer, 10 parameter values, 11
+commands, 12 parameter descriptors, 13 FWU lite, 14 housekeeping, 15
+housekeeping beacons on the receiving node, and 16 log history. Each has a
+Kconfig option; see @ref communications.
 
 **Parameter tables.** 1 to 24 are core (1 `board`, 2 `system`, 3
-`telemetry`, 4 `csp`, 5 `storage`), 25 to 49 services (25 `log` through 36
-`resmon`, listed by `param tables`) and 50 to 99 modules (50 `radio-uhf`, 51
+`telemetry`, 4 `csp`, 5 `storage`), 25 to 49 services (25 `log` through 38
+`remexec`, listed by `param tables`) and 50 to 99 modules (50 `radio-uhf`, 51
 `temp_example`, 67 `hw_test`).
 
 **Node addresses.** Under CSP 2, the default, nodes are 1 to 16382 and 16383
@@ -501,6 +502,67 @@ both nodes need the same command IDs. `reboot` and `ground_wtd` change the node.
 Remote commands need `CONFIG_KFSW_COMMAND_CSP` (port 11). The command service
 does not authenticate callers. Radio encryption can protect that link;
 other interfaces need their own access policy.
+
+### Running another node's shell commands: `remexec`
+
+`remexec` reads which shell commands a node offers and runs one of them, on
+CSP port 8. It needs `CONFIG_KFSW_REMEXEC`, which the Linux image sets.
+
+| Command | Meaning |
+| --- | --- |
+| `remexec <node> get` | The commands that node offers, one a line |
+| `remexec <node> get <command>` | That command and its subcommands, with their help |
+| `remexec <node> run "command args"` | Run it there and print what it produced |
+
+```text
+kfsw-ops# remexec 1 get
+node: 1
+time
+version
+storage info
+resmon show
+event stats
+
+kfsw-ops# remexec 1 get storage
+node: 1
+storage info             Filesystem totals and mount state
+
+kfsw-ops# remexec 1 run time
+node: 1
+command: time
+output: 36 bytes
+monotonic_ms: 4140
+monotonic_us: 4140210
+status: ok
+```
+
+**The serving node's allowlist decides, and it is the same list `get`
+reports.** A command that is not marked is refused by name, with the serving
+node's own words:
+
+```text
+kfsw-ops# remexec 1 run storage test
+node: 1
+command: storage test
+remexec: 'storage test' is not offered for remote execution
+```
+
+Marking a command marks its arguments as well, so a composition marks only
+commands whose whole argument space is safe from the ground. The list lives in
+`app/src/remexec/remexec_allowlist.c`; @ref services has the allowlist, the
+output cap and the limits.
+
+A reply that could not carry everything says how much went missing, separately
+from whether the command itself succeeded:
+
+```text
+output: 200 of 264 bytes, truncated, 64 dropped
+```
+
+A node cannot be asked to run its own commands this way, so `remexec` always
+names another node.
+Table 38 (`param get <node> remexec_refused`, `remexec_refusal`) shows what a
+node refused and why without reading its log.
 
 ## Events
 
