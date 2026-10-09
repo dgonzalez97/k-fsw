@@ -41,6 +41,13 @@ jobs:
         if: matrix.target == 'linux'
         run: ./k-fsw/tests/build-linux-minimal.sh
 
+      # The document is generated from the image, so a parameter or command
+      # added without regenerating it is a failure here rather than a page
+      # that quietly stopped being true.
+      - name: Check the interface control document against the image
+        if: matrix.target == 'linux'
+        run: ./k-fsw/tools/docs/icd.py --check
+
   quality:
     name: QUALITY / clang-format + cppcheck
     runs-on: ubuntu-24.04
