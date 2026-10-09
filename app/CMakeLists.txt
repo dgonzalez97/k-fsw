@@ -140,6 +140,7 @@ if(CONFIG_KFSW_DEBUG_SHELL)
     )
     target_sources_ifdef(CONFIG_KFSW_COMMAND app PRIVATE
         src/shell/shell_command.c
+        src/shell/shell_registry.c
     )
     target_sources_ifdef(CONFIG_KFSW_GNDWDT app PRIVATE
         src/shell/shell_gndwdt.c

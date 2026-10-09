@@ -22,6 +22,7 @@ or payload needs, then write the mission-specific code.
 | Parameters, persistence, logging, files, commands, events | @ref services |
 | CSP addresses, routes, UART/KISS, and CAN | @ref communications |
 | Upload, boot, confirm, and roll back an image | @ref firmware_update |
+| Every parameter and command, generated from the image | @ref icd |
 | Public C headers and functions | @ref api_reference |
 
 ## Repository layout

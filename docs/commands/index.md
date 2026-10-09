@@ -622,6 +622,11 @@ the ground bridge.
 | `fbo run` | `<name>` | Run a procedure file |
 | `fbo stop` | none | Stop the running procedure |
 | `fbo status` | none | Procedure, current line and counters |
+| `fbo sched add` | `<+s\|@utc> <node> "<command>"` | Release a command later |
+| `fbo sched cancel` | `<index>` | Cancel a scheduled entry |
+| `fbo sched clear` | none | Empty the queue |
+| `fbo sched list` | none | Every queued entry with its state |
+| `fbo sched status` | none | Queue counters and the next deadline |
 
 ## Firmware update
 

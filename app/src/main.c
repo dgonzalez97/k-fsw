@@ -293,6 +293,9 @@ int main(void)
 #if CONFIG_KFSW_COMMAND
 	const struct kfsw_command_definition_set *const command_sets[] = {
 		&kfsw_app_command_definitions,
+#if CONFIG_KFSW_FBO
+		&kfsw_fbo_command_definitions,
+#endif
 #if CONFIG_KFSW_GNDWDT
 		&kfsw_gndwdt_command_definitions,
 #endif
