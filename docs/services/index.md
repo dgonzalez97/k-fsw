@@ -252,6 +252,56 @@ immediately; it cannot be bypassed by `on-error continue`. Other errors follow
 the procedure's `on-error` policy. Execution time is not guaranteed, and
 pending waits are lost at restart.
 
+### The time-tagged queue
+
+A procedure needs someone to start it. The queue is for the other case: leave a
+single command behind and let the node release it when its time comes, with
+nobody listening.
+
+```text
+fbo sched add +600 0 "noop"
+fbo sched add @1900000000 2 "reboot 1234"
+fbo sched list
+fbo sched cancel 0
+fbo sched clear
+fbo sched status
+```
+
+`+seconds` counts from the moment the entry is accepted, on the monotonic clock,
+so it is unaffected by anything that happens to the wall clock afterwards.
+`@utc` is a UTC second and is refused with `-ENODATA` while the clock has never
+been set this power cycle, because a release at the wrong time is worse than a
+release that never happens. The node after the time is where the command runs;
+`0` is this one.
+
+Adding, cancelling and clearing are ordinary commands, `fbo_sched_add`,
+`fbo_sched_cancel` and `fbo_sched_clear`, so the ground reaches them over CSP the
+same way the shell does. The shell's `fbo sched` subcommands are the same
+handlers, not a second parser.
+
+An entry is addressed by the CRC32 of its content, so an uplink that arrives
+twice does not queue the command twice: the second add reports `repeated=yes`
+and names the slot already holding it. `fbo_sched_hash` is the CRC32 over the
+whole queue, which is how the ground confirms the node holds the plan it sent.
+
+An entry released later than `fbo_sched_latency_s` after its deadline reports
+`overdue` and does not run. The buffer exists because a release waits its turn
+behind whatever command is in flight; it must stay above the command reply
+timeout, and the service refuses a value below it. `CONFIG_KFSW_FBO_SCHEDULE_BURST`
+bounds how many entries one pass may release, so a forward clock step does not
+set off everything at once.
+
+The queue is a fixed array of `CONFIG_KFSW_FBO_SCHEDULE_ENTRIES` slots and does
+not survive a reset. A full queue refuses with `-ENOSPC` and changes nothing.
+Cancelling an entry that has already run returns `-EALREADY`, so a cancel never
+claims to have stopped something that fired.
+
+Everything the ground needs to operate a queue it cannot see is in parameter
+table 34: `fbo_sched_entries`, `fbo_sched_scheduled`, `fbo_sched_overdue`,
+`fbo_sched_clock_set`, `fbo_sched_next_due_s`, `fbo_sched_next_due_utc`,
+`fbo_sched_releases`, `fbo_sched_refusals`, `fbo_sched_overdues` and
+`fbo_sched_hash`.
+
 ## Persistent event journal
 
 `CONFIG_KFSW_JOURNAL` adds a fixed-size journal to the existing storage volume.
