@@ -9,11 +9,13 @@
 static void print_status(const struct shell *sh, const struct kfsw_resmon_status *status)
 {
 	shell_print(sh, "state: %s", status->running ? "sweeping" : "stopped");
-	shell_print(sh, "threads: %u", status->threads);
+	shell_print(sh, "threads: %u read, %u unmeasured", status->threads, status->unmeasured);
 	shell_print(sh, "last_used: %u%%", status->last_used_percent);
 	shell_print(sh, "worst_used: %u%% on %s", status->worst_used_percent, status->worst_thread);
 	shell_print(sh, "worst_free: %u of %u bytes", status->worst_unused_bytes,
 		    status->worst_stack_bytes);
+	shell_print(sh, "tightest: %u of %u bytes on %s", status->tightest_unused_bytes,
+		    status->tightest_stack_bytes, status->tightest_thread);
 	shell_print(sh, "alert_at: %u%%", status->alert_percent);
 	shell_print(sh, "sweeps: %u alerts: %u", status->sweeps, status->alerts);
 }

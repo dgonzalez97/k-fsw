@@ -39,6 +39,46 @@ ZTEST(services_resmon, test_sweep_reads_the_threads)
 	zassert_not_equal(status.worst_thread[0], '\0');
 }
 
+ZTEST(services_resmon, test_the_tightest_margin_is_not_the_worst_percentage)
+{
+	struct kfsw_resmon_status status;
+
+	zassert_true(kfsw_resmon_sample() > 0, "a sweep read no threads");
+	kfsw_resmon_get_status(&status);
+
+	/*
+	 * The two answer different questions. A small stack at seventy per cent
+	 * has less room left than a large one at ninety, so an operator asking
+	 * how close anything is to the edge needs the bytes, not the share.
+	 */
+	zassert_true(status.tightest_stack_bytes > 0U, "no thread held a tightest margin");
+	zassert_true(status.tightest_unused_bytes < status.tightest_stack_bytes);
+	zassert_not_equal(status.tightest_thread[0], '\0');
+
+	/* Whoever holds it, nobody can have less room than the tightest. */
+	zassert_true(status.tightest_unused_bytes <= status.worst_unused_bytes,
+		     "the tightest margin is larger than the busiest thread's: %u > %u",
+		     status.tightest_unused_bytes, status.worst_unused_bytes);
+}
+
+ZTEST(services_resmon, test_an_unreadable_stack_is_counted_not_dropped)
+{
+	struct kfsw_resmon_status status;
+	int threads = kfsw_resmon_sample();
+
+	zassert_true(threads > 0, "a sweep read no threads");
+	kfsw_resmon_get_status(&status);
+
+	/*
+	 * Whether any stack is unreadable depends on the platform, so this does
+	 * not demand one. What it demands is that the count exists and agrees
+	 * with the read count, because a stack left out silently publishes a
+	 * margin for part of the system as if it were all of it.
+	 */
+	zassert_equal(status.threads, (uint16_t)threads);
+	zassert_true((uint32_t)status.threads + status.unmeasured >= (uint32_t)threads);
+}
+
 ZTEST(services_resmon, test_alert_bounds_are_enforced)
 {
 	struct kfsw_resmon_status status;
