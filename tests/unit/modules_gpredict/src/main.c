@@ -7,6 +7,7 @@
 #include <zephyr/ztest.h>
 
 #include <kfsw/modules/gpredict.h>
+#include <kfsw/services/command.h>
 #include <kfsw/services/parameter.h>
 
 #include "gpredict_internal.h"
@@ -22,6 +23,13 @@
 
 #define GP_STATE_COUNT 5
 #define GP_EVENT_COUNT 6
+
+#define GP_PROFILE_COUNT ((uint8_t)CONFIG_KFSW_GPREDICT_PROFILES)
+#define GP_CATALOGUE 43017U
+#define GP_DOWNLINK_HZ 437505000ULL
+#define GP_HOLD_HZ 145800000ULL
+/* A value no judgement could produce, so an untouched destination shows. */
+#define GP_UNTOUCHED_HZ 1ULL
 
 /*
  * The module's clock, offset so a test can jump it without sleeping and still
@@ -582,6 +590,12 @@ ZTEST(modules_gpredict, test_param_table_is_in_the_module_band)
 		{"gp_passes_ended", 0x30U, KFSW_PARAM_U32, false},
 		{"gp_faults", 0x34U, KFSW_PARAM_U32, false},
 		{"gp_last_error", 0x38U, KFSW_PARAM_I32, false},
+		{"gp_profile", 0x3cU, KFSW_PARAM_U8, false},
+		{"gp_policy", 0x3dU, KFSW_PARAM_U8, false},
+		{"gp_profiles", 0x3eU, KFSW_PARAM_U8, false},
+		{"gp_profiles_on", 0x3fU, KFSW_PARAM_U8, false},
+		{"gp_catalogue", 0x40U, KFSW_PARAM_U32, false},
+		{"gp_profile_name", 0x44U, KFSW_PARAM_STRING, false},
 	};
 
 	zassert_equal(KFSW_GPREDICT_TABLE_ID, 52U);
@@ -608,6 +622,9 @@ ZTEST(modules_gpredict, test_param_table_is_in_the_module_band)
 		/* Nothing here survives a reset: the tracker is rebuilt at boot. */
 		zassert_false((info.flags & KFSW_PARAM_FLAG_PERSISTENT) != 0U);
 	}
+
+	/* A name that fits a profile fits the row that reports it. */
+	zassert_equal(find_definition("gp_profile_name")->capacity, KFSW_GPREDICT_PROFILE_NAME_MAX);
 }
 
 ZTEST(modules_gpredict, test_param_grace_write_applies_and_refuses)
@@ -666,13 +683,522 @@ ZTEST(modules_gpredict, test_init_is_idempotent_and_keeps_counters)
 	zassert_equal(current_state(), KFSW_GPREDICT_TRACKING);
 }
 
+/* A profile that allows the whole compiled travel and follows Gpredict. */
+static struct kfsw_gpredict_profile make_profile(const char *name)
+{
+	struct kfsw_gpredict_profile profile = {
+		.catalogue = GP_CATALOGUE,
+		.azimuth_min_mdeg = GP_AZ_MIN_MDEG,
+		.azimuth_max_mdeg = GP_AZ_MAX_MDEG,
+		.elevation_min_mdeg = GP_EL_MIN_MDEG,
+		.elevation_max_mdeg = GP_EL_MAX_MDEG,
+		.frequency_hz = GP_HOLD_HZ,
+		.policy = KFSW_GPREDICT_FREQUENCY_FOLLOW,
+		.enabled = true,
+	};
+
+	(void)strncpy(profile.name, name, sizeof(profile.name) - 1U);
+	return profile;
+}
+
+static void define_and_select(uint8_t index, const struct kfsw_gpredict_profile *profile)
+{
+	zassert_ok(kfsw_gpredict_profile_define(index, profile));
+	zassert_ok(kfsw_gpredict_profile_select(index));
+}
+
+ZTEST(modules_gpredict, test_profile_define_and_get)
+{
+	const struct kfsw_gpredict_profile lur = make_profile("LUR-1");
+	struct kfsw_gpredict_profile refused;
+	struct kfsw_gpredict_profile read;
+
+	zassert_ok(kfsw_gpredict_profile_define(0U, &lur));
+	zassert_ok(kfsw_gpredict_profile_get(0U, &read));
+	zassert_str_equal(read.name, "LUR-1");
+	zassert_equal(read.catalogue, GP_CATALOGUE);
+	zassert_equal(read.azimuth_min_mdeg, GP_AZ_MIN_MDEG);
+	zassert_equal(read.azimuth_max_mdeg, GP_AZ_MAX_MDEG);
+	zassert_equal(read.elevation_min_mdeg, GP_EL_MIN_MDEG);
+	zassert_equal(read.elevation_max_mdeg, GP_EL_MAX_MDEG);
+	zassert_equal(read.frequency_hz, GP_HOLD_HZ);
+	zassert_equal(read.policy, KFSW_GPREDICT_FREQUENCY_FOLLOW);
+	zassert_true(read.enabled);
+
+	/* The last slot is a slot; the one after it is not. */
+	zassert_ok(kfsw_gpredict_profile_define(GP_PROFILE_COUNT - 1U, &lur));
+	zassert_equal(kfsw_gpredict_profile_define(GP_PROFILE_COUNT, &lur), -ENOSPC);
+	zassert_equal(kfsw_gpredict_profile_define(0U, NULL), -EINVAL);
+
+	refused = lur;
+	refused.name[0] = '\0';
+	zassert_equal(kfsw_gpredict_profile_define(1U, &refused), -EINVAL, "empty name accepted");
+
+	refused = lur;
+	(void)memset(refused.name, 'X', sizeof(refused.name));
+	zassert_equal(kfsw_gpredict_profile_define(1U, &refused), -EINVAL,
+		      "unterminated name accepted");
+
+	refused = lur;
+	refused.policy = KFSW_GPREDICT_FREQUENCY_IGNORE + 1U;
+	zassert_equal(kfsw_gpredict_profile_define(1U, &refused), -EINVAL,
+		      "unknown policy accepted");
+
+	refused = lur;
+	refused.policy = KFSW_GPREDICT_FREQUENCY_HOLD;
+	refused.frequency_hz = 0U;
+	zassert_equal(kfsw_gpredict_profile_define(1U, &refused), -EINVAL,
+		      "HOLD with nothing to hold accepted");
+
+	refused = lur;
+	refused.azimuth_min_mdeg = mid_bearing.azimuth_mdeg + 1;
+	refused.azimuth_max_mdeg = mid_bearing.azimuth_mdeg;
+	zassert_equal(kfsw_gpredict_profile_define(1U, &refused), -EINVAL,
+		      "azimuth minimum above maximum accepted");
+
+	refused = lur;
+	refused.elevation_min_mdeg = mid_bearing.elevation_mdeg + 1;
+	refused.elevation_max_mdeg = mid_bearing.elevation_mdeg;
+	zassert_equal(kfsw_gpredict_profile_define(1U, &refused), -EINVAL,
+		      "elevation minimum above maximum accepted");
+
+	/* Nothing refused landed in a slot. */
+	zassert_equal(kfsw_gpredict_profile_get(1U, &read), -ENOENT);
+
+	/* A frequency is only read under HOLD, so FOLLOW does not need one. */
+	refused = lur;
+	refused.frequency_hz = 0U;
+	zassert_ok(kfsw_gpredict_profile_define(1U, &refused));
+
+	zassert_equal(kfsw_gpredict_profile_get(0U, NULL), -EINVAL);
+	zassert_equal(kfsw_gpredict_profile_get(GP_PROFILE_COUNT, &read), -ENOENT);
+}
+
+ZTEST(modules_gpredict, test_profile_get_empty_slot_is_enoent)
+{
+	struct kfsw_gpredict_profile read;
+
+	zassert_equal(kfsw_gpredict_profile_get(0U, &read), -ENOENT);
+	zassert_equal(kfsw_gpredict_profile_enable(0U, true), -ENOENT);
+}
+
+ZTEST(modules_gpredict, test_profile_select_and_selected)
+{
+	const struct kfsw_gpredict_profile lur = make_profile("LUR-1");
+	const struct kfsw_gpredict_profile other = make_profile("OTHER");
+	struct kfsw_gpredict_status before;
+	struct kfsw_gpredict_status after;
+
+	zassert_equal(kfsw_gpredict_profile_selected(), -ENOENT);
+	zassert_ok(kfsw_gpredict_profile_define(0U, &lur));
+	zassert_ok(kfsw_gpredict_profile_define(1U, &other));
+	/* Defining is not selecting. */
+	zassert_equal(kfsw_gpredict_profile_selected(), -ENOENT);
+
+	enter(KFSW_GPREDICT_TRACKING);
+	before = read_status();
+	zassert_ok(kfsw_gpredict_profile_select(1U));
+	zassert_equal(kfsw_gpredict_profile_selected(), 1);
+
+	/* Selecting does not move the antenna or touch the pass. */
+	after = read_status();
+	zassert_equal(after.state, KFSW_GPREDICT_TRACKING);
+	zassert_equal(after.bearings, before.bearings);
+	zassert_equal(after.azimuth_mdeg, before.azimuth_mdeg);
+
+	zassert_equal(kfsw_gpredict_profile_select(2U), -ENOENT);
+	zassert_equal(kfsw_gpredict_profile_select(GP_PROFILE_COUNT), -ENOENT);
+	zassert_equal(kfsw_gpredict_profile_selected(), 1);
+
+	zassert_ok(kfsw_gpredict_profile_select(0U));
+	zassert_equal(kfsw_gpredict_profile_selected(), 0);
+}
+
+ZTEST(modules_gpredict, test_profile_select_disabled_is_eperm)
+{
+	const struct kfsw_gpredict_profile lur = make_profile("LUR-1");
+	struct kfsw_gpredict_profile off = make_profile("OFF");
+
+	off.enabled = false;
+	define_and_select(0U, &lur);
+	zassert_ok(kfsw_gpredict_profile_define(1U, &off));
+
+	zassert_equal(kfsw_gpredict_profile_select(1U), -EPERM);
+	/* The refusal leaves the rules that were in force. */
+	zassert_equal(kfsw_gpredict_profile_selected(), 0);
+
+	zassert_ok(kfsw_gpredict_profile_enable(1U, true));
+	zassert_ok(kfsw_gpredict_profile_select(1U));
+	zassert_equal(kfsw_gpredict_profile_selected(), 1);
+}
+
+ZTEST(modules_gpredict, test_profile_disable_selected_is_ebusy)
+{
+	const struct kfsw_gpredict_profile lur = make_profile("LUR-1");
+	const struct kfsw_gpredict_profile other = make_profile("OTHER");
+	struct kfsw_gpredict_profile read;
+
+	define_and_select(0U, &lur);
+	zassert_ok(kfsw_gpredict_profile_define(1U, &other));
+
+	zassert_equal(kfsw_gpredict_profile_enable(0U, false), -EBUSY);
+	zassert_ok(kfsw_gpredict_profile_get(0U, &read));
+	zassert_true(read.enabled);
+	zassert_equal(kfsw_gpredict_profile_selected(), 0);
+
+	/* One that is not selected can be disabled, and twice is not an error. */
+	zassert_ok(kfsw_gpredict_profile_enable(1U, false));
+	zassert_ok(kfsw_gpredict_profile_enable(1U, false));
+	zassert_ok(kfsw_gpredict_profile_get(1U, &read));
+	zassert_false(read.enabled);
+	zassert_equal(kfsw_gpredict_profile_enable(2U, false), -ENOENT);
+}
+
+ZTEST(modules_gpredict, test_profile_redefine_selected_disabled_clears)
+{
+	const struct kfsw_gpredict_profile lur = make_profile("LUR-1");
+	struct kfsw_gpredict_profile changed = make_profile("LUR-1B");
+
+	/* Redefined and still enabled: the selection stands with the new rules. */
+	define_and_select(0U, &lur);
+	zassert_ok(kfsw_gpredict_profile_define(0U, &changed));
+	zassert_equal(kfsw_gpredict_profile_selected(), 0);
+
+	/* Redefined disabled: the selection goes with it. */
+	changed.enabled = false;
+	zassert_ok(kfsw_gpredict_profile_define(0U, &changed));
+	zassert_equal(kfsw_gpredict_profile_selected(), -ENOENT);
+	zassert_equal(kfsw_gpredict_profile_bearing(&mid_bearing), -ENOENT);
+}
+
+ZTEST(modules_gpredict, test_profile_narrows_travel)
+{
+	struct kfsw_gpredict_profile narrow = make_profile("NARROW");
+	const struct kfsw_gpredict_bearing refused[] = {
+		{.azimuth_mdeg = 99999, .elevation_mdeg = 40000},
+		{.azimuth_mdeg = 200001, .elevation_mdeg = 40000},
+		{.azimuth_mdeg = 150000, .elevation_mdeg = 19999},
+		{.azimuth_mdeg = 150000, .elevation_mdeg = 60001},
+	};
+	const struct kfsw_gpredict_bearing edge = {.azimuth_mdeg = 100000, .elevation_mdeg = 20000};
+	const struct kfsw_gpredict_bearing inside = {.azimuth_mdeg = 150000,
+						     .elevation_mdeg = 30000};
+	struct kfsw_gpredict_status status;
+
+	narrow.azimuth_min_mdeg = 100000;
+	narrow.azimuth_max_mdeg = 200000;
+	narrow.elevation_min_mdeg = 20000;
+	narrow.elevation_max_mdeg = 60000;
+	define_and_select(0U, &narrow);
+	enter(KFSW_GPREDICT_TRACKING);
+
+	for (size_t index = 0U; index < ARRAY_SIZE(refused); index++) {
+		/* The rotator itself would have followed this one. */
+		zassert_true((refused[index].azimuth_mdeg >= GP_AZ_MIN_MDEG) &&
+			     (refused[index].azimuth_mdeg <= GP_AZ_MAX_MDEG) &&
+			     (refused[index].elevation_mdeg >= GP_EL_MIN_MDEG) &&
+			     (refused[index].elevation_mdeg <= GP_EL_MAX_MDEG));
+		zassert_equal(kfsw_gpredict_profile_bearing(&refused[index]), -EINVAL,
+			      "az %d el %d passed the profile", refused[index].azimuth_mdeg,
+			      refused[index].elevation_mdeg);
+	}
+
+	status = read_status();
+	zassert_equal(status.state, KFSW_GPREDICT_TRACKING);
+	zassert_equal(status.refusals, ARRAY_SIZE(refused));
+	zassert_equal(status.last_error, -EINVAL);
+	zassert_equal(status.bearings, 1U);
+	zassert_equal(status.azimuth_mdeg, mid_bearing.azimuth_mdeg);
+
+	zassert_ok(kfsw_gpredict_profile_bearing(&edge));
+	zassert_ok(kfsw_gpredict_profile_bearing(&inside));
+	status = read_status();
+	zassert_equal(status.state, KFSW_GPREDICT_TRACKING);
+	zassert_equal(status.bearings, 3U);
+	zassert_equal(status.azimuth_mdeg, inside.azimuth_mdeg);
+	zassert_equal(status.elevation_mdeg, inside.elevation_mdeg);
+}
+
+ZTEST(modules_gpredict, test_profile_refused_for_widening)
+{
+	const struct kfsw_gpredict_profile base = make_profile("WIDE");
+	struct kfsw_gpredict_profile wide[4];
+	struct kfsw_gpredict_profile read;
+
+	for (size_t index = 0U; index < ARRAY_SIZE(wide); index++) {
+		wide[index] = base;
+	}
+	wide[0].azimuth_min_mdeg = GP_AZ_MIN_MDEG - 1;
+	wide[1].azimuth_max_mdeg = GP_AZ_MAX_MDEG + 1;
+	wide[2].elevation_min_mdeg = GP_EL_MIN_MDEG - 1;
+	wide[3].elevation_max_mdeg = GP_EL_MAX_MDEG + 1;
+
+	for (size_t index = 0U; index < ARRAY_SIZE(wide); index++) {
+		zassert_equal(kfsw_gpredict_profile_define(0U, &wide[index]), -EINVAL,
+			      "bound %u widened the rotator's travel", (unsigned int)index);
+		zassert_equal(kfsw_gpredict_profile_get(0U, &read), -ENOENT);
+	}
+
+	/* Exactly the rotator's travel is not wider than it. */
+	zassert_ok(kfsw_gpredict_profile_define(0U, &base));
+}
+
+ZTEST(modules_gpredict, test_profile_frequency_policies)
+{
+	struct kfsw_gpredict_profile follow = make_profile("FOLLOW");
+	struct kfsw_gpredict_profile hold = make_profile("HOLD");
+	struct kfsw_gpredict_profile ignore = make_profile("IGNORE");
+	uint64_t send = GP_UNTOUCHED_HZ;
+
+	hold.policy = KFSW_GPREDICT_FREQUENCY_HOLD;
+	ignore.policy = KFSW_GPREDICT_FREQUENCY_IGNORE;
+	zassert_ok(kfsw_gpredict_profile_define(0U, &follow));
+	zassert_ok(kfsw_gpredict_profile_define(1U, &hold));
+	zassert_ok(kfsw_gpredict_profile_define(2U, &ignore));
+
+	zassert_ok(kfsw_gpredict_profile_select(0U));
+	zassert_ok(kfsw_gpredict_profile_frequency(GP_DOWNLINK_HZ, &send));
+	zassert_equal(send, GP_DOWNLINK_HZ, "FOLLOW sent %llu", (unsigned long long)send);
+
+	zassert_ok(kfsw_gpredict_profile_select(1U));
+	send = GP_UNTOUCHED_HZ;
+	zassert_ok(kfsw_gpredict_profile_frequency(GP_DOWNLINK_HZ, &send));
+	zassert_equal(send, GP_HOLD_HZ, "HOLD sent %llu", (unsigned long long)send);
+
+	zassert_ok(kfsw_gpredict_profile_select(2U));
+	send = GP_UNTOUCHED_HZ;
+	zassert_ok(kfsw_gpredict_profile_frequency(GP_DOWNLINK_HZ, &send));
+	zassert_equal(send, 0U, "IGNORE sent %llu", (unsigned long long)send);
+
+	send = GP_UNTOUCHED_HZ;
+	zassert_equal(kfsw_gpredict_profile_frequency(0U, &send), -EINVAL);
+	zassert_equal(send, 0U);
+	zassert_equal(kfsw_gpredict_profile_frequency(GP_DOWNLINK_HZ, NULL), -EINVAL);
+
+	/* Deciding is not tuning: the tracker's frequency is untouched. */
+	zassert_equal(read_status().frequency_hz, 0U);
+}
+
+ZTEST(modules_gpredict, test_profile_calls_without_selection)
+{
+	const struct kfsw_gpredict_profile lur = make_profile("LUR-1");
+	uint64_t send = GP_UNTOUCHED_HZ;
+	struct kfsw_gpredict_status status;
+
+	/* Defined but not selected, so slot 0 is not a default. */
+	zassert_ok(kfsw_gpredict_profile_define(0U, &lur));
+
+	zassert_equal(kfsw_gpredict_profile_bearing(&mid_bearing), -ENOENT);
+	zassert_equal(kfsw_gpredict_profile_frequency(GP_DOWNLINK_HZ, &send), -ENOENT);
+	zassert_equal(send, 0U, "no selection still sent %llu", (unsigned long long)send);
+
+	status = read_status();
+	zassert_equal(status.state, KFSW_GPREDICT_PARKED);
+	zassert_equal(status.bearings, 0U);
+	/* Nothing was judged, so nothing was refused. */
+	zassert_equal(status.refusals, 0U);
+	zassert_equal(kfsw_gpredict_profile_bearing(NULL), -EINVAL);
+}
+
+ZTEST(modules_gpredict, test_profile_bearing_in_fault_is_eperm)
+{
+	const struct kfsw_gpredict_profile lur = make_profile("LUR-1");
+	struct kfsw_gpredict_status status;
+
+	define_and_select(0U, &lur);
+	zassert_ok(kfsw_gpredict_profile_bearing(&mid_bearing));
+	zassert_equal(current_state(), KFSW_GPREDICT_TRACKING);
+
+	enter(KFSW_GPREDICT_FAULT);
+	zassert_equal(kfsw_gpredict_profile_bearing(&mid_bearing), -EPERM);
+	status = read_status();
+	zassert_equal(status.state, KFSW_GPREDICT_FAULT);
+	zassert_equal(status.refusals, 1U);
+	zassert_equal(status.last_error, -EPERM);
+}
+
+static struct kfsw_command_result run_command(uint16_t id, const uint32_t *values, size_t count)
+{
+	const struct kfsw_command_source source = {.node = 0U};
+	struct kfsw_command_arg args[2];
+	struct kfsw_command_result result = {0};
+
+	zassert_true(count <= ARRAY_SIZE(args));
+	for (size_t index = 0U; index < count; index++) {
+		args[index].type = KFSW_COMMAND_TYPE_U32;
+		args[index].value.u32 = values[index];
+	}
+	(void)kfsw_command_invoke_id(id, args, count, &source, &result);
+	return result;
+}
+
+ZTEST(modules_gpredict, test_gpredict_commands_are_registered)
+{
+	static const struct {
+		const char *name;
+		uint16_t id;
+		uint8_t arg_count;
+	} expected[] = {
+		{"gpredict_select", 40U, 1U},
+		{"gpredict_enable", 41U, 2U},
+		{"gpredict_park", 42U, 0U},
+		{"gpredict_clear", 43U, 0U},
+	};
+
+	zassert_equal(kfsw_gpredict_command_definitions.count, ARRAY_SIZE(expected));
+	for (size_t index = 0U; index < ARRAY_SIZE(expected); index++) {
+		struct kfsw_command_info info;
+
+		zassert_ok(kfsw_command_find(expected[index].name, &info), "%s is missing",
+			   expected[index].name);
+		zassert_equal(info.id, expected[index].id, "%s moved", expected[index].name);
+		zassert_equal(info.arg_count, expected[index].arg_count);
+		zassert_true((info.flags & KFSW_COMMAND_FLAG_MUTATING) != 0U,
+			     "%s is not marked mutating", expected[index].name);
+	}
+}
+
+ZTEST(modules_gpredict, test_gpredict_commands_select_and_enable)
+{
+	const struct kfsw_gpredict_profile lur = make_profile("LUR-1");
+	struct kfsw_gpredict_profile off = make_profile("OFF");
+	struct kfsw_command_result result;
+	uint32_t args[2];
+
+	off.enabled = false;
+	zassert_ok(kfsw_gpredict_profile_define(0U, &lur));
+	zassert_ok(kfsw_gpredict_profile_define(1U, &off));
+
+	args[0] = 0U;
+	result = run_command(KFSW_COMMAND_ID_GPREDICT_SELECT, args, 1U);
+	zassert_equal(result.status, KFSW_COMMAND_OK);
+	zassert_str_equal(result.detail, "selected=0 name=LUR-1 catalogue=43017");
+	zassert_equal(kfsw_gpredict_profile_selected(), 0);
+
+	args[0] = 1U;
+	result = run_command(KFSW_COMMAND_ID_GPREDICT_SELECT, args, 1U);
+	zassert_equal(result.status, KFSW_COMMAND_DENIED);
+	zassert_str_equal(result.detail, "the profile is disabled; enable it first");
+
+	args[0] = 2U;
+	result = run_command(KFSW_COMMAND_ID_GPREDICT_SELECT, args, 1U);
+	zassert_equal(result.status, KFSW_COMMAND_INVALID_ARGUMENT);
+
+	/* 256 is not slot 0 with the high bits dropped. */
+	zassert_ok(kfsw_gpredict_profile_enable(1U, true));
+	zassert_ok(kfsw_gpredict_profile_select(1U));
+	args[0] = 256U;
+	result = run_command(KFSW_COMMAND_ID_GPREDICT_SELECT, args, 1U);
+	zassert_equal(result.status, KFSW_COMMAND_INVALID_ARGUMENT);
+	zassert_equal(kfsw_gpredict_profile_selected(), 1);
+
+	args[0] = 1U;
+	args[1] = 0U;
+	result = run_command(KFSW_COMMAND_ID_GPREDICT_ENABLE, args, 2U);
+	zassert_equal(result.status, KFSW_COMMAND_BUSY);
+	zassert_str_equal(result.detail, "the profile is selected; select another first");
+
+	args[0] = 0U;
+	result = run_command(KFSW_COMMAND_ID_GPREDICT_ENABLE, args, 2U);
+	zassert_equal(result.status, KFSW_COMMAND_OK);
+	zassert_str_equal(result.detail, "profile=0 enabled=0");
+
+	args[1] = 2U;
+	result = run_command(KFSW_COMMAND_ID_GPREDICT_ENABLE, args, 2U);
+	zassert_equal(result.status, KFSW_COMMAND_INVALID_ARGUMENT);
+
+	args[0] = 2U;
+	args[1] = 1U;
+	result = run_command(KFSW_COMMAND_ID_GPREDICT_ENABLE, args, 2U);
+	zassert_equal(result.status, KFSW_COMMAND_INVALID_ARGUMENT);
+	args[0] = 256U;
+	result = run_command(KFSW_COMMAND_ID_GPREDICT_ENABLE, args, 2U);
+	zassert_equal(result.status, KFSW_COMMAND_INVALID_ARGUMENT);
+}
+
+ZTEST(modules_gpredict, test_gpredict_commands_park_and_clear)
+{
+	struct kfsw_command_result result;
+
+	enter(KFSW_GPREDICT_TRACKING);
+	result = run_command(KFSW_COMMAND_ID_GPREDICT_PARK, NULL, 0U);
+	zassert_equal(result.status, KFSW_COMMAND_OK);
+	zassert_str_equal(result.detail, "state=parking");
+
+	result = run_command(KFSW_COMMAND_ID_GPREDICT_CLEAR, NULL, 0U);
+	zassert_equal(result.status, KFSW_COMMAND_BUSY);
+	zassert_str_equal(result.detail, "the tracker is not in fault");
+
+	enter(KFSW_GPREDICT_FAULT);
+	result = run_command(KFSW_COMMAND_ID_GPREDICT_PARK, NULL, 0U);
+	zassert_equal(result.status, KFSW_COMMAND_DENIED);
+	zassert_str_equal(result.detail, "the tracker is in fault; clear it first");
+	zassert_equal(current_state(), KFSW_GPREDICT_FAULT);
+
+	result = run_command(KFSW_COMMAND_ID_GPREDICT_CLEAR, NULL, 0U);
+	zassert_equal(result.status, KFSW_COMMAND_OK);
+	zassert_str_equal(result.detail, "state=parked");
+}
+
+ZTEST(modules_gpredict, test_param_profile_rows_sample)
+{
+	struct kfsw_gpredict_profile hold = make_profile("LUR-1");
+	struct kfsw_gpredict_profile off = make_profile("OFF");
+	struct kfsw_param_value value;
+
+	/* Nothing selected reads as the reserved values, not as slot 0 or FOLLOW. */
+	zassert_ok(kfsw_param_get("gp_profile", &value));
+	zassert_equal(value.scalar.u8, UINT8_MAX);
+	zassert_ok(kfsw_param_get("gp_policy", &value));
+	zassert_equal(value.scalar.u8, UINT8_MAX);
+	zassert_ok(kfsw_param_get("gp_catalogue", &value));
+	zassert_equal(value.scalar.u32, 0U);
+	zassert_ok(kfsw_param_get("gp_profile_name", &value));
+	zassert_str_equal(value.text, "");
+	zassert_ok(kfsw_param_get("gp_profiles", &value));
+	zassert_equal(value.scalar.u8, 0U);
+
+	hold.policy = KFSW_GPREDICT_FREQUENCY_HOLD;
+	off.enabled = false;
+	zassert_ok(kfsw_gpredict_profile_define(0U, &off));
+	define_and_select(2U, &hold);
+
+	zassert_ok(kfsw_param_get("gp_profile", &value));
+	zassert_equal(value.scalar.u8, 2U);
+	zassert_ok(kfsw_param_get("gp_policy", &value));
+	zassert_equal(value.scalar.u8, KFSW_GPREDICT_FREQUENCY_HOLD);
+	zassert_ok(kfsw_param_get("gp_catalogue", &value));
+	zassert_equal(value.scalar.u32, GP_CATALOGUE);
+	zassert_ok(kfsw_param_get("gp_profile_name", &value));
+	zassert_str_equal(value.text, "LUR-1");
+	zassert_ok(kfsw_param_get("gp_profiles", &value));
+	zassert_equal(value.scalar.u8, 2U);
+	zassert_ok(kfsw_param_get("gp_profiles_on", &value));
+	zassert_equal(value.scalar.u8, 1U);
+
+	zassert_ok(kfsw_gpredict_profile_enable(0U, true));
+	zassert_ok(kfsw_param_get("gp_profiles_on", &value));
+	zassert_equal(value.scalar.u8, 2U);
+
+	/* Read only: the ground chooses through the command, which checks. */
+	value.type = KFSW_PARAM_U8;
+	value.size = sizeof(uint8_t);
+	value.scalar.u8 = 0U;
+	zassert_equal(kfsw_param_set("gp_profile", &value), -EACCES);
+	zassert_equal(kfsw_gpredict_profile_selected(), 2);
+}
+
 static void *gpredict_setup(void)
 {
 	const struct kfsw_param_definition_set *const sets[] = {
 		&kfsw_gpredict_param_definitions,
 	};
+	const struct kfsw_command_definition_set *const commands[] = {
+		&kfsw_gpredict_command_definitions,
+	};
 
 	zassert_ok(kfsw_param_init(sets, ARRAY_SIZE(sets)));
+	zassert_ok(kfsw_command_init(commands, ARRAY_SIZE(commands)));
 	zassert_ok(kfsw_gpredict_init());
 	return NULL;
 }
@@ -683,6 +1209,7 @@ static void gpredict_before(void *fixture)
 
 	clock_offset_ms = 0;
 	gpredict_state_reset();
+	gpredict_test_profiles_reset();
 }
 
 ZTEST_SUITE(modules_gpredict, NULL, gpredict_setup, gpredict_before, NULL, NULL);
