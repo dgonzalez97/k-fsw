@@ -36,10 +36,20 @@ if [[ -z "$console" ]]; then
 fi
 [[ -n "$console" && -e "$console" ]] || skip "no NUCLEO console; set KFSW_NUCLEO_CONSOLE"
 
+# The bus has to be away for this case to mean anything. Put it back the way it
+# was found, because a later case that needs it up should not have to know this
+# one ran.
+restore=""
 if ip link show "$interface" >/dev/null 2>&1; then
 	state="$(ip -details link show "$interface" | awk '/can state/ {print $3; exit}')"
-	[[ "$state" == "ERROR-ACTIVE" ]] &&
-		skip "$interface is acknowledging; take it down for this case"
+	if [[ "$state" == "ERROR-ACTIVE" ]]; then
+		if sudo -n /usr/local/sbin/kfsw-can "${KFSW_CAN_BITRATE:-500000}" down >/dev/null 2>&1; then
+			restore="${KFSW_CAN_BITRATE:-500000}"
+			trap 'sudo -n /usr/local/sbin/kfsw-can "$restore" normal >/dev/null 2>&1 || true' EXIT
+		else
+			skip "$interface is acknowledging and it cannot be taken down here"
+		fi
+	fi
 fi
 
 cd "$root"
