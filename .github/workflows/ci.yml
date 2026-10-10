@@ -139,6 +139,43 @@ jobs:
       - name: Build and run the CSP smokes under CSP 1
         run: ./k-fsw/tools/ci/csp-v1.sh
 
+  analysis:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+       (github.base_ref == 'develop' || github.base_ref == 'main')) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    name: ANALYSIS / CodeChecker
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out K-FSW
+        uses: actions/checkout@v4
+        with:
+          path: k-fsw
+
+      - name: Set up the workspace
+        uses: ./k-fsw/.github/actions/workspace
+        with:
+          toolchains: arm-zephyr-eabi
+
+      - name: Install CodeChecker and clang-tidy
+        run: pip install codechecker clang-tidy
+
+      - name: Analyse the NUCLEO image and the services it leaves out
+        run: ./k-fsw/tools/ci/codechecker.sh
+
+      - name: Upload the analysis report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codechecker-report
+          path: |
+            build/codechecker/html
+            build/codechecker/reports.txt
+            build/codechecker/analyze.log
+          if-no-files-found: ignore
+
   valgrind:
     if: >-
       github.event_name == 'workflow_dispatch' ||
