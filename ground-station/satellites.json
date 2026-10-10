@@ -1,0 +1,38 @@
+{
+  "comment": "Rules applied to whatever Gpredict sends while a profile is selected. The protocol carries angles and a frequency and never says which spacecraft they are for, so the profile is chosen by hand.",
+  "profiles": [
+    {
+      "name": "LUR-1",
+      "catalogue": 60506,
+      "enabled": true,
+      "azimuth_min_deg": 0,
+      "azimuth_max_deg": 360,
+      "elevation_min_deg": 5,
+      "elevation_max_deg": 90,
+      "frequency_policy": "follow",
+      "frequency_hz": 0
+    },
+    {
+      "name": "ROADS 1",
+      "catalogue": 64535,
+      "enabled": true,
+      "azimuth_min_deg": 0,
+      "azimuth_max_deg": 360,
+      "elevation_min_deg": 5,
+      "elevation_max_deg": 90,
+      "frequency_policy": "follow",
+      "frequency_hz": 0
+    },
+    {
+      "name": "ROADS 2",
+      "catalogue": 64549,
+      "enabled": true,
+      "azimuth_min_deg": 0,
+      "azimuth_max_deg": 360,
+      "elevation_min_deg": 5,
+      "elevation_max_deg": 90,
+      "frequency_policy": "follow",
+      "frequency_hz": 0
+    }
+  ]
+}
