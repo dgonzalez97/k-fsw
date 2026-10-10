@@ -57,7 +57,7 @@ manifest:
     - name: libcsp
       remote: kfsw
       repo-path: kfsw-libcsp
-      revision: 2381cbbd61aca885dacdcf096d3e69c495fe5afb
+      revision: 95793bf7f15105d761cc398d743d0b4bec1c7dcd
       path: kfsw-comms/third_party/libcsp
 
     - name: libparam

@@ -8,6 +8,7 @@ Library           OperatingSystem
 
 *** Variables ***
 ${CAN SMOKE}      ${CURDIR}/stm32/nucleo-l496zg/can-smoke.sh
+${CAN ACCOUNTING}    ${CURDIR}/stm32/nucleo-l496zg/can-tx-accounting.sh
 
 *** Test Cases ***
 CSP Reaches A Node Over CAN
@@ -38,3 +39,16 @@ CSP Reaches A Node Over A Virtual CAN Bus
     Response Should Contain    ${result.stdout}    CSP ping 16: success
     Response Should Contain    ${result.stdout}    2:node_id = 2
     Response Should Contain    ${result.stdout}    last_can_error=0 (none)
+
+A Frame Nobody Acknowledges Is Not Counted As Sent
+    [Documentation]    With no node able to acknowledge, the board must count a
+    ...                transmission as failed. A driver that reports an
+    ...                unacknowledged frame as sent tells an operator the link
+    ...                works when nothing left the node. Needs the bus down.
+    [Tags]    physical    can    nucleo
+    ${result}=    Run Process    ${CAN ACCOUNTING}
+    ...           stdout=${TEMPDIR}/can-tx-accounting.out    stderr=STDOUT    timeout=120s
+    Log    ${result.stdout}
+    Should Be Equal As Integers    ${result.rc}    0    msg=${result.stdout}
+    Should Contain    ${result.stdout}    CAN TX ACCOUNTING RESULT:
+    Should Not Contain    ${result.stdout}    RESULT: FAIL
