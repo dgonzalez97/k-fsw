@@ -7,6 +7,7 @@ pass records this one.
 
 import json
 from pathlib import Path
+import socket
 import sqlite3
 import struct
 import subprocess
@@ -51,7 +52,7 @@ def capture(path, series):
                 index += 1
 
 
-def replay(capture_path, database, definitions=None):
+def replay(capture_path, database, definitions=None, yamcs="none"):
     command = [
         sys.executable,
         str(BRIDGE),
@@ -60,7 +61,7 @@ def replay(capture_path, database, definitions=None):
         "--store",
         str(database),
         "--yamcs",
-        "none",
+        yamcs,
     ]
     if definitions:
         command += ["--definitions", str(definitions)]
@@ -161,6 +162,27 @@ def main():
         ).fetchone()[0]
         if newest == first_definition:
             fail("a sample after the change kept the old definition")
+
+        # Yamcs is the archive and this file is the raw record of what was
+        # heard. They are not alternatives, so one run has to feed both.
+        listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        listener.bind(("127.0.0.1", 0))
+        listener.settimeout(20)
+        both = folder / "both.jsonl"
+        capture(both, [(0, [10])])
+        before = connection.execute("SELECT count(*) FROM sample").fetchone()[0]
+        replay(both, database, definitions, f"127.0.0.1:{listener.getsockname()[1]}")
+        try:
+            datagram = listener.recv(4096)
+        except socket.timeout:
+            fail("the sample was stored but never reached the Yamcs link")
+        finally:
+            listener.close()
+        after = connection.execute("SELECT count(*) FROM sample").fetchone()[0]
+        if after != before + 1:
+            fail("the sample reached Yamcs but was not stored")
+        if len(datagram) <= 2:
+            fail(f"the Yamcs datagram carried {len(datagram)} bytes")
 
         total = connection.execute("SELECT count(*) FROM sample").fetchone()[0]
         connection.close()

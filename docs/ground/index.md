@@ -266,6 +266,12 @@ A row is one reception, not one unique sample: a duplicate is evidence of the
 link too. `clock_set` says whether the node knew the time, because a sample
 stamped by the host is not the same evidence as one stamped by the node.
 
+This file and Yamcs are not alternatives, and one run feeds both: `--yamcs`
+forwards every sample to the archive that plots it, and `--store` keeps the
+frames as they arrived with the definition that decodes them and the sequence
+gaps. Yamcs is where a trend is read; this file is what the trend was built
+from, and it needs no Java and no server during a pass.
+
 ### Running Yamcs
 
 Yamcs needs Java 17; Maven comes through `./mvnw`.
