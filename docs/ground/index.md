@@ -232,6 +232,40 @@ Beacons are sent to their own port (`KFSW_HK_BEACON_PORT`) so they never reach
 a request handler. With persistence enabled, beacon settings are saved with
 the report.
 
+### Keeping what came down
+
+A pass read on a console is gone when the console closes. `--store` keeps every
+accepted sample in a SQLite file, so a value can be read against last week
+instead of only now:
+
+```bash
+./k-fsw/tools/ground/hk-bridge.py --device /dev/pts/7 --node 1 --listen \
+    --store passes.db --definitions ground-station/reports/nucleo-temperature.yaml
+```
+
+Two things decide the shape of that file, and both come from how housekeeping
+works on the node.
+
+A frame carries values and no names, so the report definition is the schema.
+`--definitions` stores the document beside the samples and points each sample at
+the definition that was in force when it arrived. A definition that changes gets
+a new row, so a sample recorded under the old one is never decoded with the new
+one.
+
+A gap is data. Every sample carries a sequence number precisely so a missing one
+is visible, so the store never fills one in. The `gap` view reports what was not
+heard, and it knows the sequence is sixteen bits, so the step from 65535 to 0 is
+one sample and not a loss of sixty-five thousand:
+
+```bash
+sqlite3 passes.db 'SELECT * FROM gap'
+sqlite3 passes.db 'SELECT sequence, node_seconds, hex(frame) FROM sample WHERE report = 0'
+```
+
+A row is one reception, not one unique sample: a duplicate is evidence of the
+link too. `clock_set` says whether the node knew the time, because a sample
+stamped by the host is not the same evidence as one stamped by the node.
+
 ### Running Yamcs
 
 Yamcs needs Java 17; Maven comes through `./mvnw`.
