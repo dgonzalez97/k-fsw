@@ -14,11 +14,12 @@ Every Thread Keeps Room On Its Stack
     [Documentation]    Fails on a thin margin and on a stack that could not be
     ...                read, because a margin for part of the system is not a
     ...                margin for the system.
-    [Tags]    physical    nucleo    resmon    stack
+    [Tags]    physical    nucleo    resmon    stack    needs-nucleo
     ${result}=    Run Process    ${STACK MARGIN}
     ...           stdout=${TEMPDIR}/stack-margin.out    stderr=STDOUT    timeout=120s
     Log    ${result.stdout}
     Should Be Equal As Integers    ${result.rc}    0    msg=${result.stdout}
-    Should Contain    ${result.stdout}    STACK MARGIN RESULT:
-    Should Not Contain    ${result.stdout}    RESULT: FAIL
+    # A case that did not run is not a case that passed.
+    Skip If    "STACK MARGIN RESULT: NOT RUN" in $result.stdout    ${result.stdout}
+    Should Contain    ${result.stdout}    STACK MARGIN RESULT: PASS
     Should Contain    ${result.stdout}    0 unmeasured

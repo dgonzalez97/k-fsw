@@ -14,8 +14,8 @@ ${CAN ACCOUNTING}    ${CURDIR}/stm32/nucleo-l496zg/can-tx-accounting.sh
 CSP Reaches A Node Over CAN
     [Documentation]    Ping, identity and remote parameters over CAN, and the
     ...                adapter's frame counters with no bus errors added during the run.
-    [Tags]    physical    can    nucleo    csp
-    ${result}=    Run Process    ${CAN SMOKE}    --no-build
+    [Tags]    physical    can    nucleo    csp    needs-can
+    ${result}=    Run Process    ${CAN SMOKE}
     ...           stdout=${TEMPDIR}/can-smoke.out    stderr=STDOUT    timeout=300s
     Log    ${result.stdout}
     Should Be Equal As Integers    ${result.rc}    0    msg=${result.stdout}
@@ -45,10 +45,11 @@ A Frame Nobody Acknowledges Is Not Counted As Sent
     ...                transmission as failed. A driver that reports an
     ...                unacknowledged frame as sent tells an operator the link
     ...                works when nothing left the node. Needs the bus down.
-    [Tags]    physical    can    nucleo
+    [Tags]    physical    can    nucleo    needs-can
     ${result}=    Run Process    ${CAN ACCOUNTING}
     ...           stdout=${TEMPDIR}/can-tx-accounting.out    stderr=STDOUT    timeout=120s
     Log    ${result.stdout}
     Should Be Equal As Integers    ${result.rc}    0    msg=${result.stdout}
-    Should Contain    ${result.stdout}    CAN TX ACCOUNTING RESULT:
-    Should Not Contain    ${result.stdout}    RESULT: FAIL
+    # A case that did not run is not a case that passed.
+    Skip If    "CAN TX ACCOUNTING RESULT: NOT RUN" in $result.stdout    ${result.stdout}
+    Should Contain    ${result.stdout}    CAN TX ACCOUNTING RESULT: PASS

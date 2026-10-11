@@ -15,7 +15,7 @@ ${FWU_CAN_OUTPUT}      %{KFSW_FWU_CAN_OUTPUT=/tmp/kfsw-fwu-can}
 CAN Update Keeps Both Images Readable
     [Documentation]    Uploads through FTP and FWU lite, compares slot files,
     ...    reverts a trial, then confirms and reboots the candidate.
-    [Tags]    physical    nucleo    can    fwu    ftp
+    [Tags]    physical    nucleo    can    fwu    ftp    needs-can
     Skip If    not $FWU_CAN_GROUND or not $FWU_CAN_IMAGE    Prebuilt CAN images not configured
     # The interpreter matters: the fixture spawns a helper that needs littlefs,
     # which only the workspace environment has.
