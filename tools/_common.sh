@@ -45,6 +45,20 @@ fi
 
 export KFSW_BUILD_DIR="${KFSW_BUILD_DIR:-${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}/$KFSW_TARGET}"
 
+# Flash the board this target names. With two probes attached openocd takes the
+# first it finds, which is a coin flip over which board gets the image, so a
+# target profile that has an ST-Link names it and this passes it on.
+kfsw_west_flash()
+{
+    local flash_args=("$@")
+
+    if [[ -n "${KFSW_STLINK_SERIAL:-}" ]]; then
+        flash_args+=(--cmd-pre-init "adapter serial $KFSW_STLINK_SERIAL")
+    fi
+
+    west flash "${flash_args[@]}"
+}
+
 # Nothing capped compilation, so a 16-core desktop ran 16 Twister builds of 16
 # compilers each and the machine spent the run swapping with the fan at full
 # tilt. Leave half the cores to the person using the computer; KFSW_JOBS

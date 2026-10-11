@@ -117,7 +117,7 @@ stty -F "$debug_serial" "$KFSW_SERIAL_BAUD" cs8 -cstopb -parenb -crtscts raw -ec
 timeout 300s cat "$debug_serial" >"$work_dir/node.log" &
 capture_pid=$!
 
-west flash -d "$KFSW_ROOT/build/nucleo_l496zg" --runner openocd >"$work_dir/flash.log" 2>&1 ||
+kfsw_west_flash -d "$KFSW_ROOT/build/nucleo_l496zg" --runner openocd >"$work_dir/flash.log" 2>&1 ||
 	{
 		cat "$work_dir/flash.log" >&2
 		exit 1

@@ -195,7 +195,7 @@ stty -F "$radio_device" "$radio_baud" cs8 -cstopb -parenb -crtscts raw -echo
 timeout 480s cat "$debug_serial" >"$work_dir/nucleo.log" &
 debug_capture_pid=$!
 
-west flash -d "$nucleo_build_dir" --runner openocd || \
+kfsw_west_flash -d "$nucleo_build_dir" --runner openocd || \
 	fail "NUCLEO flash failed"
 wait_for_output "$work_dir/nucleo.log" "@READY " "$debug_capture_pid" || \
 	fail "NUCLEO did not report readiness"

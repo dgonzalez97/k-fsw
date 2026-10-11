@@ -102,7 +102,7 @@ capture_pid=$!
 
 if [[ "$do_flash" -eq 1 ]]; then
 	banner "Flash"
-	west flash -d "$build_dir" --runner openocd >"$work_dir/flash.log" 2>&1 || \
+	kfsw_west_flash -d "$build_dir" --runner openocd >"$work_dir/flash.log" 2>&1 || \
 		abort "NUCLEO flash failed"
 fi
 

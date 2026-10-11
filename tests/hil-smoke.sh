@@ -69,7 +69,7 @@ sleep 0.25
 echo
 echo "[5/5] Flash / reset / boot"
 
-west flash \
+kfsw_west_flash \
     -d "$KFSW_BUILD_DIR" \
     --runner openocd
 

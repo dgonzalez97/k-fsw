@@ -115,7 +115,7 @@ stty -F "$debug_serial" "$KFSW_SERIAL_BAUD" cs8 -cstopb -parenb -crtscts raw -ec
 
 timeout 120s cat "$debug_serial" >"$work_dir/nucleo.log" &
 debug_capture_pid=$!
-west flash -d "$build_dir" --runner openocd || fail "NUCLEO raw-peer flash failed"
+kfsw_west_flash -d "$build_dir" --runner openocd || fail "NUCLEO raw-peer flash failed"
 wait_for_output "HOLYBRO RAW PEER: READY" || \
 	fail "the NUCLEO raw peer did not report readiness"
 
