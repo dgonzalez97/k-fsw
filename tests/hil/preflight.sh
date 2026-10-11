@@ -17,8 +17,15 @@ source "$KFSW_HIL_DIR/shapes.sh"
 # The ST-LINK's USB identity, from the target profile.
 STLINK_USB_ID="$(sed -n 's/^KFSW_STLINK_USB_ID=//p' \
 	"$KFSW_REPO_DIR/config/targets/nucleo_l496zg.env" 2>/dev/null || true)"
+# The reference board's own ST-Link serial. More than one board can answer on
+# this bench, and they are not the same composition, so the board the suite is
+# written against is named rather than taken from enumeration order.
+STLINK_SERIAL="$(sed -n 's/^KFSW_STLINK_SERIAL=//p' \
+	"$KFSW_REPO_DIR/config/targets/nucleo_l496zg.env" 2>/dev/null || true)"
 
 found_debug=""
+found_other_debug=""
+debug_is_reference=""
 found_second_serial=""
 found_radio=""
 found_can=""
@@ -55,13 +62,14 @@ stable_path_of() {
 
 discover_serial() {
 	local device stable id
+	local stlinks=()
 	for device in /dev/ttyACM* /dev/ttyUSB*; do
 		[[ -e "$device" ]] || continue
 		stable="$(stable_path_of "$device" || true)"
 		id="$(usb_id_of "$device")"
 
 		if [[ -n "$STLINK_USB_ID" && "$id" == "$STLINK_USB_ID" ]]; then
-			[[ -z "$found_debug" ]] && found_debug="${stable:-$device}"
+			stlinks+=("${stable:-$device}")
 			continue
 		fi
 		# Only a bridge can carry the CSP UART or a radio.
@@ -91,9 +99,31 @@ discover_serial() {
 		done
 	done
 
+	# Name the reference board by its serial and list the rest, so an operator
+	# sees what else is attached rather than learning it from a number that was
+	# read off another board.
+	local link
+	for link in "${stlinks[@]}"; do
+		if [[ -n "$STLINK_SERIAL" && "$link" == *"$STLINK_SERIAL"* ]]; then
+			found_debug="$link"
+			debug_is_reference="yes"
+		else
+			found_other_debug="${found_other_debug}${found_other_debug:+, }$link"
+		fi
+	done
+	if [[ -z "$found_debug" && ${#stlinks[@]} -gt 0 ]]; then
+		found_debug="${stlinks[0]}"
+		# One probe is the board under test: there is nothing to confuse it
+		# with, and another bench pins a different serial than this one. Two or
+		# more and the pinned serial decides, or the operator says which.
+		[[ ${#stlinks[@]} -eq 1 ]] && debug_is_reference="yes"
+	fi
+
 	# An explicit setting always wins over discovery.
 	if [[ -n "${KFSW_DEBUG_SERIAL:-}" ]]; then
+		# Naming a console is a statement of intent, so it is taken as given.
 		found_debug="$KFSW_DEBUG_SERIAL"
+		debug_is_reference="yes"
 	fi
 	if [[ -n "${KFSW_FTDI_DEVICE:-}" ]]; then
 		found_second_serial="$KFSW_FTDI_DEVICE"
@@ -151,10 +181,10 @@ shape_is_possible() {
 	case "$1" in
 	software) [[ -n "$have_robot" ]] ;;
 	terminal) [[ -n "$have_robot" && -n "$have_terminal" ]] ;;
-	board) [[ -n "$have_robot" && -n "$found_debug" ]] ;;
-	board-uart) [[ -n "$have_robot" && -n "$found_debug" && -n "$found_second_serial" ]] ;;
-	board-can) [[ -n "$have_robot" && -n "$found_debug" && -n "$found_can" && "$found_can" != *virtual* ]] ;;
-	radio) [[ -n "$have_robot" && -n "$found_debug" && -n "${found_radio:-$found_second_serial}" ]] ;;
+	board) [[ -n "$have_robot" && -n "$found_debug" && -n "$debug_is_reference" ]] ;;
+	board-uart) [[ -n "$have_robot" && -n "$found_debug" && -n "$debug_is_reference" && -n "$found_second_serial" ]] ;;
+	board-can) [[ -n "$have_robot" && -n "$found_debug" && -n "$debug_is_reference" && -n "$found_can" && "$found_can" != *virtual* ]] ;;
+	radio) [[ -n "$have_robot" && -n "$found_debug" && -n "$debug_is_reference" && -n "${found_radio:-$found_second_serial}" ]] ;;
 	*) return 1 ;;
 	esac
 }
@@ -170,6 +200,9 @@ missing_for() {
 		;;
 	board | board-uart | board-can | radio)
 		[[ -z "$found_debug" ]] && missing+=("the board's ST-LINK debug UART")
+		if [[ -n "$found_debug" && -z "$debug_is_reference" ]]; then
+			missing+=("KFSW_DEBUG_SERIAL, naming which of the attached boards to use")
+		fi
 		;;
 	esac
 	case "$shape" in
@@ -206,6 +239,9 @@ report() {
 		echo "  vcan0: unavailable; run sudo k-fsw/tests/vcan-up.sh"
 	fi
 	printf '  %-22s %s\n' "debug UART" "${found_debug:-not found}"
+	if [[ -n "$found_other_debug" ]]; then
+		printf '  %-22s %s\n' "other ST-Links" "$found_other_debug"
+	fi
 	printf '  %-22s %s\n' "second serial" "${found_second_serial:-not found}"
 	printf '  %-22s %s\n' "radio serial" "${found_radio:-not set; say which serial port it is}"
 	printf '  %-22s %s\n' "CAN interface" "${found_can:-${can_down:+$can_down (down)}}"
@@ -218,6 +254,14 @@ report() {
 		echo "  A serial bridge is attached but the kernel has not bound it:"
 		echo "  $serial_without_driver. Without a driver it has no port."
 		echo "  This kernel builds ftdi_sio as a module: sudo modprobe ftdi_sio"
+		echo
+	fi
+
+	if [[ -n "$found_debug" && -z "$debug_is_reference" ]]; then
+		echo "  More than one ST-Link is attached and none of them is the board"
+		echo "  these cases are written for ($STLINK_SERIAL). They are not the"
+		echo "  same composition, so a number read from another one would be"
+		echo "  reported as this board's. Set KFSW_DEBUG_SERIAL to say which."
 		echo
 	fi
 
