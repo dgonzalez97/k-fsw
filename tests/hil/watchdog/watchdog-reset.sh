@@ -69,10 +69,12 @@ done
 
 if [[ "$do_flash" -eq 1 ]]; then
 	banner "Build"
-	# The watchdog is in the NUCLEO profile; nothing to layer.
-	KFSW_BUILD_DIR="$build_dir" \
+	# The watchdog is in the NUCLEO profile; nothing to layer. Pristine because
+	# a build directory left by an earlier version of this case keeps its own
+	# cached profile, and a stale one fails for a reason this case cannot see.
+	KFSW_BUILD_DIR="$build_dir" KFSW_PRISTINE=always \
 		"$KFSW_TOOLS_DIR/build.sh" nucleo_l496zg >"$work_dir/build.log" 2>&1 || \
-		fail "the watchdog profile did not build"
+		{ cat "$work_dir/build.log" >&2; fail "the watchdog profile did not build"; }
 fi
 
 build_sha="$(git -C "$KFSW_REPO_DIR" rev-parse --short HEAD)"
@@ -98,6 +100,11 @@ for _ in $(seq 1 60); do
 	sleep 0.5
 done
 grep -q "@READY " "$work_dir/nucleo.log" || fail "NUCLEO did not report readiness"
+
+# Two boards answer on this bench, and not with the same composition.
+answered="$(sed -n 's/.*@BOOT .*board=\([^ ]*\).*/\1/p' "$work_dir/nucleo.log" | head -1)"
+[[ "$answered" == "$ZEPHYR_BOARD"* ]] ||
+	fail "${answered:-nothing} answered on ${debug_serial}, expected $ZEPHYR_BOARD"
 
 banner "Armed and feeding"
 send ""

@@ -10,8 +10,8 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-root="$(cd "$here/../../../../.." && pwd)"
-console="${KFSW_NUCLEO_CONSOLE:-}"
+repo="$(cd "$here/../../../.." && pwd)"
+root="$(cd "$repo/.." && pwd)"
 # Bytes every thread must keep free. A deep error path or an interrupt taken on
 # a thread's own stack is what this room is for.
 floor="${KFSW_STACK_FLOOR_BYTES:-128}"
@@ -19,8 +19,15 @@ floor="${KFSW_STACK_FLOOR_BYTES:-128}"
 fail() { echo "STACK MARGIN RESULT: FAIL - $*"; exit 1; }
 skip() { echo "STACK MARGIN RESULT: NOT RUN - $*"; exit 0; }
 
+# The runner exports the target profile, so prefer what it says. Two boards
+# answer on this bench and they are not the same composition, so the identity
+# is checked below rather than trusted from a path.
+console="${KFSW_NUCLEO_CONSOLE:-${KFSW_DEBUG_SERIAL:-${KFSW_SERIAL:-}}}"
 if [[ -z "$console" ]]; then
-	console="$(ls /dev/serial/by-id/*STLink* 2>/dev/null | head -1 || true)"
+	# Run on its own, with no profile in the environment.
+	# shellcheck source=/dev/null
+	console="$(. "$repo/config/targets/nucleo_l496zg.env" >/dev/null 2>&1 \
+		&& printf '%s' "${KFSW_SERIAL:-}")"
 fi
 [[ -n "$console" && -e "$console" ]] || skip "no NUCLEO console; set KFSW_NUCLEO_CONSOLE"
 
@@ -47,6 +54,15 @@ def ask(link, command, wait=3.0):
 
 with serial.Serial(console, 115200, timeout=1) as link:
     time.sleep(1.0)
+    # These numbers get published, so check which board answered.
+    identity = ask(link, "status", 2.0)
+    named = re.search(r"board: (\S+)", identity)
+    if not named:
+        print(f"STACK MARGIN RESULT: FAIL - {console} did not answer `status`")
+        raise SystemExit(1)
+    if not named.group(1).startswith("nucleo_l496zg"):
+        print(f"STACK MARGIN RESULT: FAIL - {console} is {named.group(1)}, not the L496")
+        raise SystemExit(1)
     if "command not found" in ask(link, "resmon show", 2.0):
         print("STACK MARGIN RESULT: NOT RUN - this image has no resource monitor")
         raise SystemExit(0)

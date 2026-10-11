@@ -85,6 +85,15 @@ cat "$capture_file"
 echo "========================================="
 echo
 
+# The banner says which board answered. Two boards are on this bench and they
+# are not the same composition, so @BOOT alone does not say this one booted.
+if ! grep -Fq "board=$ZEPHYR_BOARD" "$capture_file"; then
+    answered="$(sed -n 's/.*@BOOT .*board=\([^ ]*\).*/\1/p' "$capture_file" | head -1)"
+    echo "HIL RESULT: FAIL"
+    echo "  [x] ${answered:-nothing} answered on $KFSW_SERIAL, expected $ZEPHYR_BOARD"
+    exit 1
+fi
+
 boot_ok=0
 ready_ok=0
 

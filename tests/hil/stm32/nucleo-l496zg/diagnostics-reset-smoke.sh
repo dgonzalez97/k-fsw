@@ -127,6 +127,13 @@ wait_for "@READY " 60 || {
 	exit 1
 }
 
+# Two boards answer on this bench, and not with the same composition.
+answered="$(sed -n 's/.*@BOOT .*board=\([^ ]*\).*/\1/p' "$work_dir/node.log" | head -1)"
+if [[ "$answered" != "$ZEPHYR_BOARD"* ]]; then
+	echo "ERROR: ${answered:-nothing} answered on $debug_serial, expected $ZEPHYR_BOARD" >&2
+	exit 1
+fi
+
 echo "DIAGNOSTICS RESET SMOKE"
 
 say 'param set echo_enabled 1'

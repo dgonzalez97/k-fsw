@@ -19,20 +19,26 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-root="$(cd "$here/../../../../.." && pwd)"
+repo="$(cd "$here/../../../.." && pwd)"
+root="$(cd "$repo/.." && pwd)"
 
 # shellcheck source=/dev/null
 set -a; . "$here/can-bench.env"; set +a
 interface="${KFSW_CAN_INTERFACE:-can0}"
 ground="${KFSW_CAN_GROUND_NODE:-16}"
-console="${KFSW_NUCLEO_CONSOLE:-}"
 
 fail() { echo "CAN TX ACCOUNTING RESULT: FAIL - $*"; exit 1; }
 skip() { echo "CAN TX ACCOUNTING RESULT: NOT RUN - $*"; exit 0; }
 
+# The runner exports the target profile, so prefer what it says. Two boards
+# answer on this bench and they are not the same composition, so the identity
+# is checked below rather than trusted from a path.
+console="${KFSW_NUCLEO_CONSOLE:-${KFSW_DEBUG_SERIAL:-${KFSW_SERIAL:-}}}"
 if [[ -z "$console" ]]; then
-	# Never a raw /dev/ttyACM path in a tracked file: it moves between boots.
-	console="$(ls /dev/serial/by-id/*STLink* 2>/dev/null | head -1 || true)"
+	# Run on its own, with no profile in the environment.
+	# shellcheck source=/dev/null
+	console="$(. "$repo/config/targets/nucleo_l496zg.env" >/dev/null 2>&1 \
+		&& printf '%s' "${KFSW_SERIAL:-}")"
 fi
 [[ -n "$console" && -e "$console" ]] || skip "no NUCLEO console; set KFSW_NUCLEO_CONSOLE"
 
@@ -81,7 +87,31 @@ def counters(link):
 
 with serial.Serial(console, 115200, timeout=1) as link:
     time.sleep(1.0)
-    before = counters(link)
+    link.reset_input_buffer()
+    link.write(b"status\n")
+    time.sleep(2.0)
+    identity = link.read(link.in_waiting or 1).decode(errors="replace")
+    named = re.search(r"board: (\S+)", identity)
+    if not named:
+        print(f"CAN TX ACCOUNTING RESULT: FAIL - {console} did not answer `status`")
+        raise SystemExit(1)
+    if not named.group(1).startswith("nucleo_l496zg"):
+        print(f"CAN TX ACCOUNTING RESULT: FAIL - {console} is {named.group(1)}, not the L496")
+        raise SystemExit(1)
+    # An image built without CAN still answers `comms`, listing only the links
+    # it has. Asking such an image for CAN counters is not a failed accounting.
+    link.reset_input_buffer()
+    link.write(b"comms can info\n")
+    time.sleep(2.0)
+    probe = link.read(link.in_waiting or 1).decode(errors="replace")
+    opening = COUNTERS.search(probe)
+    if not opening:
+        if "Subcommands:" in probe or "command not found" in probe:
+            print("CAN TX ACCOUNTING RESULT: NOT RUN - this image has no CAN link")
+            raise SystemExit(0)
+        print(f"CAN TX ACCOUNTING RESULT: FAIL - the board did not report counters:\n{probe}")
+        raise SystemExit(1)
+    before = [int(value) for value in opening.groups()]
     link.reset_input_buffer()
     link.write(f"comms can test {ground}\n".encode())
     time.sleep(10.0)

@@ -13,6 +13,10 @@ KFSW_ROOT="$(dirname "$KFSW_REPO_DIR")"
 
 executable="${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}/linux/zephyr/zephyr.exe"
 serial=""
+# Which board a --serial run must be talking to. More than one can be attached
+# and they are not the same composition, so the tables of one are not the
+# tables of the other.
+board="nucleo_l496zg"
 work_dir="$(mktemp -d)"
 failures=0
 
@@ -26,6 +30,10 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--executable)
 		executable="${2:-}"
+		shift 2
+		;;
+	--board)
+		board="${2:-}"
 		shift 2
 		;;
 	*)
@@ -58,6 +66,8 @@ if [[ -n "$serial" ]]; then
 	sleep 1
 	printf '\r' >"$serial"
 	sleep 0.5
+	printf 'status\r' >"$serial"
+	sleep 2
 	printf 'param tables\r' >"$serial"
 	sleep 2
 	printf 'param list\r' >"$serial"
@@ -69,6 +79,11 @@ else
 	printf '%s\n' 'param tables' 'param list' |
 		"$executable" --uart_stdinout --stop_at=6.0 --no-color \
 			-flash="$work_dir/flash.bin" >"$work_dir/output.log" 2>&1 || true
+fi
+
+if [[ -n "$serial" ]]; then
+	printf '\n=== Board ===\n'
+	expect "board: $board"
 fi
 
 printf '\n=== Tables ===\n'
