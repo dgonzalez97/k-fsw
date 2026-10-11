@@ -1,0 +1,14 @@
+/* CSP over CAN on the NUCLEO-F746ZG, on CAN1 PD0/PD1, the same pins the
+ * L496ZG uses, so one transceiver wiring serves either board. The board has no
+ * transceiver, so add one between PD0/PD1 and CAN_H/CAN_L.
+ */
+&can1 {
+	bus-speed = <500000>;
+	status = "okay";
+};
+
+/ {
+	chosen {
+		kfsw,csp-can = &can1;
+	};
+};
