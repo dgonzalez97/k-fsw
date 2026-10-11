@@ -20,7 +20,7 @@ Command Retries Execute Once Despite Lost Replies
     HIL Command Should Pass    ${result}    COMMAND RETRY SMOKE RESULT: PASS
 
 Board Rejects Duplicate Command Execution
-    [Tags]    physical    firmware-batches    command-retry
+    [Tags]    physical    firmware-batches    command-retry    needs-nucleo
     Skip If    not $BATCH_SHELL or not $BATCH_KISS    Set explicit shell and KISS devices.
     ${result}=    Run Process
     ...    ${KFSW_PYTHON}    ${KFSW_REPO_DIR}/tests/command-retry-smoke.py
@@ -40,7 +40,7 @@ UTC Procedures Run And Cancel On Linux
     HIL Command Should Pass    ${result}    FBO UTC SMOKE RESULT: PASS
 
 UTC Procedures Run And Cancel On A Dedicated Board
-    [Tags]    physical    firmware-batches    fbo-utc
+    [Tags]    physical    firmware-batches    fbo-utc    needs-nucleo
     Skip If    not $BATCH_SHELL    Set an explicit dedicated bench console.
     ${result}=    Run Process
     ...    ${KFSW_PYTHON}    ${KFSW_REPO_DIR}/tests/fbo-utc-smoke.py
@@ -58,7 +58,7 @@ Journal Retains Events Across Linux Process Restarts
     HIL Command Should Pass    ${result}    JOURNAL SMOKE RESULT: PASS
 
 Board Commits And Returns An Important Event
-    [Tags]    physical    firmware-batches    journal
+    [Tags]    physical    firmware-batches    journal    needs-nucleo
     Skip If    not $BATCH_SHELL or not $BATCH_KISS    Set explicit shell and KISS devices.
     ${result}=    Run Process
     ...    ${KFSW_PYTHON}    ${KFSW_REPO_DIR}/tests/journal-smoke.py

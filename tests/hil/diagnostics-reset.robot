@@ -11,7 +11,7 @@ A Reset Leaves Its Reason And The Log Behind
     ...    commanded and carry the previous run's uptime, the restart must be
     ...    counted, and the log ring must still hold records from before the
     ...    reset with its sequence numbering continued rather than restarted.
-    [Tags]    physical    nucleo    lastwords    logs    persistence
+    [Tags]    physical    nucleo    lastwords    logs    persistence    needs-nucleo
     ${result}=    Run Diagnostics Reset Smoke
     HIL Command Should Pass    ${result}    DIAGNOSTICS RESET SMOKE RESULT: PASS
     Should Contain    ${result.stdout}    the note says the reset was commanded

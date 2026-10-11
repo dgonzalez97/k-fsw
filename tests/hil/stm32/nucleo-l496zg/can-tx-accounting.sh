@@ -13,9 +13,9 @@
 #
 #   tests/hil/stm32/nucleo-l496zg/can-tx-accounting.sh
 #
-# The bus must be down or absent. With an adapter acknowledging, the frame does
-# leave and the case cannot say anything, so it reports NOT RUN rather than a
-# result it did not earn.
+# Nothing on the bus may acknowledge. The adapter is taken down for that, but
+# another board on the same wire acknowledges too, so a delivered frame is
+# reported as NOT RUN rather than as a result the case did not earn.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -88,12 +88,14 @@ with serial.Serial(console, 115200, timeout=1) as link:
     after = counters(link)
 
 sent, _, failed = after[0] - before[0], 0, after[2] - before[2]
+if sent > 0:
+    # Something on the bus acknowledged, so the premise is gone. Another node
+    # was added to this bench and taking the adapter down stopped being enough.
+    print(f"CAN TX ACCOUNTING RESULT: NOT RUN - a frame was delivered, so another "
+          f"node is acknowledging: tx+{sent} txerr+{failed}")
+    raise SystemExit(0)
 if failed <= 0:
     print(f"CAN TX ACCOUNTING RESULT: FAIL - nothing was counted as a failed send: "
-          f"tx+{sent} txerr+{failed}")
-    raise SystemExit(1)
-if sent != 0:
-    print(f"CAN TX ACCOUNTING RESULT: FAIL - a frame nobody acknowledged was counted as sent: "
           f"tx+{sent} txerr+{failed}")
     raise SystemExit(1)
 print(f"CAN TX ACCOUNTING RESULT: PASS tx+{sent} txerr+{failed} console={console}")

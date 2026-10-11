@@ -48,7 +48,12 @@ if [[ "${1:-}" != "--no-build" ]]; then
 	KFSW_BUILD_DIR="$root/build/hil/can/nucleo" \
 		"$root/k-fsw/tools/build.sh" nucleo_l496zg >"$work/build.log" 2>&1 ||
 		fail "the flight image did not build; see $work/build.log"
-	west flash --build-dir "$root/build/hil/can/nucleo" --runner openocd \
+	flash_args=(--build-dir "$root/build/hil/can/nucleo" --runner openocd)
+	# With two probes attached, openocd takes the first it finds, which is a
+	# coin flip over which board gets this image.
+	[[ -n "${KFSW_STLINK_SERIAL:-}" ]] &&
+		flash_args+=(--cmd-pre-init "adapter serial $KFSW_STLINK_SERIAL")
+	west flash "${flash_args[@]}" \
 		>"$work/flash.log" 2>&1 || fail "could not flash the NUCLEO"
 	"$root/k-fsw/tools/k-ground" build kfsw-gnd-can >"$work/ground.log" 2>&1 ||
 		fail "the ground node did not build; see $work/ground.log"

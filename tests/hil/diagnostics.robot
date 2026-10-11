@@ -33,7 +33,7 @@ CSP Tools Diagnose A Linux Node Through KISS
     HIL Command Should Pass    ${result}    DIAGNOSTICS SMOKE RESULT: PASS
 
 Board Telemetry Can Be Captured And Replayed
-    [Tags]    physical    diagnostics    hk    csp    discover
+    [Tags]    physical    diagnostics    hk    csp    discover    needs-nucleo
     Skip If    not $BENCH_SHELL or not $BENCH_KISS or not $CSP_TOOL
     ...    Set KFSW_DIAGNOSTICS_SHELL, KFSW_DIAGNOSTICS_KISS and KFSW_CSP_TOOLS_TEST_BINARY.
     ${result}=    Run Process
