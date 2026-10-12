@@ -159,6 +159,26 @@ def image_name(target, describe):
     return name
 
 
+def build_recovery(output, target, env):
+    """The image that lives in the golden partition, built from the same tree.
+
+    A release that carries only the flight image leaves a board with an empty
+    recovery partition, so there is nothing to fall back to on the day it is
+    needed. Targets without that partition have no recovery image and say so.
+    """
+    profile = REPO / "config/profiles/nucleo-golden.conf"
+    if target != "nucleo_l496zg" or not profile.is_file():
+        return None
+    build = output / "build-golden"
+    recovery_env = env.copy()
+    recovery_env["KFSW_GOLDEN_BUILD_DIR"] = str(build)
+    with (output / "build-golden.log").open("w") as log:
+        subprocess.run(["bash", str(REPO / "tools/golden.sh"), "build"],
+                       cwd=REPO, env=recovery_env, stdout=log, stderr=subprocess.STDOUT,
+                       check=True)
+    return build / "app/zephyr/zephyr.signed.bin"
+
+
 def build_release(output, target):
     inputs = check_inputs()
     name = image_name(target, run("git", "describe", "--tags", "--always", cwd=REPO))
@@ -191,6 +211,15 @@ def build_release(output, target):
     shutil.copy2(required("KFSW_RELEASE_MANIFEST"), artifacts / "west-frozen.yml")
     shutil.copy2(artifacts / "app" / "zephyr.signed.bin", artifacts / name)
     inputs["image"] = name
+
+    recovery = build_recovery(output, target, env)
+    if recovery is not None:
+        recovery_name = f"kfsw-{target}-recovery.signed.bin"
+        shutil.copy2(recovery, artifacts / recovery_name)
+        inputs["recovery_image"] = recovery_name
+        inputs["recovery_image_bytes"] = (artifacts / recovery_name).stat().st_size
+    else:
+        inputs["recovery_image"] = None
     inputs["unsigned_payload_sha256"] = hashes[0]
     inputs["artifacts"] = {
         str(p.relative_to(artifacts)): sha256(p) for p in sorted(artifacts.rglob("*")) if p.is_file()
