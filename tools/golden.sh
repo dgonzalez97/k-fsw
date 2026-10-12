@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
-# Build and place the recovery image that lives in kfsw_golden_partition.
+# Build and place the recovery image for kfsw_golden_partition.
 #
-# The image is an ordinary signed MCUboot image, linked for the primary slot
-# like any other, and kept in the golden partition until something copies it
-# into a slot. Nothing copies it yet: selection is not implemented, so this
-# script builds, checks that it fits, and writes it where it belongs.
+# It is an ordinary signed MCUboot image, linked for the primary slot, kept in
+# the golden partition until the recovery service copies it into a slot.
 #
 #   tools/golden.sh build
 #   tools/golden.sh flash
@@ -30,6 +28,7 @@ fail() { echo "GOLDEN: FAIL $*" >&2; exit 1; }
 build()
 {
 	KFSW_SYSBUILD=1 \
+		KFSW_MCUBOOT_KEY="${KFSW_MCUBOOT_KEY:-$HOME/.config/kfsw/mcuboot-signing-key.pem}" \
 		KFSW_BUILD_DIR="$build_dir" \
 		KFSW_PRISTINE=always \
 		KFSW_EXTRA_CONF_FILE="$profiles/nucleo-mcuboot.conf;$profiles/nucleo-golden.conf${KFSW_GOLDEN_EXTRA_CONF:+;$KFSW_GOLDEN_EXTRA_CONF}" \
@@ -62,11 +61,8 @@ flash)
 	size
 	command -v openocd >/dev/null || fail "openocd is not on PATH"
 	[[ -n "${KFSW_STLINK_SERIAL:-}" ]] || fail "the target profile names no ST-Link serial"
-	# Written as data, not as a bootable image: MCUboot boots the slots, and
-	# this partition is only storage until something copies it into one.
-	# The board's own openocd configuration, the same one west flashes with:
-	# a hand-assembled interface and target pair probed no flash bank here and
-	# wrote nothing while reporting success.
+	# Written as data: MCUboot boots the slots, not this partition.
+	# The board's own configuration, the same one west flashes with.
 	support="$ZEPHYR_BASE/boards/st/nucleo_l496zg/support"
 
 	openocd -s "$support" -f "$support/openocd.cfg" \

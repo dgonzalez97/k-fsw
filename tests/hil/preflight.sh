@@ -99,9 +99,8 @@ discover_serial() {
 		done
 	done
 
-	# Name the reference board by its serial and list the rest, so an operator
-	# sees what else is attached rather than learning it from a number that was
-	# read off another board.
+	# Name the board by its serial and list the rest, so an operator sees what
+	# else is attached.
 	local link
 	for link in "${stlinks[@]}"; do
 		if [[ -n "$STLINK_SERIAL" && "$link" == *"$STLINK_SERIAL"* ]]; then
@@ -113,10 +112,8 @@ discover_serial() {
 	done
 	if [[ -z "$found_debug" && ${#stlinks[@]} -gt 0 ]]; then
 		found_debug="${stlinks[0]}"
-		# A single probe is the board under test only when this target pins no
-		# serial, which is how another bench runs these cases. When a serial is
-		# pinned and that probe is not here, the board these cases are written
-		# for is absent however few others are attached.
+		# A single probe stands for the board only when this target pins no
+		# serial, which is how another bench runs these cases.
 		[[ -z "$STLINK_SERIAL" ]] && debug_is_reference="yes"
 	fi
 

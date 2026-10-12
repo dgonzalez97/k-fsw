@@ -144,9 +144,17 @@ int main(void)
 	}
 #endif
 
+#if CONFIG_KFSW_BOOT_CONFIRM_AT_START
+	result = kfsw_boot_confirm_image();
+	if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Could not confirm this image: %d", result);
+	}
+#endif
+
 #if CONFIG_KFSW_GOLDEN
-	/* Before anything else starts: this image has already failed to stay up
-	   often enough, so the sooner the recovery one runs the better. */
+	/* Before anything else starts, because this image has already failed to
+	   stay up often enough. */
 	{
 		enum kfsw_golden_outcome recovery;
 
