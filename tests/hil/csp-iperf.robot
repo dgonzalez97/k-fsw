@@ -21,7 +21,7 @@ CSP Benchmark Validates Linux Echo Replies
     HIL Command Should Pass    ${result}    CSP IPERF SMOKE RESULT: PASS
 
 CSP Benchmark Validates Bench Echo Replies
-    [Tags]    physical    diagnostics    csp    iperf
+    [Tags]    physical    diagnostics    csp    iperf    needs-nucleo
     Skip If    not $IPERF_TOOL or not $IPERF_DEVICE
     ...    Set KFSW_CSP_IPERF_TEST_BINARY and KFSW_DIAGNOSTICS_KISS explicitly.
     ${result}=    Run Process

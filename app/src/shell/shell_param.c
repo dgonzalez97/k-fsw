@@ -57,6 +57,7 @@ struct param_list_context {
 };
 
 static void format_param_value(char *text, size_t size, const struct kfsw_param_value *value);
+static int parse_table_id(const struct shell *sh, const char *text, uint8_t *table);
 
 static void print_list_header(const struct shell *sh)
 {
@@ -95,6 +96,50 @@ static bool tally_table(const struct kfsw_param_info *info, void *context)
 	if (info->table <= KFSW_PARAM_TABLE_MODULE_LAST) {
 		list_context->counts[info->table]++;
 	}
+	return true;
+}
+
+/*
+ * The listing an interface control document is generated from. It carries the
+ * unit and the description, which the value listing leaves out, and it keeps
+ * the description last so a reader with free-form text in it is still one row.
+ */
+static void print_describe_header(const struct shell *sh)
+{
+	shell_print(sh, "%-*s  %-4s  %-*s  %-*s  %-*s  %-6s  %s", KFSW_PARAM_TABLE_COLUMN, "table",
+		    "addr", KFSW_PARAM_NAME_COLUMN, "name", KFSW_PARAM_TYPE_COLUMN, "type",
+		    KFSW_PARAM_MODE_COLUMN, "mode", "unit", "description");
+	shell_print(sh, "%.*s  %.*s  %.*s  %.*s  %.*s  %.6s  %s", KFSW_PARAM_TABLE_COLUMN,
+		    "--------------------------------", 4, "--------------------------------",
+		    KFSW_PARAM_NAME_COLUMN, "--------------------------------",
+		    KFSW_PARAM_TYPE_COLUMN, "--------------------------------",
+		    KFSW_PARAM_MODE_COLUMN, "--------------------------------",
+		    "--------------------------------", "-----------");
+}
+
+static bool print_param_description(const struct kfsw_param_info *info, void *context)
+{
+	struct param_list_context *list_context = context;
+	char table_text[KFSW_PARAM_TABLE_COLUMN + 1];
+
+	if (list_context->filter_table && (info->table != list_context->table)) {
+		return true;
+	}
+	if (!list_context->header_printed) {
+		print_describe_header(list_context->shell);
+		list_context->header_printed = true;
+	}
+	if (info->table_name != NULL) {
+		(void)snprintf(table_text, sizeof(table_text), "%s", info->table_name);
+	} else {
+		(void)snprintf(table_text, sizeof(table_text), "%" PRIu8, info->table);
+	}
+	shell_print(list_context->shell, "%-*s  0x%02" PRIx8 "  %-*s  %-*s  %-*s  %-6s  %s",
+		    KFSW_PARAM_TABLE_COLUMN, table_text, info->offset, KFSW_PARAM_NAME_COLUMN,
+		    info->name, KFSW_PARAM_TYPE_COLUMN, kfsw_param_type_name(info->type),
+		    KFSW_PARAM_MODE_COLUMN, kfsw_param_mode_name(info->flags),
+		    (info->unit != NULL) ? info->unit : "-",
+		    (info->description != NULL) ? info->description : "-");
 	return true;
 }
 
@@ -415,6 +460,29 @@ static int parse_param_value(const char *text, struct kfsw_param_value *value)
 		return -EINVAL;
 	}
 
+	return 0;
+}
+
+static int cmd_param_describe(const struct shell *sh, size_t argc, char **argv)
+{
+	struct param_list_context context = {.shell = sh, .local = true};
+	int result;
+
+	if (argc > 1U) {
+		result = parse_table_id(sh, argv[1], &context.table);
+		if (result != 0) {
+			return result;
+		}
+		context.filter_table = true;
+	}
+	result = kfsw_param_visit(print_param_description, &context);
+	if (result != 0) {
+		shell_error(sh, "describe: %d", result);
+		return result;
+	}
+	if (!context.header_printed) {
+		shell_print(sh, "no parameters");
+	}
 	return 0;
 }
 
@@ -939,6 +1007,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 #else
 		      "Every parameter, with its value.", cmd_param_list, 1, 0),
 #endif
+	SHELL_CMD_ARG(describe, NULL,
+		      "What each parameter is, with its unit: describe [table].",
+		      cmd_param_describe, 1, 1),
 #if CONFIG_KFSW_PARAM_PERSISTENCE
 	SHELL_CMD_ARG(persist, NULL,
 		      "Write the snapshot and report one table's share: persist <table>.",

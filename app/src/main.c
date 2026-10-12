@@ -1,6 +1,7 @@
 #include <errno.h>
 
 #include <zephyr/kernel.h>
+#include <zephyr/sys/reboot.h>
 #include <zephyr/sys/util.h>
 
 #if CONFIG_KFSW_CSP
@@ -51,6 +52,11 @@
 #if CONFIG_KFSW_GNDWDT
 #include <kfsw/services/gndwdt.h>
 #endif
+#if CONFIG_KFSW_REMEXEC
+#include <kfsw/services/remexec.h>
+
+#include "remexec/remexec_allowlist.h"
+#endif
 #if CONFIG_KFSW_RESMON
 #include <kfsw/services/resmon.h>
 #endif
@@ -70,6 +76,7 @@
 #include <kfsw/services/health.h>
 #endif
 #define KFSW_LOG_MODULE KFSW_LOG_MODULE_APP
+#include <kfsw/services/golden.h>
 #include <kfsw/services/log.h>
 #if CONFIG_KFSW_LOG_REMOTE
 #include <kfsw/services/log_remote.h>
@@ -137,6 +144,31 @@ int main(void)
 	}
 #endif
 
+#if CONFIG_KFSW_BOOT_CONFIRM_AT_START
+	result = kfsw_boot_confirm_image();
+	if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Could not confirm this image: %d", result);
+	}
+#endif
+
+#if CONFIG_KFSW_GOLDEN
+	/* Before anything else starts, because this image has already failed to
+	   stay up often enough. */
+	{
+		enum kfsw_golden_outcome recovery;
+
+		result = kfsw_golden_check(&recovery);
+		if (result != 0) {
+			startup_failures++;
+			kfsw_log_error("Recovery decision unavailable: %d", result);
+		} else if (recovery == KFSW_GOLDEN_INSTALLED) {
+			kfsw_log_warning("Restarting into the recovery image");
+			sys_reboot(SYS_REBOOT_COLD);
+		}
+	}
+#endif
+
 #if CONFIG_KFSW_STORAGE_TMP
 	result = kfsw_storage_tmp_mount();
 	if (result != 0) {
@@ -193,6 +225,9 @@ int main(void)
 #endif
 #if CONFIG_KFSW_TABLE
 		&kfsw_table_param_definitions,
+#endif
+#if CONFIG_KFSW_REMEXEC
+		&kfsw_remexec_param_definitions,
 #endif
 #if CONFIG_KFSW_RADIO_UHF
 		&kfsw_radio_uhf_param_definitions,
@@ -285,6 +320,9 @@ int main(void)
 #if CONFIG_KFSW_COMMAND
 	const struct kfsw_command_definition_set *const command_sets[] = {
 		&kfsw_app_command_definitions,
+#if CONFIG_KFSW_FBO
+		&kfsw_fbo_command_definitions,
+#endif
 #if CONFIG_KFSW_GNDWDT
 		&kfsw_gndwdt_command_definitions,
 #endif
@@ -399,6 +437,26 @@ int main(void)
 		} else {
 			kfsw_log_info("Firmware upload server started on CSP port %d",
 				      CONFIG_KFSW_FWU_LITE_CSP_PORT);
+		}
+	}
+#endif
+
+#if CONFIG_KFSW_REMEXEC
+	/* The allowlist is adopted whether or not CSP came up: a node that
+	 * cannot be reached must still refuse by the same list if it is.
+	 */
+	result = kfsw_remexec_init(&kfsw_app_remexec_allowlist);
+	if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Remote execution allowlist refused: %d", result);
+	} else if (csp_started) {
+		result = kfsw_remexec_server_start();
+		if (result != 0) {
+			startup_failures++;
+			kfsw_log_error("Failed to start the remote execution server: %d", result);
+		} else {
+			kfsw_log_info("Remote execution server started on CSP port %d",
+				      CONFIG_KFSW_REMEXEC_CSP_PORT);
 		}
 	}
 #endif

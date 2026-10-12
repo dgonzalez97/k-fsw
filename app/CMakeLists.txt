@@ -96,6 +96,12 @@ target_sources_ifdef(CONFIG_KFSW_COMMAND app PRIVATE
     src/commands/command_definitions.c
 )
 
+# The allowlist is the security boundary of remote execution, so it is a
+# composition file rather than a service default.
+target_sources_ifdef(CONFIG_KFSW_REMEXEC app PRIVATE
+    src/remexec/remexec_allowlist.c
+)
+
 if(CONFIG_KFSW_PARAM_TEST_DEFINITIONS)
     target_sources(app PRIVATE
         ../tests/support/parameter_definitions.c
@@ -134,12 +140,16 @@ if(CONFIG_KFSW_DEBUG_SHELL)
     )
     target_sources_ifdef(CONFIG_KFSW_COMMAND app PRIVATE
         src/shell/shell_command.c
+        src/shell/shell_registry.c
     )
     target_sources_ifdef(CONFIG_KFSW_GNDWDT app PRIVATE
         src/shell/shell_gndwdt.c
     )
     target_sources_ifdef(CONFIG_KFSW_RESMON app PRIVATE
         src/shell/shell_resmon.c
+    )
+    target_sources_ifdef(CONFIG_KFSW_REMEXEC app PRIVATE
+        src/shell/shell_remexec.c
     )
     target_sources_ifdef(CONFIG_KFSW_HK app PRIVATE
         src/shell/shell_hk.c
@@ -158,6 +168,9 @@ if(CONFIG_KFSW_DEBUG_SHELL)
     )
     target_sources_ifdef(CONFIG_KFSW_FWU app PRIVATE
         src/shell/shell_fwu.c
+    )
+    target_sources_ifdef(CONFIG_KFSW_GOLDEN app PRIVATE
+        src/shell/shell_golden.c
     )
     target_sources_ifdef(CONFIG_KFSW_HEALTH app PRIVATE
         src/shell/shell_health.c

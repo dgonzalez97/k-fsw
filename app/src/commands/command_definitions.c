@@ -14,6 +14,7 @@
 #include <kfsw/platform/lastwords.h>
 #include <kfsw/services/boot.h>
 #endif
+#include <kfsw/services/golden.h>
 #include <kfsw/services/log.h>
 #if CONFIG_KFSW_JOURNAL
 #include <kfsw/services/journal.h>
@@ -43,6 +44,7 @@
 #define KFSW_COMMAND_ID_NOOP 1U
 #define KFSW_COMMAND_ID_INFO 2U
 #define KFSW_COMMAND_ID_REBOOT 3U
+#define KFSW_COMMAND_ID_GOLDEN_INSTALL 24U
 #define KFSW_COMMAND_ID_EVENT_STATS 4U
 #define KFSW_COMMAND_ID_EVENT_TAIL 5U
 #define KFSW_COMMAND_ID_HK_DEFINE 6U
@@ -109,6 +111,45 @@ static void reboot_work_handler(struct k_work *work)
 }
 
 static K_WORK_DELAYABLE_DEFINE(reboot_work, reboot_work_handler);
+
+#if CONFIG_KFSW_GOLDEN
+static int command_golden_install(const struct kfsw_command_arg *args, size_t arg_count,
+				  const struct kfsw_command_source *source,
+				  struct kfsw_command_result *result)
+{
+	int outcome;
+
+	ARG_UNUSED(arg_count);
+
+#if CONFIG_KFSW_PARAM
+	if (!kfsw_system_reboot_pin_matches(args[0].value.text)) {
+#else
+	if (strcmp(args[0].value.text, "0000") != 0) {
+#endif
+		kfsw_log_warning("Recovery refused: node %u quoted the wrong pin", source->node);
+		result->status = KFSW_COMMAND_DENIED;
+		(void)snprintf(result->detail, sizeof(result->detail), "wrong pin");
+		return -EACCES;
+	}
+
+	outcome = kfsw_golden_install();
+	if (outcome != 0) {
+		result->status = (outcome == -ENOENT) ? KFSW_COMMAND_DENIED : KFSW_COMMAND_FAILED;
+		(void)snprintf(result->detail, sizeof(result->detail), "install failed (%d)",
+			       outcome);
+		return outcome;
+	}
+	if (k_work_schedule(&reboot_work, K_MSEC(KFSW_COMMAND_REBOOT_DELAY_MS)) < 0) {
+		result->status = KFSW_COMMAND_BUSY;
+		return -EBUSY;
+	}
+	kfsw_log_warning("Recovery image requested by node %u", source->node);
+	result->status = KFSW_COMMAND_OK;
+	(void)snprintf(result->detail, sizeof(result->detail), "rebooting in %u ms",
+		       KFSW_COMMAND_REBOOT_DELAY_MS);
+	return 0;
+}
+#endif
 
 /* Text, so 0000 keeps four characters and 0007 doesn't match 7. */
 static const enum kfsw_command_type reboot_arg_types[] = {KFSW_COMMAND_TYPE_TEXT};
@@ -504,6 +545,17 @@ static const struct kfsw_command_definition app_commands[] = {
 		.arg_count = 1U,
 		.arg_types = hk_clear_args,
 		.handler = command_hk_clear,
+	},
+#endif
+#if CONFIG_KFSW_GOLDEN
+	{
+		.id = KFSW_COMMAND_ID_GOLDEN_INSTALL,
+		.name = "golden_install",
+		.help = "Install the recovery image and restart: golden_install <pin>.",
+		.flags = KFSW_COMMAND_FLAG_MUTATING,
+		.arg_count = 1U,
+		.arg_types = reboot_arg_types,
+		.handler = command_golden_install,
 	},
 #endif
 #if CONFIG_REBOOT

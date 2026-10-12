@@ -80,9 +80,16 @@ stty -F "$debug_serial" "$KFSW_SERIAL_BAUD" cs8 -cstopb -parenb -crtscts raw -ec
 timeout 240s cat "$debug_serial" >"$work_dir/node.log" &
 capture_pid=$!
 
-west flash -d "$KFSW_ROOT/build/nucleo_l496zg" --runner openocd >"$work_dir/flash.log" 2>&1 ||
+kfsw_west_flash -d "$KFSW_ROOT/build/nucleo_l496zg" --runner openocd >"$work_dir/flash.log" 2>&1 ||
 	{ cat "$work_dir/flash.log" >&2; exit 1; }
 wait_for "@READY " 60 || { echo "ERROR: the board never reported readiness" >&2; exit 1; }
+
+# Two boards answer on this bench, and not with the same composition.
+answered="$(sed -n 's/.*@BOOT .*board=\([^ ]*\).*/\1/p' "$work_dir/node.log" | head -1)"
+if [[ "$answered" != "$ZEPHYR_BOARD"* ]]; then
+	echo "ERROR: ${answered:-nothing} answered on $debug_serial, expected $ZEPHYR_BOARD" >&2
+	exit 1
+fi
 
 echo "CLOCK SMOKE"
 

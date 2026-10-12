@@ -53,6 +53,12 @@ echo "INTEGRATION: a parameter table uploaded as a file"
 echo "INTEGRATION: housekeeping collection"
 "$KFSW_REPO_DIR/tests/hk-smoke.sh"
 
+echo "INTEGRATION: the ground keeps what came down"
+"$kfsw_python" "$KFSW_REPO_DIR/tests/hk-ground-store-smoke.py"
+
+echo "INTEGRATION: standing between Gpredict and the hardware"
+"$kfsw_python" "$KFSW_REPO_DIR/tests/gpredict-proxy-smoke.py"
+
 echo "INTEGRATION: a procedure run from a file"
 "$KFSW_REPO_DIR/tests/fbo-smoke.sh"
 

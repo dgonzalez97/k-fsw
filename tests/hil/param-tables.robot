@@ -36,7 +36,7 @@ The Listing Reports Write Behaviour
 
 NUCLEO Reports Its Tables Over The Debug UART
     [Documentation]    The same listing read from a board.
-    [Tags]    param    tables    nucleo    physical
+    [Tags]    param    tables    nucleo    physical    needs-nucleo
     ${result}=    Run Param Tables Smoke On Serial
     HIL Command Should Pass    ${result}    PARAM TABLES RESULT: PASS
 

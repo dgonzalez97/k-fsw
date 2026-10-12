@@ -5,8 +5,10 @@ Resource         resources/common.resource
 
 *** Test Cases ***
 Debug Shell And Physical UART CSP Link Succeed
-    [Tags]    smoke    nucleo    shell    csp    uart    physical
+    [Tags]    smoke    nucleo    shell    csp    uart    physical    needs-ftdi
     ${result}=    Run Physical UART CSP Smoke
+    Skip If    "UART CSP HIL RESULT: NOT RUN" in $result.stdout
+    ...    ${result.stdout}
     HIL Command Should Pass    ${result}    UART CSP HIL RESULT: PASS
     Should Contain    ${result.stdout}    K-FSW status
     Response Should Contain    ${result.stdout}    CSP ping 2: success

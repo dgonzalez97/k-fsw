@@ -1,4 +1,5 @@
 *** Settings ***
+Library    OperatingSystem
 Library    tmux_interaction_lib.TmuxInteractionLib    WITH NAME    TerminalRunner
 
 *** Variables ***
@@ -63,10 +64,27 @@ Close KFSW Terminal
     Run Keyword And Ignore Error    TerminalRunner.Close Program
     Sleep    500ms
 
+Resolve KFSW Python
+    [Documentation]    The workspace venv when there is one, python3 otherwise,
+    ...                the way tools/ci/integration.sh already decides it. A
+    ...                hard-coded venv path passes here and fails on a runner
+    ...                that has none.
+    ${from_env}=    Get Environment Variable    KFSW_PYTHON    ${EMPTY}
+    IF    $from_env
+        RETURN    ${from_env}
+    END
+    ${venv}=    Normalize Path    ${KFSW_REPO_DIR}/../.venv/bin/python
+    ${exists}=    Run Keyword And Return Status    File Should Exist    ${venv}
+    IF    $exists
+        RETURN    ${venv}
+    END
+    RETURN    python3
+
 Open KFSW Ground Console
     Reset KFSW Terminal Output
+    ${python}=    Resolve KFSW Python
     TerminalRunner.Start Program
-    ...    ${KFSW_REPO_DIR}/../.venv/bin/python
+    ...    ${python}
     ...    params=${KFSW_REPO_DIR}/tests/k-ground-flight-terminal.py
     ...    wait_time=0
     Wait Until Keyword Succeeds    90s    250ms

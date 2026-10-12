@@ -164,7 +164,7 @@ Bench tests cover CAN, radio, parameters and firmware updates. Robot drives
 the console and records the results; hardware cases are excluded from CI.
 
 [Test commands and bench setup](docs/testing/index.md) |
-[Coverage](https://dgonzalez97.github.io/k-fsw/coverage/)
+[Coverage](https://dgonzalez97.github.io/k-fsw/main/coverage/)
 
 ![Hardware test suite running](docs/media/hardware-test-robot.gif)
 

@@ -9,3 +9,6 @@ __pycache__/
 
 # Output from direct Twister runs
 twister-out*/
+
+# native_sim flash images left by a hosted run
+flash.bin

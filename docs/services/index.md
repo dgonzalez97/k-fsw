@@ -76,10 +76,9 @@ the latest increment.
 
 The reason is the one the service can establish, not a verdict from the
 bootloader: an image previously observed unconfirmed is no longer running.
-Reason 1 additionally records that MCUboot scheduled a revert while that image
-was last recorded; the service had not recorded its confirmation. The previous image
-identity is kept in the same record. It does not establish why confirmation was missed or distinguish a bootloader
-revert from another replacement of an unconfirmed image. The reason remains
+Reason 1 also means MCUboot had scheduled a revert while that image was last
+recorded, and that the service had not recorded its confirmation. The previous
+image identity is kept in the same record. The reason remains
 stored when the running image is confirmed; only the attempt count resets.
 Confirming through `boot_confirmed` saves that reset immediately. Confirmation
 through the separate MCUboot shell is reflected at the next service startup.
@@ -252,6 +251,56 @@ line, including if it becomes unset while waiting. `fbo stop` wakes the wait
 immediately; it cannot be bypassed by `on-error continue`. Other errors follow
 the procedure's `on-error` policy. Execution time is not guaranteed, and
 pending waits are lost at restart.
+
+### The time-tagged queue
+
+A procedure needs someone to start it. The queue is for the other case: leave a
+single command behind and let the node release it when its time comes, with
+nobody listening.
+
+```text
+fbo sched add +600 0 "noop"
+fbo sched add @1900000000 2 "reboot 1234"
+fbo sched list
+fbo sched cancel 0
+fbo sched clear
+fbo sched status
+```
+
+`+seconds` counts from the moment the entry is accepted, on the monotonic clock,
+so it is unaffected by anything that happens to the wall clock afterwards.
+`@utc` is a UTC second and is refused with `-ENODATA` while the clock has never
+been set this power cycle, because a release at the wrong time is worse than a
+release that never happens. The node after the time is where the command runs;
+`0` is this one.
+
+Adding, cancelling and clearing are ordinary commands, `fbo_sched_add`,
+`fbo_sched_cancel` and `fbo_sched_clear`, so the ground reaches them over CSP the
+same way the shell does. The shell's `fbo sched` subcommands are the same
+handlers, not a second parser.
+
+An entry is addressed by the CRC32 of its content, so an uplink that arrives
+twice does not queue the command twice: the second add reports `repeated=yes`
+and names the slot already holding it. `fbo_sched_hash` is the CRC32 over the
+whole queue, which is how the ground confirms the node holds the plan it sent.
+
+An entry released later than `fbo_sched_latency_s` after its deadline reports
+`overdue` and does not run. The buffer exists because a release waits its turn
+behind whatever command is in flight; it must stay above the command reply
+timeout, and the service refuses a value below it. `CONFIG_KFSW_FBO_SCHEDULE_BURST`
+bounds how many entries one pass may release, so a forward clock step does not
+set off everything at once.
+
+The queue is a fixed array of `CONFIG_KFSW_FBO_SCHEDULE_ENTRIES` slots and does
+not survive a reset. A full queue refuses with `-ENOSPC` and changes nothing.
+Cancelling an entry that has already run returns `-EALREADY`, so a cancel never
+claims to have stopped something that fired.
+
+Everything the ground needs to operate a queue it cannot see is in parameter
+table 34: `fbo_sched_entries`, `fbo_sched_scheduled`, `fbo_sched_overdue`,
+`fbo_sched_clock_set`, `fbo_sched_next_due_s`, `fbo_sched_next_due_utc`,
+`fbo_sched_releases`, `fbo_sched_refusals`, `fbo_sched_overdues` and
+`fbo_sched_hash`.
 
 ## Persistent event journal
 
@@ -871,6 +920,111 @@ failed entropy read prevents allocation. Handlers still run synchronously and
 need their own execution bounds. Changing clocks does not affect ticket
 lifetimes.
 
+## Remote shell execution
+
+`CONFIG_KFSW_REMEXEC` lets an operator read which shell commands a node offers
+and run one of them, on CSP port 8, with its output coming back to the node
+that asked. The Linux image enables it. It is not composed into the NUCLEO
+image yet: capturing output costs a shell instance, and that footprint has not
+been measured on the board.
+
+**Allowlist.** A command is unreachable until the composition marks it in the
+list handed to `kfsw_remexec_init()`. The listing reads the same array the
+executor checks, so there is nothing to keep in step. There is no wildcard, no
+debug mode and no PIN, and a composition that marks nothing lists nothing and
+refuses every execution.
+
+### How a composition marks a command
+
+The list lives beside the composition, in
+`k-fsw/app/src/remexec/remexec_allowlist.c`, not in the service:
+
+```c
+static const struct kfsw_remexec_entry remexec_entries[] = {
+	{.command = "storage info", .help = "Filesystem totals and mount state"},
+};
+```
+
+`command` is the shell command as typed, with its subcommand and without
+arguments. `help` is the line the listing shows. Marking a command marks its
+arguments too, so mark only commands whose whole argument space is safe to run
+from the ground: the reference list is read-only commands that finish promptly
+and print little.
+
+`kfsw_remexec_init()` refuses a list rather than serving part of one. It
+rejects more entries than `CONFIG_KFSW_REMEXEC_MAX_ENTRIES` (16), an entry
+without a command or help text, a command longer than 64 bytes, a command
+holding a byte that is not printable, and a repeated command. A rejected list
+leaves the node offering nothing.
+
+### What an operator sees
+
+A refusal names the command and says it is not offered, never a generic
+failure:
+
+```text
+remexec: 'storage test' is not offered for remote execution
+```
+
+A command line is at most 64 bytes and must be printable ASCII; a longer or
+malformed one is refused with its own reason. Only one execution runs at a
+time: a second request is refused `busy` rather than queued.
+
+### The output cap and what truncation looks like
+
+A reply carries at most `CONFIG_KFSW_REMEXEC_OUTPUT_MAX` bytes, 200 by
+default, which keeps one reply inside a single CSP buffer on the narrowest
+link. The service counts every byte the command printed, keeps the first cap
+bytes and reports the rest as dropped, so the count is exact:
+
+```text
+node: 2
+command: version
+output: 200 of 264 bytes, truncated, 64 dropped
+K-FSW: v1.1.0
+...
+```
+
+Whether the command succeeded is separate from whether its output fitted. A
+command that returns zero and overruns the cap reports `status: ok` with
+`truncated`; a command that fails and prints two bytes reports the failure and
+no truncation. The listing shares the cap: a long allowlist comes back
+truncated, and `remexec <node> get <command>` narrows it.
+
+### Execution and timeout
+
+Execution runs on the remote execution server thread, so a slow handler cannot
+stall the CSP router. A shell handler runs to completion and cannot be
+aborted, so `CONFIG_KFSW_REMEXEC_TIMEOUT_MS` (5000) is the budget the serving
+node measures an execution against and reports as `timeout` afterwards, and
+the client's own wait for a reply. A handler that never returns holds the
+executor and every later request is refused `busy`; the allowlist is the control
+for that, not the timeout.
+
+If the requesting node goes away mid-execution, the command still runs to
+completion. The reply is sent on the connection and discarded by the link,
+nothing is queued and nothing is retried, and the serving node's counters
+still record the execution. A client that timed out therefore does not know
+whether the command ran; read table 38 or the log on the next pass.
+
+Capturing output costs a second shell instance, so composing the service adds
+one thread of `CONFIG_SHELL_STACK_SIZE`. A node cannot be asked to run its own
+commands through `remexec`: the capture shell cannot be driven from the shell
+that asked, so a request addressed to the local node is refused.
+
+Table 38 publishes what the service counted, so a refusal is visible without
+reading a log:
+
+| Parameter | Access | Meaning |
+| --- | --- | --- |
+| `remexec_accepted` | r | Requests whose command was allowed and run |
+| `remexec_refused` | r | Requests refused before any command ran |
+| `remexec_truncated` | r | Replies that could not carry all the output |
+| `remexec_offered` | r | Commands marked for remote execution |
+| `remexec_refusal` | r | Why the most recent request was refused |
+
+See @ref kfsw_services_remexec.
+
 ## Resource monitor
 
 The resource monitor periodically reads the kernel's thread list and records
@@ -940,7 +1094,7 @@ spacecraft that lost its way out of contact eventually starts again from a
 known state. The countdown restarts only on command 16, `ground_wtd`, carrying
 the exact text `KFSWWSFK`, received over CSP. Any node may send it. Ping,
 telemetry, parameter traffic and local feed attempts do not count. The timeout
-is 2 hours to 5 days (7200–432000 seconds), with a 24-hour default (86400
+is 2 hours to 5 days (7200-432000 seconds), with a 24-hour default (86400
 seconds).
 
 From another node's console, feed node 2 and read it back:
@@ -975,7 +1129,7 @@ Table 35 exposes:
 | Parameter | Access | Meaning |
 | --- | --- | --- |
 | `gndwdt_enabled` | rw | Whether the countdown is armed |
-| `ground_wtd_timeout` | rw | Timeout in seconds, 7200–432000; default 86400 |
+| `ground_wtd_timeout` | rw | Timeout in seconds, 7200-432000; default 86400 |
 | `ground_wtd_cnt` | r | Seconds remaining; zero when stopped, expired or waiting to reset |
 | `gndwdt_since_s` | r | Seconds since startup or the last valid feed |
 | `gndwdt_contacts` | r | Valid feed commands accepted |

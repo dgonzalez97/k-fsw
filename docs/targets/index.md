@@ -131,13 +131,19 @@ flash for it.
 | `boot_partition` | `0x000000` | 64 KB |
 | `slot0_partition` | `0x010000` | 352 KB |
 | `slot1_partition` | `0x068000` | 352 KB |
-| `kfsw_golden_partition` | `0x0C0000` | 192 KB, reserved |
+| `kfsw_golden_partition` | `0x0C0000` | 192 KB, recovery image |
 | `kfsw_storage_partition` | `0x0F0000` | 64 KB |
 
 The bootloader and the application use the same flash map overlay. The
 storage partition stays at `0xF0000`, so an existing filesystem survives the
 move to MCUboot; the rollback test checks that a stored value is still there
-after every swap. The golden partition is reserved for a recovery image.
+after every swap. The golden partition holds the recovery image built by
+`tools/golden.sh`: the composition in `config/profiles/nucleo-golden.conf`, with
+CSP, parameters, the command server and both update routes and nothing else. It
+is signed and linked like any other image. The bootloader only boots the slots,
+so installing it means copying it into the secondary slot and swapping, which
+`golden_install` does on command and the boot service does on its own once an
+image has booted unconfirmed more times than `boot_retries` allows.
 
 #### Signing
 

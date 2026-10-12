@@ -25,6 +25,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           path: k-fsw
+          # The site carries one directory per version, built from refs in
+          # this clone, so a shallow checkout would publish only main.
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -43,21 +46,36 @@ jobs:
       - name: Install gcovr and plotly
         run: pip install gcovr plotly
 
+      # A version is built from a worktree at the revision its own manifest
+      # pins, so those revisions have to be present and west fetches narrowly.
+      - name: Fetch the history the version selector needs
+        run: |
+          for project in kfsw-platform kfsw-services kfsw-comms kfsw-modules; do
+            git -C "$project" fetch --tags --prune --unshallow 2>/dev/null ||
+              git -C "$project" fetch --tags --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          done
+
       - name: Build and validate SDK documentation
-        run: ./k-fsw/tools/ci/docs.sh
+        run: ./k-fsw/tools/docs/site.sh
+
+      - name: Name the version the extra reports belong to
+        id: docs
+        run: |
+          slug="$(python3 -c 'import json; print(json.load(open("build/docs/site/versions.json"))["default"])')"
+          echo "default=$slug" >>"$GITHUB_OUTPUT"
 
       # Published with the manual so both come from the same commit.
       - name: Measure coverage
         run: ./k-fsw/tools/ci/coverage.sh
 
       - name: Add coverage to the documentation
-        run: cp -r build/coverage/html build/docs/html/coverage
+        run: cp -r build/coverage/html build/docs/site/${{ steps.docs.outputs.default }}/coverage
 
       - name: Measure footprint
         run: ./k-fsw/tools/ci/footprint.sh
 
       - name: Add footprint to the documentation
-        run: cp -r build/footprint build/docs/html/footprint
+        run: cp -r build/footprint build/docs/site/${{ steps.docs.outputs.default }}/footprint
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
@@ -65,7 +83,7 @@ jobs:
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          path: build/docs/html
+          path: build/docs/site
 
   deploy:
     name: Deploy documentation to GitHub Pages

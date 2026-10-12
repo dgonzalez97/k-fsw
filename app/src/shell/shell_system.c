@@ -290,7 +290,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(log_commands,
 #endif
 #if CONFIG_KFSW_LOG_REMOTE
 	SHELL_CMD_ARG(remote, NULL,
-		      "Read another node's recent messages: remote <node> [count] [min level].",
+		      "Another node's recent messages: remote <node> [count] [level].",
 		      cmd_log_remote, 2, 2),
 #endif
 	SHELL_CMD_ARG(test, NULL, "Exercise all log levels.", cmd_log_test, 1, 0),

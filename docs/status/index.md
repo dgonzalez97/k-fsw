@@ -13,7 +13,8 @@ under `tests/hil/`; use @ref testing to find the relevant fixture.
 | CAN | `e21233f`: NUCLEO ping with `rtt_ms=50`, identity, and remote parameters, 1743 frames with no bus errors | External transceiver and termination required; the board has no transceiver |
 | Holybro | Bidirectional CSP, remote parameters, file round trips | No RF range or endurance qualification |
 | Radio encryption | Native peers: AES-256-GCM, key changes, plaintext refusal, replay rejection | Encrypted Holybro acceptance pending |
-| Firmware update | `db64963`: radio upload, boot, and confirmation | Signature checked by MCUboot; golden-image selection absent |
+| Firmware update | `db64963`: radio upload, boot, and confirmation | Signature checked by MCUboot |
+| Recovery image | `bc6bf7c`: installed on command over the console, swapped in by the bootloader, and reachable over CAN with the recovery parameter set | The automatic path needs an image that boots unconfirmed repeatedly, which a working revert prevents, so it is unproven on the bench |
 | CAN firmware update | `e21233f`: FTP and FWU lite uploads, both slot readbacks, a trial reverted without confirmation, then confirmed and rebooted | NUCLEO at 500 kbit/s; the acceptance leaves the board on the candidate, so the baseline is reinstalled between runs |
 | Housekeeping | `54ac87f`: collection, radio retrieval, and Yamcs archive | Measurements cover one report and bench |
 | Watchdog and health | Reset after starving the watchdog; runs with healthy and overdue components | STM32 watchdog cannot be disarmed once started |

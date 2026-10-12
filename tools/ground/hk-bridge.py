@@ -24,6 +24,7 @@ import collections
 import contextlib
 import json
 import math
+import pathlib
 import socket
 import struct
 import sys
@@ -344,6 +345,9 @@ def main():
     source.add_argument("--device", help="serial device or native_sim pseudo-terminal")
     source.add_argument("--replay", help="replay a capture without opening a device")
     parser.add_argument("--capture", help="write accepted samples to a new JSONL file")
+    parser.add_argument("--store", help="keep accepted samples in this SQLite database")
+    parser.add_argument("--definitions",
+                        help="report definition stored with the samples it decodes")
     parser.add_argument("--baud", type=int, default=115200)
     parser.add_argument("--node", type=int, help="CSP address to watch or poll")
     parser.add_argument("--source", type=int, default=16)
@@ -363,6 +367,8 @@ def main():
     args = parser.parse_args()
     global csp_version
     csp_version = args.csp_version
+    if args.definitions and not args.store:
+        parser.error("--definitions needs --store: it is kept beside the samples")
     if args.replay and (args.capture or args.listen or args.node is not None):
         parser.error("--replay cannot be combined with --capture, --listen or --node")
     if args.device and (args.node is None or not 0 <= args.node <= csp_max_node()):
@@ -385,9 +391,19 @@ def main():
             sink = (stack.enter_context(socket.socket(socket.AF_INET, socket.SOCK_DGRAM)),
                     (host, int(port)))
         capture = stack.enter_context(open(args.capture, "x", encoding="utf-8")) if args.capture else None
+        store = None
+        if args.store:
+            from hk_store import Store
 
-        def forward(sample, received_ms):
+            document = (pathlib.Path(args.definitions).read_text(encoding="utf-8")
+                        if args.definitions else None)
+            store = stack.enter_context(
+                Store(args.store, document, int(time.time() * 1000)))
+
+        def forward(sample, received_ms, node):
             print(describe(sample), flush=True)
+            if store:
+                store.record(node, sample, received_ms)
             if sink:
                 sink[0].sendto(envelope(sample, received_ms), sink[1])
             else:
@@ -395,8 +411,8 @@ def main():
 
         if args.replay:
             stream = stack.enter_context(open(args.replay, encoding="utf-8"))
-            for _node, sample, received_ms in read_capture(stream):
-                forward(sample, received_ms)
+            for node, sample, received_ms in read_capture(stream):
+                forward(sample, received_ms, node)
             return 0
 
         import serial
@@ -415,7 +431,7 @@ def main():
                     if capture:
                         capture.write(json.dumps(capture_record(args.node, sample, received_ms)) + "\n")
                         capture.flush()
-                    forward(sample, received_ms)
+                    forward(sample, received_ms, args.node)
             except TimeoutError as error:
                 print(f"no reply: {error}", file=sys.stderr)
                 failed = True

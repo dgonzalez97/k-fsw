@@ -14,6 +14,6 @@ echo "============================================================"
 echo " K-FSW FLASH"
 echo "============================================================"
 
-west flash \
+kfsw_west_flash \
     -d "$KFSW_BUILD_DIR" \
     --runner "${KFSW_FLASH_RUNNER:-openocd}"

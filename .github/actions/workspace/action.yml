@@ -28,6 +28,17 @@ runs:
         app-path: k-fsw
         toolchains: arm-zephyr-eabi
 
+    # Ten jobs each compile Zephyr from scratch, about 1300 objects a build,
+    # and most of those objects are identical between jobs and between runs.
+    # Zephyr's CMake uses ccache when it finds it on PATH.
+    - name: Cache compiled objects
+      uses: hendrikmuhs/ccache-action@v1
+      with:
+        key: ${{ github.job }}-${{ runner.os }}
+        restore-keys: |
+          ${{ runner.os }}-
+        max-size: 1G
+
     - name: Apply the workspace patches
       shell: bash
       run: west patch apply

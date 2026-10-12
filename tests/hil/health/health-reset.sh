@@ -84,9 +84,12 @@ done
 if [[ "$do_flash" -eq 1 ]]; then
 	banner "Build"
 	# The watchdog and health are in the NUCLEO profile; nothing to layer.
-	KFSW_BUILD_DIR="$build_dir" \
+	# Pristine because a build directory left by an earlier version of this
+	# case keeps its own cached profile, and a stale one fails for a reason
+	# this case cannot see.
+	KFSW_BUILD_DIR="$build_dir" KFSW_PRISTINE=always \
 		"$KFSW_TOOLS_DIR/build.sh" nucleo_l496zg >"$work_dir/build.log" 2>&1 || \
-		abort "the health composition did not build"
+		{ cat "$work_dir/build.log" >&2; abort "the health composition did not build"; }
 fi
 
 build_sha="$(git -C "$KFSW_REPO_DIR" rev-parse --short HEAD)"
@@ -102,7 +105,7 @@ capture_pid=$!
 
 if [[ "$do_flash" -eq 1 ]]; then
 	banner "Flash"
-	west flash -d "$build_dir" --runner openocd >"$work_dir/flash.log" 2>&1 || \
+	kfsw_west_flash -d "$build_dir" --runner openocd >"$work_dir/flash.log" 2>&1 || \
 		abort "NUCLEO flash failed"
 fi
 
@@ -111,6 +114,11 @@ for _ in $(seq 1 60); do
 	sleep 0.5
 done
 grep -q "@READY " "$work_dir/nucleo.log" || abort "the node did not report readiness"
+
+# Two boards answer on this bench, and not with the same composition.
+answered="$(sed -n 's/.*@BOOT .*board=\([^ ]*\).*/\1/p' "$work_dir/nucleo.log" | head -1)"
+[[ "$answered" == "$ZEPHYR_BOARD"* ]] ||
+	abort "${answered:-nothing} answered on ${debug_serial}, expected $ZEPHYR_BOARD"
 
 banner "Health feeds the watchdog"
 mark

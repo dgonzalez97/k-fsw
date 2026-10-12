@@ -49,6 +49,7 @@ INPUT                  = docs \
                          ../kfsw-platform/include/kfsw \
                          ../kfsw-services/include/kfsw \
                          ../kfsw-comms/include/kfsw \
+                         ../kfsw-modules/gpredict/include/kfsw \
                          ../kfsw-modules/radio-uhf/include/kfsw \
                          ../kfsw-modules/temperature-sensor-example/include/kfsw \
                          ../kfsw-modules/boton-test/include/kfsw

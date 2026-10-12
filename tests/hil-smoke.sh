@@ -69,7 +69,7 @@ sleep 0.25
 echo
 echo "[5/5] Flash / reset / boot"
 
-west flash \
+kfsw_west_flash \
     -d "$KFSW_BUILD_DIR" \
     --runner openocd
 
@@ -85,16 +85,35 @@ cat "$capture_file"
 echo "========================================="
 echo
 
+# The banner says which board answered. Two boards are on this bench and they
+# are not the same composition, so @BOOT alone does not say this one booted.
+if ! grep -Fq "board=$ZEPHYR_BOARD" "$capture_file"; then
+    answered="$(sed -n 's/.*@BOOT .*board=\([^ ]*\).*/\1/p' "$capture_file" | head -1)"
+    echo "HIL RESULT: FAIL"
+    echo "  [x] ${answered:-nothing} answered on $KFSW_SERIAL, expected $ZEPHYR_BOARD"
+    exit 1
+fi
+
 boot_ok=0
 ready_ok=0
 
 grep -Fq '@BOOT ' "$capture_file" && boot_ok=1
 grep -Fq '@READY ' "$capture_file" && ready_ok=1
 
+# The board stamps how long it took, so report it rather than only that it
+# arrived. A ceiling turns it from a note into a number that can regress.
+ready_ms="$(sed -n 's/.*@READY uptime_ms=\([0-9]\+\).*/\1/p' "$capture_file" | head -1)"
+ceiling="${KFSW_BOOT_CEILING_MS:-2000}"
+
 if [[ "$boot_ok" == 1 && "$ready_ok" == 1 ]]; then
+    if [[ -n "$ready_ms" ]] && (( ready_ms > ceiling )); then
+        echo "HIL RESULT: FAIL"
+        echo "  [x] ready in ${ready_ms} ms, over the ${ceiling} ms ceiling"
+        exit 1
+    fi
     echo "HIL RESULT: PASS"
     echo "  [ok] @BOOT"
-    echo "  [ok] @READY"
+    echo "  [ok] @READY${ready_ms:+ in ${ready_ms} ms, ceiling ${ceiling} ms}"
     exit 0
 fi
 

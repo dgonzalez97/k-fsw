@@ -232,6 +232,100 @@ Beacons are sent to their own port (`KFSW_HK_BEACON_PORT`) so they never reach
 a request handler. With persistence enabled, beacon settings are saved with
 the report.
 
+### Keeping what came down
+
+A pass read on a console is gone when the console closes. `--store` keeps every
+accepted sample in a SQLite file, so a value can be read against last week
+instead of only now:
+
+```bash
+./k-fsw/tools/ground/hk-bridge.py --device /dev/pts/7 --node 1 --listen \
+    --store passes.db --definitions ground-station/reports/nucleo-temperature.yaml
+```
+
+Two things decide the shape of that file, and both come from how housekeeping
+works on the node.
+
+A frame carries values and no names, so the report definition is the schema.
+`--definitions` stores the document beside the samples and points each sample at
+the definition that was in force when it arrived. A definition that changes gets
+a new row, so a sample recorded under the old one is never decoded with the new
+one.
+
+A gap is data. Every sample carries a sequence number precisely so a missing one
+is visible, so the store never fills one in. The `gap` view reports what was not
+heard, and it knows the sequence is sixteen bits, so the step from 65535 to 0 is
+one sample and not a loss of sixty-five thousand:
+
+```bash
+sqlite3 passes.db 'SELECT * FROM gap'
+sqlite3 passes.db 'SELECT sequence, node_seconds, hex(frame) FROM sample WHERE report = 0'
+```
+
+A row is one reception, not one unique sample: a duplicate is evidence of the
+link too. `clock_set` says whether the node knew the time, because a sample
+stamped by the host is not the same evidence as one stamped by the node.
+
+This file and Yamcs are not alternatives, and one run feeds both: `--yamcs`
+forwards every sample to the archive that plots it, and `--store` keeps the
+frames as they arrived with the definition that decodes them and the sequence
+gaps. Yamcs is where a trend is read; this file is what the trend was built
+from, and it needs no Java and no server during a pass.
+
+## Following a pass with Gpredict
+
+[Gpredict](http://gpredict.oz9aec.net/) computes the pass and speaks only as a
+client: it connects to a rotator daemon and a radio daemon and sends them
+bearings and a Doppler-corrected frequency. It exposes nothing that accepts
+orders, so nothing here tells Gpredict what to track. The proxy listens where
+those daemons listen instead.
+
+```text
+Gpredict --az/el--> gpredict-proxy.py --az/el--> rotctld --> motors
+         --freq---> gpredict-proxy.py --freq---> rigctld --> radio
+```
+
+Every decision stays Gpredict's. The proxy sees each one, applies the selected
+profile's rules, and forwards it or refuses it with `RPRT -1`, which Gpredict
+shows as an error.
+
+```bash
+./k-fsw/tools/ground/gpredict-proxy.py --list
+./k-fsw/tools/ground/gpredict-proxy.py --profile "LUR-1"
+```
+
+With no upstream the command is accepted, checked and printed but driven
+nowhere, which is how to watch Gpredict without a rotator attached. Add
+`--rotator-upstream 127.0.0.1:4533` and `--radio-upstream 127.0.0.1:4532` to
+drive the real daemons, and run the proxy on different ports so it can sit in
+front of them.
+
+### Pointing Gpredict at it
+
+In Gpredict, `Edit > Preferences > Interfaces > Rotators` and `> Radios`, add
+one of each with host `localhost` and the proxy's ports, 4533 and 4532 by
+default. Then open a module, `Radio Control` and `Antenna Control` from its
+menu, pick the satellite and the device, and press `Engage` and `Track`.
+Bearings start arriving once the spacecraft is above the horizon, so for a
+first look use one that is up now.
+
+### The profiles
+
+`ground-station/satellites.json` holds one profile per spacecraft, seeded with
+LUR-1 (60506), ROADS 1 (64535) and ROADS 2 (64549). Each carries the travel it
+allows and what to do with the frequency:
+
+| Policy | What the radio gets |
+| --- | --- |
+| `follow` | What Gpredict sent. Gpredict owns the Doppler. |
+| `hold` | The profile's own frequency. Gpredict keeps correcting every cycle, so this is a standing override and not a value set once. |
+| `ignore` | Nothing. The rotator is unaffected. |
+
+The profile is selected by hand because the protocol carries angles and a
+frequency and never says which spacecraft they are for. Choosing it from the
+frequency breaks the day two share a band. A profile with `"enabled": false` is
+defined but cannot be selected.
+
 ### Running Yamcs
 
 Yamcs needs Java 17; Maven comes through `./mvnw`.
