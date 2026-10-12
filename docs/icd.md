@@ -25,7 +25,7 @@ The mode column is what the parameter service enforces: `r` is read only, `w` is
 | 35 | service | `gndwdt` | 8 | 0 | Ground watchdog countdown |
 | 36 | service | `resmon` | 10 | 0 | Thread stack use |
 | 37 | service | `table` | 7 | 0 | Uploaded table files, adoptions and reverts |
-| 38 | service | `remexec` | 5 | 0 | Remote shell execution and its refusals |
+| 38 | service | `remexec` | 9 | 0 | Remote shell execution and its refusals |
 
 ### board (1)
 
@@ -172,7 +172,7 @@ The mode column is what the parameter service enforces: `r` is read only, `w` is
 | 0x20 | `boot_count` | u32 | rp | - | Restarts recorded across the life of the node |
 | 0x24 | `boot_reset_cause` | x32 | r | - | Cause latched at boot, before the flags were cleared |
 | 0x28 | `boot_confirmed` | u8 | w | - | Mark the running image good; can only be set, never cleared |
-| 0x29 | `boot_revert_reason` | u8 | r | - | Service evidence: 0 none, 1 missed confirmation, 2 replaced unknown, 255 invalid |
+| 0x29 | `boot_revert_reason` | u8 | r | - | 0 none, 1 missed confirmation, 2 replaced unknown, 255 invalid |
 | 0x2a | `boot_trial_valid` | u8 | r | - | Trial diagnostics were recovered and saved successfully |
 | 0x2c | `boot_attempts` | u32 | r | - | Persisted unconfirmed boots of this image; UINT32_MAX invalid |
 | 0x40 | `boot_revisions` | string | r | - | Short revision of each repository compiled into this image |
@@ -269,6 +269,10 @@ The mode column is what the parameter service enforces: `r` is read only, `w` is
 | 0x08 | `remexec_truncated` | u32 | r | - | Replies that could not carry all the output |
 | 0x0c | `remexec_offered` | u16 | r | - | Commands marked for remote execution |
 | 0x10 | `remexec_refusal` | string | r | - | Why the most recent request was refused |
+| 0x14 | `remexec_running` | u8 | r | - | Whether a command is running on this node now |
+| 0x18 | `remexec_last_result` | i32 | r | - | What the last command returned; zero before any ran |
+| 0x1c | `remexec_last_ms` | u32 | r | ms | How long the last command took |
+| 0x20 | `remexec_last_command` | string | r | - | The last command line asked for, with its arguments |
 
 ## Commands
 
