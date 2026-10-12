@@ -187,6 +187,5 @@ static int cmd_remexec(const struct shell *sh, size_t argc, char **argv)
 }
 
 SHELL_CMD_ARG_REGISTER(remexec, NULL,
-		       "Read and run what another node offers: remexec <node> get [command], "
-		       "remexec <node> run \"command args\".",
-		       cmd_remexec, 3, REMEXEC_WORDS_MAX);
+		       "What another node offers: remexec <node> get|run \"command\".", cmd_remexec,
+		       3, REMEXEC_WORDS_MAX);

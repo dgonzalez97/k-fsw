@@ -51,8 +51,14 @@ if [[ "${1:-}" != "--no-build" ]]; then
 	flash_args=(--build-dir "$root/build/hil/can/nucleo" --runner openocd)
 	# With two probes attached, openocd takes the first it finds, which is a
 	# coin flip over which board gets this image.
-	[[ -n "${KFSW_STLINK_SERIAL:-}" ]] &&
-		flash_args+=(--cmd-pre-init "adapter serial $KFSW_STLINK_SERIAL")
+	# The runner exports it; on its own, read it from the target profile.
+	if [[ -z "${KFSW_STLINK_SERIAL:-}" ]]; then
+		KFSW_STLINK_SERIAL="$(sed -n 's/^KFSW_STLINK_SERIAL=//p' \
+			"$root/k-fsw/config/targets/nucleo_l496zg.env" 2>/dev/null || true)"
+	fi
+	[[ -n "${KFSW_STLINK_SERIAL:-}" ]] ||
+		fail "no ST-Link serial, so this would flash whichever board answers first"
+	flash_args+=(--cmd-pre-init "adapter serial $KFSW_STLINK_SERIAL")
 	west flash "${flash_args[@]}" \
 		>"$work/flash.log" 2>&1 || fail "could not flash the NUCLEO"
 	"$root/k-fsw/tools/k-ground" build kfsw-gnd-can >"$work/ground.log" 2>&1 ||

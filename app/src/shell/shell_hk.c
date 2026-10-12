@@ -611,11 +611,11 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 #endif
 #if CONFIG_KFSW_COMMAND_CSP
 	SHELL_CMD_ARG(define, NULL,
-		      "Name what a report collects: define [node] <report> [class=N] [node:]table:offset ...",
+		      "Name a report: define [node] <report> [class=N] table:offset ...",
 		      cmd_hk_define, 3, CONFIG_KFSW_HK_ENTRIES + 3),
 	SHELL_CMD_ARG(clear, NULL, "Forget a report: clear [node] <report>.", cmd_hk_clear, 2, 2),
 #else
-	SHELL_CMD_ARG(define, NULL, "Name what a report collects: define <report> [class=N] [node:]table:offset ...",
+	SHELL_CMD_ARG(define, NULL, "Name a report: define <report> [class=N] [node:]table:offset ...",
 		      cmd_hk_define, 3, CONFIG_KFSW_HK_ENTRIES + 1),
 	SHELL_CMD_ARG(clear, NULL, "Forget a report: clear <report>.", cmd_hk_clear, 2, 0),
 #endif
@@ -635,10 +635,10 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 	SHELL_CMD_ARG(store_clear, NULL, "Stop storing and delete the file: store_clear <report>.",
 		      cmd_hk_store_clear, 2, 0),
 	SHELL_CMD_ARG(stored, NULL,
-		      "Read stored samples: stored <report> [from=|to=|since=|until=|skip=]...",
+		      "Read stored samples: stored <report> [from=|to=|since=|skip=]...",
 		      cmd_hk_stored, 2, CONFIG_KFSW_HK_ENTRIES),
 	SHELL_CMD_ARG(extract, NULL,
-		      "Write selected stored samples to a file: extract <report> <path> [filters]",
+		      "Stored samples to a file: extract <report> <path> [filters]",
 		      cmd_hk_extract, 3, CONFIG_KFSW_HK_ENTRIES),
 #endif
 #if CONFIG_KFSW_HK_BEACON

@@ -126,5 +126,5 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(cmd, &registry_commands,
-		   "Read the command registry. Running a command goes through its own group.",
+		   "Read the command registry; each command runs from its own group.",
 		   NULL);

@@ -99,9 +99,8 @@ discover_serial() {
 		done
 	done
 
-	# Name the reference board by its serial and list the rest, so an operator
-	# sees what else is attached rather than learning it from a number that was
-	# read off another board.
+	# Name the board by its serial and list the rest, so an operator sees what
+	# else is attached.
 	local link
 	for link in "${stlinks[@]}"; do
 		if [[ -n "$STLINK_SERIAL" && "$link" == *"$STLINK_SERIAL"* ]]; then
@@ -113,10 +112,9 @@ discover_serial() {
 	done
 	if [[ -z "$found_debug" && ${#stlinks[@]} -gt 0 ]]; then
 		found_debug="${stlinks[0]}"
-		# One probe is the board under test: there is nothing to confuse it
-		# with, and another bench pins a different serial than this one. Two or
-		# more and the pinned serial decides, or the operator says which.
-		[[ ${#stlinks[@]} -eq 1 ]] && debug_is_reference="yes"
+		# A single probe stands for the board only when this target pins no
+		# serial, which is how another bench runs these cases.
+		[[ -z "$STLINK_SERIAL" ]] && debug_is_reference="yes"
 	fi
 
 	# An explicit setting always wins over discovery.
@@ -258,10 +256,10 @@ report() {
 	fi
 
 	if [[ -n "$found_debug" && -z "$debug_is_reference" ]]; then
-		echo "  More than one ST-Link is attached and none of them is the board"
-		echo "  these cases are written for ($STLINK_SERIAL). They are not the"
-		echo "  same composition, so a number read from another one would be"
-		echo "  reported as this board's. Set KFSW_DEBUG_SERIAL to say which."
+		echo "  The board these cases are written for ($STLINK_SERIAL) is not"
+		echo "  attached. What is attached is not the same composition, so a"
+		echo "  number read from it would be reported as this board's. Set"
+		echo "  KFSW_DEBUG_SERIAL to use one of them anyway."
 		echo
 	fi
 
@@ -291,6 +289,10 @@ discover_host
 # What a caller should export, so a fixture reaches the device that was found.
 if [[ "${1:-}" == "--export" ]]; then
 	[[ -n "$found_debug" ]] && printf 'KFSW_DEBUG_SERIAL=%s\n' "$found_debug"
+	# The probe to flash through. A case that flashes without naming it gets
+	# whichever of the attached boards openocd happens to open first.
+	[[ -n "$STLINK_SERIAL" && -n "$debug_is_reference" ]] &&
+		printf 'KFSW_STLINK_SERIAL=%s\n' "$STLINK_SERIAL"
 	[[ -n "$found_second_serial" ]] && printf 'KFSW_FTDI_DEVICE=%s\n' "$found_second_serial"
 	[[ -n "$found_radio" ]] && printf 'KFSW_RADIO_SERIAL=%s\n' "$found_radio"
 	[[ -n "$found_can" && "$found_can" != *virtual* ]] &&

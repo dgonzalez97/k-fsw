@@ -1094,7 +1094,7 @@ spacecraft that lost its way out of contact eventually starts again from a
 known state. The countdown restarts only on command 16, `ground_wtd`, carrying
 the exact text `KFSWWSFK`, received over CSP. Any node may send it. Ping,
 telemetry, parameter traffic and local feed attempts do not count. The timeout
-is 2 hours to 5 days (7200–432000 seconds), with a 24-hour default (86400
+is 2 hours to 5 days (7200-432000 seconds), with a 24-hour default (86400
 seconds).
 
 From another node's console, feed node 2 and read it back:
@@ -1129,7 +1129,7 @@ Table 35 exposes:
 | Parameter | Access | Meaning |
 | --- | --- | --- |
 | `gndwdt_enabled` | rw | Whether the countdown is armed |
-| `ground_wtd_timeout` | rw | Timeout in seconds, 7200–432000; default 86400 |
+| `ground_wtd_timeout` | rw | Timeout in seconds, 7200-432000; default 86400 |
 | `ground_wtd_cnt` | r | Seconds remaining; zero when stopped, expired or waiting to reset |
 | `gndwdt_since_s` | r | Seconds since startup or the last valid feed |
 | `gndwdt_contacts` | r | Valid feed commands accepted |

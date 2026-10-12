@@ -1,6 +1,7 @@
 #include <errno.h>
 
 #include <zephyr/kernel.h>
+#include <zephyr/sys/reboot.h>
 #include <zephyr/sys/util.h>
 
 #if CONFIG_KFSW_CSP
@@ -75,6 +76,7 @@
 #include <kfsw/services/health.h>
 #endif
 #define KFSW_LOG_MODULE KFSW_LOG_MODULE_APP
+#include <kfsw/services/golden.h>
 #include <kfsw/services/log.h>
 #if CONFIG_KFSW_LOG_REMOTE
 #include <kfsw/services/log_remote.h>
@@ -139,6 +141,31 @@ int main(void)
 	if (result != 0) {
 		startup_failures++;
 		kfsw_log_error("Boot trial diagnostics unavailable: %d", result);
+	}
+#endif
+
+#if CONFIG_KFSW_BOOT_CONFIRM_AT_START
+	result = kfsw_boot_confirm_image();
+	if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Could not confirm this image: %d", result);
+	}
+#endif
+
+#if CONFIG_KFSW_GOLDEN
+	/* Before anything else starts, because this image has already failed to
+	   stay up often enough. */
+	{
+		enum kfsw_golden_outcome recovery;
+
+		result = kfsw_golden_check(&recovery);
+		if (result != 0) {
+			startup_failures++;
+			kfsw_log_error("Recovery decision unavailable: %d", result);
+		} else if (recovery == KFSW_GOLDEN_INSTALLED) {
+			kfsw_log_warning("Restarting into the recovery image");
+			sys_reboot(SYS_REBOOT_COLD);
+		}
 	}
 #endif
 
