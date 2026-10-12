@@ -60,10 +60,41 @@ def source_state(frozen):
         head = run("git", "rev-parse", "HEAD", cwd=path)
         if head != wanted:
             raise ValueError(f"{name}: checkout differs from frozen revision")
-        if run("git", "status", "--porcelain", "--untracked-files=normal", cwd=path):
-            raise ValueError(f"{name}: source tree is dirty")
+        changed = run("git", "diff", "--name-only", "HEAD", cwd=path).split()
+        changed += run("git", "ls-files", "--others", "--exclude-standard", cwd=path).split()
+        if changed:
+            # A project this repository patches is dirty by design: west patch
+            # apply leaves the working tree ahead of the pinned revision. The
+            # patches are part of what is released, so they are accounted for
+            # rather than refused, and anything they do not explain still stops
+            # the release.
+            patched = patched_files(name)
+            unexplained = sorted(set(changed) - patched)
+            if unexplained:
+                raise ValueError(f"{name}: source tree is dirty: {', '.join(unexplained)}")
         revisions[name] = head
     return revisions
+
+
+def patched_files(name):
+    """Files the patches in patches.yml are expected to change for a project."""
+    index = REPO / "zephyr/patches.yml"
+    if not index.is_file():
+        return set()
+    listed = yaml.safe_load(index.read_text()) or {}
+    touched = set()
+    for entry in listed.get("patches", []):
+        if entry.get("module") != name:
+            continue
+        patch = REPO / "zephyr/patches" / entry["path"]
+        if not patch.is_file():
+            raise ValueError(f"{name}: {entry['path']} is listed and missing")
+        if sha256(patch) != entry.get("sha256sum"):
+            raise ValueError(f"{name}: {entry['path']} does not match its recorded hash")
+        for line in patch.read_text(errors="replace").splitlines():
+            if line.startswith("+++ b/"):
+                touched.add(line[6:].strip())
+    return touched
 
 
 def check_inputs():
@@ -159,6 +190,26 @@ def image_name(target, describe):
     return name
 
 
+def build_recovery(output, target, env):
+    """The image that lives in the golden partition, built from the same tree.
+
+    A release that carries only the flight image leaves a board with an empty
+    recovery partition, so there is nothing to fall back to on the day it is
+    needed. Targets without that partition have no recovery image and say so.
+    """
+    profile = REPO / "config/profiles/nucleo-golden.conf"
+    if target != "nucleo_l496zg" or not profile.is_file():
+        return None
+    build = output / "build-golden"
+    recovery_env = env.copy()
+    recovery_env["KFSW_GOLDEN_BUILD_DIR"] = str(build)
+    with (output / "build-golden.log").open("w") as log:
+        subprocess.run(["bash", str(REPO / "tools/golden.sh"), "build"],
+                       cwd=REPO, env=recovery_env, stdout=log, stderr=subprocess.STDOUT,
+                       check=True)
+    return build / "app/zephyr/zephyr.signed.bin"
+
+
 def build_release(output, target):
     inputs = check_inputs()
     name = image_name(target, run("git", "describe", "--tags", "--always", cwd=REPO))
@@ -191,6 +242,15 @@ def build_release(output, target):
     shutil.copy2(required("KFSW_RELEASE_MANIFEST"), artifacts / "west-frozen.yml")
     shutil.copy2(artifacts / "app" / "zephyr.signed.bin", artifacts / name)
     inputs["image"] = name
+
+    recovery = build_recovery(output, target, env)
+    if recovery is not None:
+        recovery_name = f"kfsw-{target}-recovery.signed.bin"
+        shutil.copy2(recovery, artifacts / recovery_name)
+        inputs["recovery_image"] = recovery_name
+        inputs["recovery_image_bytes"] = (artifacts / recovery_name).stat().st_size
+    else:
+        inputs["recovery_image"] = None
     inputs["unsigned_payload_sha256"] = hashes[0]
     inputs["artifacts"] = {
         str(p.relative_to(artifacts)): sha256(p) for p in sorted(artifacts.rglob("*")) if p.is_file()
