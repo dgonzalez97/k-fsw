@@ -652,20 +652,47 @@ static bool find_table(const struct kfsw_param_table_info *info, void *context)
  * Table names are not sent over the link. Table IDs are fixed per component, so
  * a table this build also carries is named from here; another shows "-".
  */
+static void print_table_heading(const struct shell *sh)
+{
+	shell_print(sh, "%3s  %-7s  %-*s  %6s  %s", " id", "layer", TABLE_NAME_COLUMN, "name",
+		    "params", "holds");
+	shell_print(sh, "%.3s  %.7s  %.*s  %.6s  %.5s", "---------", "---------", TABLE_NAME_COLUMN,
+		    "--------------------------------", "---------", "---------");
+}
+
+/* The node names its own tables, so one this build does not carry is still
+ * named.
+ */
+static bool print_remote_table(const struct kfsw_param_table_info *info, void *context)
+{
+	const struct shell *sh = context;
+
+	shell_print(sh, "%3u  %-7s  %-*s  %6u  %s", info->id, kfsw_param_band_name(info->id),
+		    TABLE_NAME_COLUMN, info->name, info->count,
+		    info->description != NULL ? info->description : "");
+	return true;
+}
+
 static int print_remote_tables(const struct shell *sh, uint16_t node)
 {
 	struct param_list_context context = {.shell = sh, .local = false};
 	int result;
 
+	print_table_heading(sh);
+	result = kfsw_param_remote_tables(node, print_remote_table, (void *)sh);
+	if (result == 0) {
+		return 0;
+	}
+	if (result != -ENOTSUP) {
+		return kfsw_shell_remote_failed(sh, "param tables", node, result);
+	}
+
+	/* The node does not serve the table list. Count its descriptors instead. */
 	result = kfsw_param_remote_visit(node, tally_table, &context);
 	if (result != 0) {
 		return kfsw_shell_remote_failed(sh, "param tables", node, result);
 	}
 
-	shell_print(sh, "%3s  %-7s  %-*s  %6s  %s", " id", "layer", TABLE_NAME_COLUMN, "name",
-		    "params", "holds");
-	shell_print(sh, "%.3s  %.7s  %.*s  %.6s  %.5s", "---------", "---------", TABLE_NAME_COLUMN,
-		    "--------------------------------", "---------", "---------");
 	for (unsigned int table = KFSW_PARAM_TABLE_CORE_FIRST;
 	     table <= KFSW_PARAM_TABLE_MODULE_LAST; table++) {
 		struct table_search search = {.id = (uint8_t)table};
