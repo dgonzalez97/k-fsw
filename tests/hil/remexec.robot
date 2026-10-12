@@ -42,6 +42,12 @@ The Allowlist Is Both The Listing And The Permission
         # sees it without reading a log.
         Ground Command    param get 1 remexec_refused    1:remexec_refused = 1
         Ground Command    param get 1 remexec_accepted    1:remexec_accepted = 1
+
+        # What ran, and how it ended. The refused one never reached a handler,
+        # so the last command is still the one that did.
+        Ground Command    param get 1 remexec_last_command    1:remexec_last_command = "time"
+        Ground Command    param get 1 remexec_last_result    1:remexec_last_result = 0
+        Ground Command    param get 1 remexec_running    1:remexec_running = 0
     FINALLY
         Close Ground Pair
     END
