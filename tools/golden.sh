@@ -20,8 +20,9 @@ source "$KFSW_TOOLS_DIR/_common.sh" nucleo_l496zg
 profiles="$KFSW_REPO_DIR/config/profiles"
 build_dir="${KFSW_GOLDEN_BUILD_DIR:-$KFSW_ROOT/build/golden}"
 image="$build_dir/app/zephyr/zephyr.signed.bin"
-# From kfsw_golden_partition in nucleo-mcuboot-flash.overlay.
-golden_offset="${KFSW_GOLDEN_OFFSET:-0x000C0000}"
+# kfsw_golden_partition in nucleo-mcuboot-flash.overlay gives an offset inside
+# flash0; the debugger addresses memory, and this part maps flash at 0x08000000.
+golden_offset="${KFSW_GOLDEN_OFFSET:-0x080C0000}"
 golden_size="${KFSW_GOLDEN_SIZE:-196608}"
 
 fail() { echo "GOLDEN: FAIL $*" >&2; exit 1; }
@@ -63,12 +64,17 @@ flash)
 	[[ -n "${KFSW_STLINK_SERIAL:-}" ]] || fail "the target profile names no ST-Link serial"
 	# Written as data, not as a bootable image: MCUboot boots the slots, and
 	# this partition is only storage until something copies it into one.
-	openocd -f interface/stlink.cfg -c "adapter serial $KFSW_STLINK_SERIAL" \
-		-f target/stm32l4x.cfg \
+	# The board's own openocd configuration, the same one west flashes with:
+	# a hand-assembled interface and target pair probed no flash bank here and
+	# wrote nothing while reporting success.
+	support="$ZEPHYR_BASE/boards/st/nucleo_l496zg/support"
+
+	openocd -s "$support" -f "$support/openocd.cfg" \
+		-c "adapter serial $KFSW_STLINK_SERIAL" \
 		-c "init" -c "reset halt" \
-		-c "flash write_image erase $image $golden_offset" \
-		-c "reset run" -c "shutdown"
-	echo "GOLDEN: written at $golden_offset"
+		-c "program $image verify $golden_offset" \
+		-c "reset run" -c "shutdown" || fail "the image was not written"
+	echo "GOLDEN: written and verified at $golden_offset"
 	;;
 *)
 	echo "usage: $(basename "$0") [build|size|flash]" >&2
