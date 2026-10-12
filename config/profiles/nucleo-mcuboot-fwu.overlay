@@ -2,5 +2,6 @@
 / {
 	chosen {
 		kfsw,fwu-partition = &slot1_partition;
+		kfsw,golden-partition = &kfsw_golden_partition;
 	};
 };

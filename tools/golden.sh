@@ -32,7 +32,7 @@ build()
 		KFSW_BUILD_DIR="$build_dir" \
 		KFSW_PRISTINE=always \
 		KFSW_EXTRA_CONF_FILE="$profiles/nucleo-mcuboot.conf;$profiles/nucleo-golden.conf${KFSW_GOLDEN_EXTRA_CONF:+;$KFSW_GOLDEN_EXTRA_CONF}" \
-		KFSW_EXTRA_DTC_OVERLAY_FILE="$profiles/nucleo-mcuboot-flash.overlay;$profiles/nucleo-mcuboot.overlay;$profiles/nucleo-mcuboot-fwu.overlay" \
+		KFSW_EXTRA_DTC_OVERLAY_FILE="$profiles/nucleo-mcuboot-flash.overlay;$profiles/nucleo-mcuboot.overlay;$profiles/nucleo-mcuboot-fwu.overlay;$profiles/nucleo-can.overlay" \
 		KFSW_MCUBOOT_DTC_OVERLAY_FILE="$profiles/nucleo-mcuboot-flash.overlay" \
 		"$KFSW_TOOLS_DIR/build.sh" nucleo_l496zg
 }
