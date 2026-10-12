@@ -292,6 +292,10 @@ discover_host
 # What a caller should export, so a fixture reaches the device that was found.
 if [[ "${1:-}" == "--export" ]]; then
 	[[ -n "$found_debug" ]] && printf 'KFSW_DEBUG_SERIAL=%s\n' "$found_debug"
+	# The probe to flash through. A case that flashes without naming it gets
+	# whichever of the attached boards openocd happens to open first.
+	[[ -n "$STLINK_SERIAL" && -n "$debug_is_reference" ]] &&
+		printf 'KFSW_STLINK_SERIAL=%s\n' "$STLINK_SERIAL"
 	[[ -n "$found_second_serial" ]] && printf 'KFSW_FTDI_DEVICE=%s\n' "$found_second_serial"
 	[[ -n "$found_radio" ]] && printf 'KFSW_RADIO_SERIAL=%s\n' "$found_radio"
 	[[ -n "$found_can" && "$found_can" != *virtual* ]] &&
