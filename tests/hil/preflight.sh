@@ -113,10 +113,11 @@ discover_serial() {
 	done
 	if [[ -z "$found_debug" && ${#stlinks[@]} -gt 0 ]]; then
 		found_debug="${stlinks[0]}"
-		# One probe is the board under test: there is nothing to confuse it
-		# with, and another bench pins a different serial than this one. Two or
-		# more and the pinned serial decides, or the operator says which.
-		[[ ${#stlinks[@]} -eq 1 ]] && debug_is_reference="yes"
+		# A single probe is the board under test only when this target pins no
+		# serial, which is how another bench runs these cases. When a serial is
+		# pinned and that probe is not here, the board these cases are written
+		# for is absent however few others are attached.
+		[[ -z "$STLINK_SERIAL" ]] && debug_is_reference="yes"
 	fi
 
 	# An explicit setting always wins over discovery.
@@ -258,10 +259,10 @@ report() {
 	fi
 
 	if [[ -n "$found_debug" && -z "$debug_is_reference" ]]; then
-		echo "  More than one ST-Link is attached and none of them is the board"
-		echo "  these cases are written for ($STLINK_SERIAL). They are not the"
-		echo "  same composition, so a number read from another one would be"
-		echo "  reported as this board's. Set KFSW_DEBUG_SERIAL to say which."
+		echo "  The board these cases are written for ($STLINK_SERIAL) is not"
+		echo "  attached. What is attached is not the same composition, so a"
+		echo "  number read from it would be reported as this board's. Set"
+		echo "  KFSW_DEBUG_SERIAL to use one of them anyway."
 		echo
 	fi
 
