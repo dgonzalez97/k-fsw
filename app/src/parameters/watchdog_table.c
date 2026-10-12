@@ -151,6 +151,8 @@ static const struct kfsw_param_definition watchdog_param_definitions[] = {
 	},
 };
 
+KFSW_PARAM_TABLE_FITS_THE_LINK(watchdog_param_definitions);
+
 const struct kfsw_param_definition_set kfsw_watchdog_param_definitions = {
 	.table = KFSW_PARAM_TABLE_WATCHDOG,
 	.name = KFSW_PARAM_TABLE_WATCHDOG_NAME,

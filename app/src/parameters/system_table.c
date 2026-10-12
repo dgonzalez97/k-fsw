@@ -106,6 +106,8 @@ static const struct kfsw_param_definition system_param_definitions[] = {
 	},
 };
 
+KFSW_PARAM_TABLE_FITS_THE_LINK(system_param_definitions);
+
 const struct kfsw_param_definition_set kfsw_system_param_definitions = {
 	.table = KFSW_PARAM_TABLE_SYSTEM,
 	.name = KFSW_PARAM_TABLE_SYSTEM_NAME,

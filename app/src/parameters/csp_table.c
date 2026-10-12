@@ -321,6 +321,8 @@ static const struct kfsw_param_definition csp_param_definitions[] = {
 	},
 };
 
+KFSW_PARAM_TABLE_FITS_THE_LINK(csp_param_definitions);
+
 const struct kfsw_param_definition_set kfsw_csp_param_definitions = {
 	.table = KFSW_PARAM_TABLE_CSP,
 	.name = KFSW_PARAM_TABLE_CSP_NAME,
