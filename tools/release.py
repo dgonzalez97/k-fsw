@@ -180,14 +180,14 @@ def build_release(output, target):
         raise ValueError("Unsigned application payloads differ between builds")
     artifacts = output / "artifacts"
     artifacts.mkdir()
-    for image_name in ("app", "mcuboot"):
-        source = output / "build-a" / image_name / "zephyr"
-        destination = artifacts / image_name
+    for part in ("app", "mcuboot"):
+        source = output / "build-a" / part / "zephyr"
+        destination = artifacts / part
         destination.mkdir()
-        for name in (".config", "zephyr.dts", "zephyr.map", "zephyr.bin", "zephyr.elf",
-                     "zephyr.signed.bin", "zephyr.hex"):
-            if (source / name).is_file():
-                shutil.copy2(source / name, destination / name)
+        for artifact in (".config", "zephyr.dts", "zephyr.map", "zephyr.bin", "zephyr.elf",
+                         "zephyr.signed.bin", "zephyr.hex"):
+            if (source / artifact).is_file():
+                shutil.copy2(source / artifact, destination / artifact)
     shutil.copy2(required("KFSW_RELEASE_MANIFEST"), artifacts / "west-frozen.yml")
     shutil.copy2(artifacts / "app" / "zephyr.signed.bin", artifacts / name)
     inputs["image"] = name
