@@ -313,3 +313,51 @@ can then sit side by side on a node or a ground station. The name is at most 64
 characters of letters, digits, `.`, `_` and `-`, so it always fits an FTP path;
 a longer or odd name stops the release instead of being cut. The build output
 itself stays `zephyr.signed.bin`.
+
+### The recovery image
+
+A release also carries `kfsw-<target>-recovery.signed.bin`, built from the same
+tree by `tools/golden.sh` and recorded in `release.json` as `recovery_image`.
+It is the composition in `config/profiles/nucleo-golden.conf`: CSP over the
+UART and CAN links, remote parameters, the command server and both update
+routes, and nothing else. No console, no filesystem, no housekeeping. It exists
+to be reachable and to take a new image, and it is around 143 KB against the
+192 KB the golden partition holds, where the flight image is 247 KB. A target
+without that partition has no recovery image and `recovery_image` is null.
+
+Flash it once per board, at `0x080C0000`, with `tools/golden.sh flash`. It is
+not flashed by the release and it does not change when the flight image does,
+which is the point: it is the version you fall back to.
+
+#### How recovery works
+
+The bootloader only boots the slots, so the image in the golden partition is
+never run from there. Installing it means copying it into the secondary slot
+and asking for a swap, which is what the update service already does for an
+uploaded image, so recovery reuses it rather than writing to flash itself.
+
+Two things can ask for that:
+
+- `golden_install <pin>`, a command like `reboot`, over CSP or from the shell.
+  An operator who already knows the image is bad does not have to wait.
+- The boot service, once an image has booted unconfirmed more times than
+  `boot_retries` allows. That parameter is persistent and between one and ten;
+  without the parameter snapshot it restarts at its compiled default every
+  boot, so the build warns and so does the log at startup.
+
+The swap is a trial, not a permanent one: if the recovery image cannot boot
+either, the bootloader still has somewhere to go back to. The recovery image
+confirms itself once it has finished starting, because no operator is going to
+confirm it for a node that is already in trouble. That is
+`CONFIG_KFSW_BOOT_CONFIRM_AT_START`, and an image an operator confirms should
+leave it off.
+
+The automatic path is the one to be careful about. The retry budget is only
+spent by repeated unconfirmed boots, and MCUboot's own revert rescues a node
+before that happens: it puts the previous image back after a single failed
+trial. So the budget is reached only by a node whose revert is not rescuing it,
+which is the case recovery exists for and which a bench with a working
+bootloader cannot reproduce. What is verified on hardware is the mechanism
+underneath: `tests/hil/golden-recovery-smoke.sh` installs the image on command
+and checks from the ground node over CAN that the node comes back carrying the
+recovery parameter set.
