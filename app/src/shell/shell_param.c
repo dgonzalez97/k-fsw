@@ -344,6 +344,48 @@ static int cmd_param_describe(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
+/* One table at a time, each with its own budget: a whole node does not fit a
+ * slow link, which is what the tables are for. The ids are collected before
+ * any of them is asked for, because the walk that yields them is still
+ * reading the reply that carries them.
+ */
+struct remote_tables {
+	uint8_t id[KFSW_PARAM_TABLE_MODULE_LAST + 1U];
+	size_t count;
+};
+
+static bool collect_remote_table_id(const struct kfsw_param_table_info *info, void *context)
+{
+	struct remote_tables *tables = context;
+
+	if (tables->count < ARRAY_SIZE(tables->id)) {
+		tables->id[tables->count++] = info->id;
+	}
+	return true;
+}
+
+static int list_remote_parameters(uint16_t node, struct param_list_context *context)
+{
+	struct remote_tables tables = {0};
+	int result = kfsw_param_remote_tables(node, collect_remote_table_id, &tables);
+
+	if (result == -ENOTSUP) {
+		/* The node does not serve its table list. Ask for everything. */
+		return kfsw_param_remote_visit(node, print_param_info, context);
+	}
+	if (result != 0) {
+		return result;
+	}
+	for (size_t i = 0; i < tables.count; i++) {
+		result = kfsw_param_remote_visit_table(node, tables.id[i], print_param_info,
+						       context);
+		if (result != 0) {
+			return result;
+		}
+	}
+	return 0;
+}
+
 static int cmd_param_list(const struct shell *sh, size_t argc, char **argv)
 {
 	struct param_list_context context = {
@@ -367,7 +409,7 @@ static int cmd_param_list(const struct shell *sh, size_t argc, char **argv)
 			result = kfsw_param_visit(print_param_info, &context);
 		} else {
 			context.local = false;
-			result = kfsw_param_remote_visit(node, print_param_info, &context);
+			result = list_remote_parameters(node, &context);
 			if (kfsw_shell_no_answer(result)) {
 				return kfsw_shell_remote_failed(sh, "param list", node, result);
 			}
@@ -566,8 +608,14 @@ static int cmd_param_table(const struct shell *sh, size_t argc, char **argv)
 		if (node == THIS_NODE) {
 			return print_local_table(sh, &context);
 		}
-		/* Names first, then one request for the values. */
-		result = kfsw_param_remote_visit(node, collect_table_names, &context);
+		/* Names first, then one request for the values. Asking for the
+		 * table alone keeps the exchange inside the refresh budget.
+		 */
+		result = kfsw_param_remote_visit_table(node, context.table, collect_table_names,
+						       &context);
+		if (result == -ENOTSUP) {
+			result = kfsw_param_remote_visit(node, collect_table_names, &context);
+		}
 		if (result != 0) {
 			return kfsw_shell_remote_failed(sh, "param table", node, result);
 		}

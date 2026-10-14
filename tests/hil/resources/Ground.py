@@ -18,7 +18,7 @@ from firmware_fixture import NativeNode
 class Ground:
     ROBOT_LIBRARY_SCOPE = 'TEST'
 
-    def open_ground_pair(self, output, procedure=''):
+    def open_ground_pair(self, output, procedure='', baud=''):
         self.stack = ExitStack()
         self.output = Path(output)
         self.output.mkdir(parents=True, exist_ok=False)
@@ -37,7 +37,7 @@ class Ground:
             self.flight = self.stack.enter_context(NativeNode(self.flight_image, self.output / 'flight'))
             self.ground = self.stack.enter_context(NativeNode(self.ground_image, self.output / 'ground', flash))
             self.bridge_log = self.stack.enter_context((self.output / 'bridge.log').open('w'))
-            baud = os.environ.get('KFSW_GROUND_LINK_BAUD', '')
+            baud = baud or os.environ.get('KFSW_GROUND_LINK_BAUD', '')
             if baud:
                 # A pseudo terminal ignores its termios speed, so the rate has
                 # to be paced by the relay for the pair to feel a slow link.
