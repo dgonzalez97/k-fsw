@@ -84,6 +84,9 @@ format_sources+=(
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/scrub.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/scrub/scrub.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/scrub-parameters/scrub_table.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/limits.h"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/limits/limits.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/limits-parameters/limits_table.c"
 )
 
 echo "QUALITY: clang-format (${#format_sources[@]} files)"
