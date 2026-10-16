@@ -59,6 +59,7 @@
 #endif
 #if CONFIG_KFSW_RESMON
 #include <kfsw/services/resmon.h>
+#include <kfsw/services/scrub.h>
 #endif
 #if CONFIG_KFSW_HK
 #include <kfsw/services/hk.h>
@@ -204,6 +205,9 @@ int main(void)
 #endif
 #if CONFIG_KFSW_RESMON
 		&kfsw_resmon_param_definitions,
+#endif
+#if CONFIG_KFSW_SCRUB
+		&kfsw_scrub_param_definitions,
 #endif
 #if CONFIG_KFSW_HK
 		&kfsw_hk_param_definitions,
@@ -535,6 +539,17 @@ int main(void)
 	if (result != 0) {
 		startup_failures++;
 		kfsw_log_error("Failed to start the resource monitor: %d", result);
+	}
+#endif
+
+#if CONFIG_KFSW_SCRUB
+	/* After the persisted references are restored, or the first sweep would
+	 * read every region as unlearned.
+	 */
+	result = kfsw_scrub_start();
+	if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Failed to start the image scrub: %d", result);
 	}
 #endif
 

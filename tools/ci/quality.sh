@@ -81,6 +81,9 @@ format_sources+=(
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/parameter_csp.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/parameter_internal.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/parameter_persistence.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/scrub.h"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/scrub/scrub.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/scrub-parameters/scrub_table.c"
 )
 
 echo "QUALITY: clang-format (${#format_sources[@]} files)"
