@@ -547,6 +547,7 @@ the five repositories has one, and a new table should too.
 | 35 | service | `gndwdt` | `kfsw-services/src/gndwdt-parameters/` |
 | 36 | service | `resmon` | `kfsw-services/src/resmon-parameters/` |
 | 39 | service | `scrub` | `kfsw-services/src/scrub-parameters/` |
+| 40 | service | `limits` | `kfsw-services/src/limits-parameters/` |
 | 50 | module | `radio_uhf` | `kfsw-modules/radio-uhf/parameters/` |
 | 51 | module | `temp_example` | `kfsw-modules/temperature-sensor-example/parameters/` |
 | 67 | module | `hw_test` | `kfsw-modules/boton-test/` |
@@ -1116,6 +1117,56 @@ without a question behind it. A sweep reads hundreds of kilobytes of flash, so
 between chunks, so it does not starve the watchdog feed. The recovery
 composition leaves scrub off: it has no parameter persistence, so it could not
 hold a reference.
+
+## Limits
+
+`KFSW_LIMITS` watches local numeric parameters against a bound and releases a
+command when one is crossed. The rules are one text file,
+`limits/limits.txt` under the FTP root, uploaded as a procedure is and read at
+boot and on `limits load [file]`:
+
+```text
+# parameter          cmp  bound  dwell  node  action
+stack_worst_used     >    90     3      0     resmon sample
+```
+
+The first five whitespace separated fields are the parameter, the comparison
+(`>`, `>=`, `<`, `<=`, `==`, `!=`), the bound, the dwell and the node. Everything
+after them is the action, a registered command with its arguments, kept as
+written. A line starting with `#` is a comment; there are no trailing comments.
+
+The bound is read as the parameter's own type, so a fractional bound on an
+integer parameter is refused, and `==` and `!=` are refused on a float. The
+dwell is how many consecutive sweeps must satisfy the comparison, from 1 to 255.
+The action must name a registered command with the right arguments when the file
+is loaded, not when it fires.
+
+A file with any bad line is refused whole. The previous rules stay in force,
+`limits_parse_errors` rises, and `limits status` and `limits_error_line` name
+the line and what was wrong with it.
+
+A rule fires once per crossing. The action is released through the scheduler of
+file based operations, one second out, so the release is recorded and may
+address another node. The rule then latches, and re-arms on the first sweep that
+finds the comparison false. A release that fails is counted in `limits_failures`
+and tried again on the next sweep.
+
+| Parameter | Access | Meaning |
+| --- | --- | --- |
+| `limits_rules` | r | Rules in force |
+| `limits_running` | r | Whether the periodic sweep is scheduled |
+| `limits_enabled` | rwb | 0 stops the sweeps and keeps the loaded rules |
+| `limits_interval_ms` | rwb | Between sweeps; 0 for none, otherwise 100 to 3600000 |
+| `limits_sweeps` | r | Sweeps completed while enabled |
+| `limits_fires` | r | Actions released |
+| `limits_failures` | r | Parameter reads and releases that failed |
+| `limits_parse_errors` | r | Files refused for a bad line |
+| `limits_last_fired_ms` | r | Uptime of the last release; 0 before any |
+| `limits_last_fired` | r | Index of the rule that fired last; 255 before any |
+| `limits_error_line` | r | Line that got the last file refused |
+
+From the shell: `limits status`, `limits list`, `limits load [file]` and
+`limits sweep`. `KFSW_LIMITS` depends on `KFSW_PARAM` and `KFSW_FBO`.
 
 ## Watchdogs
 
