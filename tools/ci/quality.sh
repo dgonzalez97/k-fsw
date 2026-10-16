@@ -116,6 +116,8 @@ if [[ -d "$KFSW_WORKSPACE_ROOT/kfsw-modules" ]]; then
 	)
 fi
 
+python3 "$KFSW_CI_DIR/descriptions.py"
+
 # Checked after the formatter has run, so a missing analyser doesn't hide
 # formatting errors.
 if ! command -v cppcheck >/dev/null 2>&1; then
