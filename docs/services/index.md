@@ -546,6 +546,7 @@ the five repositories has one, and a new table should too.
 | 34 | service | `fbo` | `kfsw-services/src/fbo-parameters/` |
 | 35 | service | `gndwdt` | `kfsw-services/src/gndwdt-parameters/` |
 | 36 | service | `resmon` | `kfsw-services/src/resmon-parameters/` |
+| 39 | service | `scrub` | `kfsw-services/src/scrub-parameters/` |
 | 50 | module | `radio_uhf` | `kfsw-modules/radio-uhf/parameters/` |
 | 51 | module | `temp_example` | `kfsw-modules/temperature-sensor-example/parameters/` |
 | 67 | module | `hw_test` | `kfsw-modules/boton-test/` |
@@ -1058,6 +1059,63 @@ stacks, so its reported values do not measure stack headroom.
 `KFSW_RESMON` selects `INIT_STACKS`, `THREAD_STACK_INFO`, `THREAD_MONITOR` and
 `THREAD_NAME`. Measurements use the initial stack fill and the kernel thread
 list. Disable the service if the target cannot afford that overhead.
+
+## Image scrub
+
+The update service checks an image as it arrives and the bootloader checks the
+slot it boots. Nothing else reads the slot that is not running, or the recovery
+image, ever again, so a bit flip in either is found when the image is needed
+and not before. `KFSW_SCRUB` re-reads them and compares a CRC32 against a
+reference that outlives a reset.
+
+| Region | Where | Image starts at |
+| --- | --- | --- |
+| `slot0` | `slot0_partition` | the partition start |
+| `slot1` | `slot1_partition` | `kfsw_fwu_slot_write_offset()`, one sector in |
+| `golden` | the `kfsw,golden-partition` node | the partition start |
+
+The storage partition is not a region. It is a mutable filesystem holding the
+parameter snapshots, the journal and the procedure files, so a checksum over it
+would differ after every ordinary write.
+
+A region is swept only when it holds an image, meaning the bootloader's magic
+at that region's image offset. The length swept comes from the image header, so
+an erased tail does not change the result and an empty secondary slot reads as
+`empty` rather than as a fault.
+
+| Parameter | Access | Meaning |
+| --- | --- | --- |
+| `<region>_reference` | rwb | The learned CRC32; 0 means none is |
+| `<region>_measured` | r | What the last sweep read |
+| `<region>_bytes` | r | Image bytes swept |
+| `<region>_state` | r | 0 empty, 1 unknown, 2 ok, 3 mismatch, 4 unreadable |
+| `scrub_sweeps` | r | Sweeps completed |
+| `scrub_mismatches` | r | Regions found changed, once per crossing |
+| `scrub_last_ms` | r | Monotonic ms at the end of the last sweep |
+| `scrub_regions` | r | Regions this build can sweep |
+| `scrub_running` | r | Whether the periodic sweep is running |
+
+The reference is learned on command, never silently: a region whose reference
+is unknown reports `unknown` and never `ok`. `scrub learn <region>` sweeps the
+region and takes what is on flash now as the reference, then writes the
+parameter snapshot, because a reference held only in RAM would be relearned at
+every boot and could never report a mismatch.
+
+A mismatch logs an error and raises an event once per crossing, so one decayed
+image is a single finding rather than one per sweep. It re-arms when a sweep
+finds the region matching again, which happens after a new image is written and
+learned.
+
+From the shell: `scrub status`, `scrub sweep [region]` and
+`scrub learn <region>`.
+
+`KFSW_SCRUB` depends on `KFSW_FWU`, because the secondary image sits where the
+update service writes it and because scrubbing a slot nothing writes to is work
+without a question behind it. A sweep reads hundreds of kilobytes of flash, so
+`KFSW_SCRUB_PERIOD_MS` defaults to an hour; the read is chunked and yields
+between chunks, so it does not starve the watchdog feed. The recovery
+composition leaves scrub off: it has no parameter persistence, so it could not
+hold a reference.
 
 ## Watchdogs
 

@@ -1,0 +1,13 @@
+/* Scrub reads the secondary image where the update service writes it, so the
+ * update service has to be bound to a partition for the offset to exist.
+ */
+/ {
+	chosen {
+		kfsw,fwu-partition = &slot1_partition;
+	};
+};
+
+/* Write in 8-byte blocks like the real part, so alignment errors show up. */
+&flash0 {
+	write-block-size = <8>;
+};
