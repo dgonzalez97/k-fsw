@@ -14,7 +14,7 @@ kfsw_shape_needs() {
 	software) echo "hosted images, socat and tmux; optional host tools and vcan0" ;;
 	terminal) echo "tmux and the robot-terminal-runner submodule" ;;
 	board) echo "a NUCLEO-L496ZG on its ST-LINK debug UART" ;;
-	board-uart) echo "the board, plus a second serial adapter on the CSP UART" ;;
+	board-uart) echo "NUCLEO-L496ZG and NUCLEO-F746ZG ST-LINKs, plus an FTDI adapter wired to the board under test" ;;
 	board-can) echo "the board with a CAN transceiver, plus a host CAN adapter" ;;
 	radio) echo "a pair of Holybro radios, one on the board and one on the host" ;;
 	*) return 1 ;;
@@ -26,7 +26,7 @@ kfsw_shape_covers() {
 	software) echo "every scenario that needs no hardware" ;;
 	terminal) echo "operator-style shell sessions against the Linux image" ;;
 	board) echo "boot and readiness, the clock and the reset note across a reset, parameter tables" ;;
-	board-uart) echo "CSP over the physical UART, telemetry capture, the echo benchmark, command retries" ;;
+	board-uart) echo "CSP over the L496 and F746 physical UARTs, telemetry capture, the echo benchmark, command retries" ;;
 	board-can) echo "CSP over CAN, and firmware update over CAN with both slots read back" ;;
 	radio) echo "the raw and CSP links, firmware update over the radio, beacons" ;;
 	*) return 1 ;;
