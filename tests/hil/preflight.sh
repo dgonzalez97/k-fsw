@@ -23,6 +23,10 @@ STLINK_USB_ID="$(sed -n 's/^KFSW_STLINK_USB_ID=//p' \
 STLINK_SERIAL="$(sed -n 's/^KFSW_STLINK_SERIAL=//p' \
 	"$KFSW_REPO_DIR/config/targets/nucleo_l496zg.env" 2>/dev/null || true)"
 
+F746_STLINK_SERIAL="$(sed -n 's/^KFSW_STLINK_SERIAL=//p' \
+	"$KFSW_REPO_DIR/config/targets/nucleo_f746zg.env")"
+found_f746_debug=""
+found_ftdi=""
 found_debug=""
 found_other_debug=""
 debug_is_reference=""
@@ -67,6 +71,9 @@ discover_serial() {
 		[[ -e "$device" ]] || continue
 		stable="$(stable_path_of "$device" || true)"
 		id="$(usb_id_of "$device")"
+		if [[ "$id" == 0403:6001 || "$id" == 0403:6015 || "$id" == 0403:6014 ]]; then
+			[[ -n "$stable" ]] && found_ftdi="$stable"
+		fi
 
 		if [[ -n "$STLINK_USB_ID" && "$id" == "$STLINK_USB_ID" ]]; then
 			stlinks+=("${stable:-$device}")
@@ -103,6 +110,9 @@ discover_serial() {
 	# else is attached.
 	local link
 	for link in "${stlinks[@]}"; do
+		if [[ -n "$F746_STLINK_SERIAL" && "$link" == /dev/serial/by-id/*"$F746_STLINK_SERIAL"* ]]; then
+			found_f746_debug="$link"
+		fi
 		if [[ -n "$STLINK_SERIAL" && "$link" == *"$STLINK_SERIAL"* ]]; then
 			found_debug="$link"
 			debug_is_reference="yes"
@@ -125,6 +135,10 @@ discover_serial() {
 	fi
 	if [[ -n "${KFSW_FTDI_DEVICE:-}" ]]; then
 		found_second_serial="$KFSW_FTDI_DEVICE"
+		found_ftdi="$KFSW_FTDI_DEVICE"
+	fi
+	if [[ -n "${KFSW_F746_DEBUG_SERIAL:-}" && -e "$KFSW_F746_DEBUG_SERIAL" ]]; then
+		found_f746_debug="$KFSW_F746_DEBUG_SERIAL"
 	fi
 	if [[ -n "${KFSW_RADIO_SERIAL:-}" ]]; then
 		found_radio="$KFSW_RADIO_SERIAL"
@@ -180,7 +194,9 @@ shape_is_possible() {
 	software) [[ -n "$have_robot" ]] ;;
 	terminal) [[ -n "$have_robot" && -n "$have_terminal" ]] ;;
 	board) [[ -n "$have_robot" && -n "$found_debug" && -n "$debug_is_reference" ]] ;;
-	board-uart) [[ -n "$have_robot" && -n "$found_debug" && -n "$debug_is_reference" && -n "$found_second_serial" ]] ;;
+	# The F746 scenario skips itself when that board is absent, so the shape
+	# only needs the adapter the link runs on.
+	board-uart) [[ -n "$have_robot" && -n "$found_debug" && -n "$debug_is_reference" && -n "$found_ftdi" ]] ;;
 	board-can) [[ -n "$have_robot" && -n "$found_debug" && -n "$debug_is_reference" && -n "$found_can" && "$found_can" != *virtual* ]] ;;
 	radio) [[ -n "$have_robot" && -n "$found_debug" && -n "$debug_is_reference" && -n "${found_radio:-$found_second_serial}" ]] ;;
 	*) return 1 ;;
@@ -204,7 +220,9 @@ missing_for() {
 		;;
 	esac
 	case "$shape" in
-	board-uart) [[ -z "$found_second_serial" ]] && missing+=("a second serial adapter") ;;
+	board-uart)
+		[[ -z "$found_ftdi" ]] && missing+=("an FTDI UART adapter")
+		;;
 	board-can)
 		if [[ -n "$can_down" ]]; then
 			missing+=("$can_down brought up: sudo ip link set $can_down up type can bitrate 500000")
@@ -240,6 +258,11 @@ report() {
 	if [[ -n "$found_other_debug" ]]; then
 		printf '  %-22s %s\n' "other ST-Links" "$found_other_debug"
 	fi
+	printf '  %-22s %s\n' "F746 debug UART" "${found_f746_debug:-not found}"
+	printf '  %-22s %s\n' "FTDI UART" "${found_ftdi:-not found}"
+	# One cable, one board: the UART scenario for any other board says so and
+	# does not run.
+	printf '  %-22s %s\n' "FTDI wired to" "${KFSW_FTDI_BOARD:-nucleo_l496zg (set KFSW_FTDI_BOARD)}"
 	printf '  %-22s %s\n' "second serial" "${found_second_serial:-not found}"
 	printf '  %-22s %s\n' "radio serial" "${found_radio:-not set; say which serial port it is}"
 	printf '  %-22s %s\n' "CAN interface" "${found_can:-${can_down:+$can_down (down)}}"
@@ -293,6 +316,8 @@ if [[ "${1:-}" == "--export" ]]; then
 	# whichever of the attached boards openocd happens to open first.
 	[[ -n "$STLINK_SERIAL" && -n "$debug_is_reference" ]] &&
 		printf 'KFSW_STLINK_SERIAL=%s\n' "$STLINK_SERIAL"
+	[[ -n "$found_f746_debug" ]] && printf 'KFSW_F746_DEBUG_SERIAL=%s\n' "$found_f746_debug"
+	[[ -n "$found_ftdi" ]] && found_second_serial="$found_ftdi"
 	[[ -n "$found_second_serial" ]] && printf 'KFSW_FTDI_DEVICE=%s\n' "$found_second_serial"
 	[[ -n "$found_radio" ]] && printf 'KFSW_RADIO_SERIAL=%s\n' "$found_radio"
 	[[ -n "$found_can" && "$found_can" != *virtual* ]] &&

@@ -17,6 +17,9 @@
 };
 
 &usart6 {
+	/* The shell prints this name in `comms uart info`; without it the
+	 * devicetree node name shows instead. */
+	label = "usart6";
 	current-speed = <115200>;
 	parity = "none";
 	stop-bits = "1";

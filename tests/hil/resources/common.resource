@@ -1,6 +1,8 @@
 *** Settings ***
 Library    Collections
+Library    OperatingSystem
 Library    Process
+Library    String
 Library    Ground.py
 
 *** Variables ***
@@ -11,6 +13,7 @@ ${KFSW_PYTHON}        ${{__import__('sys').executable}}
 # on a bench with two of them is not the one under test. run.sh sets this from
 # what preflight.sh discovered.
 ${DEBUG_SERIAL}       %{KFSW_DEBUG_SERIAL=}
+${F746_DEBUG_SERIAL}    %{KFSW_F746_DEBUG_SERIAL=}
 ${FTDI_DEVICE}        %{KFSW_FTDI_DEVICE=}
 ${HOLYBRO_RADIO}      %{KGROUND_HOLYBRO_DEVICE=}
 
@@ -24,8 +27,33 @@ Run NUCLEO Boot Smoke
     ...    env:KFSW_SERIAL=${DEBUG_SERIAL}
     RETURN    ${result}
 
+Prepare CAN Firmware Images
+    [Documentation]    Builds the baseline and the candidate, installs the
+    ...    baseline and confirms it. The other CAN scenarios reflash the board
+    ...    with a plain image, so this has to run immediately before the update
+    ...    test rather than once for the whole shape.
+    ${result}=    Run Process
+    ...    ${KFSW_REPO_DIR}/tests/hil/fwu/can-images.sh    install
+    ...    stdout=${OUTPUT DIR}/can-fwu-images.out    stderr=STDOUT    timeout=2400
+    ${text}=    Get File    ${OUTPUT DIR}/can-fwu-images.out
+    Skip If    "CAN FWU IMAGES: NOT RUN" in $text    ${text}
+    Should Be Equal As Integers    ${result.rc}    0    ${text}
+    ${ground}=    Get Lines Containing String    ${text}    KFSW_FWU_CAN_GROUND=
+    ${image}=    Get Lines Containing String    ${text}    KFSW_FWU_CAN_IMAGE=
+    ${ground}=    Fetch From Right    ${ground}    =
+    ${image}=    Fetch From Right    ${image}    =
+    RETURN    ${ground.strip()}    ${image.strip()}
+
 Run Physical UART CSP Smoke
-    @{arguments}=    Create List    --serial    ${DEBUG_SERIAL}
+    [Arguments]    ${target}=nucleo_l496zg
+    @{arguments}=    Create List    --target    ${target}
+    IF    $target == 'nucleo_f746zg'
+        IF    $F746_DEBUG_SERIAL
+            Append To List    ${arguments}    --serial    ${F746_DEBUG_SERIAL}
+        END
+    ELSE IF    $DEBUG_SERIAL
+        Append To List    ${arguments}    --serial    ${DEBUG_SERIAL}
+    END
     IF    $FTDI_DEVICE
         Append To List    ${arguments}    --ftdi    ${FTDI_DEVICE}
     END

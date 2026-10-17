@@ -114,8 +114,11 @@ def check_link(ground, board, attempts=3):
 
 
 def read_slot(ground, slot, destination):
+    # The client reports the byte count on its own line, so the result line
+    # ends at PASS. Matching the old one-line form waited for a string the
+    # firmware stopped printing.
     ground.run(f"ftp get {FLIGHT} /boot/firmware_{slot}.bin {destination}",
-               ": PASS bytes=", timeout=600)
+               ": PASS", timeout=600)
 
 
 def compare(ground, first, second):
@@ -200,12 +203,15 @@ def run_test(arguments, output):
             raise RuntimeError("Candidate and running revisions must differ")
         ground.run(f"ftp ls {FLIGHT} /boot", "firmware_1.bin")
         read_slot(ground, 1, "/before.bin")
-        ground.run(f"ftp put {FLIGHT} /candidate.bin /boot/firmware_1.bin", "FAIL (-5)")
+        # The slot files are a read-only view of flash, so a write to one is
+        # refused with EROFS. The old expectation was EIO, from before the
+        # server reported why.
+        ground.run(f"ftp put {FLIGHT} /candidate.bin /boot/firmware_1.bin", "FAIL (-30)")
         read_slot(ground, 1, "/readback.bin")
         compare(ground, "/before.bin", "/readback.bin")
 
         print("CAN FWU: FTP upload and readback", flush=True)
-        ground.run(f"ftp put {FLIGHT} /candidate.bin /firmware.bin", ": PASS bytes=",
+        ground.run(f"ftp put {FLIGHT} /candidate.bin /firmware.bin", ": PASS",
                    timeout=600)
         board.run("fwu status", "swap_scheduled: yes")
         read_slot(ground, 2, "/readback.bin")

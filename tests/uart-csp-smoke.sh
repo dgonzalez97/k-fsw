@@ -1,13 +1,39 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-source "$(dirname "$0")/../tools/_common.sh" nucleo_l496zg
-
+target=nucleo_l496zg
 ftdi_device=""
-debug_serial="$KFSW_SERIAL"
+debug_serial=""
+
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+		--target) target="${2:?--target requires a board}"; shift 2 ;;
+		--ftdi) ftdi_device="${2:?--ftdi requires a device path}"; shift 2 ;;
+		--serial) debug_serial="${2:?--serial requires a device path}"; shift 2 ;;
+		*) echo "ERROR: unknown argument: $1"; exit 1 ;;
+	esac
+done
+
+case "$target" in
+	nucleo_l496zg) uart_device=usart3 ;;
+	nucleo_f746zg) uart_device=usart6 ;;
+	*) echo "ERROR: unsupported UART HIL target: $target"; exit 1 ;;
+esac
+
+source "$(dirname "$0")/../tools/_common.sh" "$target"
+
+# One FTDI cable serves one board. Which board it is wired to is a fact about
+# the bench that nothing can read from software, so the bench states it.
+ftdi_board="${KFSW_FTDI_BOARD:-nucleo_l496zg}"
+if [[ "$target" != "$ftdi_board" ]]; then
+	echo "UART CSP HIL RESULT: NOT RUN - the FTDI cable is on $ftdi_board, not $target"
+	exit 0
+fi
+
+debug_serial="${debug_serial:-$KFSW_SERIAL}"
 debug_baud="$KFSW_SERIAL_BAUD"
 nucleo_build_dir="$KFSW_BUILD_DIR"
-linux_build_dir="$KFSW_ROOT/build/linux"
+linux_build_dir="${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}/linux"
 linux_executable="$linux_build_dir/zephyr/zephyr.exe"
 work_dir="$(mktemp -d /tmp/kfsw-uart-csp.XXXXXX)"
 linux_pid=""
@@ -15,23 +41,6 @@ debug_capture_pid=""
 bridge_pid=""
 debug_stty=""
 ftdi_stty=""
-
-while [[ $# -gt 0 ]]; do
-	case "$1" in
-		--ftdi)
-			ftdi_device="${2:?--ftdi requires a device path}"
-			shift 2
-			;;
-		--serial)
-			debug_serial="${2:?--serial requires a device path}"
-			shift 2
-			;;
-		*)
-			echo "ERROR: unknown argument: $1"
-			exit 1
-			;;
-	esac
-done
 
 cleanup()
 {
@@ -188,7 +197,7 @@ if [[ -z "$ftdi_device" ]]; then
 fi
 
 [[ -e "$ftdi_device" ]] || fail "FTDI device is missing: $ftdi_device"
-[[ -e "$debug_serial" ]] || fail "ST-LINK debug UART is missing: $debug_serial"
+[[ -e "$debug_serial" ]] || skip "ST-LINK debug UART is missing for $target: $debug_serial"
 
 if [[ "$(readlink -f "$ftdi_device")" == "$(readlink -f "$debug_serial")" ]]; then
 	fail "CSP UART and debug UART resolve to the same device"
@@ -217,8 +226,26 @@ lsusb | grep -Ei '0403:6001|FT232|FTDI' || true
 echo "Debug shell: $debug_serial"
 echo "YP-05 logic selection: 3.3 V required"
 
-"$KFSW_ROOT/k-fsw/tools/build.sh" linux
-"$KFSW_ROOT/k-fsw/tools/build.sh" nucleo_l496zg
+KFSW_BUILD_DIR="$linux_build_dir" "$KFSW_ROOT/k-fsw/tools/build.sh" linux
+if [[ "$target" == nucleo_f746zg ]]; then
+	profiles="$KFSW_REPO_DIR/config/profiles"
+	KFSW_EXTRA_CONF_FILE="$profiles/f746-uart.conf" \
+		KFSW_EXTRA_DTC_OVERLAY_FILE="$profiles/f746-uart.overlay" \
+		"$KFSW_REPO_DIR/tools/build.sh" "$target"
+else
+	"$KFSW_REPO_DIR/tools/build.sh" "$target"
+fi
+
+config="$nucleo_build_dir/zephyr/.config"
+[[ -r "$config" ]] || fail "built configuration is missing: $config"
+node="$(sed -n 's/^CONFIG_KFSW_CSP_ADDRESS=//p' "$config")"
+board="$(sed -n 's/^CONFIG_BOARD_TARGET="\(.*\)"/\1/p' "$config")"
+[[ "$node" =~ ^[0-9]+$ && -n "$board" ]] || fail "built node or board identity is missing"
+have_storage=false
+grep -qx 'CONFIG_KFSW_STORAGE=y' "$config" && have_storage=true
+if ! $have_storage; then
+	echo "SKIP: storage info, storage test, mount point and FTP transfers: CONFIG_KFSW_STORAGE is disabled for $target"
+fi
 
 [[ -x "$linux_executable" ]] || \
 	fail "the supported Linux target executable was not produced"
@@ -241,27 +268,26 @@ wait_for_output "$work_dir/nucleo.log" "@BOOT " "$debug_capture_pid" || \
 wait_for_output "$work_dir/nucleo.log" "@READY " "$debug_capture_pid" || \
 	fail "NUCLEO did not report @READY on the ST-LINK UART"
 
-printf '%s\r\n' \
-	'status' \
-	'storage info' \
-	'storage test' \
-	'comms uart info' >"$debug_serial"
+printf '%s\r\n' 'status' 'comms uart info' >"$debug_serial"
 wait_for_output "$work_dir/nucleo.log" "K-FSW status" \
 	"$debug_capture_pid" || fail "NUCLEO debug shell did not answer status"
-wait_for_output "$work_dir/nucleo.log" "board: nucleo_l496zg/stm32l496xx" \
+wait_for_output "$work_dir/nucleo.log" "board: $board" \
 	"$debug_capture_pid" || fail "NUCLEO status reported an unexpected board"
-wait_for_output "$work_dir/nucleo.log" "mount_point: /kfsw" \
-	"$debug_capture_pid" || fail "NUCLEO storage mount point was not reported"
-wait_for_output "$work_dir/nucleo.log" "Storage test: PASS" \
-	"$debug_capture_pid" || fail "NUCLEO storage test did not pass"
-wait_for_output "$work_dir/nucleo.log" "device: usart3" \
-	"$debug_capture_pid" || fail "NUCLEO did not report USART3 UART status"
+if $have_storage; then
+	printf '%s\r\n' 'storage info' 'storage test' >"$debug_serial"
+	wait_for_output "$work_dir/nucleo.log" "mount_point: /kfsw" \
+		"$debug_capture_pid" || fail "NUCLEO storage mount point was not reported"
+	wait_for_output "$work_dir/nucleo.log" "Storage test: PASS" \
+		"$debug_capture_pid" || fail "NUCLEO storage test did not pass"
+fi
+wait_for_output "$work_dir/nucleo.log" "device: $uart_device" \
+	"$debug_capture_pid" || fail "NUCLEO did not report $uart_device UART status"
 wait_for_output "$work_dir/nucleo.log" "ready: yes" \
 	"$debug_capture_pid" || fail "NUCLEO did not report a ready CSP UART"
 wait_for_output "$work_dir/nucleo.log" "CSP interface: KISS" \
 	"$debug_capture_pid" || fail "NUCLEO did not report its KISS interface"
-wait_for_output "$work_dir/nucleo.log" "CSP node: 2" \
-	"$debug_capture_pid" || fail "NUCLEO did not report CSP node 2"
+wait_for_output "$work_dir/nucleo.log" "CSP node: $node" \
+	"$debug_capture_pid" || fail "NUCLEO did not report CSP node $node"
 wait_for_output "$work_dir/nucleo.log" "CSP peer: 1" \
 	"$debug_capture_pid" || fail "NUCLEO did not report CSP peer 1"
 
@@ -299,9 +325,9 @@ bridge_pid=$!
 wait_for_output "$work_dir/socat.log" "starting data transfer loop" \
 	"$bridge_pid" || fail "PTY to FTDI bridge did not become ready"
 
-printf '%s\n' 'csp ping 2' >&3
-wait_for_output "$work_dir/linux.log" "CSP ping 2: success" "$linux_pid" || \
-	fail "KFSW-Linux could not ping NUCLEO CSP node 2"
+printf '%s\n' "csp ping $node" >&3
+wait_for_output "$work_dir/linux.log" "CSP ping $node: success" "$linux_pid" || \
+	fail "KFSW-Linux could not ping NUCLEO CSP node $node"
 
 printf '%s\r\n' \
 	'csp ping 1' \
@@ -313,40 +339,48 @@ wait_for_output "$work_dir/nucleo.log" "CSP ping 1: success" \
 wait_for_output "$work_dir/nucleo.log" "UART CSP test: PASS" \
 	"$debug_capture_pid" || fail "NUCLEO UART transport test did not pass"
 
-printf '%s\n' 'comms uart test' 'comms uart info' >&3
+# The hosted node's compiled peer is the L496; name the node under test so the
+# same check works for either board.
+printf '%s\n' "comms uart test $node" 'comms uart info' >&3
 wait_for_output "$work_dir/linux.log" "UART CSP test: PASS" "$linux_pid" || \
 	fail "KFSW-Linux UART transport test did not pass"
 
-printf '%s\n' \
-	'ftp generate /build/hil-4k.bin 4096' \
-	'ftp mkdir 2 /hil' \
-	'ftp put 2 /build/hil-4k.bin /hil/hil-4k.bin' \
-	'ftp stat 2 /hil/hil-4k.bin' \
-	'ftp ls 2 /hil' \
-	'ftp get 2 /hil/hil-4k.bin /build/hil-4k-returned.bin' \
-	'ftp verify /build/hil-4k.bin /build/hil-4k-returned.bin' \
-	'ftp generate /build/hil-16k.bin 16384' \
-	'ftp put 2 /build/hil-16k.bin /hil/hil-16k.bin' \
-	'ftp get 2 /hil/hil-16k.bin /build/hil-16k-returned.bin' \
-	'ftp verify /build/hil-16k.bin /build/hil-16k-returned.bin' \
-	'csp ping 2' \
-	'param get 2 test_u32' \
-	'comms uart info' >&3
+if $have_storage; then
+	printf '%s\n' \
+		'ftp generate /build/hil-4k.bin 4096' \
+		'ftp mkdir 2 /hil' \
+		'ftp put 2 /build/hil-4k.bin /hil/hil-4k.bin' \
+		'ftp stat 2 /hil/hil-4k.bin' \
+		'ftp ls 2 /hil' \
+		'ftp get 2 /hil/hil-4k.bin /build/hil-4k-returned.bin' \
+		'ftp verify /build/hil-4k.bin /build/hil-4k-returned.bin' \
+		'ftp generate /build/hil-16k.bin 16384' \
+		'ftp put 2 /build/hil-16k.bin /hil/hil-16k.bin' \
+		'ftp get 2 /hil/hil-16k.bin /build/hil-16k-returned.bin' \
+		'ftp verify /build/hil-16k.bin /build/hil-16k-returned.bin' \
+		'csp ping 2' \
+		'param get 2 test_u32' \
+		'comms uart info' >&3
 
-wait_for_output "$work_dir/linux.log" \
-	"FTP put node=2 source=/build/hil-4k.bin destination=/hil/hil-4k.bin: PASS bytes=4096" \
-	"$linux_pid" || fail "4 KiB physical FTP upload did not pass"
-wait_for_output "$work_dir/linux.log" \
-	"FTP verify first=/build/hil-4k.bin second=/build/hil-4k-returned.bin: PASS" \
-	"$linux_pid" || fail "4 KiB physical FTP round trip did not match"
-wait_for_output "$work_dir/linux.log" \
-	"FTP put node=2 source=/build/hil-16k.bin destination=/hil/hil-16k.bin: PASS bytes=16384" \
-	"$linux_pid" || fail "16 KiB physical FTP upload did not pass"
-wait_for_output "$work_dir/linux.log" \
-	"FTP verify first=/build/hil-16k.bin second=/build/hil-16k-returned.bin: PASS" \
-	"$linux_pid" || fail "16 KiB physical FTP round trip did not match"
-wait_for_output "$work_dir/linux.log" "2:test_u32 = 42" "$linux_pid" || \
-	fail "PARAM did not work after physical FTP transfers"
+	wait_for_output "$work_dir/linux.log" \
+		"FTP put node=2 source=/build/hil-4k.bin destination=/hil/hil-4k.bin: PASS bytes=4096" \
+		"$linux_pid" || fail "4 KiB physical FTP upload did not pass"
+	wait_for_output "$work_dir/linux.log" \
+		"FTP verify first=/build/hil-4k.bin second=/build/hil-4k-returned.bin: PASS" \
+		"$linux_pid" || fail "4 KiB physical FTP round trip did not match"
+	wait_for_output "$work_dir/linux.log" \
+		"FTP put node=2 source=/build/hil-16k.bin destination=/hil/hil-16k.bin: PASS bytes=16384" \
+		"$linux_pid" || fail "16 KiB physical FTP upload did not pass"
+	wait_for_output "$work_dir/linux.log" \
+		"FTP verify first=/build/hil-16k.bin second=/build/hil-16k-returned.bin: PASS" \
+		"$linux_pid" || fail "16 KiB physical FTP round trip did not match"
+	wait_for_output "$work_dir/linux.log" "2:test_u32 = 42" "$linux_pid" || \
+		fail "PARAM did not work after physical FTP transfers"
+fi
+
+printf '%s\n' "param get $node node_id" 'comms uart info' >&3
+wait_for_output "$work_dir/linux.log" "$node:node_id = $node" "$linux_pid" || \
+	fail "remote node_id did not match the built CSP node"
 
 for log_file in linux.log nucleo.log; do
 	last_stats="$(grep -F 'KISS tx=' "$work_dir/$log_file" | tail -1 || true)"
