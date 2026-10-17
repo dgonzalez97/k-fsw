@@ -7,6 +7,7 @@ source "$(dirname "$0")/../tools/_common.sh" "$KFSW_TARGET"
 
 capture_file="$(mktemp)"
 capture_pid=""
+bootloader_file="$(mktemp)"
 
 cleanup()
 {
@@ -15,7 +16,7 @@ cleanup()
         wait "$capture_pid" 2>/dev/null || true
     fi
 
-    rm -f "$capture_file"
+    rm -f "$capture_file" "$bootloader_file"
 }
 
 trap cleanup EXIT
@@ -29,8 +30,8 @@ echo
 echo "[1/5] ST-LINK"
 
 if ! lsusb | grep -q "$KFSW_STLINK_USB_ID"; then
-    echo "FAIL: $KFSW_STLINK_USB_ID not visible."
-    exit 1
+    echo "HIL RESULT: NOT RUN - $KFSW_STLINK_USB_ID not visible."
+    exit 0
 fi
 
 echo "PASS"
@@ -39,8 +40,8 @@ echo
 echo "[2/5] Serial"
 
 if [[ ! -e "$KFSW_SERIAL" ]]; then
-    echo "FAIL: $KFSW_SERIAL missing."
-    exit 1
+    echo "HIL RESULT: NOT RUN - $KFSW_SERIAL missing."
+    exit 0
 fi
 
 echo "PASS"
@@ -48,7 +49,44 @@ echo "PASS"
 echo
 echo "[3/5] Build"
 
-"$KFSW_ROOT/k-fsw/tools/build.sh" "$KFSW_TARGET"
+flash_args=()
+if [[ "$KFSW_TARGET" == nucleo_l496zg ]]; then
+    support="$ZEPHYR_BASE/boards/st/nucleo_l496zg/support"
+    if ! openocd -s "$support" -f "$support/openocd.cfg" \
+        -c "adapter serial $KFSW_STLINK_SERIAL" \
+        -c "init" -c "halt" \
+        -c "dump_image $bootloader_file 0x08000000 0x10000" \
+        -c "resume" -c "shutdown"; then
+        echo "FAIL: cannot read the bootloader area; no image was flashed."
+        exit 1
+    fi
+    if [[ "$(wc -c <"$bootloader_file")" -ne 65536 ]]; then
+        echo "FAIL: incomplete bootloader read; no image was flashed."
+        exit 1
+    fi
+    if grep -aqF 'Booting MCUboot' "$bootloader_file"; then
+        if [[ -z "${KFSW_MCUBOOT_KEY:-}" || ! -r "$KFSW_MCUBOOT_KEY" ]]; then
+            echo "FAIL: MCUboot detected; set KFSW_MCUBOOT_KEY to its readable signing key."
+            exit 1
+        fi
+        profiles="$KFSW_REPO_DIR/config/profiles"
+        KFSW_BUILD_DIR="$KFSW_BUILD_DIR/boot-smoke-signed"
+        export KFSW_BUILD_DIR
+        echo "Boot image: signed application; MCUboot banner found in the bootloader area."
+        KFSW_SYSBUILD=1 KFSW_PRISTINE=always \
+            KFSW_EXTRA_CONF_FILE="$profiles/nucleo-mcuboot.conf;$profiles/nucleo-mcuboot-fwu.conf" \
+            KFSW_EXTRA_DTC_OVERLAY_FILE="$profiles/nucleo-mcuboot-flash.overlay;$profiles/nucleo-mcuboot.overlay;$profiles/nucleo-mcuboot-fwu.overlay" \
+            KFSW_MCUBOOT_DTC_OVERLAY_FILE="$profiles/nucleo-mcuboot-flash.overlay" \
+            "$KFSW_REPO_DIR/tools/build.sh" "$KFSW_TARGET"
+        flash_args+=(--domain app)
+    else
+        echo "Boot image: plain application; no MCUboot banner in the bootloader area."
+        KFSW_PRISTINE=always "$KFSW_REPO_DIR/tools/build.sh" "$KFSW_TARGET"
+    fi
+else
+    echo "Boot image: plain application; no MCUboot composition for $KFSW_TARGET."
+    "$KFSW_REPO_DIR/tools/build.sh" "$KFSW_TARGET"
+fi
 
 echo
 echo "[4/5] Start serial capture BEFORE reset"
@@ -71,7 +109,7 @@ echo "[5/5] Flash / reset / boot"
 
 kfsw_west_flash \
     -d "$KFSW_BUILD_DIR" \
-    --runner openocd
+    --runner openocd "${flash_args[@]}"
 
 sleep 2
 

@@ -8,6 +8,7 @@ Resource         resources/common.resource
 NUCLEO Reports Boot And Ready
     [Tags]    smoke    nucleo    physical    needs-nucleo
     ${result}=    Run NUCLEO Boot Smoke
+    Skip If    "HIL RESULT: NOT RUN" in $result.stdout    ${result.stdout}
     HIL Command Should Pass    ${result}    HIL RESULT: PASS
     Should Contain    ${result.stdout}    @BOOT
     Should Contain    ${result.stdout}    @READY
