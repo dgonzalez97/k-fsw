@@ -1,0 +1,25 @@
+/* CSP over a physical UART on the NUCLEO-F746ZG.
+ *
+ * USART3 PD8/PD9 is the ST-LINK virtual COM port on this board, and that is
+ * where the shell and the logs are, so the CSP link cannot share it as it does
+ * on the L496ZG. It goes on USART6 instead, PG14 (TX) and PG9 (RX), which are
+ * D1 and D0 on the Zio header. The board enables USART6 with those pins
+ * already, so only the choice is made here.
+ *
+ * Wiring, with an FTDI TTL-232R-3V3: yellow (FTDI RX) to D1, orange (FTDI TX)
+ * to D0, black to GND, and the red 5 V lead left unconnected. PG9 and PG14 are
+ * also D0 and D1 of the Arduino header, so no shield can share them.
+ */
+/ {
+	chosen {
+		kfsw,csp-uart = &usart6;
+	};
+};
+
+&usart6 {
+	current-speed = <115200>;
+	parity = "none";
+	stop-bits = "1";
+	data-bits = <8>;
+	status = "okay";
+};
