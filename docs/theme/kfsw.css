@@ -257,27 +257,51 @@ dl.note, dl.warning, dl.attention {
 }
 
 /* The version selector, added by kfsw-versions.js on a published site. */
+/* The version strip sits at the top of the navigation tree and stays there
+ * while the tree scrolls.
+ */
 .kfsw-version-box {
-	position: fixed;
-	right: 12px;
-	bottom: 12px;
-	z-index: 1000;
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	box-sizing: border-box;
+	padding: 8px 10px;
+	margin: -12px 0 6px 0;
+	background: var(--kfsw-surface);
+	border-bottom: 1px solid var(--kfsw-border);
+}
+
+.kfsw-version-label {
+	color: var(--kfsw-navy);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
 }
 
 .kfsw-version-select {
-	font: inherit;
-	padding: 4px 8px;
-	border: 1px solid #b0b8c4;
-	border-radius: 4px;
-	background: #ffffff;
-	color: #1f2933;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+	flex: 1 1 auto;
+	min-width: 0;
+	font-family: inherit;
+	font-size: 13px;
+	padding: 3px 6px;
+	border: 1px solid var(--kfsw-border);
+	border-radius: 3px;
+	background: #fff;
+	color: var(--kfsw-ink);
 }
 
-@media (prefers-color-scheme: dark) {
-	.kfsw-version-select {
-		border-color: #4a5568;
-		background: #1f2933;
-		color: #e4e7eb;
-	}
+.kfsw-version-select:focus {
+	outline: 2px solid var(--kfsw-teal);
+	outline-offset: 1px;
+}
+
+/* The tree already highlights the page being read, so the button that
+ * re-synchronises it has nothing left to do.
+ */
+#nav-sync {
+	display: none;
 }
