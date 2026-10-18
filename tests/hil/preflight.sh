@@ -267,6 +267,8 @@ report() {
 	printf '  %-22s %s\n' "radio serial" "${found_radio:-not set; say which serial port it is}"
 	printf '  %-22s %s\n' "CAN interface" "${found_can:-${can_down:+$can_down (down)}}"
 	printf '  %-22s %s\n' "" "${found_can:-${can_down:-none at all}}" >/dev/null
+	printf '  %-22s %s\n' "signing key" \
+		"$([[ -r "$signing_key" ]] && echo "$signing_key" || echo "not found, so no signed image")"
 	printf '  %-22s %s\n' "Robot Framework" "${have_robot:-missing}"
 	printf '  %-22s %s\n' "terminal runner" "${have_terminal:-missing}"
 	echo
@@ -305,6 +307,8 @@ report() {
 	echo "Run one with: tests/hil/run.sh <shape>"
 }
 
+signing_key="${KFSW_MCUBOOT_KEY:-$HOME/.config/kfsw/mcuboot-signing-key.pem}"
+
 discover_serial
 discover_can
 discover_host
@@ -322,6 +326,11 @@ if [[ "${1:-}" == "--export" ]]; then
 	[[ -n "$found_radio" ]] && printf 'KFSW_RADIO_SERIAL=%s\n' "$found_radio"
 	[[ -n "$found_can" && "$found_can" != *virtual* ]] &&
 		printf 'KFSW_CAN_INTERFACE=%s\n' "$found_can"
+	# The signing key is a bench input like a port is. The scenarios that build
+	# a signed image default to this path, and the boot smoke refuses to guess
+	# which key to sign with, so the bench declares it here once. A board
+	# carrying MCUboot otherwise fails the first case of the board shape.
+	[[ -r "$signing_key" ]] && printf 'KFSW_MCUBOOT_KEY=%s\n' "$signing_key"
 	exit 0
 fi
 
