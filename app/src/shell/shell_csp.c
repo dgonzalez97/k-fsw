@@ -244,6 +244,25 @@ static int cmd_csp_debug(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
+/* The dial itself is in kfsw-comms; this only parses it. */
+static int cmd_csp_rdp(const struct shell *sh, size_t argc, char **argv)
+{
+	unsigned long level;
+	char *end;
+
+	if (argc < 2U) {
+		shell_print(sh, "CSP RDP trace: %u", kfsw_csp_get_rdp_trace());
+		return 0;
+	}
+	level = strtoul(argv[1], &end, 10);
+	if ((*end != '\0') || (kfsw_csp_set_rdp_trace((uint8_t)level) != 0)) {
+		shell_error(sh, "level is 0 off, 1 errors, 2 with the protocol");
+		return -EINVAL;
+	}
+	shell_print(sh, "CSP RDP trace: %lu", level);
+	return 0;
+}
+
 static int cmd_csp_ident(const struct shell *sh, size_t argc, char **argv)
 {
 	struct kfsw_csp_identity identity;
@@ -404,6 +423,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(csp_commands,
 	SHELL_CMD_ARG(reboot, NULL, "Restart a node: reboot <node> <pin> [--retry].",
 		      cmd_csp_reboot, 3, 1),
 #endif
+	SHELL_CMD_ARG(rdp, NULL, "Reliable transport detail: rdp [0..2].", cmd_csp_rdp, 1, 1),
 	SHELL_CMD_ARG(routes, NULL, "Show the CSP static routing table.", cmd_csp_routes, 1, 0),
 	SHELL_SUBCMD_SET_END);
 

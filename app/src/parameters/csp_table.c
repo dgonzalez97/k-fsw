@@ -95,6 +95,26 @@ static void sample_interfaces(void *value)
 	*(uint8_t *)value = csp_interfaces;
 }
 
+/* The reliable transport's own verbosity, which the ground may need to raise
+ * for one pass. Not persistent: a reset returns to quiet.
+ */
+static uint8_t csp_rdp_trace;
+
+static void sample_rdp_trace(void *value)
+{
+	*(uint8_t *)value = kfsw_csp_get_rdp_trace();
+}
+
+static int validate_rdp_trace(const union kfsw_param_scalar *value)
+{
+	return (value->u8 > 2U) ? -ERANGE : 0;
+}
+
+static void apply_rdp_trace(const union kfsw_param_scalar *value)
+{
+	(void)kfsw_csp_set_rdp_trace(value->u8);
+}
+
 /* libcsp's own error counters, sampled together. */
 static uint8_t csp_buffer_out;
 static uint8_t csp_conn_out;
@@ -298,6 +318,18 @@ static const struct kfsw_param_definition csp_param_definitions[] = {
 		.value = &csp_last_can_error,
 		.default_value = {.u8 = 0U},
 		.sample = sample_last_can_error,
+	},
+	{
+		.offset = 0x1dU,
+		.type = KFSW_PARAM_U8,
+		.flags = KFSW_PARAM_FLAG_CONFIGURATION | KFSW_PARAM_FLAG_LIVE,
+		.name = "rdp_trace",
+		.description = "RDP detail: 0 off, 1 errors, 2 with the protocol",
+		.value = &csp_rdp_trace,
+		.default_value = {.u8 = 0U},
+		.validate = validate_rdp_trace,
+		.changed = apply_rdp_trace,
+		.sample = sample_rdp_trace,
 	},
 	{
 		.offset = 0x20U,
