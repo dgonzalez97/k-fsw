@@ -27,7 +27,7 @@ kfsw_shape_covers() {
 	terminal) echo "operator-style shell sessions against the Linux image" ;;
 	board) echo "boot and readiness, the clock and the reset note across a reset, parameter tables, the image scrub against real flash" ;;
 	board-uart) echo "CSP over the L496 and F746 physical UARTs, telemetry capture, the echo benchmark, command retries" ;;
-	board-can) echo "CSP over CAN, and firmware update over CAN with both slots read back" ;;
+	board-can) echo "CSP over CAN, firmware update with both slots read back, procedures and the time-tagged queue, and a limit released on two links" ;;
 	radio) echo "the raw and CSP links, firmware update over the radio, beacons" ;;
 	*) return 1 ;;
 	esac

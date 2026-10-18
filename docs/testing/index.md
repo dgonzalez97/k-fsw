@@ -117,6 +117,8 @@ partway through.
 | Holybro serial and CSP link | `tests/hil/radio-uhf/holybro/` |
 | Encrypted radio, wrong keys, captured-frame replay | `tests/hil/radio-uhf/holybro/crypto-smoke.py` |
 | Image scrub: a reference across a reset, a changed slot | `tests/hil/scrub/learned-reference.sh` |
+| A procedure over the bus, the queue releasing alone, remote execution | `tests/hil/fbo/pass-plan.sh` |
+| A parameter limit releasing a command on two links at once | `tests/hil/limits/released-on-two-links.sh` |
 | Bootloader revert and the wrong signing key | `tests/hil/mcuboot/rollback.sh` |
 | Robot scenarios | `tests/hil/` |
 
