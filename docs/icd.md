@@ -26,6 +26,7 @@ The mode column is what the parameter service enforces: `r` is read only, `w` is
 | 36 | service | `resmon` | 10 | 0 | Thread stack use |
 | 37 | service | `table` | 7 | 0 | Uploaded table files, adoptions and reverts |
 | 38 | service | `remexec` | 9 | 0 | Remote shell execution and its refusals |
+| 40 | service | `limits` | 11 | 2 | Parameter limits |
 
 ### board (1)
 
@@ -273,6 +274,22 @@ The mode column is what the parameter service enforces: `r` is read only, `w` is
 | 0x18 | `remexec_last_result` | i32 | r | - | What the last command returned; zero before any ran |
 | 0x1c | `remexec_last_ms` | u32 | r | ms | How long the last command took |
 | 0x20 | `remexec_last_command` | string | r | - | The last command line asked for, with its arguments |
+
+### limits (40)
+
+| Offset | Name | Type | Mode | Unit | Description |
+| --- | --- | --- | --- | --- | --- |
+| 0x00 | `limits_rules` | u8 | r | - | Rules in force |
+| 0x01 | `limits_running` | u8 | r | - | Whether the periodic sweep is scheduled |
+| 0x02 | `limits_enabled` | u8 | wp | - | 0 stops the sweeps and keeps the loaded rules |
+| 0x04 | `limits_interval_ms` | u32 | wp | ms | Between periodic sweeps; 0 or 100 to 3600000 |
+| 0x08 | `limits_sweeps` | u32 | r | - | Sweeps completed while enabled |
+| 0x0c | `limits_fires` | u32 | r | - | Actions released |
+| 0x10 | `limits_failures` | u32 | r | - | Parameter reads and releases that failed |
+| 0x14 | `limits_parse_errors` | u32 | r | - | Rule files refused for a bad line |
+| 0x18 | `limits_last_fired_ms` | u32 | r | ms | Uptime of the last release; 0 before any |
+| 0x1c | `limits_last_fired` | u8 | r | - | Index of the rule that fired last; 255 before any |
+| 0x1e | `limits_error_line` | u16 | r | - | Line that got the last file refused; 0 for none |
 
 ## Commands
 
