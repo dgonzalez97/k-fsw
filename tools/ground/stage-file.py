@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Stage a host file in a stopped native_sim node's LittleFS partition.
 
-The flash geometry must match the node's devicetree.
+The flash geometry must match the node's devicetree. A partition that already
+holds a filesystem is added to, not replaced: staging a second file used to
+discard the first one silently, which is a slow way to debug a test.
 """
 
 import argparse
@@ -41,6 +43,13 @@ def main() -> int:
               file=sys.stderr)
         return 1
 
+    flash = pathlib.Path(arguments.flash)
+    # The backing file covers the whole simulated device, so it is padded to
+    # full size and the partition is read out of it at its own offset.
+    existing = flash.read_bytes() if flash.exists() else b""
+    contents = bytearray(b"\xff" * flash_size)
+    contents[: len(existing)] = existing[:flash_size]
+
     filesystem = LittleFS(
         block_size=block_size,
         block_count=size // block_size,
@@ -48,7 +57,14 @@ def main() -> int:
         prog_size=int(arguments.prog_size, 0),
         cache_size=int(arguments.cache_size, 0),
         lookahead_size=int(arguments.lookahead_size, 0),
+        mount=False,
     )
+    filesystem.context.buffer = bytearray(contents[offset : offset + size])
+    try:
+        filesystem.mount()
+    except Exception:
+        filesystem.format()
+        filesystem.mount()
 
     destination = arguments.destination.lstrip("/")
     parent = pathlib.PurePosixPath(destination).parent
@@ -65,13 +81,6 @@ def main() -> int:
         handle.write(payload)
 
     image = filesystem.context.buffer
-
-    flash = pathlib.Path(arguments.flash)
-    # The backing file covers the whole simulated device, so it is padded to
-    # full size before the partition is spliced in at its own offset.
-    existing = flash.read_bytes() if flash.exists() else b""
-    contents = bytearray(b"\xff" * flash_size)
-    contents[: len(existing)] = existing[:flash_size]
     contents[offset : offset + len(image)] = image
     flash.write_bytes(bytes(contents))
 
