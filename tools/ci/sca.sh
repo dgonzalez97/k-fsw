@@ -28,11 +28,11 @@ build_result=$?
 # Only K-FSW's libraries are built: the image would not fit, and is not needed.
 echo "SCA: the services the NUCLEO leaves out, in $out_dir/services"
 if [[ $build_result -eq 0 ]]; then
-	west build -p always -b "$ZEPHYR_BOARD" "$KFSW_ROOT/k-fsw/app" -d "$out_dir/services" \
+	west build -p always -b "$ZEPHYR_BOARD" "$KFSW_REPO_DIR/app" -d "$out_dir/services" \
 		--cmake-only \
-		--extra-conf "$KFSW_ROOT/k-fsw/tests/config/sca-services.conf" \
-		--extra-dtc-overlay "$KFSW_ROOT/k-fsw/config/profiles/nucleo-mcuboot-flash.overlay" \
-		--extra-dtc-overlay "$KFSW_ROOT/k-fsw/config/profiles/nucleo-mcuboot-fwu.overlay" \
+		--extra-conf "$KFSW_REPO_DIR/tests/config/sca-services.conf" \
+		--extra-dtc-overlay "$KFSW_REPO_DIR/config/profiles/nucleo-mcuboot-flash.overlay" \
+		--extra-dtc-overlay "$KFSW_REPO_DIR/config/profiles/nucleo-mcuboot-fwu.overlay" \
 		-- -DZEPHYR_SCA_VARIANT=gcc >>"$log_file" 2>&1 &&
 		cmake --build "$out_dir/services" --target app kfsw_services kfsw_comms \
 			kfsw_platform >>"$log_file" 2>&1

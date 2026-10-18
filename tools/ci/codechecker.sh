@@ -30,10 +30,10 @@ echo "CODECHECKER: building nucleo_l496zg"
 
 # Configured, and its generated headers made, but not built: it would not fit.
 echo "CODECHECKER: configuring the services the NUCLEO leaves out"
-west build -p always -b "$ZEPHYR_BOARD" "$KFSW_ROOT/k-fsw/app" -d "$services_dir" --cmake-only \
-	--extra-conf "$KFSW_ROOT/k-fsw/tests/config/sca-services.conf" \
-	--extra-dtc-overlay "$KFSW_ROOT/k-fsw/config/profiles/nucleo-mcuboot-flash.overlay" \
-	--extra-dtc-overlay "$KFSW_ROOT/k-fsw/config/profiles/nucleo-mcuboot-fwu.overlay" \
+west build -p always -b "$ZEPHYR_BOARD" "$KFSW_REPO_DIR/app" -d "$services_dir" --cmake-only \
+	--extra-conf "$KFSW_REPO_DIR/tests/config/sca-services.conf" \
+	--extra-dtc-overlay "$KFSW_REPO_DIR/config/profiles/nucleo-mcuboot-flash.overlay" \
+	--extra-dtc-overlay "$KFSW_REPO_DIR/config/profiles/nucleo-mcuboot-fwu.overlay" \
 	>>"$out_dir/build.log" 2>&1
 cmake --build "$services_dir" --target syscall_list_h_target driver_validation_h_target \
 	kobj_types_h_target offsets_h version_h >>"$out_dir/build.log" 2>&1
@@ -65,7 +65,7 @@ echo "CODECHECKER: $units translation units"
 
 cat >"$out_dir/skip.txt" <<SKIP
 -*/third_party/*
-+$KFSW_ROOT/k-fsw/app/*
++$KFSW_REPO_DIR/app/*
 +$KFSW_ROOT/kfsw-platform/*
 +$KFSW_ROOT/kfsw-services/*
 +$KFSW_ROOT/kfsw-comms/*

@@ -6,7 +6,7 @@ endif()
 if(KFSW_RELEASE_BUILD)
     execute_process(
         COMMAND "${KFSW_WORKSPACE_ROOT}/.venv/bin/python"
-            "${KFSW_WORKSPACE_ROOT}/k-fsw/tools/release.py" check
+            "${KFSW_REPO_ROOT}/tools/release.py" check
             --output "${CMAKE_CURRENT_BINARY_DIR}/release-inputs.json"
         RESULT_VARIABLE kfsw_release_result
     )

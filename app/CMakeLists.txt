@@ -1,9 +1,22 @@
 cmake_minimum_required(VERSION 3.20.0)
 
-get_filename_component(KFSW_WORKSPACE_ROOT
-    "${CMAKE_CURRENT_LIST_DIR}/../.."
+# This repository, and the workspace it was fetched into. The workspace is
+# found by its west directory rather than assumed to be two levels up, so a git
+# worktree of this repository builds its own sources against the one workspace
+# that holds Zephyr and the dependency modules.
+get_filename_component(KFSW_REPO_ROOT
+    "${CMAKE_CURRENT_LIST_DIR}/.."
     ABSOLUTE
 )
+set(KFSW_WORKSPACE_ROOT "${KFSW_REPO_ROOT}")
+while(NOT EXISTS "${KFSW_WORKSPACE_ROOT}/.west")
+    get_filename_component(kfsw_parent "${KFSW_WORKSPACE_ROOT}/.." ABSOLUTE)
+    if(kfsw_parent STREQUAL KFSW_WORKSPACE_ROOT)
+        get_filename_component(KFSW_WORKSPACE_ROOT "${KFSW_REPO_ROOT}/.." ABSOLUTE)
+        break()
+    endif()
+    set(KFSW_WORKSPACE_ROOT "${kfsw_parent}")
+endwhile()
 
 # Select the west modules used by this application.
 list(APPEND ZEPHYR_EXTRA_MODULES
@@ -14,7 +27,7 @@ list(APPEND ZEPHYR_EXTRA_MODULES
     "${KFSW_WORKSPACE_ROOT}/kfsw-modules"
 )
 
-include("${KFSW_WORKSPACE_ROOT}/k-fsw/cmake/release.cmake")
+include("${KFSW_REPO_ROOT}/cmake/release.cmake")
 set(CSP_USE_RDP ON CACHE BOOL "" FORCE)
 set(CSP_USE_HMAC OFF CACHE BOOL "" FORCE)
 set(CSP_USE_PROMISC OFF CACHE BOOL "" FORCE)
