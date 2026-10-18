@@ -38,6 +38,13 @@ A File Crosses A Link That Drops Bytes
     ${out}=    Run Hosted Fixture    k-ground-ftp-smoke.sh    K-GROUND FTP RESULT: PASS    --lossy
     Should Match Regexp    ${out}    crc32=[0-9a-f]{8} bytes=32768 lossy=yes dropped=[1-9][0-9]* resent=[1-9][0-9]*
 
+A Download Continues After The Pass Ends
+    [Documentation]    The link is cut mid-download and comes back; the partial is continued, not redone.
+    [Tags]    software    ground    ftp    resume
+    ${out}=    Run Hosted Fixture    k-ground-ftp-smoke.sh    K-GROUND FTP RESULT: PASS    --interrupted
+    Should Match Regexp    ${out}    crc32=[0-9a-f]{8} bytes=32768 interrupted=yes resumed_at=[1-9][0-9]*
+    Should Contain    ${out}    down-copy.bin.part.map
+
 Remote Log Reads As Text And As A Dictionary
     [Tags]    software    ground    log    journal
     Open Ground Pair    ${OUTPUT DIR}/ground-log

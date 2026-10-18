@@ -817,22 +817,41 @@ DATA (next offset)               -> writes <path>.part
                                  <- PUT_RESULT after sync, check and rename
 ```
 
-A download is the same in the other direction: GET, GET_INFO, DATA and
-GET_RESULT. The receiving side always writes `<path>.part`, syncs it, checks
-it and renames it. An existing file is left alone until the rename.
+A download is the same in the other direction:
 
-### Resuming an upload
+```text
+client                              server
+GET (path, held bytes, resume)   ->
+                                 <- GET_INFO (size, CRC32, offset it starts at)
+                                 <- DATA (that offset)
+writes <path>.part               <- DATA (next offset)
+                                 <- GET_RESULT
+```
 
-An upload interrupted by a lost link continues on the next attempt, without an
-operator asking. Uploading the same file again is the whole interface.
+The receiving side always writes `<path>.part`, syncs it, checks it and renames
+it. An existing file is left alone until the rename.
 
-The server keeps `<path>.part` after an interruption instead of deleting it, and
-records what it is going to become in `<path>.part.map`: a magic, a version, the
-intended size and CRC32, and a CRC32 over those fields. On the next upload of
-the same path it reads that note, and continues only when the size and CRC32
-match the new request. A note for a different version of the file is ignored and
-the partial is overwritten, so an upload never wastes a pass discovering at the
-end that it joined two different files.
+### Resuming a transfer
+
+A transfer interrupted by a lost link continues on the next attempt, without an
+operator asking. Asking for the same file again is the whole interface, in both
+directions.
+
+Whichever node receives keeps `<path>.part` after an interruption instead of
+deleting it, and records what it is going to become in `<path>.part.map`: a
+magic, a version, the intended size and CRC32, and a CRC32 over those fields.
+That is the server for an upload and the client for a download, next to the
+destination file either way.
+
+On an upload the sender already knows the size and CRC32, so they travel in the
+PUT request and the server continues only when its note matches them. On a
+download the receiver is the one holding a partial and the only one that knows
+which file it belongs to, so the GET request carries the note's size and CRC32
+together with how much is already on disk, and the sending node compares them
+against the file it holds now. A claim about anything else is refused with a
+zero offset in `GET_INFO`, and the client discards its partial and starts the
+file again. Either way a transfer never wastes a pass discovering at the end
+that it joined two different files.
 
 The resume point is the partial's own size, not a number from the note, because a
 reset can leave the note ahead of what reached flash. The CRC32 of those bytes is
@@ -840,12 +859,14 @@ recomputed before the transfer continues, and the final check still covers the
 whole file, so a resumed upload is verified exactly like a fresh one.
 
 Chunks arrive strictly in order, so the note holds no chunk map. `PUT_READY`
-carries the offset to start from, and a client that does not set the resume flag
-in its request gets the original behaviour: the partial is discarded and the
-upload starts at zero.
+and `GET_INFO` carry the offset the transfer starts from, and a request without
+the resume flag gets the original behaviour: the partial is discarded and the
+transfer starts at zero. The node that holds the file has the last word on both
+sides, because it is the one that can tell whether the partial still belongs to
+it.
 
-A partial for a file that is never uploaded again stays on disk until that path
-is uploaded or deleted.
+A partial for a file that is never asked for again stays on disk until that
+path is transferred or deleted.
 
 The server has one acceptor and one worker and answers `busy` to a second
 connection. Client calls share one static workspace behind a mutex. Each

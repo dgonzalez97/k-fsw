@@ -3,6 +3,7 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/fs/fs.h>
 #include <zephyr/storage/flash_map.h>
+#include <zephyr/sys/crc.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/ztest.h>
 
@@ -533,4 +534,174 @@ ZTEST(kfsw_ftp_client_link, test_a_download_to_a_path_climbing_out_is_refused)
 	zassert_not_equal(kfsw_ftp_get(PEER_NODE, "/thing.bin", "/../escape.bin", &outcome), 0,
 			  "a download landing outside the sandbox was accepted");
 	zassert_equal(link_fake.sends, 0U, "the escaping download reached the link");
+}
+
+/* ------------------------------------------- a download that took two passes */
+
+/*
+ * The receiving node owns the partial, so these cases watch the local side of
+ * an interrupted download: what is left on disk, what the next request claims,
+ * and what happens when the sending node refuses that claim.
+ */
+
+#define DOWNLOAD_LOCAL "/landed.bin"
+#define DOWNLOAD_FULL KFSW_FTP_STORAGE_ROOT DOWNLOAD_LOCAL
+#define DOWNLOAD_SIZE 16U
+#define DOWNLOAD_HALF 8U
+
+static const uint8_t download_content[DOWNLOAD_SIZE] = {
+	0x10U, 0x11U, 0x12U, 0x13U, 0x14U, 0x15U, 0x16U, 0x17U,
+	0x20U, 0x21U, 0x22U, 0x23U, 0x24U, 0x25U, 0x26U, 0x27U,
+};
+
+/* Queue one chunk of a download. The data stays where the caller put it, as a
+ * real frame's does until it is released. */
+static void peer_will_send_data(uint32_t offset, const uint8_t *data, uint16_t size,
+				uint32_t total_size, uint32_t crc32)
+{
+	struct kfsw_ftp_message *reply = &link_fake.scripted[link_fake.scripted_count];
+
+	memset(reply, 0, sizeof(*reply));
+	reply->opcode = KFSW_FTP_OP_GET_DATA;
+	reply->offset = offset;
+	reply->total_size = total_size;
+	reply->crc32 = crc32;
+	reply->data = data;
+	reply->data_size = size;
+	link_fake.scripted_result[link_fake.scripted_count] = 0;
+	link_fake.scripted_count++;
+}
+
+static bool file_exists(const char *full_path)
+{
+	struct fs_dirent entry;
+
+	return fs_stat(full_path, &entry) == 0;
+}
+
+static uint32_t file_size_of(const char *full_path)
+{
+	struct fs_dirent entry;
+
+	zassert_ok(fs_stat(full_path, &entry), "%s is not there", full_path);
+	return (uint32_t)entry.size;
+}
+
+static void no_download_in_progress(void)
+{
+	(void)fs_mkdir(KFSW_FTP_STORAGE_ROOT);
+	(void)fs_unlink(DOWNLOAD_FULL);
+	(void)fs_unlink(DOWNLOAD_FULL ".part");
+	(void)fs_unlink(DOWNLOAD_FULL ".part.map");
+}
+
+/* The state an interrupted pass leaves behind, written directly. */
+static void given_partial(uint32_t size, uint32_t whole_crc32)
+{
+	struct fs_file_t file;
+
+	no_download_in_progress();
+	fs_file_t_init(&file);
+	zassert_ok(fs_open(&file, DOWNLOAD_FULL ".part", FS_O_CREATE | FS_O_WRITE),
+		   "the partial fixture would not open");
+	zassert_equal(fs_write(&file, download_content, size), (ssize_t)size,
+		      "the partial fixture was not written");
+	zassert_ok(fs_close(&file), "the partial fixture would not close");
+	zassert_ok(kfsw_ftp_partial_note_write(DOWNLOAD_FULL, DOWNLOAD_SIZE, whole_crc32),
+		   "the partial fixture has no note");
+}
+
+/*
+ * A pass that ends mid-file keeps what arrived, and keeps the note that says
+ * which file it belongs to. The destination must not appear until the whole
+ * file is there.
+ */
+ZTEST(kfsw_ftp_client_link, test_an_interrupted_download_keeps_its_partial)
+{
+	const uint32_t whole_crc = crc32_ieee(download_content, DOWNLOAD_SIZE);
+	struct kfsw_ftp_transfer_result outcome;
+	uint32_t noted_size = 0U;
+	uint32_t noted_crc = 0U;
+
+	no_download_in_progress();
+	peer_will_reply_with_offset(KFSW_FTP_OP_GET_INFO, KFSW_FTP_STATUS_OK, 0U, DOWNLOAD_SIZE);
+	link_fake.scripted[0].crc32 = whole_crc;
+	peer_will_send_data(0U, download_content, DOWNLOAD_HALF, DOWNLOAD_SIZE, whole_crc);
+
+	zassert_equal(kfsw_ftp_get(PEER_NODE, "/remote.bin", DOWNLOAD_LOCAL, &outcome), -ETIMEDOUT,
+		      "a download cut off mid-file was not reported");
+	zassert_false(file_exists(DOWNLOAD_FULL), "an unfinished download appeared as the file");
+	zassert_equal(file_size_of(DOWNLOAD_FULL ".part"), DOWNLOAD_HALF,
+		      "the bytes that did arrive were not kept");
+	zassert_ok(kfsw_ftp_partial_note_read(DOWNLOAD_FULL, &noted_size, &noted_crc),
+		   "the partial was left without a note");
+	zassert_equal(noted_size, DOWNLOAD_SIZE);
+	zassert_equal(noted_crc, whole_crc, "the note describes a different file");
+}
+
+/* The next pass claims what it holds and stitches the rest onto it. */
+ZTEST(kfsw_ftp_client_link, test_the_next_download_continues_from_the_partial)
+{
+	const uint32_t whole_crc = crc32_ieee(download_content, DOWNLOAD_SIZE);
+	struct kfsw_ftp_transfer_result outcome;
+
+	given_partial(DOWNLOAD_HALF, whole_crc);
+	peer_will_reply_with_offset(KFSW_FTP_OP_GET_INFO, KFSW_FTP_STATUS_OK, DOWNLOAD_HALF,
+				    DOWNLOAD_SIZE);
+	link_fake.scripted[0].crc32 = whole_crc;
+	peer_will_send_data(DOWNLOAD_HALF, &download_content[DOWNLOAD_HALF], DOWNLOAD_HALF,
+			    DOWNLOAD_SIZE, whole_crc);
+	peer_will_reply_with_offset(KFSW_FTP_OP_GET_RESULT, KFSW_FTP_STATUS_OK, 0U, DOWNLOAD_SIZE);
+	link_fake.scripted[2].crc32 = whole_crc;
+
+	zassert_ok(kfsw_ftp_get(PEER_NODE, "/remote.bin", DOWNLOAD_LOCAL, &outcome),
+		   "the second pass did not finish the file");
+	zassert_equal(link_fake.sent[0].flags, KFSW_FTP_FLAG_RESUME,
+		      "the request did not offer to continue");
+	zassert_equal(link_fake.sent[0].offset, DOWNLOAD_HALF,
+		      "the request did not say how much it already had");
+	zassert_equal(link_fake.sent[0].crc32, whole_crc,
+		      "the request did not say which file the partial belongs to");
+	zassert_equal(outcome.bytes, DOWNLOAD_SIZE, "the result counted only the second half");
+	zassert_equal(outcome.crc32, whole_crc,
+		      "the committed file is not the one both ends agreed on");
+	zassert_equal(file_size_of(DOWNLOAD_FULL), DOWNLOAD_SIZE);
+	zassert_false(file_exists(DOWNLOAD_FULL ".part"), "the partial outlived its transfer");
+	zassert_false(file_exists(DOWNLOAD_FULL ".part.map"), "the note outlived its partial");
+}
+
+/*
+ * The sending node has the last word. When it refuses the claim the partial is
+ * discarded, and the note is rewritten for the file now coming in.
+ */
+ZTEST(kfsw_ftp_client_link, test_a_refused_claim_downloads_the_file_again)
+{
+	const uint32_t whole_crc = crc32_ieee(download_content, DOWNLOAD_SIZE);
+	struct kfsw_ftp_transfer_result outcome;
+
+	given_partial(DOWNLOAD_HALF, 0xA5A5A5A5U);
+	peer_will_reply_with_offset(KFSW_FTP_OP_GET_INFO, KFSW_FTP_STATUS_OK, 0U, DOWNLOAD_SIZE);
+	link_fake.scripted[0].crc32 = whole_crc;
+	peer_will_send_data(0U, download_content, DOWNLOAD_SIZE, DOWNLOAD_SIZE, whole_crc);
+	peer_will_reply_with_offset(KFSW_FTP_OP_GET_RESULT, KFSW_FTP_STATUS_OK, 0U, DOWNLOAD_SIZE);
+	link_fake.scripted[2].crc32 = whole_crc;
+
+	zassert_ok(kfsw_ftp_get(PEER_NODE, "/remote.bin", DOWNLOAD_LOCAL, &outcome),
+		   "a download that had to start again was refused");
+	zassert_equal(outcome.crc32, whole_crc, "the restarted download kept the stale bytes");
+	zassert_equal(file_size_of(DOWNLOAD_FULL), DOWNLOAD_SIZE);
+}
+
+/* A start the client never claimed belongs to some other conversation. */
+ZTEST(kfsw_ftp_client_link, test_a_download_starting_somewhere_unasked_is_refused)
+{
+	struct kfsw_ftp_transfer_result outcome;
+
+	no_download_in_progress();
+	peer_will_reply_with_offset(KFSW_FTP_OP_GET_INFO, KFSW_FTP_STATUS_OK, DOWNLOAD_HALF,
+				    DOWNLOAD_SIZE);
+
+	zassert_equal(kfsw_ftp_get(PEER_NODE, "/remote.bin", DOWNLOAD_LOCAL, &outcome), -EBADMSG,
+		      "a download accepted a start it had not asked for");
+	zassert_false(file_exists(DOWNLOAD_FULL), "the refused download left the file behind");
 }

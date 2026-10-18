@@ -3,6 +3,7 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/fs/fs.h>
 #include <zephyr/storage/flash_map.h>
+#include <zephyr/sys/crc.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/ztest.h>
 
@@ -292,6 +293,61 @@ ZTEST(kfsw_ftp_server, test_an_upload_with_an_unknown_flag_is_refused)
 	zassert_equal(link_fake.sends, 1U, "the upload produced no answer");
 	zassert_equal(link_fake.response[0].opcode, KFSW_FTP_OP_PUT_RESULT);
 	zassert_not_equal(link_fake.response[0].status, KFSW_FTP_STATUS_OK);
+}
+
+/*
+ * The download half of resume: the client says how much of this file it holds,
+ * and this node sends only the rest.
+ */
+ZTEST(kfsw_ftp_server, test_a_download_sends_only_what_the_client_is_missing)
+{
+	static const char contents[] = "0123456789abcdef";
+	const uint32_t total = (uint32_t)(sizeof(contents) - 1U);
+	const uint32_t held = 8U;
+
+	write_file(KFSW_FTP_STORAGE_ROOT "/down.bin", contents);
+	given_request(KFSW_FTP_OP_GET_REQUEST, "/down.bin");
+	link_fake.request.flags = KFSW_FTP_FLAG_RESUME;
+	link_fake.request.offset = held;
+	link_fake.request.total_size = total;
+	link_fake.request.crc32 = crc32_ieee((const uint8_t *)contents, total);
+
+	serve();
+
+	zassert_true(link_fake.sends >= 3U, "the download was not answered with data");
+	zassert_equal(link_fake.response[0].opcode, KFSW_FTP_OP_GET_INFO);
+	zassert_equal(link_fake.response[0].status, KFSW_FTP_STATUS_OK);
+	zassert_equal(link_fake.response[0].offset, held,
+		      "the info reply should name the bytes the client already holds");
+	zassert_equal(link_fake.response[1].opcode, KFSW_FTP_OP_GET_DATA);
+	zassert_equal(link_fake.response[1].offset, held, "the first chunk restarted the file");
+	zassert_equal(link_fake.response[1].data_size, (uint16_t)(total - held),
+		      "the whole file was sent to a client that only needed the rest");
+	zassert_mem_equal(link_fake.response[1].data, &contents[held], total - held,
+			  "the chunk did not continue where the client left off");
+}
+
+/* A claim about content this node no longer has is refused, not stitched. */
+ZTEST(kfsw_ftp_server, test_a_download_claim_for_other_content_starts_over)
+{
+	static const char contents[] = "0123456789abcdef";
+	const uint32_t total = (uint32_t)(sizeof(contents) - 1U);
+
+	write_file(KFSW_FTP_STORAGE_ROOT "/changed.bin", contents);
+	given_request(KFSW_FTP_OP_GET_REQUEST, "/changed.bin");
+	link_fake.request.flags = KFSW_FTP_FLAG_RESUME;
+	link_fake.request.offset = 8U;
+	link_fake.request.total_size = total;
+	link_fake.request.crc32 = 0xDEADBEEFU;
+
+	serve();
+
+	zassert_true(link_fake.sends >= 3U, "the download was not answered with data");
+	zassert_equal(link_fake.response[0].opcode, KFSW_FTP_OP_GET_INFO);
+	zassert_equal(link_fake.response[0].offset, 0U,
+		      "a claim about different content was honoured");
+	zassert_equal(link_fake.response[1].data_size, (uint16_t)total,
+		      "a refused claim should send the file whole");
 }
 
 /* Reading it is allowed. */

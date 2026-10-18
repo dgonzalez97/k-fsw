@@ -4,6 +4,11 @@ set -Eeuo pipefail
 # Software round trip of one file between the two configured ground roles.
 # kfsw-ops (node 19) uploads test.txt to kfsw-gnd-uhf (node 16), reads its
 # metadata back, downloads it again, and compares the two local copies.
+#
+# --interrupted does something else: it cuts the link in the middle of a
+# download and brings it back, which is what the end of a pass looks like from
+# the software. The download has to continue from what arrived, not start the
+# file again.
 
 KGROUND_TEST="$(readlink -f "${BASH_SOURCE[0]}")"
 KGROUND_TESTS_DIR="$(dirname "$KGROUND_TEST")"
@@ -12,9 +17,14 @@ KGROUND_WORKSPACE_ROOT="$(dirname "$KGROUND_REPO_DIR")"
 KGROUND_BUILD_ROOT="${KGROUND_BUILD_ROOT:-${KFSW_OUTPUT_ROOT:-$KGROUND_WORKSPACE_ROOT/build}/k-ground}"
 
 lossy_link=0
+interrupted=0
 bytes=256
 if [[ "${1:-}" == --lossy ]]; then
 	lossy_link=1
+	bytes=32768
+	shift
+elif [[ "${1:-}" == --interrupted ]]; then
+	interrupted=1
 	bytes=32768
 	shift
 fi
@@ -131,7 +141,19 @@ node16_pty="$(sed -n 's/^uart_1 connected to pseudotty: //p' \
 node19_pty="$(sed -n 's/^uart_1 connected to pseudotty: //p' \
 	"$work_dir/node19.log" | head -1)"
 
-if [[ "$lossy_link" -eq 1 ]]; then
+if [[ "$interrupted" -eq 1 ]]; then
+	# Forward everything, then go deaf long enough for both ends to give up
+	# on the transfer. --cut-for must outlast the file transfer timeout.
+	python3 "$KGROUND_REPO_DIR/tests/support/lossy-link.py" \
+		--left "$node16_pty" --right "$node19_pty" \
+		--drop-every 1000000000 --drop-bytes 0 \
+		--cut-after-get-data 4 --cut-for 20 \
+		--ready-file "$work_dir/bridge.ready" \
+		>"$work_dir/socat.log" 2>&1 &
+	bridge_pid=$!
+	wait_for_output "$work_dir/bridge.ready" "lossy link ready" "$bridge_pid" || \
+		fail "the cutting bridge did not become ready"
+elif [[ "$lossy_link" -eq 1 ]]; then
 	# Drop bytes in runs, like lost packets.
 	python3 "$KGROUND_REPO_DIR/tests/support/lossy-link.py" \
 		--left "$node16_pty" --right "$node19_pty" \
@@ -153,6 +175,60 @@ fi
 printf '%s\n' 'csp ping 19' >&3
 wait_for_output "$work_dir/node16.log" "CSP ping 19: success" "$node16_pid" || \
 	fail "node 16 could not ping node 19"
+
+if [[ "$interrupted" -eq 1 ]]; then
+	# Node 16 holds the file; node 19 downloads it across a pass that ends.
+	printf '%s\n' "ftp generate /build/down.bin $bytes" >&3
+	wait_for_output "$work_dir/node16.log" "FTP generate /build/down.bin: PASS" \
+		"$node16_pid" || fail "node 16 did not generate the file to download"
+	source_crc="$(tr -d '\r' <"$work_dir/node16.log" |
+		awk '/FTP generate \/build\/down.bin: PASS/ { found = 1 }
+		     found && /^crc32: / { print $2; exit }')"
+	[[ -n "$source_crc" ]] || fail "the generated file did not report a CRC"
+
+	printf '%s\n' 'ftp get 16 /build/down.bin /build/down-copy.bin' >&4
+	wait_for_output "$work_dir/socat.log" "lossy link: deaf" "$bridge_pid" || \
+		fail "the bridge never cut the pass"
+	if grep -Fq 'FTP get 16 /build/down.bin -> /build/down-copy.bin: PASS' \
+		"$work_dir/node19.log"; then
+		fail "the download finished although the link was cut"
+	fi
+
+	# What the interrupted pass left behind is the whole point.
+	wait_for_output "$work_dir/socat.log" "lossy link: forwarding again" \
+		"$bridge_pid" || fail "the bridge never came back"
+	printf '%s\n' 'ftp ls 19 /build' >&4
+	wait_for_output "$work_dir/node19.log" "down-copy.bin.part" "$node19_pid" || \
+		fail "the interrupted download kept nothing to continue from"
+	grep -Fq "down-copy.bin.part.map" "$work_dir/node19.log" || \
+		fail "the partial was left without the note that names its file"
+
+	printf '%s\n' 'ftp get 16 /build/down.bin /build/down-copy.bin' \
+		'ftp ls 19 /build' >&4
+	wait_for_output "$work_dir/node19.log" \
+		'FTP get 16 /build/down.bin -> /build/down-copy.bin: PASS' \
+		"$node19_pid" || fail "the second pass did not finish the download"
+	grep -Fq 'FTP: continuing' "$work_dir/node19.log" || \
+		fail "the second pass started the file again instead of continuing"
+	resumed_at="$(tr -d '\r' <"$work_dir/node19.log" |
+		sed -n 's/.*FTP: continuing .* at \([0-9]*\) of .*/\1/p' | head -1)"
+	[[ -n "$resumed_at" && "$resumed_at" -gt 0 ]] || \
+		fail "the second pass continued from nowhere"
+	grep -Fq "crc32: $source_crc" "$work_dir/node19.log" || \
+		fail "the stitched file is not the one node 16 holds"
+
+	# Nothing of the transfer may outlive it.
+	after_last_listing="$(tr -d '\r' <"$work_dir/node19.log" |
+		awk '/^FTP ls 19 \/build/ { buffer = "" ; next } { buffer = buffer $0 "\n" }
+		     END { printf "%s", buffer }')"
+	if grep -Fq '.part' <<<"$after_last_listing"; then
+		fail "the partial outlived the download it belonged to"
+	fi
+
+	cat "$work_dir/node19.log"
+	echo "K-GROUND FTP RESULT: PASS crc32=$source_crc bytes=$bytes interrupted=yes resumed_at=$resumed_at"
+	exit 0
+fi
 
 # The operator node drives the whole round trip.
 printf '%s\n' \
