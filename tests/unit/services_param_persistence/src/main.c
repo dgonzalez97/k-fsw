@@ -234,6 +234,8 @@ static bool accumulate_entry_size(const struct kfsw_param_info *info, void *cont
 	case KFSW_PARAM_U32:
 	case KFSW_PARAM_I32:
 	case KFSW_PARAM_FLOAT:
+	/* A hex value is stored as its unsigned twin, so it costs the same. */
+	case KFSW_PARAM_X32:
 		value_size = 4U;
 		break;
 	case KFSW_PARAM_DATA:
@@ -517,6 +519,53 @@ ZTEST(param_persistence, test_a_persistent_value_is_written_without_being_asked)
 	zassert_ok(kfsw_param_get("log_level", &value));
 	zassert_equal(value.scalar.u8, 4U,
 		      "a value marked persistent did not reach flash on its own");
+}
+
+/*
+ * A hex value is an unsigned value that the shell prints differently, and the
+ * snapshot stores widths rather than display styles. This is here because the
+ * format once knew nothing about the hex types, and the first table to keep
+ * one took the whole snapshot down with it: no boot counter, no recovery
+ * budget, nothing kept at all. The bench found it; the fix belongs with a test
+ * that would have.
+ */
+ZTEST(param_persistence, test_a_hex_value_is_kept_like_its_unsigned_twin)
+{
+	struct kfsw_param_value value;
+
+	zassert_ok(kfsw_param_get("test_hex", &value));
+	zassert_equal(value.type, KFSW_PARAM_X32, "the fixture is no longer hexadecimal");
+
+	value.scalar.u32 = 0x5724f079U;
+	zassert_ok(kfsw_param_set("test_hex", &value));
+	zassert_ok(kfsw_param_persist_save(), "a kept hex value stopped the snapshot");
+
+	zassert_ok(kfsw_param_restore_defaults(), "defaults could not be put back");
+	zassert_ok(kfsw_param_persist_load());
+	zassert_ok(kfsw_param_get("test_hex", &value));
+	zassert_equal(value.scalar.u32, 0x5724f079U, "the hex value did not survive the file");
+}
+
+/*
+ * The neighbours of a kept hex value go to flash in the same snapshot, so a
+ * format that cannot hold one of them must not take the others with it.
+ */
+ZTEST(param_persistence, test_one_value_does_not_decide_the_whole_snapshot)
+{
+	struct kfsw_param_value value;
+
+	set_u32("test_u32", 4242U);
+	zassert_ok(kfsw_param_get("test_hex", &value));
+	value.scalar.u32 = 0x0badc0deU;
+	zassert_ok(kfsw_param_set("test_hex", &value));
+
+	zassert_ok(kfsw_param_persist_save());
+	zassert_ok(kfsw_param_restore_defaults());
+	zassert_ok(kfsw_param_persist_load());
+
+	zassert_equal(get_u32("test_u32"), 4242U, "the ordinary value was lost");
+	zassert_ok(kfsw_param_get("test_hex", &value));
+	zassert_equal(value.scalar.u32, 0x0badc0deU, "the hex value was lost");
 }
 
 ZTEST_SUITE(param_persistence, NULL, persistence_setup, persistence_before, NULL, NULL);
