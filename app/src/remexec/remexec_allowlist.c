@@ -36,6 +36,28 @@ static const struct kfsw_remexec_entry remexec_entries[] = {
 		.help = "Event record counters",
 	},
 #endif
+/* The links, as the shell groups them. A node reached over one link can
+ * be asked about the others, which is the only way to tell a quiet
+ * radio from a quiet node.
+ */
+#if CONFIG_KFSW_CSP_KISS_UART
+	{
+		.command = "comms uart info",
+		.help = "Each dedicated CSP UART and its counters",
+	},
+#endif
+#if CONFIG_KFSW_CSP_CAN
+	{
+		.command = "comms can info",
+		.help = "The CSP CAN interface and its counters",
+	},
+#endif
+#if CONFIG_KFSW_RADIO_UHF
+	{
+		.command = "comms uhf status",
+		.help = "Configured UHF radio identity and status",
+	},
+#endif
 };
 
 const struct kfsw_remexec_allowlist kfsw_app_remexec_allowlist = {
