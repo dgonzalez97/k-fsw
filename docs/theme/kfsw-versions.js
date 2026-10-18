@@ -48,10 +48,14 @@
 
 	function build(root, manifest) {
 		var here = currentSlug(root);
+		var panel = document.getElementById("nav-tree-contents");
 		var box = document.createElement("div");
+		var label = document.createElement("span");
 		var select = document.createElement("select");
 
 		box.className = "kfsw-version-box";
+		label.className = "kfsw-version-label";
+		label.textContent = "Version";
 		select.className = "kfsw-version-select";
 		select.setAttribute("aria-label", "Documentation version");
 
@@ -68,8 +72,17 @@
 			go(pageWithin(root, slug), root + slug + "/index.html");
 		});
 
+		box.appendChild(label);
 		box.appendChild(select);
-		document.body.appendChild(box);
+		/* At the top of the navigation tree, where Doxygen keeps its own
+		 * controls. The tree is a scrolling panel and the strip sticks to
+		 * its top, so it needs none of the height arithmetic in resize.js.
+		 */
+		if (panel !== null) {
+			panel.insertBefore(box, panel.firstChild);
+		} else {
+			document.body.appendChild(box);
+		}
 	}
 
 	function start(root) {

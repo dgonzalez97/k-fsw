@@ -321,148 +321,6 @@ static void print_param_value(const struct shell *sh, uint16_t node, const char 
 	}
 }
 
-static int parse_param_value(const char *text, struct kfsw_param_value *value)
-{
-	char *end = NULL;
-	unsigned long long unsigned_value = 0U;
-	long long signed_value = 0;
-
-	errno = 0;
-	switch (value->type) {
-	case KFSW_PARAM_U8:
-	case KFSW_PARAM_U16:
-	case KFSW_PARAM_U32:
-	case KFSW_PARAM_U64:
-	case KFSW_PARAM_X8:
-	case KFSW_PARAM_X16:
-	case KFSW_PARAM_X32:
-	case KFSW_PARAM_X64:
-		if (text[0] == '-') {
-			return -ERANGE;
-		}
-		unsigned_value = strtoull(text, &end, 0);
-		if ((errno != 0) || (end == text) || (*end != '\0')) {
-			return -EINVAL;
-		}
-		break;
-	case KFSW_PARAM_I8:
-	case KFSW_PARAM_I16:
-	case KFSW_PARAM_I32:
-	case KFSW_PARAM_I64:
-		signed_value = strtoll(text, &end, 0);
-		if ((errno != 0) || (end == text) || (*end != '\0')) {
-			return -EINVAL;
-		}
-		break;
-#if CONFIG_KFSW_PARAM_FLOAT
-	case KFSW_PARAM_FLOAT:
-		value->scalar.f32 = strtof(text, &end);
-		return ((errno == 0) && (end != text) && (*end == '\0')) ? 0 : -EINVAL;
-	case KFSW_PARAM_DOUBLE:
-		value->scalar.f64 = strtod(text, &end);
-		return ((errno == 0) && (end != text) && (*end == '\0')) ? 0 : -EINVAL;
-#endif
-	case KFSW_PARAM_STRING: {
-		size_t length = 0U;
-
-		while ((length + 1U < sizeof(value->text)) && (text[length] != '\0')) {
-			value->text[length] = text[length];
-			length++;
-		}
-		if (text[length] != '\0') {
-			return -EMSGSIZE;
-		}
-		value->text[length] = '\0';
-		value->size = length + 1U;
-		return 0;
-	}
-	case KFSW_PARAM_DATA: {
-		/* Comma-separated, with the declared number of elements. */
-		const char *cursor = text;
-		size_t count = 0U;
-
-		while ((*cursor != '\0') && (count < sizeof(value->bytes))) {
-			unsigned long element;
-
-			errno = 0;
-			element = strtoul(cursor, &end, 0);
-			if ((errno != 0) || (end == cursor) || (element > UINT8_MAX)) {
-				return -EINVAL;
-			}
-			value->bytes[count] = (uint8_t)element;
-			count++;
-			cursor = end;
-			if (*cursor == ',') {
-				cursor++;
-			} else if (*cursor != '\0') {
-				return -EINVAL;
-			}
-		}
-		if (count == 0U) {
-			return -EINVAL;
-		}
-		value->size = count;
-		return 0;
-	}
-	case KFSW_PARAM_INVALID:
-	default:
-		return -ENOTSUP;
-	}
-
-	switch (value->type) {
-	case KFSW_PARAM_U8:
-	case KFSW_PARAM_X8:
-		if (unsigned_value > UINT8_MAX) {
-			return -ERANGE;
-		}
-		value->scalar.u8 = (uint8_t)unsigned_value;
-		break;
-	case KFSW_PARAM_U16:
-	case KFSW_PARAM_X16:
-		if (unsigned_value > UINT16_MAX) {
-			return -ERANGE;
-		}
-		value->scalar.u16 = (uint16_t)unsigned_value;
-		break;
-	case KFSW_PARAM_U32:
-	case KFSW_PARAM_X32:
-		if (unsigned_value > UINT32_MAX) {
-			return -ERANGE;
-		}
-		value->scalar.u32 = (uint32_t)unsigned_value;
-		break;
-	case KFSW_PARAM_U64:
-	case KFSW_PARAM_X64:
-		value->scalar.u64 = (uint64_t)unsigned_value;
-		break;
-	case KFSW_PARAM_I8:
-		if ((signed_value < INT8_MIN) || (signed_value > INT8_MAX)) {
-			return -ERANGE;
-		}
-		value->scalar.i8 = (int8_t)signed_value;
-		break;
-	case KFSW_PARAM_I16:
-		if ((signed_value < INT16_MIN) || (signed_value > INT16_MAX)) {
-			return -ERANGE;
-		}
-		value->scalar.i16 = (int16_t)signed_value;
-		break;
-	case KFSW_PARAM_I32:
-		if ((signed_value < INT32_MIN) || (signed_value > INT32_MAX)) {
-			return -ERANGE;
-		}
-		value->scalar.i32 = (int32_t)signed_value;
-		break;
-	case KFSW_PARAM_I64:
-		value->scalar.i64 = (int64_t)signed_value;
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
 static int cmd_param_describe(const struct shell *sh, size_t argc, char **argv)
 {
 	struct param_list_context context = {.shell = sh, .local = true};
@@ -482,6 +340,48 @@ static int cmd_param_describe(const struct shell *sh, size_t argc, char **argv)
 	}
 	if (!context.header_printed) {
 		shell_print(sh, "no parameters");
+	}
+	return 0;
+}
+
+/* One table at a time, each with its own budget: a whole node does not fit a
+ * slow link, which is what the tables are for. The ids are collected before
+ * any of them is asked for, because the walk that yields them is still
+ * reading the reply that carries them.
+ */
+struct remote_tables {
+	uint8_t id[KFSW_PARAM_TABLE_MODULE_LAST + 1U];
+	size_t count;
+};
+
+static bool collect_remote_table_id(const struct kfsw_param_table_info *info, void *context)
+{
+	struct remote_tables *tables = context;
+
+	if (tables->count < ARRAY_SIZE(tables->id)) {
+		tables->id[tables->count++] = info->id;
+	}
+	return true;
+}
+
+static int list_remote_parameters(uint16_t node, struct param_list_context *context)
+{
+	struct remote_tables tables = {0};
+	int result = kfsw_param_remote_tables(node, collect_remote_table_id, &tables);
+
+	if (result == -ENOTSUP) {
+		/* The node does not serve its table list. Ask for everything. */
+		return kfsw_param_remote_visit(node, print_param_info, context);
+	}
+	if (result != 0) {
+		return result;
+	}
+	for (size_t i = 0; i < tables.count; i++) {
+		result = kfsw_param_remote_visit_table(node, tables.id[i], print_param_info,
+						       context);
+		if (result != 0) {
+			return result;
+		}
 	}
 	return 0;
 }
@@ -509,7 +409,7 @@ static int cmd_param_list(const struct shell *sh, size_t argc, char **argv)
 			result = kfsw_param_visit(print_param_info, &context);
 		} else {
 			context.local = false;
-			result = kfsw_param_remote_visit(node, print_param_info, &context);
+			result = list_remote_parameters(node, &context);
 			if (kfsw_shell_no_answer(result)) {
 				return kfsw_shell_remote_failed(sh, "param list", node, result);
 			}
@@ -605,7 +505,7 @@ static int cmd_param_set(const struct shell *sh, size_t argc, char **argv)
 		return print_param_error(sh, "set", name, result);
 	}
 
-	result = parse_param_value(text, &value);
+	result = kfsw_param_parse_text(text, &value);
 	if (result != 0) {
 		shell_error(sh, "set: invalid %s value '%s'", kfsw_param_type_name(value.type),
 			    text);
@@ -708,8 +608,14 @@ static int cmd_param_table(const struct shell *sh, size_t argc, char **argv)
 		if (node == THIS_NODE) {
 			return print_local_table(sh, &context);
 		}
-		/* Names first, then one request for the values. */
-		result = kfsw_param_remote_visit(node, collect_table_names, &context);
+		/* Names first, then one request for the values. Asking for the
+		 * table alone keeps the exchange inside the refresh budget.
+		 */
+		result = kfsw_param_remote_visit_table(node, context.table, collect_table_names,
+						       &context);
+		if (result == -ENOTSUP) {
+			result = kfsw_param_remote_visit(node, collect_table_names, &context);
+		}
 		if (result != 0) {
 			return kfsw_shell_remote_failed(sh, "param table", node, result);
 		}
@@ -794,20 +700,47 @@ static bool find_table(const struct kfsw_param_table_info *info, void *context)
  * Table names are not sent over the link. Table IDs are fixed per component, so
  * a table this build also carries is named from here; another shows "-".
  */
+static void print_table_heading(const struct shell *sh)
+{
+	shell_print(sh, "%3s  %-7s  %-*s  %6s  %s", " id", "layer", TABLE_NAME_COLUMN, "name",
+		    "params", "holds");
+	shell_print(sh, "%.3s  %.7s  %.*s  %.6s  %.5s", "---------", "---------", TABLE_NAME_COLUMN,
+		    "--------------------------------", "---------", "---------");
+}
+
+/* The node names its own tables, so one this build does not carry is still
+ * named.
+ */
+static bool print_remote_table(const struct kfsw_param_table_info *info, void *context)
+{
+	const struct shell *sh = context;
+
+	shell_print(sh, "%3u  %-7s  %-*s  %6u  %s", info->id, kfsw_param_band_name(info->id),
+		    TABLE_NAME_COLUMN, info->name, info->count,
+		    info->description != NULL ? info->description : "");
+	return true;
+}
+
 static int print_remote_tables(const struct shell *sh, uint16_t node)
 {
 	struct param_list_context context = {.shell = sh, .local = false};
 	int result;
 
+	print_table_heading(sh);
+	result = kfsw_param_remote_tables(node, print_remote_table, (void *)sh);
+	if (result == 0) {
+		return 0;
+	}
+	if (result != -ENOTSUP) {
+		return kfsw_shell_remote_failed(sh, "param tables", node, result);
+	}
+
+	/* The node does not serve the table list. Count its descriptors instead. */
 	result = kfsw_param_remote_visit(node, tally_table, &context);
 	if (result != 0) {
 		return kfsw_shell_remote_failed(sh, "param tables", node, result);
 	}
 
-	shell_print(sh, "%3s  %-7s  %-*s  %6s  %s", " id", "layer", TABLE_NAME_COLUMN, "name",
-		    "params", "holds");
-	shell_print(sh, "%.3s  %.7s  %.*s  %.6s  %.5s", "---------", "---------", TABLE_NAME_COLUMN,
-		    "--------------------------------", "---------", "---------");
 	for (unsigned int table = KFSW_PARAM_TABLE_CORE_FIRST;
 	     table <= KFSW_PARAM_TABLE_MODULE_LAST; table++) {
 		struct table_search search = {.id = (uint8_t)table};

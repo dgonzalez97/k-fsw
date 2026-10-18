@@ -53,6 +53,21 @@ Remote Tables Describe Their Layer And Contents
         Close Ground Pair
     END
 
+One Remote Table Fits The Slowest Link
+    [Documentation]    k-ground asks for one table of descriptors over a relay paced
+    ...    at 4800 baud, the slowest link this has to work on. A whole node does not
+    ...    fit the refresh budget at that rate; one table does. No physical UART evidence.
+    [Tags]    software    param    tables    ground
+    Require Hosted Ground Dependencies
+    Open Ground Pair    ${OUTPUT DIR}/ground-slow-table    baud=4800
+    TRY
+        ${out}=    Ground Command    param table 1 4    route_table    timeout=60
+        Should Match Regexp    ${out}    4 +0x00 +tx_packets
+        Should Match Regexp    ${out}    4 +0x14 +interfaces
+    FINALLY
+        Close Ground Pair
+    END
+
 Hosted Boot Diagnostics Are Explicitly Unavailable Remotely
     [Documentation]    k-ground reads hosted diagnostics over PTY KISS; u8 zero is false.
     ...    No MCUboot or reset evidence.

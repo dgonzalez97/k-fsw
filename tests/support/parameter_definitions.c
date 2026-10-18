@@ -8,6 +8,7 @@
 static uint32_t test_u32 = 42U;
 static int32_t test_i32 = -7;
 static float test_float = 1.5F;
+static uint32_t test_hex = 0xdeadbeefU;
 static uint8_t test_read_only = 9U;
 
 static const struct kfsw_param_definition test_param_definitions[] = {
@@ -37,6 +38,19 @@ static const struct kfsw_param_definition test_param_definitions[] = {
 		.description = "Writable floating-point integration value",
 		.value = &test_float,
 		.default_value = {.f32 = 1.5F},
+	},
+	{
+		/* A hex value that is kept. The snapshot format knows widths and
+		 * not display styles, and when it did not know this one it
+		 * refused the whole snapshot.
+		 */
+		.offset = 0x18U,
+		.type = KFSW_PARAM_X32,
+		.flags = KFSW_PARAM_FLAG_DEBUG | KFSW_PARAM_FLAG_PERSISTENT,
+		.name = "test_hex",
+		.description = "Writable hexadecimal value that is persisted",
+		.value = &test_hex,
+		.default_value = {.u32 = 0xdeadbeefU},
 	},
 	{
 		.offset = 0x14U,

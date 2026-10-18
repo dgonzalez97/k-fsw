@@ -148,6 +148,12 @@ if(CONFIG_KFSW_DEBUG_SHELL)
     target_sources_ifdef(CONFIG_KFSW_RESMON app PRIVATE
         src/shell/shell_resmon.c
     )
+    target_sources_ifdef(CONFIG_KFSW_SCRUB app PRIVATE
+        src/shell/shell_scrub.c
+    )
+    target_sources_ifdef(CONFIG_KFSW_LIMITS app PRIVATE
+        src/shell/shell_limits.c
+    )
     target_sources_ifdef(CONFIG_KFSW_REMEXEC app PRIVATE
         src/shell/shell_remexec.c
     )

@@ -81,35 +81,27 @@ void kfsw_shell_print_fields(const struct shell *sh, const char *text)
 	}
 }
 
+/* The service owns the conversion, so the shell and the CSP path cannot
+   disagree about what a command argument means. This only says why. */
 static int parse_argument(const struct shell *sh, const char *text, enum kfsw_command_type type,
 			  struct kfsw_command_arg *arg)
 {
-	int parse_error = 0;
+	int outcome = kfsw_command_parse_arg(text, type, arg);
 
-	arg->type = type;
-	switch (type) {
-	case KFSW_COMMAND_TYPE_U32:
-		arg->value.u32 = (uint32_t)shell_strtoul(text, 0, &parse_error);
+	switch (outcome) {
+	case 0:
 		break;
-	case KFSW_COMMAND_TYPE_I32:
-		arg->value.i32 = (int32_t)shell_strtol(text, 0, &parse_error);
+	case -ENAMETOOLONG:
+		shell_error(sh, "argument is longer than %u bytes", KFSW_COMMAND_MAX_TEXT_SIZE);
 		break;
-	case KFSW_COMMAND_TYPE_TEXT:
-		if (strnlen(text, KFSW_COMMAND_MAX_TEXT_SIZE + 1U) > KFSW_COMMAND_MAX_TEXT_SIZE) {
-			shell_error(sh, "argument is longer than %u bytes",
-				    KFSW_COMMAND_MAX_TEXT_SIZE);
-			return -ENAMETOOLONG;
-		}
-		arg->value.text = text;
+	case -ENOTSUP:
+		shell_error(sh, "argument type %d is not supported here", (int)type);
 		break;
 	default:
-		return -ENOTSUP;
+		shell_error(sh, "invalid argument '%s'", text);
+		break;
 	}
-	if (parse_error != 0) {
-		shell_error(sh, "invalid number '%s'", text);
-		return -EINVAL;
-	}
-	return 0;
+	return outcome;
 }
 
 /* Zero once the node answered, whatever it answered; the status is in result. */

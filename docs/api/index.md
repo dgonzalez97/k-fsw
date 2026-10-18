@@ -30,6 +30,8 @@ Under **API Reference**, use **API Groups** to browse by component or
 - @ref kfsw_services_health for health monitoring
 - @ref kfsw_services_gndwdt for the ground watchdog
 - @ref kfsw_services_resmon for the resource monitor
+- @ref kfsw_services_limits for parameter limits
+- @ref kfsw_services_scrub for the image scrub
 - @ref kfsw_services_fwu for firmware update
 - @ref kfsw_services_fwu_lite for FWU lite uploads
 - @ref kfsw_services_fbo for file based operations

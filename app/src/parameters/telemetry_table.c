@@ -139,6 +139,8 @@ static const struct kfsw_param_definition telemetry_param_definitions[] = {
 	},
 };
 
+KFSW_PARAM_TABLE_FITS_THE_LINK(telemetry_param_definitions);
+
 const struct kfsw_param_definition_set kfsw_telemetry_param_definitions = {
 	.table = KFSW_PARAM_TABLE_TELEMETRY,
 	.name = KFSW_PARAM_TABLE_TELEMETRY_NAME,

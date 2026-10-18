@@ -26,6 +26,10 @@ if [[ "${KFSW_ROBOT_ACCEPTANCE:-0}" == 1 ]]; then
 	"$robot_python" "$KFSW_REPO_DIR/tests/hil/software-preflight.py"
 fi
 
+# Which image a scenario picks, and what it refuses, is decided in shell and is
+# worth checking without a bench attached.
+"$robot_python" "$KFSW_REPO_DIR/tests/hil-scenarios-test.py"
+
 # The fixtures refuse an existing output directory, so a second run would fail.
 rm -rf "${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/robot/dry-run" "${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/robot/software"
 

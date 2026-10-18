@@ -18,7 +18,7 @@ from firmware_fixture import NativeNode
 class Ground:
     ROBOT_LIBRARY_SCOPE = 'TEST'
 
-    def open_ground_pair(self, output, procedure=''):
+    def open_ground_pair(self, output, procedure='', baud=''):
         self.stack = ExitStack()
         self.output = Path(output)
         self.output.mkdir(parents=True, exist_ok=False)
@@ -37,9 +37,17 @@ class Ground:
             self.flight = self.stack.enter_context(NativeNode(self.flight_image, self.output / 'flight'))
             self.ground = self.stack.enter_context(NativeNode(self.ground_image, self.output / 'ground', flash))
             self.bridge_log = self.stack.enter_context((self.output / 'bridge.log').open('w'))
-            self.bridge = subprocess.Popen(['socat', self.flight.device + ',raw,echo=0',
-                                            self.ground.device + ',raw,echo=0'],
-                                           stdout=self.bridge_log, stderr=subprocess.STDOUT)
+            baud = baud or os.environ.get('KFSW_GROUND_LINK_BAUD', '')
+            if baud:
+                # A pseudo terminal ignores its termios speed, so the rate has
+                # to be paced by the relay for the pair to feel a slow link.
+                bridge = [sys.executable, str(Path(__file__).with_name('4800baud_link.py')),
+                          self.flight.device, self.ground.device, '--baud', baud]
+            else:
+                bridge = ['socat', self.flight.device + ',raw,echo=0',
+                          self.ground.device + ',raw,echo=0']
+            self.bridge = subprocess.Popen(bridge, stdout=self.bridge_log,
+                                           stderr=subprocess.STDOUT)
             self.stack.callback(self.stop_bridge)
             time.sleep(.2)
             self.ground_command('csp routes', '0/0 -> KISS direct')

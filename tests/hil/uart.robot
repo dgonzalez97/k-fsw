@@ -21,3 +21,14 @@ Debug Shell And Physical UART CSP Link Succeed
     Response Should Contain    ${result.stdout}    -> /hil/hil-16k.bin: PASS
     Response Should Contain    ${result.stdout}    bytes: 16384
     Response Should Contain    ${result.stdout}    /build/hil-16k-returned.bin: PASS
+
+F746 Physical UART CSP Link Succeeds
+    [Tags]    smoke    physical    uart    csp    needs-ftdi    needs-f746
+    ${result}=    Run Physical UART CSP Smoke    nucleo_f746zg
+    Skip If    "UART CSP HIL RESULT: NOT RUN" in $result.stdout
+    ...    ${result.stdout}
+    HIL Command Should Pass    ${result}    UART CSP HIL RESULT: PASS
+    Response Should Contain    ${result.stdout}    CSP ping 3: success
+    Response Should Contain    ${result.stdout}    CSP ping 1: success
+    Response Should Contain    ${result.stdout}    3:node_id = 3
+    Should Contain    ${result.stdout}    SKIP: storage info, storage test, mount point and FTP transfers

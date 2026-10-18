@@ -81,6 +81,12 @@ format_sources+=(
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/parameter_csp.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/parameter_internal.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/parameter_persistence.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/scrub.h"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/scrub/scrub.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/scrub-parameters/scrub_table.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/limits.h"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/limits/limits.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/limits-parameters/limits_table.c"
 )
 
 echo "QUALITY: clang-format (${#format_sources[@]} files)"
@@ -115,6 +121,8 @@ if [[ -d "$KFSW_WORKSPACE_ROOT/kfsw-modules" ]]; then
 			-print0 | sort -z
 	)
 fi
+
+python3 "$KFSW_CI_DIR/descriptions.py"
 
 # Checked after the formatter has run, so a missing analyser doesn't hide
 # formatting errors.

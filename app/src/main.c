@@ -59,6 +59,10 @@
 #endif
 #if CONFIG_KFSW_RESMON
 #include <kfsw/services/resmon.h>
+#include <kfsw/services/scrub.h>
+#endif
+#if CONFIG_KFSW_LIMITS
+#include <kfsw/services/limits.h>
 #endif
 #if CONFIG_KFSW_HK
 #include <kfsw/services/hk.h>
@@ -204,6 +208,12 @@ int main(void)
 #endif
 #if CONFIG_KFSW_RESMON
 		&kfsw_resmon_param_definitions,
+#endif
+#if CONFIG_KFSW_SCRUB
+		&kfsw_scrub_param_definitions,
+#endif
+#if CONFIG_KFSW_LIMITS
+		&kfsw_limits_param_definitions,
 #endif
 #if CONFIG_KFSW_HK
 		&kfsw_hk_param_definitions,
@@ -535,6 +545,28 @@ int main(void)
 	if (result != 0) {
 		startup_failures++;
 		kfsw_log_error("Failed to start the resource monitor: %d", result);
+	}
+#endif
+
+#if CONFIG_KFSW_SCRUB
+	/* After the persisted references are restored, or the first sweep would
+	 * read every region as unlearned.
+	 */
+	result = kfsw_scrub_start();
+	if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Failed to start the image scrub: %d", result);
+	}
+#endif
+
+#if CONFIG_KFSW_LIMITS
+	/* After the persisted switches are restored and the command registry is
+	 * frozen, since a rule is checked against both when it is loaded.
+	 */
+	result = kfsw_limits_init();
+	if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Failed to load the limits: %d", result);
 	}
 #endif
 

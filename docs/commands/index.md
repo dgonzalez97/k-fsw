@@ -47,6 +47,8 @@ service:
 | `health` | `CONFIG_KFSW_HEALTH` |
 | `gndwdt` | `CONFIG_KFSW_GNDWDT` |
 | `resmon` | `CONFIG_KFSW_RESMON` |
+| `limits` | `CONFIG_KFSW_LIMITS` |
+| `scrub` | `CONFIG_KFSW_SCRUB` |
 | `remexec` | `CONFIG_KFSW_REMEXEC` |
 | `comms uhf` | `CONFIG_KFSW_RADIO_UHF_SHELL` |
 | `temp` | `CONFIG_KFSW_TEMP_EXAMPLE_SHELL` |
