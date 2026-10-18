@@ -22,4 +22,13 @@ for target in "${targets[@]}"; do
 	KFSW_PRISTINE=always "$KFSW_TOOLS_DIR/build.sh" "$target"
 done
 
+# The generated interface control document is checked against the image that
+# was just built, which is what the workflow does after this stage. Leaving it
+# to the workflow alone is how two releases went out with a stale icd.md.
+if [[ " ${targets[*]} " == *" linux "* ]]; then
+	echo
+	echo "CI BUILD: interface control document"
+	"$KFSW_TOOLS_DIR/docs/icd.py" --check
+fi
+
 echo "BUILD RESULT: PASS (${targets[*]})"
