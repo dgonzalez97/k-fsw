@@ -77,11 +77,12 @@ static bool print_csp_interface(const struct kfsw_csp_interface_info *interface_
 
 	shell_print(sh,
 		    "%s addr=%u/%u default=%s tx=%u rx=%u txerr=%u "
-		    "rxerr=%u drop=%u",
+		    "rxerr=%u drop=%u autherr=%u",
 		    interface_info->name, interface_info->address, interface_info->prefix_length,
 		    interface_info->is_default ? "yes" : "no", interface_info->tx_packets,
 		    interface_info->rx_packets, interface_info->tx_errors,
-		    interface_info->rx_errors, interface_info->dropped_packets);
+		    interface_info->rx_errors, interface_info->dropped_packets,
+		    interface_info->auth_errors);
 
 	return true;
 }
