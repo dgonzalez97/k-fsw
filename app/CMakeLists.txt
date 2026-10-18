@@ -28,8 +28,12 @@ list(APPEND ZEPHYR_EXTRA_MODULES
 )
 
 include("${KFSW_REPO_ROOT}/cmake/release.cmake")
+# libcsp options that its Zephyr integration does not take from Kconfig, so
+# this is the only place they can be set. Anything the integration does map
+# belongs in Kconfig and must not be forced here: KFSW_CSP_HMAC used to be
+# contradicted by a forced OFF on this line, and the build worked only because
+# the integration happens to run later.
 set(CSP_USE_RDP ON CACHE BOOL "" FORCE)
-set(CSP_USE_HMAC OFF CACHE BOOL "" FORCE)
 set(CSP_USE_PROMISC OFF CACHE BOOL "" FORCE)
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
