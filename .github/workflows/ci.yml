@@ -48,6 +48,12 @@ jobs:
         if: matrix.target == 'linux'
         run: ./k-fsw/tools/docs/icd.py --check
 
+      - name: Check the golden recovery composition and partition fit
+        if: matrix.target == 'nucleo_l496zg'
+        env:
+          KFSW_MCUBOOT_KEY: ${{ github.workspace }}/bootloader/mcuboot/root-ec-p256.pem
+        run: python3 ./k-fsw/tools/ci/golden.py
+
   quality:
     name: QUALITY / clang-format + cppcheck
     runs-on: ubuntu-24.04

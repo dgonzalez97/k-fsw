@@ -21,6 +21,7 @@ west manifest --validate
 # workflow checks this too; having it only there is how two releases went out
 # with a stale icd.md.
 "$KFSW_REPO_DIR/tools/docs/icd.py" --check
+python3 "$KFSW_CI_DIR/golden.py"
 "$KFSW_CI_DIR/quality.sh"
 "$KFSW_CI_DIR/unit.sh"
 "$KFSW_CI_DIR/integration.sh"
