@@ -1,0 +1,5 @@
+# A rule the bench can cross on purpose. boot_delay_ms only takes effect on the
+# next boot, so moving it has no side effect on the running node.
+#
+# parameter      cmp  bound  dwell  node  action
+boot_delay_ms    >    1000   2      0     noop

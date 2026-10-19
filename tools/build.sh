@@ -77,6 +77,6 @@ fi
 west build \
     -p "$KFSW_PRISTINE" \
     -b "$ZEPHYR_BOARD" \
-    "$KFSW_ROOT/k-fsw/app" \
+    "$KFSW_REPO_DIR/app" \
     -d "$KFSW_BUILD_DIR" \
 	"${west_args[@]}"

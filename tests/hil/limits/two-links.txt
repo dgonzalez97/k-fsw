@@ -1,0 +1,3 @@
+# parameter      cmp bound dwell node action
+boot_delay_ms    >   1000  2     16   noop
+boot_delay_ms    >   3000  2     17   noop

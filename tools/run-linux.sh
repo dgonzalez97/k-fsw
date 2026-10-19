@@ -16,12 +16,12 @@ fi
 case "${node:-1}" in
 	1)
 		source "$(dirname "$0")/_common.sh" linux
-		build_command=("$KFSW_ROOT/k-fsw/tools/build.sh" linux)
+		build_command=("$KFSW_REPO_DIR/tools/build.sh" linux)
 		;;
 	2)
 		KFSW_BUILD_DIR="$(dirname "$(dirname "$(dirname "$(readlink -f "$0")")")")/build/tests/linux-node2"
 		source "$(dirname "$0")/_common.sh" linux
-		build_command=("$KFSW_ROOT/k-fsw/tests/build-linux-node2.sh")
+		build_command=("$KFSW_REPO_DIR/tests/build-linux-node2.sh")
 		;;
 	*)
 		echo "ERROR: supported Linux CSP nodes are 1 and 2"

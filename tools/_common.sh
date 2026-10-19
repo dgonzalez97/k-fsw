@@ -5,7 +5,18 @@ KFSW_COMMON_FILE="$(readlink -f "${BASH_SOURCE[0]}")"
 
 KFSW_TOOLS_DIR="$(dirname "$KFSW_COMMON_FILE")"
 KFSW_REPO_DIR="$(dirname "$KFSW_TOOLS_DIR")"
-KFSW_ROOT="$(dirname "$KFSW_REPO_DIR")"
+
+# The workspace is where west keeps its configuration, found by walking up, and
+# not simply the parent directory. A git worktree of this repository is a
+# different checkout in a different place, and resolving the application from
+# the parent would build the main checkout while claiming to build this one.
+KFSW_ROOT="$KFSW_REPO_DIR"
+while [[ "$KFSW_ROOT" != "/" && ! -d "$KFSW_ROOT/.west" ]]; do
+    KFSW_ROOT="$(dirname "$KFSW_ROOT")"
+done
+if [[ "$KFSW_ROOT" == "/" ]]; then
+    KFSW_ROOT="$(dirname "$KFSW_REPO_DIR")"
+fi
 
 KFSW_TARGET="${1:-nucleo_l496zg}"
 
@@ -32,6 +43,7 @@ fi
 
 export KFSW_TARGET
 export KFSW_ROOT
+export KFSW_REPO_DIR
 export ZEPHYR_BASE="$KFSW_ROOT/zephyr"
 
 if [[ -z "${ZEPHYR_SDK_INSTALL_DIR:-}" && \

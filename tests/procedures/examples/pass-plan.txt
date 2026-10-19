@@ -1,0 +1,11 @@
+# A pass plan: confirm the node, leave a report collecting between passes, and
+# queue a check-in in case the next pass does not happen.
+#
+# A line has no quoting, so every argument is a single word.
+on-error stop
+info
+event_stats
+hk_define 1 3:0
+hk_period 1 60000
+on-error continue
+fbo_sched_add +600 0 noop

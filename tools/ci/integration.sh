@@ -62,6 +62,9 @@ echo "INTEGRATION: standing between Gpredict and the hardware"
 echo "INTEGRATION: a procedure run from a file"
 "$KFSW_REPO_DIR/tests/fbo-smoke.sh"
 
+echo "INTEGRATION: a parameter limit crossed, released and re-armed"
+"$KFSW_REPO_DIR/tests/limits-smoke.sh"
+
 echo "INTEGRATION: multi-interface CSP/KISS routing and transit"
 "$KFSW_REPO_DIR/tests/build-multi-kiss.sh"
 "$KFSW_REPO_DIR/tests/multi-kiss-smoke.sh"

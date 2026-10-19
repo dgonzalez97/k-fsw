@@ -6,7 +6,7 @@ KFSW_TARGET="${1:-nucleo_l496zg}"
 source "$(dirname "$0")/_common.sh" "$KFSW_TARGET"
 
 if [[ ! -f "$KFSW_BUILD_DIR/zephyr/zephyr.elf" ]]; then
-    "$KFSW_ROOT/k-fsw/tools/build.sh" "$KFSW_TARGET"
+    "$KFSW_REPO_DIR/tools/build.sh" "$KFSW_TARGET"
 fi
 
 west debug \

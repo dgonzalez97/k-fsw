@@ -1,0 +1,3 @@
+# The first rule is valid; the second names a comparison that does not exist.
+boot_delay_ms    >    1000   2      0     noop
+boot_delay_ms    ><   1000   2      0     noop

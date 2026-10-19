@@ -22,7 +22,7 @@ executable="${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}/linux/zephyr/zephyr.exe"
 
 mkdir -p "$output_dir"
 
-KFSW_EXTRA_CONF_FILE="$KFSW_ROOT/k-fsw/tests/config/param-fixtures.conf" \
+KFSW_EXTRA_CONF_FILE="$KFSW_REPO_DIR/tests/config/param-fixtures.conf" \
 	"$KFSW_TOOLS_DIR/build.sh" linux
 
 echo "MEMORY: Valgrind log: $valgrind_log"
@@ -33,7 +33,7 @@ printf '%s\n' 'param set param_autosave 0' 'param set test_u32 1234' 'param save
 	"$executable" --uart_stdinout --stop_at=1.0 --no-color \
 		-flash="$corrupt_flash" -flash_erase \
 		>"$output_dir/corrupt-fixture.log" 2>&1
-"$KFSW_ROOT/k-fsw/tests/corrupt-param-flash.py" "$corrupt_flash"
+"$KFSW_REPO_DIR/tests/corrupt-param-flash.py" "$corrupt_flash"
 
 run_valgrind()
 {

@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <zephyr/shell/shell.h>
@@ -284,7 +285,53 @@ static int cmd_log_remote(const struct shell *sh, size_t argc, char **argv)
 }
 #endif
 
+/*
+ * One service at a time, by name. The levels are also a parameter array, which
+ * is how the ground reaches them, but setting one module from a console should
+ * not mean writing the whole array.
+ */
+static int cmd_log_level(const struct shell *sh, size_t argc, char **argv)
+{
+	unsigned long level;
+	char *end;
+
+	if (argc == 1U) {
+		for (unsigned int module = 0U; module < KFSW_LOG_MODULE_COUNT; module++) {
+			shell_print(sh, "%-8s %u",
+				    kfsw_log_module_name((enum kfsw_log_module)module),
+				    kfsw_log_get_module_level((enum kfsw_log_module)module));
+		}
+		return 0;
+	}
+
+	for (unsigned int module = 0U; module < KFSW_LOG_MODULE_COUNT; module++) {
+		if (strcmp(argv[1], kfsw_log_module_name((enum kfsw_log_module)module)) != 0) {
+			continue;
+		}
+		if (argc == 2U) {
+			shell_print(sh, "%-8s %u", argv[1],
+				    kfsw_log_get_module_level((enum kfsw_log_module)module));
+			return 0;
+		}
+		level = strtoul(argv[2], &end, 10);
+		if ((*end != '\0') || (level > 4U)) {
+			shell_error(sh, "level is 0 debug, 1 info, 2 warning, 3 error, 4 off");
+			return -EINVAL;
+		}
+		if (kfsw_log_set_module_level((enum kfsw_log_module)module, (uint8_t)level) != 0) {
+			shell_error(sh, "%s would not take level %lu", argv[1], level);
+			return -EINVAL;
+		}
+		shell_print(sh, "%-8s %lu", argv[1], level);
+		return 0;
+	}
+	shell_error(sh, "unknown module: %s", argv[1]);
+	return -EINVAL;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(log_commands,
+	SHELL_CMD_ARG(level, NULL, "Levels by service: level [<module> [0..4]].",
+		      cmd_log_level, 1, 2),
 #if CONFIG_KFSW_LOG_HISTORY
 	SHELL_CMD_ARG(history, NULL, "Read recent log messages.", cmd_log_history, 1, 0),
 #endif
