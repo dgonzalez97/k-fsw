@@ -115,6 +115,7 @@ From the workspace root:
 . .venv/bin/activate
 west manifest --validate
 west update
+./k-fsw/tools/zephyr-patch.sh
 ```
 
 Preserve local dependency changes before updating. Detached HEAD at a

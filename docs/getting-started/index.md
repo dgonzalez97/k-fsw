@@ -86,12 +86,15 @@ Initialize west from the local manifest and check out the pinned revisions:
 ```bash
 west init -l k-fsw
 west update
-west patch apply
+./k-fsw/tools/zephyr-patch.sh
 ```
 
-`west patch apply` applies the patches listed in `k-fsw/zephyr/patches.yml` to
-the pinned Zephyr. Today there is one: Tab in the shell lists one option per
-line with its help. Without it the build still works and Tab shows a grid.
+`./k-fsw/tools/zephyr-patch.sh` applies the shell Tab help patch to the pinned
+Zephyr and reports when it is already applied. Tab lists one option per line
+with its help. Builds never apply it; run the helper after `west update`.
+`--check` only reports the patch state. `tools/ci/all.sh` and the release
+script check it and stop if it is absent or conflicts. GitHub workspace setup
+applies it as a separate step.
 
 Install Zephyr's Python requirements and export its CMake package:
 
@@ -120,16 +123,19 @@ cd k-fsw-workspace
 git -C k-fsw switch main
 git -C k-fsw pull --ff-only
 west manifest --validate
-west patch clean
 west update
-west patch apply
+./k-fsw/tools/zephyr-patch.sh
 git -C k-fsw submodule update --init --recursive
 ```
 
-`west patch clean` takes the patches out first, so `west update` finds Zephyr
-unchanged. `west update` may say it left a local branch behind, and usually leaves each
-dependency on a detached `HEAD` at the manifest commit. That is normal. Commit
-or stash your work in the dependencies first.
+Preserve local dependency changes before updating. If `west update` refuses
+to overwrite a modified file, inspect the changes before proceeding. The patch
+helper accepts both pristine and already patched Zephyr trees and refuses
+conflicting changes. A tree carrying an earlier revision of the patch counts as
+conflicting; restore the file with
+`git -C zephyr checkout -- subsys/shell/shell.c`, which discards any other
+local edits to it, and run the helper again. Dependencies normally end up on a detached `HEAD` at the
+manifest commit.
 
 ## First KFSW-Linux build
 

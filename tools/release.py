@@ -63,11 +63,6 @@ def source_state(frozen):
         changed = run("git", "diff", "--name-only", "HEAD", cwd=path).split()
         changed += run("git", "ls-files", "--others", "--exclude-standard", cwd=path).split()
         if changed:
-            # A project this repository patches is dirty by design: west patch
-            # apply leaves the working tree ahead of the pinned revision. The
-            # patches are part of what is released, so they are accounted for
-            # rather than refused, and anything they do not explain still stops
-            # the release.
             patched = patched_files(name)
             unexplained = sorted(set(changed) - patched)
             if unexplained:
@@ -77,24 +72,15 @@ def source_state(frozen):
 
 
 def patched_files(name):
-    """Files the patches in patches.yml are expected to change for a project."""
-    index = REPO / "zephyr/patches.yml"
-    if not index.is_file():
+    if name != "zephyr":
         return set()
-    listed = yaml.safe_load(index.read_text()) or {}
-    touched = set()
-    for entry in listed.get("patches", []):
-        if entry.get("module") != name:
-            continue
-        patch = REPO / "zephyr/patches" / entry["path"]
-        if not patch.is_file():
-            raise ValueError(f"{name}: {entry['path']} is listed and missing")
-        if sha256(patch) != entry.get("sha256sum"):
-            raise ValueError(f"{name}: {entry['path']} does not match its recorded hash")
-        for line in patch.read_text(errors="replace").splitlines():
-            if line.startswith("+++ b/"):
-                touched.add(line[6:].strip())
-    return touched
+    patch = REPO / "patches/zephyr/shell-tab-help.patch"
+    run(str(REPO / "tools/zephyr-patch.sh"), "--check", str(WORKSPACE / "zephyr"))
+    return {
+        line[6:].strip()
+        for line in patch.read_text().splitlines()
+        if line.startswith("+++ b/")
+    }
 
 
 def check_inputs():
