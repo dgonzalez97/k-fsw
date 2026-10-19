@@ -13,7 +13,7 @@ ${FBO PASS PLAN}    ${CURDIR}/fbo/pass-plan.sh
 *** Test Cases ***
 A Procedure Crosses The Bus And The Queue Releases Without The Ground
     [Tags]    physical    can    nucleo    fbo    remexec    needs-can
-    ${result}=    Run Process    ${FBO PASS PLAN}
+    ${result}=    Run Process    ${FBO PASS PLAN}    --board    nucleo_l496zg
     ...           stdout=${OUTPUT DIR}/fbo-can.out    stderr=STDOUT    timeout=2400s
     Log    ${result.stdout}
     Skip If    "FBO CAN RESULT: NOT RUN" in $result.stdout    ${result.stdout}

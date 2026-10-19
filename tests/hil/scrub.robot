@@ -15,7 +15,7 @@ A Learned Reference Survives A Reset And Catches A Changed Slot
     ...                slot0 and sweep again. Needs the project signing key and
     ...                openocd, and reflashes the board.
     [Tags]    physical    nucleo    scrub    needs-nucleo
-    ${result}=    Run Process    ${SCRUB REFERENCE}
+    ${result}=    Run Process    ${SCRUB REFERENCE}    --board    nucleo_l496zg
     ...           stdout=${OUTPUT DIR}/scrub-reference.out    stderr=STDOUT    timeout=2400s
     Log    ${result.stdout}
     Skip If    "SCRUB HIL RESULT: NOT RUN" in $result.stdout    ${result.stdout}

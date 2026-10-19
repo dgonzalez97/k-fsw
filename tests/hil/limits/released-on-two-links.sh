@@ -2,9 +2,22 @@
 set -Eeuo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$here/../../../tools/_common.sh" nucleo_l496zg
+board_name=nucleo_l496zg
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+	--board)
+		[[ $# -ge 2 && -n "$2" && "$2" != --* ]] || { echo '--board needs a name' >&2; exit 2; }
+		board_name="$2"; shift 2 ;;
+	*) echo "unknown argument: $1" >&2; exit 2 ;;
+	esac
+done
+source "$here/../resources/board.sh"
+if ! hil_board "$board_name" limits-links; then
+	echo "LIMITS LINKS RESULT: NOT RUN - $hil_board_reason"
+	exit 0
+fi
 profiles="$KFSW_REPO_DIR/config/profiles"
-debug="${KFSW_DEBUG_SERIAL:-${KFSW_SERIAL:-}}"
+debug="$hil_board_debug"
 ftdi="${KFSW_FTDI_DEVICE:-}"
 interface="${KFSW_CAN_INTERFACE:-can0}"
 work="$(mktemp -d /tmp/kfsw-limits-links.XXXXXX)"
@@ -26,7 +39,7 @@ for device in "$debug" "$ftdi"; do
 		skip 'set KFSW_DEBUG_SERIAL and KFSW_FTDI_DEVICE to present /dev/serial/by-id devices'
 done
 [[ "$(readlink -f "$debug")" != "$(readlink -f "$ftdi")" ]] || skip 'debug and KISS need separate UARTs'
-[[ "${KFSW_FTDI_BOARD:-nucleo_l496zg}" == nucleo_l496zg ]] || skip 'FTDI is assigned to another board'
+[[ "${KFSW_FTDI_BOARD:-nucleo_l496zg}" == "$board_name" ]] || skip 'FTDI is assigned to another board'
 for tool in socat ip west; do command -v "$tool" >/dev/null || skip "$tool is missing"; done
 [[ -n "${KFSW_STLINK_SERIAL:-}" ]] || skip 'KFSW_STLINK_SERIAL must name the flash probe'
 ip -details link show "$interface" >"$work/can.log" 2>&1 || skip "no $interface"
@@ -41,7 +54,7 @@ build() {
 }
 build linux kiss "$profiles/ground-kiss.conf"
 build linux can "$profiles/ground-can.conf" "$profiles/k-ground-can.overlay"
-build nucleo_l496zg board "$profiles/nucleo-can.conf;$profiles/nucleo-limits-links.conf" "$profiles/nucleo-can.overlay"
+build "$KFSW_TARGET" board "$hil_board_conf" "$hil_board_overlay"
 
 wait_for() {
 	local file="$1" pattern="$2" seconds="${3:-30}"
@@ -100,7 +113,7 @@ pids+=("$!")
 kfsw_west_flash --build-dir "$build_root/board" --runner openocd \
 	>"$work/flash.log" 2>&1 || fail 'board flash failed'
 wait_for "$work/board.log" '@READY ' 40 || fail 'board did not report @READY'
-echo "build: $(git -C "$KFSW_REPO_DIR" rev-parse HEAD) board=nucleo_l496zg debug=$debug KISS=$ftdi CAN=$interface"
+echo "build: $(git -C "$KFSW_REPO_DIR" rev-parse HEAD) board=$board_name debug=$debug KISS=$ftdi CAN=$interface"
 board_check 'csp routes' '16/14 -> KISS' || fail 'node 16 has no KISS route'
 since_mark | grep -Fq '17/14 -> CAN' || fail 'node 17 has no CAN route'
 board_check 'csp ping 16' 'CSP ping 16: success' || skip 'board cannot ping 16 over KISS'

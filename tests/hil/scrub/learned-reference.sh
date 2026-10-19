@@ -17,27 +17,33 @@
 set -euo pipefail
 
 KFSW_TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../tools" && pwd)"
-source "$KFSW_TOOLS_DIR/_common.sh" nucleo_l496zg
+board_name=nucleo_l496zg
+do_build=1
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+	--board)
+		[[ $# -ge 2 && -n "$2" && "$2" != --* ]] || { echo '--board needs a name' >&2; exit 2; }
+		board_name="$2"; shift 2 ;;
+	--no-build) do_build=0; shift ;;
+	*) echo "unknown argument: $1" >&2; exit 2 ;;
+	esac
+done
+source "$KFSW_TOOLS_DIR/../tests/hil/resources/board.sh"
+if ! hil_board "$board_name" scrub; then
+	echo "SCRUB HIL RESULT: NOT RUN - $hil_board_reason"
+	exit 0
+fi
 
-debug_serial="${KFSW_DEBUG_SERIAL:-${KFSW_SERIAL:-}}"
+debug_serial="$hil_board_debug"
 signing_key="${KFSW_MCUBOOT_KEY:-$HOME/.config/kfsw/mcuboot-signing-key.pem}"
-build_dir="$KFSW_ROOT/build/hil/scrub/nucleo_l496zg"
-profiles="$KFSW_REPO_DIR/config/profiles"
-# The same set the firmware update images are built with: the flash layout, the
-# application's own slot view, and the update partitions.
-overlays="$profiles/nucleo-mcuboot-flash.overlay;$profiles/nucleo-mcuboot.overlay"
-overlays="$overlays;$profiles/nucleo-mcuboot-fwu.overlay"
+build_dir="$KFSW_ROOT/build/hil/scrub/$board_name"
+overlays="$hil_board_overlay"
 imgtool="$KFSW_ROOT/bootloader/mcuboot/scripts/imgtool.py"
 work_dir="$(mktemp -d)"
 debug_stty=""
 capture_pid=""
-do_build=1
 
-readonly FLASH_BASE=0x08000000
-readonly SLOT0_ADDR=0x08010000
-readonly SLOT_SIZE=360448
-readonly HEADER_SIZE=0x200
-readonly ALIGN=8
+readonly FLASH_BASE SLOT0_ADDR SLOT_SIZE HEADER_SIZE ALIGN
 readonly VERSION_A=1.0.0
 readonly VERSION_B=2.0.0
 
@@ -130,20 +136,13 @@ sign_image()
 
 write_slot()
 {
-	openocd -f "$KFSW_ROOT/zephyr/boards/st/nucleo_l496zg/support/openocd.cfg" \
+	openocd -f "$hil_board_openocd" \
+		-c "adapter serial $KFSW_STLINK_SERIAL" \
 		-c "init" -c "reset halt" \
 		-c "flash write_image erase $2 $1" \
 		-c "reset run" -c "shutdown" >>"$work_dir/openocd.log" 2>&1 ||
 		abort "could not write $2 to $1"
 }
-
-while [[ $# -gt 0 ]]; do
-	case "$1" in
-	--no-build) do_build=0 ;;
-	*) printf 'unknown argument: %s\n' "$1" >&2; exit 2 ;;
-	esac
-	shift
-done
 
 [[ -n "$debug_serial" ]] || abort "KFSW_DEBUG_SERIAL is not set"
 [[ "$debug_serial" == /dev/serial/by-id/* ]] ||
@@ -160,10 +159,10 @@ if [[ "$do_build" -eq 1 ]]; then
 	KFSW_SYSBUILD=1 \
 		KFSW_MCUBOOT_KEY="$signing_key" \
 		KFSW_BUILD_DIR="$build_dir" \
-		KFSW_EXTRA_CONF_FILE="$profiles/nucleo-mcuboot.conf;$profiles/nucleo-mcuboot-fwu.conf" \
+		KFSW_EXTRA_CONF_FILE="$hil_board_conf" \
 		KFSW_EXTRA_DTC_OVERLAY_FILE="$overlays" \
-		KFSW_MCUBOOT_DTC_OVERLAY_FILE="$profiles/nucleo-mcuboot-flash.overlay" \
-		"$KFSW_TOOLS_DIR/build.sh" nucleo_l496zg >"$work_dir/build.log" 2>&1 ||
+		KFSW_MCUBOOT_DTC_OVERLAY_FILE="$hil_board_boot_overlay" \
+		"$KFSW_TOOLS_DIR/build.sh" "$KFSW_TARGET" >"$work_dir/build.log" 2>&1 ||
 		abort "the MCUboot composition with scrub did not build"
 fi
 grep -Fq 'CONFIG_KFSW_SCRUB=y' "$build_dir/app/zephyr/.config" ||
@@ -184,7 +183,8 @@ timeout 900s cat "$debug_serial" >"$work_dir/nucleo.log" &
 capture_pid=$!
 
 banner "Install bootloader and image A"
-openocd -f "$KFSW_ROOT/zephyr/boards/st/nucleo_l496zg/support/openocd.cfg" \
+openocd -f "$hil_board_openocd" \
+	-c "adapter serial $KFSW_STLINK_SERIAL" \
 	-c "init" -c "reset halt" -c "flash erase_sector 0 0 last" \
 	-c "shutdown" >>"$work_dir/openocd.log" 2>&1 || abort "could not erase flash"
 write_slot "$FLASH_BASE" "$build_dir/mcuboot/zephyr/zephyr.bin"

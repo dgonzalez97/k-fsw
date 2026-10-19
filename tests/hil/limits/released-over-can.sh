@@ -11,9 +11,22 @@
 set -Eeuo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$here/../../../tools/_common.sh" nucleo_l496zg
+board_name=nucleo_l496zg
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+	--board)
+		[[ $# -ge 2 && -n "$2" && "$2" != --* ]] || { echo '--board needs a name' >&2; exit 2; }
+		board_name="$2"; shift 2 ;;
+	*) echo "unknown argument: $1" >&2; exit 2 ;;
+	esac
+done
+source "$here/../resources/board.sh"
+if ! hil_board "$board_name" limits-can; then
+	echo "LIMITS CAN RESULT: NOT RUN - $hil_board_reason"
+	exit 0
+fi
 profiles="$KFSW_REPO_DIR/config/profiles"
-debug="${KFSW_DEBUG_SERIAL:-${KFSW_SERIAL:-}}"
+debug="$hil_board_debug"
 interface="${KFSW_CAN_INTERFACE:-can0}"
 board_node=2
 ground_node=17
@@ -51,8 +64,7 @@ build() {
 		fail "the $name image did not build; see $work/build-$name.log"
 }
 build linux ground "$profiles/ground-can.conf" "$profiles/k-ground-can.overlay"
-build nucleo_l496zg board "$profiles/nucleo-can.conf;$profiles/nucleo-limits-can.conf" \
-	"$profiles/nucleo-can.overlay"
+build "$KFSW_TARGET" board "$hil_board_conf" "$hil_board_overlay"
 
 wait_for() {
 	local file="$1" pattern="$2" seconds="${3:-30}"
