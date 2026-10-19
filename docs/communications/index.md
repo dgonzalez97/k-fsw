@@ -206,6 +206,11 @@ so read them as an indication. `csp counters clear` zeroes them before a run.
 Parameter table 4 carries the same values, so a ground station reads them like
 any other parameter.
 
+Tracing is a dial an operator can move from the ground through the CSP
+parameters: `packet_trace` selects packet dumps (0 off, 1 on), and `rdp_trace`
+selects RDP detail (0 off, 1 errors, 2 with the protocol). Both take effect
+immediately and neither survives a reset.
+
 ## Remote interface counters
 
 `csp ifstat 2 KISS` reads a named interface on node 2 through CSP management.

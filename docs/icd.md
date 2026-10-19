@@ -11,7 +11,7 @@ The mode column is what the parameter service enforces: `r` is read only, `w` is
 | 1 | core | `board` | 11 | 0 | Node identity and what the board carries |
 | 2 | core | `system` | 3 | 3 | Boot delay, report period, reboot pin |
 | 3 | core | `telemetry` | 5 | 0 | Uptime, storage and CSP buffers |
-| 4 | core | `csp` | 16 | 0 | CSP counters and the route table |
+| 4 | core | `csp` | 17 | 0 | CSP counters and the route table |
 | 5 | core | `storage` | 4 | 0 | Filesystem size, free space, mount |
 | 25 | service | `log` | 6 | 3 | Log levels, colour and counters |
 | 26 | service | `param` | 9 | 1 | Parameter counts and snapshot saves |
@@ -81,6 +81,7 @@ The mode column is what the parameter service enforces: `r` is read only, `w` is
 | 0x1b | `last_error` | u8 | r | - | Code of the last libcsp error |
 | 0x1c | `last_can_error` | u8 | r | - | Code of the last CAN framing error |
 | 0x1d | `rdp_trace` | u8 | w | - | RDP detail: 0 off, 1 errors, 2 with the protocol |
+| 0x1e | `packet_trace` | u8 | w | - | Packet dump: 0 off, 1 on |
 | 0x20 | `route_table` | string | r | - | Compiled routes in libcsp CIDR syntax |
 
 ### storage (5)
