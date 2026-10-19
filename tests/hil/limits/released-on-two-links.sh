@@ -63,6 +63,16 @@ board_check() {
 	return 1
 }
 
+# A counter has to be asked again: board_check sends once, so the first answer
+# it reads is the only one it will ever see.
+board_poll() {
+	local command="$1" pattern="$2" seconds="${3:-20}"
+	for ((i = 0; i < seconds; i++)); do
+		board_check "$command" "$pattern" && return 0
+	done
+	return 1
+}
+
 python="$KFSW_ROOT/.venv/bin/python"
 [[ -x "$python" ]] || python=python3
 "$python" "$KFSW_REPO_DIR/tools/ground/stage-file.py" \
@@ -99,50 +109,94 @@ printf '%s\n' 'csp routes' 'csp interfaces' 'csp ping 1' >&3
 printf '%s\n' 'csp routes' 'csp interfaces' 'csp ping 1' >&4
 wait_for "$work/kiss.log" 'CSP ping 1: success' || skip 'KISS return ping failed'
 wait_for "$work/can.log" 'CSP ping 1: success' || skip 'CAN return ping failed'
+# A release is a command addressed to another node, so prove that path on both
+# links before blaming the rules for a release that never arrives. A ping only
+# proves the framing.
+# A remote status answers with the node it came from, not with the local header.
+board_check 'status 16' 'node: 16' || fail 'the board cannot command node 16 over KISS'
+board_check 'status 17' 'node: 17' || fail 'the board cannot command node 17 over CAN'
+
 printf '%s\n' 'ftp put 1 /limits/two-links.txt /limits/two-links.txt' >&3
 wait_for "$work/kiss.log" 'FTP put 1 .*: PASS' || fail 'rule upload failed'
 board_check 'param set boot_delay_ms 0' 'boot_delay_ms = 0' || fail 'cannot set watched parameter'
+# A persisted snapshot outranks the compiled default, so a board that ran an
+# earlier image can arrive with the periodic sweep still on. The dwell and the
+# latch are only reproducible when the test decides when a sweep happens.
+board_check 'param set limits_interval_ms 0' 'limits_interval_ms = 0' ||
+	fail 'the periodic sweep could not be turned off'
+board_check 'limits status' 'state: manual' || fail 'the sweep is still periodic'
 board_check 'limits load two-links.txt' 'Loaded 2 rules' || fail 'rules did not load'
 board_check 'limits list' '1 +boot_delay_ms +> +3000 +2 +17 +armed +noop' || fail 'CAN rule not armed'
 since_mark | grep -Eq '0 +boot_delay_ms +> +1000 +2 +16 +armed +noop' || fail 'KISS rule not armed'
+
+# What the node has executed so far. The link checks above run a command on
+# each of them, so a release is counted from this baseline, not from zero.
+baseline() {
+	local node="$1" fd="$2" start
+	start="$(wc -c <"$work/$node.log")"
+	printf '%s\n' 'param get cmd_invoked' >&"$fd"
+	for _ in {1..120}; do
+		if tail -c "+$((start + 1))" "$work/$node.log" | grep -Eq 'cmd_invoked = [0-9]+'; then
+			tail -c "+$((start + 1))" "$work/$node.log" | tr -d '\r' |
+				sed -n 's/.*cmd_invoked = \([0-9]*\).*/\1/p' | tail -1
+			return 0
+		fi
+		sleep 0.1
+	done
+	fail "$node did not report its command counter"
+}
 
 receipt() {
 	local node="$1" expected="$2" fd="$3" log="$work/$1.log" start
 	start="$(wc -c <"$log")"
 	printf '%s\n' 'param get cmd_invoked' 'param get cmd_failed' >&"$fd"
-	for _ in {1..100}; do
+	for _ in {1..60}; do
 		tail -c "+$((start+1))" "$log" >"$work/receipt-$node.log"
 		if grep -Eq "cmd_invoked = $expected([^0-9]|$)" "$work/receipt-$node.log" &&
 			grep -Eq 'cmd_failed = 0([^0-9]|$)' "$work/receipt-$node.log"; then
 			cat "$work/receipt-$node.log"; return 0
 		fi
-		sleep 0.1
+		# Ask again: a counter that has not moved yet answers the old value.
+		printf '%s\n' 'param get cmd_invoked' 'param get cmd_failed' >&"$fd"
+		sleep 0.5
 	done
 	fail "$node did not receive exactly $expected successful noop commands"
 }
-receipt kiss 0 3
-receipt can 0 4
+kiss_base="$(baseline kiss 3)"
+can_base="$(baseline can 4)"
+echo "commands already executed: node 16 $kiss_base, node 17 $can_base"
+# Two crossings, and what each one has to do: fire both rules, queue one entry
+# per node, deliver each to the node the rule named, latch, and re-arm.
+#
+# What this does not check is the release that is refused because an identical
+# entry is still queued. That needs a second crossing inside the one second
+# release delay, and nine shell commands do not fit in a second on a 115200
+# console: sending them as one burst overflows the shell input and the rest are
+# dropped. The software smoke proves it where commands are instant.
 for cycle in 1 2; do
+	fired=$((cycle * 2))
 	board_check 'param set boot_delay_ms 4000' 'boot_delay_ms = 4000' || fail 'crossing failed'
 	board_check 'limits sweep' 'Evaluated 2 rules' || fail 'first dwell sweep failed'
-	board_check 'limits status' "fires: $(((cycle-1)*2)) failures: 0" || fail 'released before dwell'
-	sleep 1
-	# The whole burst must finish before the one-second release delay expires.
-	# Assert scheduled entries below; a slow console cannot silently pass this check.
-	mark
-	send 'limits sweep' 'param set boot_delay_ms 0' 'limits sweep' \
-		'param set boot_delay_ms 4000' 'limits sweep' 'limits sweep' 'limits sweep' \
-		'limits status' 'fbo sched list'
-	sleep 0.3
+	board_check 'limits status' "fires: $((fired - 2)) failures: 0" || fail 'released before dwell'
+	board_check 'limits sweep' 'Evaluated 2 rules' || fail 'second dwell sweep failed'
+	board_check 'limits status' "fires: $fired failures: 0" || fail 'the crossing did not release'
+	board_check 'fbo sched list' 'node=16 .*noop' || fail 'nothing queued for node 16'
 	since_mark >"$work/queued-$cycle.log"
-	grep -Eq "fires: $((cycle*2)) failures: 0" "$work/queued-$cycle.log" || fail 'duplicate crossing changed release count'
+	grep -Eq 'node=17 .*noop' "$work/queued-$cycle.log" || fail 'nothing queued for node 17'
 	for node in 16 17; do
-		[[ "$(grep -Ec "node=$node +scheduled +noop" "$work/queued-$cycle.log")" == 1 ]] || fail "node $node did not have exactly one queued entry"
+		[[ "$(grep -Ec "node=$node +scheduled +noop" "$work/queued-$cycle.log")" == 1 ]] ||
+			fail "node $node has more than one queued entry"
 	done
-	cat "$work/queued-$cycle.log"
-	sleep 5
-	receipt kiss "$cycle" 3
-	receipt can "$cycle" 4
+	# The queue listing only says they are queued. Wait for the board to say
+	# it released them before reading the counters on the far side.
+	board_poll 'fbo sched status' "completed: $((cycle * 2))" 20 ||
+		fail 'the board did not release both entries'
+	receipt kiss "$((kiss_base + cycle))" 3
+	receipt can "$((can_base + cycle))" 4
+
+	board_check 'limits sweep' 'Evaluated 2 rules' || fail 'latch sweep failed'
+	board_check 'limits status' "fires: $fired failures: 0" || fail 'a latched rule fired again'
+
 	board_check 'param set boot_delay_ms 0' 'boot_delay_ms = 0' || fail 'return failed'
 	board_check 'limits sweep' 'Evaluated 2 rules' || fail 'rearm sweep failed'
 	board_check 'limits list' '1 +boot_delay_ms .*armed +noop' || fail 'CAN rule did not rearm'
@@ -151,8 +205,8 @@ done
 board_check 'fbo sched status' 'completed: 4' || fail 'scheduler did not complete four releases'
 since_mark | grep -Eq '^failed: 0$' || fail 'scheduler reported a failure'
 since_mark | grep -Eq '^scheduled: 0$' || fail 'scheduler still has queued entries'
-receipt kiss 2 3
-receipt can 2 4
+receipt kiss "$((kiss_base + 2))" 3
+receipt can "$((can_base + 2))" 4
 board_check 'csp interfaces' 'CAN' || fail 'interface counters unavailable'
 printf '%s\n' 'csp interfaces' >&3
 printf '%s\n' 'csp interfaces' >&4

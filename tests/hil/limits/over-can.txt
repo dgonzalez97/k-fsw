@@ -1,0 +1,4 @@
+# One rule, and its action is released on the ground node across the bus.
+#
+# parameter      cmp bound dwell node action
+boot_delay_ms    >   1000  2     17   noop
