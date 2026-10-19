@@ -75,7 +75,9 @@ A Procedure Staged Through The Ground Node Runs On Flight
     Require Hosted Ground Dependencies
     Open Ground Pair    ${OUTPUT DIR}/ground-fbo-smoke    smoke.txt
     TRY
-        Ground Command    ftp mkdir 1 /procedures    : PASS
+        # The flight node makes its own procedures directory at startup, so an
+        # upload has somewhere to land without anyone creating it first.
+        Ground Command    ftp ls 1 /    procedures
         Ground Command    ftp put 1 /procedures/smoke.txt /procedures/smoke.txt    : PASS
         Flight Command    fbo run smoke.txt    smoke.txt started
         Sleep    2s
@@ -88,7 +90,7 @@ A Procedure Staged Through The Ground Node Runs On Flight
     END
     Open Ground Pair    ${OUTPUT DIR}/ground-fbo-check-in    examples/check-in.txt
     TRY
-        Ground Command    ftp mkdir 1 /procedures    : PASS
+        Ground Command    ftp ls 1 /    procedures
         Ground Command    ftp put 1 /procedures/check-in.txt /procedures/check-in.txt    : PASS
         Flight Command    fbo run check-in.txt    finished at line 4 (0)
     FINALLY
