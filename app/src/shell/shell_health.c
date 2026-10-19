@@ -118,14 +118,14 @@ static int cmd_health_report(const struct shell *sh, size_t argc, char **argv)
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	health_commands,
-	SHELL_CMD_ARG(list, NULL, "Show each watched component and its deadline.",
+	SHELL_CMD_ARG(list, NULL, "Show each watched component and its deadline",
 		      cmd_health_list, 1, 0),
-	SHELL_CMD_ARG(report, NULL, "Report a component alive: report <handle>.",
+	SHELL_CMD_ARG(report, NULL, "Report a component alive: report <handle>",
 		      cmd_health_report, 2, 0),
-	SHELL_CMD_ARG(status, NULL, "Show whether the watchdog is being fed, and why.",
+	SHELL_CMD_ARG(status, NULL, "Show whether the watchdog is being fed, and why",
 		      cmd_health_status, 1, 0),
 	SHELL_CMD_ARG(watch, NULL,
-		      "Watch a component nothing reports: watch <name> <ms> confirm.",
+		      "Watch a component nothing reports: watch <name> <ms> confirm",
 		      cmd_health_watch, 1, 3),
 	SHELL_SUBCMD_SET_END);
 

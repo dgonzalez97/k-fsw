@@ -403,28 +403,28 @@ static int cmd_csp_clock(const struct shell *sh, size_t argc, char **argv)
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(csp_commands,
-	SHELL_CMD_ARG(ifstat, NULL, "Read remote counters: ifstat <node> <interface>.",
+	SHELL_CMD_ARG(ifstat, NULL, "Read remote counters: ifstat <node> <interface>",
 		      cmd_csp_ifstat, 3, 0),
 	SHELL_CMD_ARG(clock, NULL,
-		      "Time: clock, clock set <utc>, clock <node>, clock <node> sync.",
+		      "Time: clock [set <utc>|<node> [sync]]",
 		      cmd_csp_clock, 1, 2),
-	SHELL_CMD_ARG(counters, NULL, "Show libcsp error counters: counters [clear].",
+	SHELL_CMD_ARG(counters, NULL, "Show libcsp error counters: counters [clear]",
 		      cmd_csp_counters, 1, 1),
-	SHELL_CMD_ARG(debug, NULL, "Trace packets in and out: debug [on|off].", cmd_csp_debug, 1,
+	SHELL_CMD_ARG(debug, NULL, "Trace packets in and out: debug [on|off]", cmd_csp_debug, 1,
 		      1),
-	SHELL_CMD_ARG(ident, NULL, "Identify a node, or this one when no node is given.",
+	SHELL_CMD_ARG(ident, NULL, "Identify a node, or this one when no node is given: ident [node]",
 		      cmd_csp_ident, 1, 1),
-	SHELL_CMD_ARG(info, NULL, "Show local CSP identity and router state.", cmd_csp_info, 1, 0),
-	SHELL_CMD_ARG(interfaces, NULL, "Show registered CSP interfaces.", cmd_csp_interfaces, 1,
+	SHELL_CMD_ARG(info, NULL, "Show local CSP identity and router state", cmd_csp_info, 1, 0),
+	SHELL_CMD_ARG(interfaces, NULL, "Show registered CSP interfaces", cmd_csp_interfaces, 1,
 		      0),
-	SHELL_CMD_ARG(ping, NULL, "Ping a node, or this one when no node is given.", cmd_csp_ping,
+	SHELL_CMD_ARG(ping, NULL, "Ping a node, or this one when no node is given: ping [node]", cmd_csp_ping,
 		      1, 1),
 #if CONFIG_KFSW_COMMAND && CONFIG_REBOOT
-	SHELL_CMD_ARG(reboot, NULL, "Restart a node: reboot <node> <pin> [--retry].",
+	SHELL_CMD_ARG(reboot, NULL, "Restart a node: reboot <node> <pin> [--retry]",
 		      cmd_csp_reboot, 3, 1),
 #endif
-	SHELL_CMD_ARG(rdp, NULL, "Reliable transport detail: rdp [0..2].", cmd_csp_rdp, 1, 1),
-	SHELL_CMD_ARG(routes, NULL, "Show the CSP static routing table.", cmd_csp_routes, 1, 0),
+	SHELL_CMD_ARG(rdp, NULL, "Reliable transport detail: rdp [0..2]", cmd_csp_rdp, 1, 1),
+	SHELL_CMD_ARG(routes, NULL, "Show the CSP static routing table", cmd_csp_routes, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(csp, &csp_commands, "CSP commands.", NULL);

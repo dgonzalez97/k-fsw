@@ -607,44 +607,46 @@ static int cmd_hk_extract(const struct shell *sh, size_t argc, char **argv)
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	hk_commands,
 #if CONFIG_KFSW_HK_PERSISTENCE
-	SHELL_CMD_ARG(save, NULL, "Save settings; replace a rejected snapshot.", cmd_hk_save, 1, 0),
+	SHELL_CMD_ARG(save, NULL, "Save settings; replace a rejected snapshot", cmd_hk_save, 1, 0),
 #endif
 #if CONFIG_KFSW_COMMAND_CSP
 	SHELL_CMD_ARG(define, NULL,
-		      "Name a report: define [node] <report> [class=N] table:offset ...",
+		      "Name a report: define [node] <report> [class=N] <[node:]table:offset> ... [--retry]",
 		      cmd_hk_define, 3, CONFIG_KFSW_HK_ENTRIES + 3),
-	SHELL_CMD_ARG(clear, NULL, "Forget a report: clear [node] <report>.", cmd_hk_clear, 2, 2),
+	SHELL_CMD_ARG(clear, NULL, "Forget a report: clear [node] <report> [--retry]", cmd_hk_clear, 2, 2),
 #else
-	SHELL_CMD_ARG(define, NULL, "Name a report: define <report> [class=N] [node:]table:offset ...",
+	SHELL_CMD_ARG(define, NULL, "Name a report: define <report> [class=N] <[node:]table:offset> ...",
 		      cmd_hk_define, 3, CONFIG_KFSW_HK_ENTRIES + 1),
-	SHELL_CMD_ARG(clear, NULL, "Forget a report: clear <report>.", cmd_hk_clear, 2, 0),
+	SHELL_CMD_ARG(clear, NULL, "Forget a report: clear <report>", cmd_hk_clear, 2, 0),
 #endif
-	SHELL_CMD_ARG(show, NULL, "Show the reports and the counters.", cmd_hk_show, 1, 0),
-	SHELL_CMD_ARG(collect, NULL, "Collect now: collect <report>.", cmd_hk_collect, 2, 0),
-	SHELL_CMD_ARG(get, NULL, "Read samples back: get <report> [count].", cmd_hk_get, 2, 1),
+	SHELL_CMD_ARG(show, NULL, "Show the reports and the counters", cmd_hk_show, 1, 0),
+	SHELL_CMD_ARG(collect, NULL, "Collect now: collect <report>", cmd_hk_collect, 2, 0),
+	SHELL_CMD_ARG(get, NULL, "Read samples back: get <report> [count]", cmd_hk_get, 2, 1),
 #if CONFIG_KFSW_COMMAND_CSP
-	SHELL_CMD_ARG(period, NULL, "Collect repeatedly: period [node] <report> <ms>, 0 to stop.",
+	SHELL_CMD_ARG(period, NULL, "Collect repeatedly; 0 to stop: period [node] <report> <ms> [--retry]",
 		      cmd_hk_period, 3, 2),
 #else
-	SHELL_CMD_ARG(period, NULL, "Collect repeatedly: period <report> <ms>, 0 to stop.",
+	SHELL_CMD_ARG(period, NULL, "Collect repeatedly; 0 to stop: period <report> <ms>",
 		      cmd_hk_period, 3, 0),
 #endif
 #if CONFIG_KFSW_HK_STORE
-	SHELL_CMD_ARG(store, NULL, "Keep samples in a file: store <report> <ms>, 0 to stop.",
+	SHELL_CMD_ARG(store, NULL, "Keep samples in a file; 0 to stop: store <report> <ms>",
 		      cmd_hk_store, 3, 0),
-	SHELL_CMD_ARG(store_clear, NULL, "Stop storing and delete the file: store_clear <report>.",
+	SHELL_CMD_ARG(store_clear, NULL, "Stop storing and delete the file: store_clear <report>",
 		      cmd_hk_store_clear, 2, 0),
 	SHELL_CMD_ARG(stored, NULL,
-		      "Read stored samples: stored <report> [from=|to=|since=|skip=]...",
+		      "Read stored samples: stored <report> [from=<sequence>] [to=<sequence>] "
+		      "[since=<seconds>] [until=<seconds>] [skip=<flags>]",
 		      cmd_hk_stored, 2, CONFIG_KFSW_HK_ENTRIES),
 	SHELL_CMD_ARG(extract, NULL,
-		      "Stored samples to a file: extract <report> <path> [filters]",
+		      "Stored samples to a file: extract <report> <path> [from=<sequence>] [to=<sequence>] "
+		      "[since=<seconds>] [until=<seconds>] [skip=<flags>]",
 		      cmd_hk_extract, 3, CONFIG_KFSW_HK_ENTRIES),
 #endif
 #if CONFIG_KFSW_HK_BEACON
 	SHELL_CMD_ARG(beacon, NULL,
-		      "Send unprompted: beacon <report> <node> <ms>, 0 to stop, "
-		      STRINGIFY(CONFIG_KFSW_HK_BEACON_FLOOR_MS) " at least.",
+		      "Send unprompted; 0 to stop, "
+		      STRINGIFY(CONFIG_KFSW_HK_BEACON_FLOOR_MS) " at least: beacon <report> <node> <ms>",
 		      cmd_hk_beacon, 4, 0),
 #endif
 	SHELL_SUBCMD_SET_END);

@@ -330,28 +330,28 @@ static int cmd_log_level(const struct shell *sh, size_t argc, char **argv)
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(log_commands,
-	SHELL_CMD_ARG(level, NULL, "Levels by service: level [<module> [0..4]].",
+	SHELL_CMD_ARG(level, NULL, "Levels by service: level [<module> [0..4]]",
 		      cmd_log_level, 1, 2),
 #if CONFIG_KFSW_LOG_HISTORY
-	SHELL_CMD_ARG(history, NULL, "Read recent log messages.", cmd_log_history, 1, 0),
+	SHELL_CMD_ARG(history, NULL, "Read recent log messages", cmd_log_history, 1, 0),
 #endif
 #if CONFIG_KFSW_LOG_REMOTE
 	SHELL_CMD_ARG(remote, NULL,
-		      "Another node's recent messages: remote <node> [count] [level].",
+		      "Another node's recent messages: remote <node> [count] [level]",
 		      cmd_log_remote, 2, 2),
 #endif
-	SHELL_CMD_ARG(test, NULL, "Exercise all log levels.", cmd_log_test, 1, 0),
+	SHELL_CMD_ARG(test, NULL, "Exercise all log levels", cmd_log_test, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(log, &log_commands, "Logging commands.", NULL);
 #if CONFIG_KFSW_COMMAND_CSP
-SHELL_CMD_ARG_REGISTER(status, NULL, "Show status, here or on a node: status [node].", cmd_status,
-		       1, 1);
+SHELL_CMD_ARG_REGISTER(status, NULL, "Show status, here or on a node: status [node]", cmd_status, 1,
+		       1);
 #else
-SHELL_CMD_ARG_REGISTER(status, NULL, "Show basic runtime status.", cmd_status, 1, 0);
+SHELL_CMD_ARG_REGISTER(status, NULL, "Show basic runtime status: status", cmd_status, 1, 0);
 #endif
-SHELL_CMD_ARG_REGISTER(time, NULL, "Show monotonic time.", cmd_time, 1, 0);
-SHELL_CMD_ARG_REGISTER(version, NULL, "Show build information.", cmd_version, 1, 0);
+SHELL_CMD_ARG_REGISTER(time, NULL, "Show monotonic time: time", cmd_time, 1, 0);
+SHELL_CMD_ARG_REGISTER(version, NULL, "Show build information: version", cmd_version, 1, 0);
 
 #if CONFIG_KFSW_COMMAND && CONFIG_REBOOT
 static int cmd_reboot(const struct shell *sh, size_t argc, char **argv)
@@ -361,6 +361,6 @@ static int cmd_reboot(const struct shell *sh, size_t argc, char **argv)
 	return kfsw_shell_run_command(sh, KFSW_SHELL_THIS_NODE, "reboot", 1U, &argv[1]);
 }
 
-SHELL_CMD_ARG_REGISTER(reboot, NULL, "Restart this node: reboot <pin>; csp reboot for another.",
+SHELL_CMD_ARG_REGISTER(reboot, NULL, "Restart this node; csp reboot for another: reboot <pin>",
 		       cmd_reboot, 2, 0);
 #endif

@@ -218,23 +218,23 @@ static int cmd_fbo_status(const struct shell *sh, size_t argc, char **argv)
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	fbo_sched_commands,
-	SHELL_CMD_ARG(add, NULL, "Release a command later: add <+s|@utc> <node> \"<command>\".",
+	SHELL_CMD_ARG(add, NULL, "Release a command later: add <+s|@utc> <node> \"<command>\"",
 		      cmd_fbo_sched_add, 4, 0),
-	SHELL_CMD_ARG(cancel, NULL, "Cancel a scheduled entry: cancel <index>.",
+	SHELL_CMD_ARG(cancel, NULL, "Cancel a scheduled entry: cancel <index>",
 		      cmd_fbo_sched_cancel, 2, 0),
-	SHELL_CMD_ARG(clear, NULL, "Empty the queue; a release in flight finishes.",
+	SHELL_CMD_ARG(clear, NULL, "Empty the queue; a release in flight finishes",
 		      cmd_fbo_sched_clear, 1, 0),
-	SHELL_CMD_ARG(list, NULL, "Show every queued entry.", cmd_fbo_sched_list, 1, 0),
-	SHELL_CMD_ARG(status, NULL, "Show the queue counters.", cmd_fbo_sched_status, 1, 0),
+	SHELL_CMD_ARG(list, NULL, "Show every queued entry", cmd_fbo_sched_list, 1, 0),
+	SHELL_CMD_ARG(status, NULL, "Show the queue counters", cmd_fbo_sched_status, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	fbo_commands,
 	SHELL_CMD(sched, &fbo_sched_commands, "Time-tagged queue: release a command later.",
 		  NULL),
-	SHELL_CMD_ARG(run, NULL, "Carry out a procedure: run <name>.", cmd_fbo_run, 2, 0),
-	SHELL_CMD_ARG(stop, NULL, "Ask the running procedure to stop.", cmd_fbo_stop, 1, 0),
-	SHELL_CMD_ARG(status, NULL, "Show what a procedure has done.", cmd_fbo_status, 1, 0),
+	SHELL_CMD_ARG(run, NULL, "Carry out a procedure: run <name>", cmd_fbo_run, 2, 0),
+	SHELL_CMD_ARG(stop, NULL, "Ask the running procedure to stop", cmd_fbo_stop, 1, 0),
+	SHELL_CMD_ARG(status, NULL, "Show what a procedure has done", cmd_fbo_status, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(fbo, &fbo_commands, "File based operations: run a sequence from a file.", NULL);

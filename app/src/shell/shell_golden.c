@@ -34,10 +34,10 @@ static int cmd_golden_install(const struct shell *sh, size_t argc, char **argv)
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	golden_commands,
-	SHELL_CMD_ARG(status, NULL, "Whether the golden partition holds an image.",
+	SHELL_CMD_ARG(status, NULL, "Whether the golden partition holds an image",
 		      cmd_golden_status, 1, 0),
 #if CONFIG_KFSW_COMMAND
-	SHELL_CMD_ARG(install, NULL, "Install it and restart: install [node] <pin>.",
+	SHELL_CMD_ARG(install, NULL, "Install it and restart: install [node] <pin>",
 		      cmd_golden_install, 2, 1),
 #endif
 	SHELL_SUBCMD_SET_END);

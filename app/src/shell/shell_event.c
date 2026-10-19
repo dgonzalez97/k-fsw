@@ -109,20 +109,20 @@ static int cmd_event_clear(const struct shell *sh, size_t argc, char **argv)
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	event_commands,
-	SHELL_CMD_ARG(clear, NULL, "Discard held records; counters are kept.", cmd_event_clear, 1,
+	SHELL_CMD_ARG(clear, NULL, "Discard held records; counters are kept", cmd_event_clear, 1,
 		      0),
-	SHELL_CMD_ARG(list, NULL, "Show held records, oldest first.", cmd_event_list, 1, 0),
+	SHELL_CMD_ARG(list, NULL, "Show held records, oldest first", cmd_event_list, 1, 0),
 #if CONFIG_KFSW_COMMAND_CSP
-	SHELL_CMD_ARG(stats, NULL, "Show record counters, here or on a node: stats [node].",
+	SHELL_CMD_ARG(stats, NULL, "Show record counters, here or on a node: stats [node]",
 		      cmd_event_stats, 1, 1),
 #else
-	SHELL_CMD_ARG(stats, NULL, "Show record counters.", cmd_event_stats, 1, 0),
+	SHELL_CMD_ARG(stats, NULL, "Show record counters", cmd_event_stats, 1, 0),
 #endif
 #if CONFIG_KFSW_COMMAND_CSP
-	SHELL_CMD_ARG(tail, NULL, "One record by age, newest 0: tail [node] <age>.",
+	SHELL_CMD_ARG(tail, NULL, "One record by age, newest 0: tail [node] <age>",
 		      cmd_event_tail, 2, 1),
 #elif CONFIG_KFSW_COMMAND
-	SHELL_CMD_ARG(tail, NULL, "One record by age, newest 0: tail <age>.", cmd_event_tail,
+	SHELL_CMD_ARG(tail, NULL, "One record by age, newest 0: tail <age>", cmd_event_tail,
 		      2, 0),
 #endif
 	SHELL_SUBCMD_SET_END);

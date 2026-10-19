@@ -919,56 +919,56 @@ static int cmd_param_clear(const struct shell *sh, size_t argc, char **argv)
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	param_commands,
 #if CONFIG_KFSW_PARAM_PERSISTENCE
-	SHELL_CMD_ARG(clear, NULL, "Delete the saved snapshot; RAM is unchanged.", cmd_param_clear,
+	SHELL_CMD_ARG(clear, NULL, "Delete the saved snapshot; RAM is unchanged", cmd_param_clear,
 		      1, 0),
-	SHELL_CMD_ARG(defaults, NULL, "Restore compiled defaults in RAM only.", cmd_param_defaults,
+	SHELL_CMD_ARG(defaults, NULL, "Restore compiled defaults in RAM only", cmd_param_defaults,
 		      1, 0),
 #endif
 	SHELL_CMD_ARG(get, NULL,
 #if CONFIG_KFSW_PARAM_CSP
-		      "Get local or remote value: get [node] <name>.", cmd_param_get, 2, 1),
+		      "Get local or remote value: get [node] <name>", cmd_param_get, 2, 1),
 #else
-		      "Get a local value: get <name>.", cmd_param_get, 2, 0),
+		      "Get a local value: get <name>", cmd_param_get, 2, 0),
 #endif
 #if CONFIG_KFSW_PARAM_PERSISTENCE
-	SHELL_CMD_ARG(load, NULL, "Reload the saved snapshot into RAM.", cmd_param_load, 1, 0),
+	SHELL_CMD_ARG(load, NULL, "Reload the saved snapshot into RAM", cmd_param_load, 1, 0),
 #endif
 	SHELL_CMD_ARG(list, NULL,
 #if CONFIG_KFSW_PARAM_CSP
-		      "Every parameter of a node, with its value: list [node].", cmd_param_list,
+		      "Every parameter of a node, with its value: list [node]", cmd_param_list,
 		      1, 1),
 #else
-		      "Every parameter, with its value.", cmd_param_list, 1, 0),
+		      "Every parameter, with its value: list", cmd_param_list, 1, 0),
 #endif
 	SHELL_CMD_ARG(describe, NULL,
-		      "What each parameter is, with its unit: describe [table].",
+		      "What each parameter is, with its unit: describe [table]",
 		      cmd_param_describe, 1, 1),
 #if CONFIG_KFSW_PARAM_PERSISTENCE
 	SHELL_CMD_ARG(persist, NULL,
-		      "Write the snapshot and report one table's share: persist <table>.",
+		      "Write the snapshot and report one table's share: persist <table>",
 		      cmd_param_persist, 2, 0),
-	SHELL_CMD_ARG(save, NULL, "Atomically save persistent RAM values.", cmd_param_save, 1, 0),
+	SHELL_CMD_ARG(save, NULL, "Atomically save persistent RAM values", cmd_param_save, 1, 0),
 #endif
 	SHELL_CMD_ARG(set, NULL,
 #if CONFIG_KFSW_PARAM_CSP
-		      "Set local or remote value: set [node] <name> <value>.", cmd_param_set, 3, 1),
+		      "Set local or remote value: set [node] <name> <value>", cmd_param_set, 3, 1),
 #else
-		      "Set a local value: set <name> <value>.", cmd_param_set, 3, 0),
+		      "Set a local value: set <name> <value>", cmd_param_set, 3, 0),
 #endif
 	SHELL_CMD_ARG(table, NULL,
 #if CONFIG_KFSW_PARAM_CSP
-		      "The parameters of one table, with values: table [node] <id>.",
+		      "The parameters of one table, with values: table [node] <id>",
 		      cmd_param_table, 2, 1),
 #else
-		      "The parameters of one table, with values: table <id>.", cmd_param_table,
+		      "The parameters of one table, with values: table <id>", cmd_param_table,
 		      2, 0),
 #endif
 	SHELL_CMD_ARG(tables, NULL,
 #if CONFIG_KFSW_PARAM_CSP
-		      "The tables a node carries, without values: tables [node].",
+		      "The tables a node carries, without values: tables [node]",
 		      cmd_param_tables, 1, 1),
 #else
-		      "The tables, without values.", cmd_param_tables, 1, 0),
+		      "The tables, without values: tables", cmd_param_tables, 1, 0),
 #endif
 	SHELL_SUBCMD_SET_END);
 

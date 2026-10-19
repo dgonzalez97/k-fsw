@@ -20,8 +20,13 @@ the wrong number of arguments prints its usage:
 ```text
 kfsw:~$ ftp generate
 generate: wrong parameter count
-generate - Create deterministic local data: generate <path> <bytes 0..32768>.
+generate - Create deterministic local data: generate <path> <bytes 0..32768>
 ```
+
+Required arguments use `<name>` and optional arguments use `[name]`. A
+subcommand that takes arguments ends its help with its usage; one that takes
+none says nothing further. For example, `ftp -h` includes
+`get <node> <remote> <local>` and `put <node> <local> <remote>`.
 
 ## Commands and build options
 
@@ -601,16 +606,18 @@ data: 0002000001000ce9d363
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `hk define` | `[node] <report> [node:]table:offset ...` | Set what a report collects |
-| `hk clear` | `[node] <report>` | Delete a report |
+| `hk define` | `[node] <report> [class=N] <[node:]table:offset> ... [--retry]` | Set what a report collects |
+| `hk clear` | `[node] <report> [--retry]` | Delete a report |
 | `hk show` | none | Reports and counters |
 | `hk collect` | `<report>` | Collect now |
 | `hk get` | `<report> [count]` | Print collected samples |
-| `hk period` | `[node] <report> <ms>` | Collect periodically, 0 to stop |
+| `hk period` | `[node] <report> <ms> [--retry]` | Collect periodically, 0 to stop |
 | `hk store` | `<report> <ms>` | Also write samples to a file, 0 to stop |
 | `hk store_clear` | `<report>` | Stop storing and delete the file |
 | `hk beacon` | `<report> <node> <ms>` | Send the latest sample periodically, 0 to stop |
 | `hk save` | none | Save the report settings |
+
+`--retry` applies when a destination node is given.
 
 A leading node sets up that node's reports: `hk define 2 0 3:0 3:8` asks node 2
 to collect its own uptime and free storage as report 0. An entry always holds a

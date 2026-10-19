@@ -101,21 +101,23 @@ static int cmd_journal_remote(const struct shell *sh, size_t argc, char **argv)
 
 #if CONFIG_KFSW_COMMAND_CSP
 #define NODE_ARGS 1
+#define NODE_USAGE " [node]"
 #else
 #define NODE_ARGS 0
+#define NODE_USAGE ""
 #endif
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	journal_commands,
 #if CONFIG_KFSW_LOG_REMOTE
-	SHELL_CMD_ARG(remote, NULL, "Download another node's newest records: remote <node> [count].",
+	SHELL_CMD_ARG(remote, NULL, "Download another node's newest records: remote <node> [count]",
 		      cmd_journal_remote, 2, 1),
 #endif
-	SHELL_CMD_ARG(stats, NULL, "Journal state, here or on a node: stats [node].",
+	SHELL_CMD_ARG(stats, NULL, "Journal state, here or on a node: stats" NODE_USAGE,
 		      cmd_journal_stats, 1, NODE_ARGS),
-	SHELL_CMD_ARG(tail, NULL, "One saved event by age, newest 0: tail [node] <age>.",
+	SHELL_CMD_ARG(tail, NULL, "One saved event by age, newest 0: tail" NODE_USAGE " <age>",
 		      cmd_journal_tail, 2, NODE_ARGS),
-	SHELL_CMD_ARG(time, NULL, "When a saved event happened: time [node] <age>.",
+	SHELL_CMD_ARG(time, NULL, "When a saved event happened: time" NODE_USAGE " <age>",
 		      cmd_journal_time, 2, NODE_ARGS),
 	SHELL_SUBCMD_SET_END);
 

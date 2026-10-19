@@ -100,11 +100,11 @@ static int cmd_limits_sweep(const struct shell *sh, size_t argc, char **argv)
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(limits_commands,
-	SHELL_CMD_ARG(list, NULL, "List the rules in force.", cmd_limits_list, 1, 0),
-	SHELL_CMD_ARG(load, NULL, "Load a rule file: load [file].", cmd_limits_load, 1, 1),
-	SHELL_CMD_ARG(status, NULL, "Show counters and the last load result.", cmd_limits_status,
+	SHELL_CMD_ARG(list, NULL, "List the rules in force", cmd_limits_list, 1, 0),
+	SHELL_CMD_ARG(load, NULL, "Load a rule file: load [file]", cmd_limits_load, 1, 1),
+	SHELL_CMD_ARG(status, NULL, "Show counters and the last load result", cmd_limits_status,
 		      1, 0),
-	SHELL_CMD_ARG(sweep, NULL, "Evaluate the rules now.", cmd_limits_sweep, 1, 0),
+	SHELL_CMD_ARG(sweep, NULL, "Evaluate the rules now", cmd_limits_sweep, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(limits, &limits_commands, "Parameter limits.", NULL);

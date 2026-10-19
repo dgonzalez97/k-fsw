@@ -80,8 +80,8 @@ static int cmd_uart_test(const struct shell *sh, size_t argc, char **argv)
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(uart_commands,
-	SHELL_CMD_ARG(info, NULL, "Show each dedicated CSP UART status.", cmd_uart_info, 1, 0),
-	SHELL_CMD_ARG(test, NULL, "Ping configured or explicit peer: test [node].",
+	SHELL_CMD_ARG(info, NULL, "Show each dedicated CSP UART status", cmd_uart_info, 1, 0),
+	SHELL_CMD_ARG(test, NULL, "Ping configured or explicit peer: test [node]",
 		      cmd_uart_test, 1, 1),
 	SHELL_SUBCMD_SET_END);
 

@@ -28,6 +28,7 @@ fi
 	printf 'pa\t g\t test_u32\n'
 	# Two matches: Tab lists them one per line with their help.
 	printf 'st\t\n'
+	printf 'ftp \t\025\n'
 	printf '%s\n' \
 		'help' \
 		'status' \
@@ -56,7 +57,9 @@ fi
 		'param clear' \
 		'storage info' \
 		'storage test' \
-		'ftp' \
+		'ftp -h' \
+		'csp -h' \
+		'hk -h' \
 		'ftp generate' \
 		'ftp mkdir /selfnode' \
 		'ftp ls /' \
@@ -72,7 +75,7 @@ fi
 cat "$capture_file"
 
 expected_output=(
-	"  status   : Show status, here or on a node: status [node]."
+	"  status   : Show status, here or on a node: status [node]"
 	"  storage  : Filesystem storage commands."
     '@BOOT '
     '@READY '
@@ -84,9 +87,9 @@ expected_output=(
 	'csp      : CSP commands.'
 	'ftp      : File transfer. Without a node, this node.'
 	'param    : Parameter commands.'
-	'status   : Show status, here or on a node: status [node].'
+	'status   : Show status, here or on a node: status [node]'
 	'storage  : Filesystem storage commands.'
-	'version  : Show build information.'
+	'version  : Show build information: version'
     'K-FSW status'
     'revisions:'
     '  kfsw-libcsp: '
@@ -152,9 +155,14 @@ expected_output=(
 	'ready: yes'
 	'total_bytes: '
 	'Storage test: PASS'
-	'  mkdir     : Create a directory: mkdir [node] <path>.'
+	'  mkdir     : Create a directory'
+	'Download from a remote node: get <node> <remote> <local>'
+	'Upload to a remote node: put <node> <local> <remote>'
+	'Identify a node, or this one when no node is given: ident [node]'
+	'Ping a node, or this one when no node is given: ping [node]'
+	'Forget a report: clear [node] <report> [--retry]'
+	'generate - Create deterministic local data: generate <path> <bytes 0..32768>'
 	'generate: wrong parameter count'
-	'generate - Create deterministic local data: generate <path> <bytes 0..32768>.'
 	'FTP mkdir 1 /selfnode: PASS'
 	# The firmware slots and the RAM volume show in a listing of the root.
 	'dir           0 boot'
@@ -178,6 +186,13 @@ for expected in "${expected_output[@]}"; do
         exit 1
     fi
 done
+
+# Both Tab and -h must show the transfer argument order.
+if [[ $(grep -Fc 'Download from a remote node: get <node> <remote> <local>' "$capture_file") -lt 2 ]]; then
+    echo "SHELL RESULT: FAIL"
+    echo "  FTP argument hints missing from Tab or help"
+    exit 1
+fi
 
 # The version comes from the build, so only check that one is printed.
 if ! grep -Eq '^K-FSW: .+' "$capture_file"; then

@@ -126,18 +126,18 @@ static int cmd_gndwdt_timeout(const struct shell *sh, size_t argc, char **argv)
 
 SHELL_STATIC_SUBCMD_SET_CREATE(gndwdt_commands,
 #if CONFIG_KFSW_COMMAND_CSP
-	SHELL_CMD_ARG(feed, NULL, "Feed another node's ground watchdog: feed <node>.",
+	SHELL_CMD_ARG(feed, NULL, "Feed another node's ground watchdog: feed <node>",
 		      cmd_gndwdt_feed, 2, 0),
 #endif
-	SHELL_CMD_ARG(off, NULL, "Disarm this node's countdown.", cmd_gndwdt_arm, 1, 0),
-	SHELL_CMD_ARG(on, NULL, "Arm this node's countdown.", cmd_gndwdt_arm, 1, 0),
+	SHELL_CMD_ARG(off, NULL, "Disarm this node's countdown", cmd_gndwdt_arm, 1, 0),
+	SHELL_CMD_ARG(on, NULL, "Arm this node's countdown", cmd_gndwdt_arm, 1, 0),
 #if CONFIG_KFSW_COMMAND_CSP
-	SHELL_CMD_ARG(show, NULL, "Show the countdown, here or on another node: show [node].",
+	SHELL_CMD_ARG(show, NULL, "Show the countdown, here or on another node: show [node]",
 		      cmd_gndwdt_show, 1, 1),
 #else
-	SHELL_CMD_ARG(show, NULL, "Show the countdown and its counters.", cmd_gndwdt_show, 1, 0),
+	SHELL_CMD_ARG(show, NULL, "Show the countdown and its counters", cmd_gndwdt_show, 1, 0),
 #endif
-	SHELL_CMD_ARG(timeout, NULL, "Set the silence allowed: timeout <seconds>.",
+	SHELL_CMD_ARG(timeout, NULL, "Set the silence allowed: timeout <seconds>",
 		      cmd_gndwdt_timeout, 2, 0),
 	SHELL_SUBCMD_SET_END);
 

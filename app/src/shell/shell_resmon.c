@@ -76,10 +76,10 @@ static int cmd_resmon_alert(const struct shell *sh, size_t argc, char **argv)
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(resmon_commands,
-	SHELL_CMD_ARG(alert, NULL, "Set the stack use that raises an event: alert <percent>.",
+	SHELL_CMD_ARG(alert, NULL, "Set the stack use that raises an event: alert <percent>",
 		      cmd_resmon_alert, 2, 0),
-	SHELL_CMD_ARG(sample, NULL, "Sweep the threads now.", cmd_resmon_sample, 1, 0),
-	SHELL_CMD_ARG(show, NULL, "Show what the last sweep found.", cmd_resmon_show, 1, 0),
+	SHELL_CMD_ARG(sample, NULL, "Sweep the threads now", cmd_resmon_sample, 1, 0),
+	SHELL_CMD_ARG(show, NULL, "Show what the last sweep found", cmd_resmon_show, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(resmon, &resmon_commands, "Resource monitor.", NULL);

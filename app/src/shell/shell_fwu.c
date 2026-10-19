@@ -175,17 +175,17 @@ static int cmd_fwu_flash(const struct shell *sh, size_t argc, char **argv)
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	fwu_commands,
-	SHELL_CMD_ARG(abort, NULL, "Abandon a transfer and erase the slot.", cmd_fwu_abort, 1, 0),
-	SHELL_CMD_ARG(begin, NULL, "Start a transfer: begin <size> <crc32>.", cmd_fwu_begin, 3,
+	SHELL_CMD_ARG(abort, NULL, "Abandon a transfer and erase the slot", cmd_fwu_abort, 1, 0),
+	SHELL_CMD_ARG(begin, NULL, "Start a transfer: begin <size> <crc32>", cmd_fwu_begin, 3,
 		      0),
-	SHELL_CMD_ARG(finish, NULL, "Verify the image and offer it to the bootloader.",
+	SHELL_CMD_ARG(finish, NULL, "Verify the image and offer it to the bootloader",
 		      cmd_fwu_finish, 1, 0),
 #if CONFIG_KFSW_FWU_LITE_CSP
-	SHELL_CMD_ARG(flash, NULL, "Ask a node to boot its image: flash <node>.", cmd_fwu_flash,
+	SHELL_CMD_ARG(flash, NULL, "Ask a node to boot its image: flash <node>", cmd_fwu_flash,
 		      2, 0),
-	SHELL_CMD_ARG(send, NULL, "Send an image: send <node> <path>.", cmd_fwu_send, 3, 0),
+	SHELL_CMD_ARG(send, NULL, "Send an image: send <node> <path>", cmd_fwu_send, 3, 0),
 #endif
-	SHELL_CMD_ARG(status, NULL, "Show update state and slot geometry.", cmd_fwu_status, 1, 0),
+	SHELL_CMD_ARG(status, NULL, "Show update state and slot geometry", cmd_fwu_status, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(fwu, &fwu_commands, "Firmware update.", NULL);
