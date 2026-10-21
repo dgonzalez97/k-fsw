@@ -81,7 +81,7 @@ PYTHON
 }
 
 count_parameters() {
-	printf '%s\n' "csp ping $flight" "param list $flight" |
+	printf '%s\n' "csp ping $flight" "param listall $flight" |
 		timeout 150 "$ground_exe" --uart_stdinout "--can-if=$interface" \
 			--stop_at=70.0 --no-color >"$1" 2>&1 || true
 	grep -c "^ *[0-9]\+  " "$1" || true

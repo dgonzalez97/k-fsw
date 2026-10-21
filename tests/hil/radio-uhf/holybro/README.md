@@ -161,7 +161,7 @@ Then try a parameter over the radio. Set `log_level` to another value between
 to its default of `1`. Don't run `param save` during this test.
 
 ```text
-kfsw-gnd-uhf# param list 2
+kfsw-gnd-uhf# param listall 2
 kfsw-gnd-uhf# param get 2 node_id
 kfsw-gnd-uhf# param get 2 log_level
 kfsw-gnd-uhf# param set 2 log_level 3

@@ -566,7 +566,7 @@ local-only composition.
 ### Tables
 
 A parameter is addressed by table and offset. Table numbers are split by the
-layer that defines the table, which `param tables` shows in its `layer`
+layer that defines the table, which `param whichtables` shows in its `layer`
 column:
 
 | Numbers | Used by |
@@ -583,7 +583,7 @@ are unique inside a table. Names are unique on the node and up to
 registration.
 
 A definition set can carry a `description`, one short line saying what the
-table holds; `param tables` prints it in its `holds` column. Every table in
+table holds; `param whichtables` prints it in its `holds` column. Every table in
 the five repositories has one, and a new table should too.
 
 | ID | Layer | Name | Source |
@@ -620,7 +620,7 @@ platform and comms layers can't depend on the parameter service.
 
 ### Write modes
 
-The `mode` column of `param list` comes from each definition:
+The `mode` column of `param listall` comes from each definition:
 
 | Letter | Meaning |
 | --- | --- |
@@ -674,7 +674,7 @@ caches the descriptors of one remote node.
 ```text
 kfsw:~$ param get 2 log_level
 kfsw:~$ param set 2 log_level 2
-kfsw:~$ param list 2
+kfsw:~$ param listall 2
 ```
 
 A named read asks the node for that one descriptor and then the value. A node

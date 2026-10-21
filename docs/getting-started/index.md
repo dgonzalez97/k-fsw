@@ -89,12 +89,12 @@ west update
 ./k-fsw/tools/zephyr-patch.sh
 ```
 
-`./k-fsw/tools/zephyr-patch.sh` applies the shell Tab help patch to the pinned
-Zephyr and reports when it is already applied. Tab lists one option per line
-with its help. Builds never apply it; run the helper after `west update`.
-`--check` only reports the patch state. `tools/ci/all.sh` and the release
-script check it and stop if it is absent or conflicts. GitHub workspace setup
-applies it as a separate step.
+`./k-fsw/tools/zephyr-patch.sh` applies the shell Tab help and mandatory ZMS
+close-error patches to the pinned Zephyr and reports when each is already
+applied. Tab lists one option per line with its help. Builds never apply the
+patches; run the helper after `west update`. `--check` only reports their state.
+`tools/ci/all.sh` and the release script stop if either patch is absent or
+conflicts. GitHub workspace setup applies them as a separate step.
 
 Install Zephyr's Python requirements and export its CMake package:
 
@@ -195,7 +195,7 @@ kfsw:~$ status
 kfsw:~$ version
 kfsw:~$ time
 kfsw:~$ storage info
-kfsw:~$ param list
+kfsw:~$ param listall
 kfsw:~$ param get log_level
 kfsw:~$ csp info
 kfsw:~$ csp routes

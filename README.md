@@ -78,9 +78,9 @@ other ground roles.
 
 ### Parameters
 
-`param tables` lists the tables, `param table <id>` prints one with its values
-and `param list` prints every parameter. Put a node number first to ask
-another node: `param tables 2`.
+`param whichtables` lists the tables, `param table <id>` prints one with its values
+and `param listall` prints every parameter. Put a node number first to ask
+another node: `param whichtables 2`.
 
 Remote access uses [Space Inventor's libparam](https://github.com/spaceinventor/libparam).
 

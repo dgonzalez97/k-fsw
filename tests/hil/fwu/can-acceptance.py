@@ -27,7 +27,7 @@ def soak(board, ground, seconds, output):
     board.run("hk period 0 1000", "every 1000 ms")
     board.run("hk period 1 1000", "every 1000 ms")
     board.run("hk beacon 0 16 5000")
-    ground.run("param list 2", "temp_valid")
+    ground.run("param listall 2", "temp_valid")
     ground.run("ftp generate /soak-source.bin 4096", ": PASS")
     board.run("hil start", "Timing started")
     deadline = time.monotonic() + seconds
