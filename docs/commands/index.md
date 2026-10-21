@@ -273,20 +273,22 @@ packets leave on USART3; don't connect the shell terminal to the CSP UART.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `param tables` | `[node]` | The tables a node carries, without values |
+| `param whichtables` | `[node]` | The tables a node carries, without values |
 | `param table` | `[node] <id>` | The parameters of one table, with values |
-| `param list` | `[node]` | Every parameter of a node, with values |
+| `param listall` | `[node]` | Every parameter of a node, with values |
 | `param get` | `[node] <name>` | Read a value |
 | `param set` | `[node] <name> <value>` | Write a value |
 
 Three views of the same parameters, from the widest to the most detailed:
-`tables` says which tables exist, `table` shows one, `list` shows them all. `layer` says which part of K-FSW defines the table, `kept` how many of its
-values are saved, and `holds` what is in it. Table names are not sent over the
-link, so for another node the names and descriptions come from this build,
-whose table numbers are the same.
+`whichtables` says which tables exist, `table` shows one, and `listall` shows
+every parameter. `layer` identifies the part of K-FSW that defines a table;
+`holds` describes its contents. Local output also includes `kept`, the number
+of persistent values. Remote table summaries carry their own names and
+descriptions. For older nodes without table-list support, names and descriptions
+come from this build by matching table IDs; an unknown table is named `-`.
 
 ```text
-kfsw:~$ param tables
+kfsw:~$ param whichtables
  id  layer    name          params  kept  holds
 ---  -------  ------------  ------  ----  -----
   1  core     board             11     0  Node identity and what the board carries
@@ -298,7 +300,7 @@ kfsw:~$ param tables
 ```
 
 ```text
-kfsw:~$ param list
+kfsw:~$ param listall
 table       addr  name                              type    mode  value
 ----------  ----  --------------------------------  ------  ----  -----
 board       0x00  node_id                           u16     r     1
@@ -314,7 +316,10 @@ Input is parsed with the parameter's type; overflow, negative unsigned values
 and bad numbers are rejected.
 
 `echo_enabled` makes the console repeat what it receives. It is off by
-default:
+default. On `native_sim`, run `param set echo_enabled 1` to enable interactive
+TAB completion and arrow-key command history. The same console behavior applies
+on boards. Zephyr ignores TAB and arrow-key escape sequences while echo is off;
+history and completion are already compiled in.
 
 ```text
 kfsw:~$ param set echo_enabled 1
@@ -494,7 +499,7 @@ Kconfig option; see @ref communications.
 
 **Parameter tables.** 1 to 24 are core (1 `board`, 2 `system`, 3
 `telemetry`, 4 `csp`, 5 `storage`), 25 to 49 services (25 `log` through 38
-`remexec`, listed by `param tables`) and 50 to 99 modules (50 `radio-uhf`, 51
+`remexec`, listed by `param whichtables`) and 50 to 99 modules (50 `radio-uhf`, 51
 `temp_example`, 67 `hw_test`).
 
 **Node addresses.** Under CSP 2, the default, nodes are 1 to 16382 and 16383

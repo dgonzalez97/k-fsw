@@ -20,7 +20,7 @@ board="nucleo_l496zg"
 work_dir="$(mktemp -d)"
 failures=0
 
-trap 'rm -rf "$work_dir"' EXIT
+trap '[[ "${KFSW_KEEP_TEST_OUTPUT:-0}" == 1 ]] || rm -rf "$work_dir"' EXIT
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -59,7 +59,7 @@ if [[ -n "$serial" ]]; then
 	[[ -e "$serial" ]] || { printf '%s is not present\n' "$serial" >&2; exit 1; }
 
 	stty_saved="$(stty -F "$serial" -g)"
-	trap 'stty -F "$serial" "$stty_saved" 2>/dev/null || true; rm -rf "$work_dir"' EXIT
+	trap 'stty -F "$serial" "$stty_saved" 2>/dev/null || true; [[ "${KFSW_KEEP_TEST_OUTPUT:-0}" == 1 ]] || rm -rf "$work_dir"' EXIT
 	stty -F "$serial" 115200 cs8 -cstopb -parenb -crtscts raw -echo
 	timeout 30s cat "$serial" >"$work_dir/output.log" &
 	capture_pid=$!
@@ -68,15 +68,15 @@ if [[ -n "$serial" ]]; then
 	sleep 0.5
 	printf 'status\r' >"$serial"
 	sleep 2
-	printf 'param tables\r' >"$serial"
+	printf 'param whichtables\r' >"$serial"
 	sleep 2
-	printf 'param list\r' >"$serial"
+	printf 'param listall\r' >"$serial"
 	sleep 3
 	kill "$capture_pid" 2>/dev/null || true
 	wait "$capture_pid" 2>/dev/null || true
 else
 	[[ -x "$executable" ]] || { printf '%s is not built\n' "$executable" >&2; exit 1; }
-	printf '%s\n' 'param tables' 'param list' |
+	printf '%s\n' 'param whichtables' 'param listall' |
 		"$executable" --uart_stdinout --stop_at=6.0 --no-color \
 			-flash="$work_dir/flash.bin" >"$work_dir/output.log" 2>&1 || true
 fi
