@@ -117,8 +117,8 @@ See [targets](docs/targets/index.md).
 | --- | --- | --- | --- | --- |
 | `linux` | `native_sim/native/64` | x86-64 host | KISS over a PTY; optional CAN via SocketCAN | Reference services and optional profiles |
 | `nucleo_l496zg` | STM32 Nucleo L496ZG | Arm Cortex-M4 | KISS on USART3; optional CAN on PD0/PD1 | Reference services and optional profiles |
-| `frdm_k64f` | NXP FRDM-K64F | Arm Cortex-M4 | OpenSDA UART console | Shell only; CSP, parameters, storage and file transfer are off |
-| `rpi_pico_w` | Raspberry Pi Pico W | Arm Cortex-M0+ | USB CDC ACM console | Shell only; CSP, parameters, storage and file transfer are off |
+| `frdm_k64f` | NXP FRDM-K64F | Arm Cortex-M4 | OpenSDA UART console | Shell only; full services deferred to 2.0 |
+| `rpi_pico_w` | Raspberry Pi Pico W | Arm Cortex-M0+ | USB CDC ACM console | Core services, UART0 CSP and persistent LittleFS; recorded software build success, service HIL NOT RUN |
 
 ### Identifying a board
 
