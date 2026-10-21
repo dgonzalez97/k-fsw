@@ -1,7 +1,62 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-KFSW_TARGET="${1:-nucleo_l496zg}"
+usage() {
+	cat <<'EOF'
+Usage: tools/build.sh [target] [--semihost]
+       tools/build.sh --help
+
+Target defaults to nucleo_l496zg.
+  --semihost  Append the debug-only full-text log mirror profile (default off).
+              Requires a supported Cortex-M composition and OpenOCD semihosting
+              enabled before execution. Supported targets: nucleo_l496zg,
+              nucleo_f746zg, frdm_k64f.
+EOF
+}
+
+KFSW_TARGET=""
+semihost=false
+for arg in "$@"; do
+	case "$arg" in
+		--help)
+			if [[ $# != 1 ]]; then
+				echo "ERROR: --help must be used alone" >&2
+				exit 2
+			fi
+			usage
+			exit 0
+			;;
+		--semihost)
+			if $semihost; then
+				echo "ERROR: duplicate --semihost" >&2
+				exit 2
+			fi
+			semihost=true
+			;;
+		-*)
+			echo "ERROR: unknown option: $arg" >&2
+			usage >&2
+			exit 2
+			;;
+		*)
+			if [[ -n "$KFSW_TARGET" || ! "$arg" =~ ^[a-zA-Z0-9_]+$ ]]; then
+				echo "ERROR: expected one target name: $arg" >&2
+				exit 2
+			fi
+			KFSW_TARGET="$arg"
+			;;
+	esac
+done
+KFSW_TARGET="${KFSW_TARGET:-nucleo_l496zg}"
+if $semihost; then
+	case "$KFSW_TARGET" in
+		nucleo_l496zg|nucleo_f746zg|frdm_k64f) ;;
+		*)
+			echo "ERROR: --semihost is unsupported for target: $KFSW_TARGET" >&2
+			exit 2
+			;;
+	esac
+fi
 KFSW_PRISTINE="${KFSW_PRISTINE:-auto}"
 
 case "$KFSW_PRISTINE" in
@@ -14,6 +69,10 @@ case "$KFSW_PRISTINE" in
 esac
 
 source "$(dirname "$0")/_common.sh" "$KFSW_TARGET"
+
+if $semihost; then
+	KFSW_EXTRA_CONF_FILE="${KFSW_EXTRA_CONF_FILE:+$KFSW_EXTRA_CONF_FILE;}$KFSW_REPO_DIR/config/profiles/log-semihost.conf"
+fi
 
 echo
 echo "============================================================"

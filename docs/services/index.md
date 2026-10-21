@@ -421,6 +421,67 @@ milliseconds, module, severity and up to 191 text bytes. Log filters apply
 before retention. Zephyr logs, driver output and shell responses are not
 captured.
 
+### Debugger text mirror
+
+`config/profiles/log-semihost.conf` opts into full-text K-FSW mirroring.
+It preserves the USB/UART text console and copies the already-rendered bounded
+message, severity, colour escapes and final newline to a platform-owned sink.
+Markers are included without a severity prefix, as on the local console.
+The sink does not capture arbitrary Zephyr logs, driver output, or shell replies.
+It does not use `CONFIG_LOG_BACKEND_SEMIHOST` or change remote dictionary export.
+
+From the workspace root, build the reference NUCLEO-L496ZG image:
+
+```bash
+./k-fsw/tools/build.sh nucleo_l496zg --semihost
+./k-fsw/tools/debug.sh nucleo_l496zg
+```
+
+The option appends the profile to any existing `KFSW_EXTRA_CONF_FILE` list.
+It is off by default; `./k-fsw/tools/build.sh --help` describes the option.
+The option supports `nucleo_l496zg`, `nucleo_f746zg` and `frdm_k64f`;
+other targets are rejected before building.
+
+Use the NUCLEO's ST-Link through the OpenOCD runner. Before letting the image
+execute, issue these commands in GDB:
+
+```text
+monitor reset halt
+monitor arm semihosting enable
+monitor arm semihosting_fileio disable
+continue
+```
+
+OpenOCD handles terminal writes on its own output. Keep that output available
+for capture. The sink uses Zephyr's `semihost_write` with stdout handle 1, as
+the pinned Zephyr semihost log backend does. Zero unwritten bytes means success;
+partial writes, negative errors and invalid results are rejected without retry
+or recursive logging. Concurrent mirror attempts are skipped without waiting.
+
+The guard checks CMSIS DHCSR C_DEBUGEN on supported mainline Cortex-M targets.
+It skips calls when detached, in a handler, with interrupts masked, or in
+unprivileged thread mode. Cortex-M0/M0+, TrustZone configurations and non-Cortex-M
+targets return unsupported. History locks are released before mirroring.
+A probe attachment does **not** prove a semihost handler is active: enabling the
+handler before execution is mandatory. Detachment can race the guard and BKPT;
+keep the debugger connected for the whole opt-in session. A build option cannot
+make asynchronous debugger removal safe at every instruction boundary.
+
+Overhead is **unmeasured**. Each accepted mirror copies one bounded line and
+halts the core for a host write; host latency has no firmware bound. Measure
+log-call latency and missed deadlines on the intended debugger/board before
+using this in timing-sensitive debugging. The normal build disables both
+options, compiling out the sink and mirror, with no extra formatting or
+semihost calls. Do not enable this profile in flight builds.
+
+For HIL, record the exact ELF, probe, OpenOCD version and capture. Compare a
+warning, a long/truncated message and a boot marker against the UART console;
+confirm a detached boot skips the sink, and ISR/IRQ-masked logging never enters
+BKPT. Test handler-disabled execution only under controlled debugger recovery.
+Native tests cover sink policy, text preservation and failed/partial write
+results through linker wrappers; CMSIS register behavior and detach timing
+remain HIL-only. No physical acceptance or timing measurement is claimed here.
+
 ### Remote log
 
 `CONFIG_KFSW_LOG_REMOTE` serves the history, and the journal when
