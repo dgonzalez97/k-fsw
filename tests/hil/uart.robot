@@ -10,6 +10,8 @@ Debug Shell And Physical UART CSP Link Succeed
     Skip If    "UART CSP HIL RESULT: NOT RUN" in $result.stdout
     ...    ${result.stdout}
     HIL Command Should Pass    ${result}    UART CSP HIL RESULT: PASS
+    Should Contain    ${result.stdout}    CSP DEBUG RDP: PASS levels=0,1,2 refused=256,-1,text restored=yes
+    Should Contain    ${result.stdout}    CSP DEBUG PACKET: PASS values=0,1 refused=2 restored=yes
     Should Contain    ${result.stdout}    K-FSW status
     Response Should Contain    ${result.stdout}    CSP ping 2: success
     Response Should Contain    ${result.stdout}    CSP ping 1: success
@@ -28,6 +30,8 @@ F746 Physical UART CSP Link Succeeds
     Skip If    "UART CSP HIL RESULT: NOT RUN" in $result.stdout
     ...    ${result.stdout}
     HIL Command Should Pass    ${result}    UART CSP HIL RESULT: PASS
+    Should Contain    ${result.stdout}    CSP DEBUG RDP: PASS levels=0,1,2 refused=256,-1,text restored=yes
+    Should Contain    ${result.stdout}    CSP DEBUG PACKET: PASS values=0,1 refused=2 restored=yes
     Response Should Contain    ${result.stdout}    CSP ping 3: success
     Response Should Contain    ${result.stdout}    CSP ping 1: success
     Response Should Contain    ${result.stdout}    3:node_id = 3

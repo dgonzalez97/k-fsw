@@ -247,19 +247,20 @@ static int cmd_csp_debug(const struct shell *sh, size_t argc, char **argv)
 /* The dial itself is in kfsw-comms; this only parses it. */
 static int cmd_csp_rdp(const struct shell *sh, size_t argc, char **argv)
 {
-	unsigned long level;
-	char *end;
+	long level;
+	int parse_error = 0;
 
 	if (argc < 2U) {
 		shell_print(sh, "CSP RDP trace: %u", kfsw_csp_get_rdp_trace());
 		return 0;
 	}
-	level = strtoul(argv[1], &end, 10);
-	if ((*end != '\0') || (kfsw_csp_set_rdp_trace((uint8_t)level) != 0)) {
+	level = shell_strtol(argv[1], 10, &parse_error);
+	if ((parse_error != 0) || (level < 0L) || (level > 2L) ||
+	    (kfsw_csp_set_rdp_trace((uint8_t)level) != 0)) {
 		shell_error(sh, "level is 0 off, 1 errors, 2 with the protocol");
 		return -EINVAL;
 	}
-	shell_print(sh, "CSP RDP trace: %lu", level);
+	shell_print(sh, "CSP RDP trace: %ld", level);
 	return 0;
 }
 
