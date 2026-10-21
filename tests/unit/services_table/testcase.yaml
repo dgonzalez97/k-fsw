@@ -9,3 +9,24 @@ tests:
       - native_sim/native/64
     integration_platforms:
       - native_sim/native/64
+  kfsw.services.table.fallible_persistence:
+    tags: [unit, services, param, storage]
+    platform_allow: [native_sim/native/64]
+    integration_platforms: [native_sim/native/64]
+    extra_configs:
+      - CONFIG_KFSW_PARAM_PERSISTENCE=y
+    extra_args: EXTRA_CFLAGS=-DKFSW_TEST_FALLIBLE_PERSIST=1
+  kfsw.services.table.fallible_mixed:
+    tags: [unit, services, param, storage]
+    platform_allow: [native_sim/native/64]
+    integration_platforms: [native_sim/native/64]
+    extra_configs:
+      - CONFIG_KFSW_PARAM_PERSISTENCE=y
+    extra_args: EXTRA_CFLAGS=-DKFSW_TEST_FALLIBLE_MIXED=1
+  kfsw.services.table.text_persistence:
+    tags: [unit, services, param, storage]
+    platform_allow: [native_sim/native/64]
+    integration_platforms: [native_sim/native/64]
+    extra_configs:
+      - CONFIG_KFSW_PARAM_PERSISTENCE=y
+    extra_args: EXTRA_CFLAGS=-DKFSW_TEST_TEXT_PERSIST=1

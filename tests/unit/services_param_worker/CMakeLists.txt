@@ -10,6 +10,7 @@ list(APPEND ZEPHYR_EXTRA_MODULES
     "${KFSW_WORKSPACE_ROOT}/kfsw-comms/third_party/libcsp"
     "${KFSW_WORKSPACE_ROOT}/kfsw-comms"
     "${KFSW_WORKSPACE_ROOT}/kfsw-services"
+    "${KFSW_WORKSPACE_ROOT}/kfsw-modules"
 )
 
 set(CSP_REPRODUCIBLE_BUILDS ON CACHE BOOL "" FORCE)
@@ -27,3 +28,8 @@ target_include_directories(app PRIVATE
 target_link_libraries(app PRIVATE kfsw::services kfsw::comms kfsw_libparam)
 
 zephyr_link_libraries(-Wl,--wrap=csp_buffer_get)
+
+if(CONFIG_KFSW_BOTON_TEST)
+    target_link_libraries(app PRIVATE kfsw::boton_test)
+    zephyr_link_libraries(-Wl,--wrap=kfsw_boton_test_led_gpio_set)
+endif()

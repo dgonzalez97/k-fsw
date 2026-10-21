@@ -52,7 +52,8 @@ static const struct kfsw_param_definition fixture_definitions[] = {
 	{
 		.offset = OFFSET_LIMIT,
 		.type = KFSW_PARAM_U32,
-		.flags = KFSW_PARAM_FLAG_CONFIGURATION,
+		.flags = KFSW_PARAM_FLAG_CONFIGURATION |
+			 (IS_ENABLED(KFSW_TEST_FALLIBLE_MIXED) ? KFSW_PARAM_FLAG_PERSISTENT : 0),
 		.name = "fixture_limit",
 		.description = "Range-checked configuration value",
 		.value = &fixture_limit,
@@ -84,6 +85,94 @@ static const struct kfsw_param_definition_set fixture_set = {
 	.name = "fixture",
 	.definitions = fixture_definitions,
 	.count = ARRAY_SIZE(fixture_definitions),
+};
+
+static uint32_t applied_value;
+static int apply_calls;
+static int apply_error;
+static int notifications;
+static bool refuse_validation;
+
+static int validate_applied(const union kfsw_param_scalar *value)
+{
+	return refuse_validation ? -ERANGE : validate_limit(value);
+}
+
+static int apply_value(const union kfsw_param_scalar *value)
+{
+	apply_calls++;
+	if (apply_error != 0) {
+		return apply_error;
+	}
+	applied_value = value->u32;
+	return 0;
+}
+
+static void applied_changed(const union kfsw_param_scalar *value)
+{
+	ARG_UNUSED(value);
+	notifications++;
+}
+
+static const struct kfsw_param_definition fallible_definitions[] = {
+	{.offset = 0,
+	 .type = KFSW_PARAM_U32,
+	 .name = "applied_value",
+	 .value = &applied_value,
+	 .validate = validate_applied,
+	 .apply = apply_value,
+	 .changed = applied_changed,
+	 .flags = (IS_ENABLED(KFSW_TEST_FALLIBLE_PERSIST) || IS_ENABLED(KFSW_TEST_FALLIBLE_MIXED))
+			  ? KFSW_PARAM_FLAG_PERSISTENT
+			  : 0},
+	{.offset = 4, .type = KFSW_PARAM_I32, .name = "applied_mode", .value = &fixture_mode},
+};
+static const struct kfsw_param_definition_set fallible_set = {
+	.table = 22,
+	.name = "fallible",
+	.definitions = fallible_definitions,
+	.count = ARRAY_SIZE(fallible_definitions),
+};
+
+static char fixture_text[8];
+static uint8_t fixture_data[2];
+static int text_changes;
+static int data_changes;
+
+static void text_changed(const char *text)
+{
+	ARG_UNUSED(text);
+	text_changes++;
+}
+
+static void data_changed(const uint8_t *data, size_t size)
+{
+	ARG_UNUSED(data);
+	ARG_UNUSED(size);
+	data_changes++;
+}
+
+static const struct kfsw_param_definition text_definitions[] = {
+	{.offset = 0,
+	 .type = KFSW_PARAM_STRING,
+	 .name = "fixture_text",
+	 .value = fixture_text,
+	 .capacity = sizeof(fixture_text),
+	 .flags = IS_ENABLED(KFSW_TEST_TEXT_PERSIST) ? KFSW_PARAM_FLAG_PERSISTENT : 0,
+	 .changed_text = text_changed},
+	{.offset = 8,
+	 .type = KFSW_PARAM_DATA,
+	 .name = "fixture_data",
+	 .value = fixture_data,
+	 .capacity = sizeof(fixture_data),
+	 .flags = IS_ENABLED(KFSW_TEST_TEXT_PERSIST) ? KFSW_PARAM_FLAG_PERSISTENT : 0,
+	 .changed_data = data_changed},
+};
+static const struct kfsw_param_definition_set text_set = {
+	.table = 21,
+	.name = "text",
+	.definitions = text_definitions,
+	.count = ARRAY_SIZE(text_definitions),
 };
 
 static uint8_t file_image[TABLE_MAX_SIZE];
@@ -424,6 +513,157 @@ ZTEST(services_table, test_a_dumped_table_loads_back_unchanged)
 	zassert_equal(read_u32("fixture_limit"), 77U);
 }
 
+ZTEST(services_table, test_fallible_load_and_retryable_undo)
+{
+	struct kfsw_table_report report;
+	struct kfsw_table_status before, after;
+
+	apply_calls = 0;
+	notifications = 0;
+	applied_value = 11;
+	begin_file(22);
+	add_u32(0, 77);
+	write_file(1);
+	zassert_ok(kfsw_table_validate(TABLE_PATH, &report));
+	zassert_equal(apply_calls, 0, "file validation applied owner state");
+	zassert_ok(kfsw_table_load(TABLE_PATH, &report));
+	zassert_equal(applied_value, 77);
+	zassert_equal(apply_calls, 1);
+	zassert_equal(notifications, 1, "duplicate load notification");
+
+	zassert_ok(kfsw_table_get_status(&before));
+	begin_file(22);
+	add_u32(0, 88);
+	add_i32(4, 9);
+	write_file(2);
+	zassert_equal(kfsw_table_load(TABLE_PATH, &report), -EBADMSG);
+	zassert_equal(report.reason, -ENOTSUP);
+	zassert_equal(applied_value, 77);
+	zassert_equal(apply_calls, 1);
+
+	begin_file(22);
+	add_u32(0, LIMIT_MAX + 1);
+	write_file(1);
+	zassert_equal(kfsw_table_load(TABLE_PATH, &report), -EBADMSG);
+	zassert_equal(apply_calls, 1);
+
+	begin_file(22);
+	add_u32(0, 88);
+	write_file(1);
+	apply_error = -EIO;
+	zassert_equal(kfsw_table_load(TABLE_PATH, &report), -EIO);
+	zassert_equal(report.reason, -EIO);
+	zassert_equal(applied_value, 77);
+	zassert_equal(notifications, 1);
+	zassert_ok(kfsw_table_get_status(&after));
+	zassert_equal(after.loads, before.loads);
+	zassert_equal(after.state, KFSW_TABLE_LOADED);
+
+	refuse_validation = true;
+	zassert_equal(kfsw_table_revert(), -ERANGE);
+	zassert_equal(apply_calls, 2, "rejected undo applied owner state");
+	refuse_validation = false;
+	zassert_equal(kfsw_table_revert(), -EIO);
+	zassert_equal(applied_value, 77);
+	zassert_equal(notifications, 1);
+	apply_error = 0;
+	zassert_ok(kfsw_table_revert());
+	zassert_equal(applied_value, 11, "undo captured owner backing after application");
+	zassert_equal(apply_calls, 4);
+	zassert_equal(notifications, 2);
+}
+
+ZTEST(services_table, test_text_and_data_batch_notifies_once)
+{
+	const uint8_t text[] = "new";
+	const uint8_t data[] = {3, 4};
+
+	strcpy(fixture_text, "old");
+	fixture_data[0] = 1;
+	fixture_data[1] = 2;
+	text_changes = 0;
+	data_changes = 0;
+	begin_file(21);
+	add_entry(0, 7, text, sizeof(text));
+	add_entry(8, 8, data, sizeof(data));
+	write_file(2);
+	zassert_ok(kfsw_table_load(TABLE_PATH, NULL));
+	zassert_str_equal(fixture_text, "new");
+	zassert_mem_equal(fixture_data, data, sizeof(data));
+	zassert_equal(text_changes, 1);
+	zassert_equal(data_changes, 1);
+	zassert_ok(kfsw_table_revert());
+	zassert_str_equal(fixture_text, "old");
+	zassert_equal(fixture_data[0], 1);
+	zassert_equal(fixture_data[1], 2);
+	zassert_equal(text_changes, 2);
+	zassert_equal(data_changes, 2);
+}
+
+#if defined(KFSW_TEST_FALLIBLE_PERSIST) || defined(KFSW_TEST_FALLIBLE_MIXED)
+ZTEST(services_table, test_fallible_snapshot_and_defaults)
+{
+	struct kfsw_param_value value = {
+		.type = KFSW_PARAM_U32, .size = sizeof(uint32_t), .scalar.u32 = 41};
+
+	apply_calls = 0;
+	notifications = 0;
+	zassert_ok(kfsw_param_set("applied_value", &value));
+	zassert_ok(kfsw_param_persist_save());
+	value.scalar.u32 = 52;
+	zassert_ok(kfsw_param_set("applied_value", &value));
+	if (IS_ENABLED(KFSW_TEST_FALLIBLE_MIXED)) {
+		set_u32("fixture_limit", 25);
+		zassert_equal(kfsw_param_persist_load(), -ENOTSUP);
+		zassert_equal(kfsw_param_restore_defaults(), -ENOTSUP);
+		zassert_equal(applied_value, 52);
+		zassert_equal(fixture_limit, 25);
+		zassert_equal(apply_calls, 2);
+		zassert_equal(notifications, 2);
+		return;
+	}
+	apply_error = -EIO;
+	zassert_equal(kfsw_param_persist_load(), -EIO);
+	zassert_equal(kfsw_param_restore_defaults(), -EIO);
+	zassert_equal(applied_value, 52);
+	zassert_equal(apply_calls, 4);
+	zassert_equal(notifications, 2);
+	apply_error = 0;
+	zassert_ok(kfsw_param_persist_load());
+	zassert_equal(applied_value, 41);
+	zassert_ok(kfsw_param_restore_defaults());
+	zassert_equal(applied_value, 0);
+	zassert_equal(apply_calls, 6);
+	zassert_equal(notifications, 4);
+}
+#endif
+
+#if defined(KFSW_TEST_TEXT_PERSIST)
+ZTEST(services_table, test_text_and_data_snapshot_and_defaults)
+{
+	strcpy(fixture_text, "saved");
+	fixture_data[0] = 3;
+	fixture_data[1] = 4;
+	text_changes = 0;
+	data_changes = 0;
+	zassert_ok(kfsw_param_persist_save());
+	strcpy(fixture_text, "other");
+	fixture_data[0] = 9;
+	zassert_ok(kfsw_param_persist_load());
+	zassert_str_equal(fixture_text, "saved");
+	zassert_equal(fixture_data[0], 3);
+	zassert_equal(fixture_data[1], 4);
+	zassert_equal(text_changes, 1);
+	zassert_equal(data_changes, 1);
+	zassert_ok(kfsw_param_restore_defaults());
+	zassert_str_equal(fixture_text, "");
+	zassert_equal(fixture_data[0], 0);
+	zassert_equal(fixture_data[1], 0);
+	zassert_equal(text_changes, 2);
+	zassert_equal(data_changes, 2);
+}
+#endif
+
 static void table_before(void *fixture)
 {
 	struct kfsw_table_status status;
@@ -443,13 +683,14 @@ static void table_before(void *fixture)
 
 static void *table_setup(void)
 {
-	const struct kfsw_param_definition_set *const sets[] = {&fixture_set,
-								&kfsw_table_param_definitions};
+	const struct kfsw_param_definition_set *const sets[] = {
+		&fixture_set, &fallible_set, &text_set, &kfsw_table_param_definitions};
 
 	erase_storage_partition();
 	zassert_ok(kfsw_storage_mount());
 	(void)fs_mkdir(TABLE_DIRECTORY);
 	zassert_ok(kfsw_param_init(sets, ARRAY_SIZE(sets)));
+	zassert_equal(apply_calls, 0, "registry initialization applied hardware");
 	return NULL;
 }
 
