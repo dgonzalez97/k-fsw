@@ -1,0 +1,14 @@
+--- a/subsys/kvss/zms/zms.c
++++ b/subsys/kvss/zms/zms.c
+@@ -763,7 +763,10 @@
+ 
+ 	zms_ate_crc8_update(&close_ate);
+ 
+-	(void)zms_flash_ate_wrt(fs, &close_ate);
++	rc = zms_flash_ate_wrt(fs, &close_ate);
++	if (rc) {
++		return rc;
++	}
+ 
+ 	zms_sector_advance(fs, &fs->ate_wra);
+ 

@@ -11,6 +11,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 
 import yaml
 from west.manifest import Manifest
@@ -62,8 +63,8 @@ def source_state(frozen):
             raise ValueError(f"{name}: checkout differs from frozen revision")
         changed = run("git", "diff", "--name-only", "HEAD", cwd=path).split()
         changed += run("git", "ls-files", "--others", "--exclude-standard", cwd=path).split()
+        patched = patched_files(name)
         if changed:
-            patched = patched_files(name)
             unexplained = sorted(set(changed) - patched)
             if unexplained:
                 raise ValueError(f"{name}: source tree is dirty: {', '.join(unexplained)}")
@@ -74,13 +75,36 @@ def source_state(frozen):
 def patched_files(name):
     if name != "zephyr":
         return set()
-    patch = REPO / "patches/zephyr/shell-tab-help.patch"
+    patches = [REPO / "patches/zephyr" / filename for filename in (
+        "shell-tab-help.patch", "zms-close-error.patch",
+    )]
     run(str(REPO / "tools/zephyr-patch.sh"), "--check", str(WORKSPACE / "zephyr"))
-    return {
+    files = {
         line[6:].strip()
+        for patch in patches
         for line in patch.read_text().splitlines()
         if line.startswith("+++ b/")
     }
+    # Reconstruct the permitted result from HEAD; path allowlisting alone
+    # would also admit unrelated edits inside a patched file.
+    with tempfile.TemporaryDirectory(prefix="kfsw-release-patches-") as directory:
+        fixture = Path(directory)
+        for filename in files:
+            target = fixture / filename
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(subprocess.check_output(
+                ["git", "show", f"HEAD:{filename}"], cwd=WORKSPACE / "zephyr"))
+        for patch in patches:
+            reverse = subprocess.run(
+                ["git", "apply", "--check", "--reverse", str(patch)], cwd=fixture,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            if reverse.returncode != 0:
+                run("git", "apply", str(patch), cwd=fixture)
+        for filename in files:
+            if (fixture / filename).read_bytes() != (WORKSPACE / "zephyr" / filename).read_bytes():
+                raise ValueError(f"zephyr: source differs from approved patches: {filename}")
+    return files
 
 
 def check_inputs():
