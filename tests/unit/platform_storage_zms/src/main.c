@@ -19,7 +19,7 @@
 #define SIZE KFSW_STORAGE_ZMS_SECTOR_SIZE
 #define COUNT CONFIG_KFSW_STORAGE_ZMS_SECTOR_COUNT
 #define PHYSICAL_SIZE 0x40000U
-#define PARTITION DT_CHOSEN(kfsw_storage_partition)
+#define STORAGE_PARTITION DT_CHOSEN(kfsw_storage_partition)
 
 static const struct flash_area *area;
 static uint8_t *memory;
@@ -162,7 +162,7 @@ static void *setup(void)
 {
 	size_t size;
 
-	zassert_ok(flash_area_open(DT_FIXED_PARTITION_ID(PARTITION), &area));
+	zassert_ok(flash_area_open(DT_FIXED_PARTITION_ID(STORAGE_PARTITION), &area));
 	memory = flash_simulator_get_memory(area->fa_dev, &size);
 	zassert_not_null(memory);
 	zassert_true(size >= area->fa_off + area->fa_size);
