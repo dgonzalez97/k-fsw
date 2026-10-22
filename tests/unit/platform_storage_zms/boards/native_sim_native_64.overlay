@@ -1,0 +1,15 @@
+/ {
+	chosen {
+		kfsw,storage-partition = &storage_partition;
+	};
+};
+
+&flash0 {
+	erase-block-size = <0x40000>;
+	write-block-size = <4>;
+};
+
+&storage_partition {
+	label = "kfsw-zms-test";
+	reg = <0x80000 0x80000>;
+};
