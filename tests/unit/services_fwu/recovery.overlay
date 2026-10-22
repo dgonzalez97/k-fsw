@@ -1,0 +1,6 @@
+/ {
+	chosen {
+		zephyr,code-partition = &slot1_partition;
+		kfsw,fwu-partition = &slot0_partition;
+	};
+};

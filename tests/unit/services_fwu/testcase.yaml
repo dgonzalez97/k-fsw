@@ -8,3 +8,11 @@ tests:
       - native_sim/native/64
     integration_platforms:
       - native_sim/native/64
+  kfsw.services.fwu.recovery:
+    tags: [unit, services, fwu]
+    platform_allow: [native_sim/native/64]
+    extra_args:
+      - DTC_OVERLAY_FILE="app.overlay;recovery.overlay"
+    extra_configs:
+      - CONFIG_KFSW_FWU_RECOVERY=y
+      - CONFIG_KFSW_FWU_SLOT_OFFSET_SECTORS=0
