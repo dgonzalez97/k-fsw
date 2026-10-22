@@ -2,6 +2,8 @@
 set -Eeuo pipefail
 
 repo_dir="$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")"
+# CI fetches the pinned commit without necessarily fetching its tag.
+zephyr_revision=684c9e8f32e4373a21098559f748f06915f950c9
 if [[ $# -gt 1 ]]; then
 	echo "Usage: $0 [pristine-shell.c]" >&2
 	exit 2
@@ -20,14 +22,14 @@ cp "$repo_dir/tools/ci/all.sh" "$work_dir/k-fsw/tools/ci/"
 cp "$repo_dir/patches/zephyr/"*.patch "$work_dir/k-fsw/patches/zephyr/"
 if [[ $# == 1 ]]; then
 	cp "$1" "$work_dir/zephyr/subsys/shell/shell.c"
-elif ! git -C "$repo_dir/../zephyr" show v4.4.0:subsys/shell/shell.c \
+elif ! git -C "$repo_dir/../zephyr" show "$zephyr_revision:subsys/shell/shell.c" \
 	> "$work_dir/zephyr/subsys/shell/shell.c"; then
 	echo 'ERROR: cannot read shell.c at the pinned Zephyr revision; pass a pristine shell.c' >&2
 	exit 1
 fi
 cp "$work_dir/zephyr/subsys/shell/shell.c" "$work_dir/pristine.c"
-git -C "$repo_dir/../zephyr" show v4.4.0:subsys/kvss/zms/zms.c > "$work_dir/zephyr/subsys/kvss/zms/zms.c"
-git -C "$repo_dir/../zephyr" show v4.4.0:VERSION > "$work_dir/zephyr/VERSION"
+git -C "$repo_dir/../zephyr" show "$zephyr_revision:subsys/kvss/zms/zms.c" > "$work_dir/zephyr/subsys/kvss/zms/zms.c"
+git -C "$repo_dir/../zephyr" show "$zephyr_revision:VERSION" > "$work_dir/zephyr/VERSION"
 cp "$work_dir/zephyr/subsys/kvss/zms/zms.c" "$work_dir/pristine-zms.c"
 mkdir -p "$work_dir/expected/subsys/kvss/zms"
 cp "$work_dir/pristine-zms.c" "$work_dir/expected/subsys/kvss/zms/zms.c"
