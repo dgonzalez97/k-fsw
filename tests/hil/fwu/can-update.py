@@ -248,7 +248,7 @@ def run_test(arguments, output):
         compare(ground, "/before.bin", "/readback.bin")
         if arguments.stack_check:
             print("CAN FWU: PARAM read and stack margins", flush=True)
-            ground.run(f"param list {FLIGHT}", "param_requests_dropped", timeout=30)
+            ground.run(f"param listall {FLIGHT}", "param_requests_dropped", timeout=30)
             ground.run(f"param get {FLIGHT} param_requests_dropped", f"{FLIGHT}:param_requests_dropped = ")
             stacks = board.run("kernel thread stacks", "unused")
             (output / "stacks.txt").write_text(stacks)

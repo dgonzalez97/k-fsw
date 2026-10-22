@@ -16,6 +16,7 @@ git -C k-fsw pull --ff-only
 . .venv/bin/activate
 west manifest --validate
 west update
+./k-fsw/tools/zephyr-patch.sh
 ```
 
 Dependencies normally end up detached at their manifest SHA. Create a branch

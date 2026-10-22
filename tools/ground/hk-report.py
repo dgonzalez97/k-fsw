@@ -69,7 +69,7 @@ def cmd_define(report, _args):
 
 
 def cmd_check(report, args):
-    """Compare the file with a `param list` capture from a node.
+    """Compare the file with a `param listall` capture from a node.
 
     An entry whose table or offset doesn't match the node would still decode,
     with the wrong values.
@@ -83,7 +83,7 @@ def cmd_check(report, args):
             seen[(match.group(1), int(match.group(2), 16))] = (match.group(3), match.group(4))
 
     if not seen:
-        raise SystemExit(f"{args.capture}: no parameter rows found; is this `param list` output?")
+        raise SystemExit(f"{args.capture}: no parameter rows found; is this `param listall` output?")
 
     problems = []
     for entry in report["entries"]:
@@ -267,8 +267,8 @@ def main():
     xtce = commands.add_parser("xtce", help="write the Yamcs mission database")
     xtce.add_argument("-o", "--output", default="-", help="destination, or - for stdout")
 
-    check = commands.add_parser("check", help="compare against a node's `param list` output")
-    check.add_argument("capture", help="file holding `param list` output")
+    check = commands.add_parser("check", help="compare against a node's `param listall` output")
+    check.add_argument("capture", help="file holding `param listall` output")
 
     args = parser.parse_args()
     report = load(args.definition)

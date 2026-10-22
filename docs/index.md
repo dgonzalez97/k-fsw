@@ -56,7 +56,7 @@ From a configured west workspace:
 ./k-fsw/tools/kfsw-linux run
 ```
 
-After `@READY`, try `status`, `param tables`, `storage info`, and `csp info`.
+After `@READY`, try `status`, `param whichtables`, `storage info`, and `csp info`.
 See @ref getting_started for workspace setup.
 
 ## Development

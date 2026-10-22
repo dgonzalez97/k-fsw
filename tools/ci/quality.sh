@@ -8,6 +8,8 @@ KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
 
 clang_format=""
 
+bash "$KFSW_REPO_DIR/tests/build-options-test.sh"
+
 if [[ -x "$KFSW_WORKSPACE_ROOT/.venv/bin/clang-format" ]]; then
 	clang_format="$KFSW_WORKSPACE_ROOT/.venv/bin/clang-format"
 elif command -v clang-format >/dev/null 2>&1; then
@@ -36,6 +38,10 @@ mapfile -d '' format_sources < <(
 )
 
 format_sources+=(
+	"$KFSW_WORKSPACE_ROOT/kfsw-platform/include/kfsw/platform/semihost.h"
+	"$KFSW_WORKSPACE_ROOT/kfsw-platform/src/semihost.c"
+	"$KFSW_WORKSPACE_ROOT/kfsw-platform/src/semihost_internal.h"
+	"$KFSW_WORKSPACE_ROOT/kfsw-platform/src/semihost_target.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-platform/include/kfsw/platform/storage.h"
 	"$KFSW_WORKSPACE_ROOT/kfsw-platform/src/storage.c"
 	"$KFSW_WORKSPACE_ROOT/kfsw-platform/include/kfsw/platform/watchdog.h"

@@ -15,6 +15,8 @@ if [[ -f "$KFSW_WORKSPACE_ROOT/.venv/bin/activate" ]]; then
 	source "$KFSW_WORKSPACE_ROOT/.venv/bin/activate"
 fi
 
+"$KFSW_REPO_DIR/tools/zephyr-patch.sh" --check
+"$KFSW_REPO_DIR/tests/zephyr-patch.sh"
 west manifest --validate
 "$KFSW_CI_DIR/build.sh"
 # Against the image build.sh just made, which carries no test fixtures. The

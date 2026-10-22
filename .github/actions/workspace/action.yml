@@ -41,7 +41,7 @@ runs:
 
     - name: Apply the workspace patches
       shell: bash
-      run: west patch apply
+      run: ./k-fsw/tools/zephyr-patch.sh
 
     - name: Install system packages
       if: inputs.packages != ''

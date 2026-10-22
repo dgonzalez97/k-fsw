@@ -420,7 +420,7 @@ report=k-fsw/ground-station/reports/nucleo-temperature.yaml
     -o k-fsw/ground-station/yamcs/src/main/yamcs/mdb/kfsw-hk.xml
 ```
 
-`hk-report.py check` compares the file with a node's `param list`, which
+`hk-report.py check` compares the file with a node's `param listall`, which
 catches a parameter that moved.
 
 ### Bridge datagrams

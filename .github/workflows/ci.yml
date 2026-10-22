@@ -72,6 +72,9 @@ jobs:
       - name: Check source quality
         run: ./k-fsw/tools/ci/quality.sh
 
+      - name: Check workspace patch and release regressions
+        run: ./k-fsw/tests/zephyr-patch.sh
+
   unit:
     name: UNIT / Twister
     runs-on: ubuntu-24.04

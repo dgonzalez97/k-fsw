@@ -46,8 +46,8 @@ run_image()
 	local output_log="$3"
 
 	printf '%s\n' \
-		'param tables' \
-		'param list' \
+		'param whichtables' \
+		'param listall' \
 		'param get press_count' \
 		'param get last_press_s' \
 		'param get led_green' \

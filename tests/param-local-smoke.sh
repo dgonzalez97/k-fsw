@@ -5,14 +5,14 @@ KFSW_PARAM_LOCAL_TOOL="$(readlink -f "${BASH_SOURCE[0]}")"
 KFSW_TESTS_DIR="$(dirname "$KFSW_PARAM_LOCAL_TOOL")"
 KFSW_REPO_DIR="$(dirname "$KFSW_TESTS_DIR")"
 KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
-param_local_build_dir="$KFSW_WORKSPACE_ROOT/build/tests/param-local"
+param_local_build_dir="${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/tests/param-local"
 executable="$param_local_build_dir/zephyr/zephyr.exe"
-work_dir="$(mktemp -d /tmp/kfsw-param-local.XXXXXX)"
+work_dir="$(mktemp -d "${TMPDIR:-/tmp}/kfsw-param-local.XXXXXX")"
 capture_file="$work_dir/output.log"
 
 cleanup()
 {
-	rm -rf -- "$work_dir"
+	[[ "${KFSW_KEEP_TEST_OUTPUT:-0}" == 1 ]] || rm -rf -- "$work_dir"
 }
 
 fail()
@@ -52,7 +52,11 @@ if find "$param_local_build_dir" -name 'libcsp.a' -print -quit | grep -q .; then
 fi
 
 printf '%s\n' \
-	'param list' \
+	'param -h' \
+	'param save -h' \
+	'param whichtables' \
+	'param listall' \
+	'param whichtables' \
 	'param get test_u32' \
 	'param set test_u32 1234' \
 	'param get test_u32' \
@@ -71,9 +75,13 @@ printf '%s\n' \
 	"$executable" --uart_stdinout --stop_at=1.0 --no-color \
 		-flash="$work_dir/flash.bin" >"$capture_file" 2>&1
 
+expect 'Save persistent parameters to storage' "persistent save help missing"
+expect 'Every parameter, with its value: listall' "local listall help missing"
+expect 'The tables, without values: whichtables' "local whichtables help missing"
 expect 'Parameter table initialized' "the local table did not initialize"
-expect '0:0 node_id' "param list omitted node_id"
-expect '0:4 test_float' "param list omitted test_float"
+expect 'board       0x00  node_id' "param listall omitted node_id"
+expect 'test        0x10  test_float' "param listall omitted test_float"
+expect '  1  core     board' "param whichtables omitted the board table"
 expect 'test_u32 = 42' "the compiled unsigned default was not visible"
 expect 'test_u32 = 1234' "local unsigned set/get failed"
 expect "set: parameter 'node_id' is read-only" "read-only rejection failed"

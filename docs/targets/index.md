@@ -12,8 +12,8 @@ example `rpi_pico_w` maps to `rpi_pico/rp2040/w`.
 | --- | --- | --- | --- |
 | `linux` | `native_sim/native/64` | Shell, storage, parameters, persistence, CSP UART/KISS, remote parameters, FTP | Software tests in CI |
 | `nucleo_l496zg` | `nucleo_l496zg` | Same as Linux; shell on ST-LINK, CSP on USART3 | CI build; boot, storage, UART/KISS, CSP, remote parameters and FTP on the bench |
-| `frdm_k64f` | `frdm_k64f/mk64f12` | Shell only | Boot and shell on the board |
-| `rpi_pico_w` | `rpi_pico/rp2040/w` | USB CDC ACM shell only | Boot and shell on the board |
+| `frdm_k64f` | `frdm_k64f/mk64f12` | Shell only; full support deferred to tag2.0 | Boot and shell on the board |
+| `rpi_pico_w` | `rpi_pico/rp2040/w` | Full service software composition; USB shell, UART0 CSP and persistent LittleFS | Recorded software build success; service HIL NOT RUN |
 
 Only Linux and the NUCLEO are built in CI.
 
@@ -28,7 +28,8 @@ board target, so `csp ident` names the hardware too.
 
 In this recording the FRDM and the Pico run bench configurations with CSP, on
 CAN and behind a UHF radio. The `frdm_k64f` and `rpi_pico_w` targets in the
-table are shell only.
+table now have different defaults: FRDM remains shell only, while Pico composes
+the services below. The recording does not verify the Pico default image.
 
 ## KFSW-Linux
 
@@ -206,7 +207,7 @@ radio.
 
 The `frdm_k64f` target maps to `frdm_k64f/mk64f12` and uses the OpenSDA serial
 console and the OpenOCD runner. CSP, parameters, persistence, FTP, storage and
-the filesystem are disabled.
+the filesystem are disabled. Full FRDM service support is deferred to tag2.0.
 
 ```bash
 ./k-fsw/tools/build.sh frdm_k64f
@@ -219,25 +220,120 @@ The test builds, flashes, waits for `kfsw:~$` and runs `status`, `version` and
 
 ## Raspberry Pi Pico W
 
-The `rpi_pico_w` target maps to `rpi_pico/rp2040/w`. Its overlay puts the
-console and shell on USB CDC ACM, and the shell waits for DTR so no output is
-lost before a terminal is open. CSP, parameters, persistence, FTP and storage
-are not enabled.
+The `rpi_pico_w` target maps to `rpi_pico/rp2040/w`. Its default is a full
+service software composition: local and CSP parameters, automatic parameter
+persistence, table files, FTP, command service with retry, events and persistent
+journal, HK collection, sample files and beacons, retained and remote logs,
+last words, allowlisted remexec, FBO and scheduling, limits, resource monitoring,
+ground watchdog, hardware watchdog and health supervision. These reuse the
+existing owners and application startup sequence. Beacons need a configured
+report interval before they transmit.
+
+The USB CDC ACM console and shell remain separate from CSP. The shell waits
+for DTR. UART0 uses the board's unchanged `uart0_default` pinctrl at 115200
+8N1, without flow control. Pico is CSP v2 node 3, with peer 1 and route
+`0/0 KISS`; other nodes on the bench must have distinct addresses and use v2.
+
+| Connection | Pico W header | Peer connection |
+| --- | --- | --- |
+| CSP UART0 TX | GP0, physical pin 1 | 3.3 V UART RX |
+| CSP UART0 RX | GP1, physical pin 2 | 3.3 V UART TX |
+| Common ground | GND, physical pin 3 | UART GND |
+| Debug shell | USB CDC ACM | Host USB terminal with DTR |
+
+### Flash and RAM contract
+
+The board has 2 MiB of external XIP flash, mapped at `0x10000000`. Partition
+offsets below are relative to that address; ranges are half open.
+
+| Region | Offset range | Size |
+| --- | --- | --- |
+| Zephyr RP2040 boot2 | `[0x000000, 0x000100)` | 256 B |
+| Application `code_partition` | `[0x000100, 0x1c0000)` | `0x1bff00` B (1,834,752 B) |
+| Persistent LittleFS | `[0x1c0000, 0x200000)` | 256 KiB |
+
+The overlay shrinks the existing board code partition and leaves boot2 intact.
+`CONFIG_USE_DT_CODE_PARTITION=y` makes Zephyr generate load offset `0x100` and
+load size `0x1bff00`; its linker limits the XIP application to that region.
+boot2 stays at `0x10000000`, code starts at `0x10000100`, and storage starts at
+`0x101c0000`. The storage partition is aligned to the 4096 B erase sectors.
+Zephyr's RP2040 flash driver uses the Pico SDK RAM/ROM flash routines and a
+256 B staging buffer while interrupts are locked. No filesystem is placed
+over the application or boot2. Flash stalls can delay UART reception and
+watchdog feeding; their effects under concurrent transfers and autosave need
+physical measurement.
+
+The platform owns the mount at `/kfsw`: erased media is formatted on first
+mount, existing media is mounted without formatting, and non-erased corrupt
+media is refused. Parameter snapshots, journal, HK files and FTP share this
+finite volume. Free-space and full-volume refusals still apply; capacity is
+not a promise that every configured ring and upload can coexist.
+
+The existing scratch mount `/kfsw/tmp` uses a separate 32 x 512 B RAM disk,
+formatted every boot. Its 16 KiB buffer is allocated by Zephyr in the normal
+SRAM region, so the linker counts it against the RP2040's 264 KiB (270,336 B)
+SRAM. It leaves at most 248 KiB (253,952 B) for all other static data, stacks,
+filesystem caches, driver state and heaps. Main stack is 2048 B, shell stack
+3072 B, and remexec adds another 3072 B shell stack plus its default 3072 B
+server stack. The libcsp startup heap reservation is 2048 B; CSP buffer,
+connection RX queue and QFIFO counts are each 32. Service stack and table
+capacities retain their defaults; they have not been reduced to fit.
+
+Build acceptance must inspect `.config`, `zephyr.dts`, `linker.cmd`, the map
+and `ram_report` before accepting fit. Resource monitoring is enabled for later
+stack measurements. The latest verified prior report records 299,440 B flash
+and 263,776 B RAM,
+leaving 6,560 B static RAM headroom. This is a tight margin for that recorded
+composition, not a new measurement of the current tree. Reproduce the exact
+configuration and reports before using those figures for acceptance. Runtime
+stack margin and physical behavior remain unverified.
+
+The watchdog starts after service initialization with an 8000 ms timeout,
+500 ms health checks and a 4000 ms application deadline. This is below the
+RP2040 driver's approximately 8388 ms maximum after erratum RP2040-E1.
+The RP2040 RTC is selected for the existing CSP clock adapter; retention
+across resets and power loss is not claimed.
+
+### Scope and verification
+
+Full service composition does not mean parity with every optional profile.
+MCUboot, FWU, golden recovery and scrub are unsupported by this layout: no
+secondary, golden or bootloader partitions are reserved. They need a separate
+shared application/bootloader layout contract. The STM32 supply-voltage last
+words detector is unavailable on RP2040. CAN, radio crypto, Wi-Fi transport and
+example device modules are not composed. Float parameters are disabled as on
+the reference boards; the composed tables do not declare them.
+
+The delivered board configuration composes the services listed above. Prior
+software builds succeeded; this documentation update runs no new build.
+Earlier physical evidence covers USB shell bring-up only. Pico service HIL is
+**NOT RUN**. Before physical acceptance,
+verify USB shell and boot markers, storage write/reset/read, parameter
+save/reset/restore, bidirectional CSP ping and effective routes, remote PARAM,
+FTP integrity and full-volume refusal, HK/log reads, remexec allowlist refusal,
+FBO/limits actions and watchdog recovery. Record UART error/drop counters while
+flash is being written. A corrupt non-erased filesystem must remain unformatted.
+
+From the isolated repository root, build and inspect the generated reports:
 
 ```bash
-./k-fsw/tools/build.sh rpi_pico_w
-KFSW_SERIAL=/dev/serial/by-id/<pico-console> \
-  ./k-fsw/tests/hil/shell-smoke.sh rpi_pico_w
+repo="$PWD"
+export KFSW_OUTPUT_ROOT="$repo/build/pico-services"
+KFSW_PRISTINE=always "$repo/tools/build.sh" linux
+KFSW_PRISTINE=always "$repo/tools/build.sh" rpi_pico_w
+west build -d "$KFSW_OUTPUT_ROOT/rpi_pico_w" -t ram_report
+west build -d "$KFSW_OUTPUT_ROOT/rpi_pico_w" -t rom_report
 ```
 
-The target uses Zephyr's UF2 runner. If the UF2 has to be copied by hand, for
-example through usbipd, flash it first and run the test with `KFSW_FLASH=0`:
-
-```bash
-KFSW_FLASH=0 \
-KFSW_SERIAL=/dev/serial/by-id/<pico-console> \
-  ./k-fsw/tests/hil/shell-smoke.sh rpi_pico_w
-```
+Hosted storage, persistence, CSP, FTP, HK, remexec, FBO and limits regressions
+must use the Linux executable from that output root. Builds and hosted tests
+are not rerun by this documentation update; recorded Pico build success does
+not establish hosted regression or physical acceptance. Existing NUCLEO-only
+physical scripts retain
+their restrictions: Pico flash and USB console contracts have not been added
+to those service tests. `tests/hil/shell-smoke.sh rpi_pico_w` remains only a
+shell bring-up check, using the UF2 runner and a stable USB serial identity;
+manual UF2 installation can use its existing `KFSW_FLASH=0` path.
 
 ## Shell test and target files
 

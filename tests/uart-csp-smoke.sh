@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+source "$(dirname "$0")/support/csp-debug-checks.sh"
+
 target=nucleo_l496zg
 ftdi_device=""
 debug_serial=""
@@ -41,9 +43,27 @@ debug_capture_pid=""
 bridge_pid=""
 debug_stty=""
 ftdi_stty=""
+original_rdp=""
+original_packet_trace=""
+
+send_debug()
+{
+	printf '%s\r\n' "$@" >"$debug_serial"
+}
+
+send_linux()
+{
+	printf '%s\n' "$@" >&3
+}
 
 cleanup()
 {
+	# Local shell restoration also works when the CSP link has failed.
+	if [[ -n "$original_rdp" || -n "$original_packet_trace" ]]; then
+		timeout 2s bash -c 'printf "%s\r\n" "$@" >"$0"' "$debug_serial" \
+			${original_rdp:+"csp rdp $original_rdp"} \
+			${original_packet_trace:+"param set packet_trace $original_packet_trace"} || true
+	fi
 	[[ -n "$bridge_pid" ]] && kill "$bridge_pid" 2>/dev/null || true
 	[[ -n "$linux_pid" ]] && kill "$linux_pid" 2>/dev/null || true
 	[[ -n "$debug_capture_pid" ]] && \
@@ -238,6 +258,8 @@ fi
 
 config="$nucleo_build_dir/zephyr/.config"
 [[ -r "$config" ]] || fail "built configuration is missing: $config"
+grep -qx 'CONFIG_KFSW_DEBUG_SHELL=y' "$config" || \
+	skip "CSP debug shell is disabled for $target"
 node="$(sed -n 's/^CONFIG_KFSW_CSP_ADDRESS=//p' "$config")"
 board="$(sed -n 's/^CONFIG_BOARD_TARGET="\(.*\)"/\1/p' "$config")"
 [[ "$node" =~ ^[0-9]+$ && -n "$board" ]] || fail "built node or board identity is missing"
@@ -339,6 +361,71 @@ wait_for_output "$work_dir/nucleo.log" "CSP ping 1: success" \
 wait_for_output "$work_dir/nucleo.log" "UART CSP test: PASS" \
 	"$debug_capture_pid" || fail "NUCLEO UART transport test did not pass"
 
+# Keep route and interface evidence on both sides of the physical link.
+csp_exchange "$work_dir/nucleo.log" "$debug_capture_pid" send_debug \
+	'csp routes' || fail "board routes did not complete"
+csp_exchange "$work_dir/linux.log" "$linux_pid" send_linux \
+	'csp routes' || fail "host routes did not complete"
+for command in 'csp ident' 'csp interfaces' 'comms uart info'; do
+	csp_exchange "$work_dir/nucleo.log" "$debug_capture_pid" send_debug \
+		"$command" || fail "board evidence did not complete: $command"
+	csp_exchange "$work_dir/linux.log" "$linux_pid" send_linux \
+		"$command" || fail "host evidence did not complete: $command"
+done
+
+csp_exchange "$work_dir/nucleo.log" "$debug_capture_pid" send_debug \
+	'csp rdp' || fail "cannot read original RDP level"
+original_rdp="$(sed -n 's/^CSP RDP trace: \([0-2]\)$/\1/p' <<<"$CSP_REPLY")"
+[[ "$original_rdp" =~ ^[0-2]$ ]] || fail "invalid original RDP level"
+for level in 0 1 2; do
+	csp_exchange "$work_dir/nucleo.log" "$debug_capture_pid" send_debug \
+		"csp rdp $level" && csp_reply_has "CSP RDP trace: $level" || \
+		fail "RDP level $level was not accepted"
+	csp_exchange "$work_dir/nucleo.log" "$debug_capture_pid" send_debug \
+		'csp rdp' && csp_reply_has "CSP RDP trace: $level" || \
+		fail "RDP level $level did not read back"
+done
+for invalid in 256 -1 text; do
+	csp_refusal_check "$work_dir/nucleo.log" "$debug_capture_pid" send_debug \
+		"csp rdp $invalid" 'csp rdp' \
+		'level is 0 off, 1 errors, 2 with the protocol' \
+		"CSP RDP trace: $invalid" 'CSP RDP trace: 2' || \
+		fail "RDP refusal/preservation failed for $invalid"
+done
+csp_exchange "$work_dir/nucleo.log" "$debug_capture_pid" send_debug \
+	"csp rdp $original_rdp" && csp_reply_has "CSP RDP trace: $original_rdp" || \
+	fail "RDP restoration failed"
+csp_exchange "$work_dir/nucleo.log" "$debug_capture_pid" send_debug \
+	'csp rdp' && csp_reply_has "CSP RDP trace: $original_rdp" || \
+	fail "restored RDP level did not read back"
+original_rdp=""
+echo 'CSP DEBUG RDP: PASS levels=0,1,2 refused=256,-1,text restored=yes'
+
+csp_exchange "$work_dir/linux.log" "$linux_pid" send_linux \
+	"param get $node packet_trace" || fail "cannot read original packet trace"
+original_packet_trace="$(sed -n "s/^$node:packet_trace = \([01]\)$/\1/p" <<<"$CSP_REPLY")"
+[[ "$original_packet_trace" =~ ^[01]$ ]] || fail "invalid original packet trace"
+for value in 0 1; do
+	csp_exchange "$work_dir/linux.log" "$linux_pid" send_linux \
+		"param set $node packet_trace $value" && \
+		csp_reply_has "$node:packet_trace = $value" || fail "packet trace set failed"
+	csp_exchange "$work_dir/linux.log" "$linux_pid" send_linux \
+		"param get $node packet_trace" && \
+		csp_reply_has "$node:packet_trace = $value" || fail "packet trace readback failed"
+done
+csp_refusal_check "$work_dir/linux.log" "$linux_pid" send_linux \
+	"param set $node packet_trace 2" "param get $node packet_trace" \
+	"param set: node $node did not answer" "$node:packet_trace = 2" \
+	"$node:packet_trace = 1" || fail "packet trace refusal/preservation failed"
+csp_exchange "$work_dir/linux.log" "$linux_pid" send_linux \
+	"param set $node packet_trace $original_packet_trace" && \
+	csp_reply_has "$node:packet_trace = $original_packet_trace" || fail "packet trace restore failed"
+csp_exchange "$work_dir/linux.log" "$linux_pid" send_linux \
+	"param get $node packet_trace" && \
+	csp_reply_has "$node:packet_trace = $original_packet_trace" || fail "packet trace restore readback failed"
+original_packet_trace=""
+echo 'CSP DEBUG PACKET: PASS values=0,1 refused=2 restored=yes'
+
 # The hosted node's compiled peer is the L496; name the node under test so the
 # same check works for either board.
 printf '%s\n' "comms uart test $node" 'comms uart info' >&3
@@ -378,7 +465,11 @@ if $have_storage; then
 		fail "PARAM did not work after physical FTP transfers"
 fi
 
-printf '%s\n' "param get $node node_id" 'comms uart info' >&3
+csp_exchange "$work_dir/nucleo.log" "$debug_capture_pid" send_debug \
+	'comms uart info' || fail "final board counters did not complete"
+csp_exchange "$work_dir/linux.log" "$linux_pid" send_linux \
+	'comms uart info' || fail "final host counters did not complete"
+printf '%s\n' "param get $node node_id" >&3
 wait_for_output "$work_dir/linux.log" "$node:node_id = $node" "$linux_pid" || \
 	fail "remote node_id did not match the built CSP node"
 
@@ -391,9 +482,9 @@ for log_file in linux.log nucleo.log; do
 done
 
 echo "--- linux.log ---"
-sed -n '1,320p' "$work_dir/linux.log"
+cat "$work_dir/linux.log"
 echo "--- nucleo.log ---"
-sed -n '1,320p' "$work_dir/nucleo.log"
+cat "$work_dir/nucleo.log"
 echo "--- socat.log ---"
 sed -n '1,120p' "$work_dir/socat.log"
 echo "UART CSP HIL RESULT: PASS"

@@ -46,7 +46,7 @@ Remote Tables Describe Their Layer And Contents
     Require Hosted Ground Dependencies
     Open Ground Pair    ${OUTPUT DIR}/ground-tables
     TRY
-        ${out}=    Ground Command    param tables 1    Uploaded table files, adoptions and reverts
+        ${out}=    Ground Command    param whichtables 1    Uploaded table files, adoptions and reverts
         Should Match Regexp    ${out}    id +layer +name +params +holds
         Should Match Regexp    ${out}    (?<![0-9])37 +service .*Uploaded table files, adoptions and reverts
     FINALLY

@@ -71,6 +71,7 @@ static void print_list_header(const struct shell *sh)
 		    KFSW_PARAM_MODE_COLUMN, "--------------------------------", "-----");
 }
 
+#if CONFIG_KFSW_PARAM_CSP
 static bool collect_table_names(const struct kfsw_param_info *info, void *context)
 {
 	struct param_list_context *list_context = context;
@@ -98,6 +99,8 @@ static bool tally_table(const struct kfsw_param_info *info, void *context)
 	}
 	return true;
 }
+
+#endif
 
 /*
  * The listing an interface control document is generated from. It carries the
@@ -349,6 +352,7 @@ static int cmd_param_describe(const struct shell *sh, size_t argc, char **argv)
  * any of them is asked for, because the walk that yields them is still
  * reading the reply that carries them.
  */
+#if CONFIG_KFSW_PARAM_CSP
 struct remote_tables {
 	uint8_t id[KFSW_PARAM_TABLE_MODULE_LAST + 1U];
 	size_t count;
@@ -386,7 +390,9 @@ static int list_remote_parameters(uint16_t node, struct param_list_context *cont
 	return 0;
 }
 
-static int cmd_param_list(const struct shell *sh, size_t argc, char **argv)
+#endif
+
+static int cmd_param_listall(const struct shell *sh, size_t argc, char **argv)
 {
 	struct param_list_context context = {
 		.shell = sh,
@@ -411,7 +417,7 @@ static int cmd_param_list(const struct shell *sh, size_t argc, char **argv)
 			context.local = false;
 			result = list_remote_parameters(node, &context);
 			if (kfsw_shell_no_answer(result)) {
-				return kfsw_shell_remote_failed(sh, "param list", node, result);
+				return kfsw_shell_remote_failed(sh, "param listall", node, result);
 			}
 		}
 	}
@@ -421,13 +427,17 @@ static int cmd_param_list(const struct shell *sh, size_t argc, char **argv)
 	result = kfsw_param_visit(print_param_info, &context);
 #endif
 
-	if (result == -ENOSPC) {
+#if CONFIG_KFSW_PARAM_CSP
+	if ((result == -ENOSPC) && !context.local) {
 		/* The descriptor cache filled up during the download; name the option to raise. */
 		shell_error(sh,
 			    "parameter list failed: the remote cache holds %d descriptors; "
 			    "raise CONFIG_KFSW_PARAM_REMOTE_POOL_SIZE",
 			    CONFIG_KFSW_PARAM_REMOTE_POOL_SIZE);
-	} else if (result != 0) {
+		return result;
+	}
+#endif
+	if (result != 0) {
 		shell_error(sh, "parameter list failed (%d)", result);
 	}
 	return result;
@@ -459,9 +469,11 @@ static int cmd_param_get(const struct shell *sh, size_t argc, char **argv)
 	result = kfsw_param_get(name, &value);
 #endif
 
+#if CONFIG_KFSW_PARAM_CSP
 	if ((node != THIS_NODE) && kfsw_shell_no_answer(result)) {
 		return kfsw_shell_remote_failed(sh, "param get", node, result);
 	}
+#endif
 	if (result != 0) {
 		return print_param_error(sh, "get", name, result);
 	}
@@ -498,9 +510,11 @@ static int cmd_param_set(const struct shell *sh, size_t argc, char **argv)
 	text = argv[2];
 	result = kfsw_param_get(name, &value);
 #endif
+#if CONFIG_KFSW_PARAM_CSP
 	if ((node != THIS_NODE) && kfsw_shell_no_answer(result)) {
 		return kfsw_shell_remote_failed(sh, "param set", node, result);
 	}
+#endif
 	if (result != 0) {
 		return print_param_error(sh, "set", name, result);
 	}
@@ -696,10 +710,7 @@ static bool find_table(const struct kfsw_param_table_info *info, void *context)
 	return false;
 }
 
-/*
- * Table names are not sent over the link. Table IDs are fixed per component, so
- * a table this build also carries is named from here; another shows "-".
- */
+/* The remote table protocol does not carry a persistent-value count. */
 static void print_table_heading(const struct shell *sh)
 {
 	shell_print(sh, "%3s  %-7s  %-*s  %6s  %s", " id", "layer", TABLE_NAME_COLUMN, "name",
@@ -732,13 +743,13 @@ static int print_remote_tables(const struct shell *sh, uint16_t node)
 		return 0;
 	}
 	if (result != -ENOTSUP) {
-		return kfsw_shell_remote_failed(sh, "param tables", node, result);
+		return kfsw_shell_remote_failed(sh, "param whichtables", node, result);
 	}
 
 	/* The node does not serve the table list. Count its descriptors instead. */
 	result = kfsw_param_remote_visit(node, tally_table, &context);
 	if (result != 0) {
-		return kfsw_shell_remote_failed(sh, "param tables", node, result);
+		return kfsw_shell_remote_failed(sh, "param whichtables", node, result);
 	}
 
 	for (unsigned int table = KFSW_PARAM_TABLE_CORE_FIRST;
@@ -758,7 +769,7 @@ static int print_remote_tables(const struct shell *sh, uint16_t node)
 }
 #endif
 
-static int cmd_param_tables(const struct shell *sh, size_t argc, char **argv)
+static int cmd_param_whichtables(const struct shell *sh, size_t argc, char **argv)
 {
 	struct param_list_context context = {
 		.shell = sh,
@@ -933,12 +944,12 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 #if CONFIG_KFSW_PARAM_PERSISTENCE
 	SHELL_CMD_ARG(load, NULL, "Reload the saved snapshot into RAM", cmd_param_load, 1, 0),
 #endif
-	SHELL_CMD_ARG(list, NULL,
+	SHELL_CMD_ARG(listall, NULL,
 #if CONFIG_KFSW_PARAM_CSP
-		      "Every parameter of a node, with its value: list [node]", cmd_param_list,
+		      "Every parameter of a node, with its value: listall [node]", cmd_param_listall,
 		      1, 1),
 #else
-		      "Every parameter, with its value: list", cmd_param_list, 1, 0),
+		      "Every parameter, with its value: listall", cmd_param_listall, 1, 0),
 #endif
 	SHELL_CMD_ARG(describe, NULL,
 		      "What each parameter is, with its unit: describe [table]",
@@ -947,7 +958,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 	SHELL_CMD_ARG(persist, NULL,
 		      "Write the snapshot and report one table's share: persist <table>",
 		      cmd_param_persist, 2, 0),
-	SHELL_CMD_ARG(save, NULL, "Atomically save persistent RAM values", cmd_param_save, 1, 0),
+	SHELL_CMD_ARG(save, NULL, "Save persistent parameters to storage", cmd_param_save, 1, 0),
 #endif
 	SHELL_CMD_ARG(set, NULL,
 #if CONFIG_KFSW_PARAM_CSP
@@ -963,12 +974,12 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 		      "The parameters of one table, with values: table <id>", cmd_param_table,
 		      2, 0),
 #endif
-	SHELL_CMD_ARG(tables, NULL,
+	SHELL_CMD_ARG(whichtables, NULL,
 #if CONFIG_KFSW_PARAM_CSP
-		      "The tables a node carries, without values: tables [node]",
-		      cmd_param_tables, 1, 1),
+		      "The tables a node carries, without values: whichtables [node]",
+		      cmd_param_whichtables, 1, 1),
 #else
-		      "The tables, without values: tables", cmd_param_tables, 1, 0),
+		      "The tables, without values: whichtables", cmd_param_whichtables, 1, 0),
 #endif
 	SHELL_SUBCMD_SET_END);
 

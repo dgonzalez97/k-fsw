@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Software-only checks for HIL image selection and argument validation."""
 import os
+import pty
 from pathlib import Path
 import shutil
 import subprocess
@@ -115,6 +116,8 @@ exit 0
 
     def test_uart_target_build_and_storage_selection(self):
         shutil.copy(REPO / "tests/uart-csp-smoke.sh", self.repo / "tests")
+        (self.repo / "tests/support").mkdir()
+        shutil.copy(REPO / "tests/support/csp-debug-checks.sh", self.repo / "tests/support")
         with (self.repo / "tools/_common.sh").open("a") as common:
             common.write('export KFSW_ROOT KFSW_BUILD_DIR\n')
         ftdi = self.root / "ftdi"
@@ -142,9 +145,9 @@ if [[ "$1" == linux ]]; then
     printf '#!/bin/sh\\nexit 0\\n' >"$KFSW_BUILD_DIR/zephyr/zephyr.exe"
     chmod +x "$KFSW_BUILD_DIR/zephyr/zephyr.exe"
 elif [[ "$1" == nucleo_f746zg ]]; then
-    printf 'CONFIG_KFSW_CSP_ADDRESS=3\\nCONFIG_BOARD_TARGET="nucleo_f746zg"\\n# CONFIG_KFSW_STORAGE is not set\\n' >"$KFSW_BUILD_DIR/zephyr/.config"
+    printf 'CONFIG_KFSW_DEBUG_SHELL=y\\nCONFIG_KFSW_CSP_ADDRESS=3\\nCONFIG_BOARD_TARGET="nucleo_f746zg"\\n# CONFIG_KFSW_STORAGE is not set\\n' >"$KFSW_BUILD_DIR/zephyr/.config"
 else
-    printf 'CONFIG_KFSW_CSP_ADDRESS=2\\nCONFIG_BOARD_TARGET="nucleo_l496zg/stm32l496xx"\\nCONFIG_KFSW_STORAGE=y\\n' >"$KFSW_BUILD_DIR/zephyr/.config"
+    printf 'CONFIG_KFSW_DEBUG_SHELL=y\\nCONFIG_KFSW_CSP_ADDRESS=2\\nCONFIG_BOARD_TARGET="nucleo_l496zg/stm32l496xx"\\nCONFIG_KFSW_STORAGE=y\\n' >"$KFSW_BUILD_DIR/zephyr/.config"
 fi
 ''')
         for target in (None, "nucleo_f746zg"):
@@ -169,6 +172,109 @@ fi
                 else:
                     self.assertIn("build nucleo_l496zg", calls)
                     self.assertNotIn("SKIP: storage info", result.stdout)
+
+
+class Preflight(unittest.TestCase):
+    def setUp(self):
+        self.work = tempfile.TemporaryDirectory(prefix="kfsw-preflight-")
+        self.addCleanup(self.work.cleanup)
+        self.root = Path(self.work.name)
+        self.repo = self.root / "k-fsw"
+        (self.repo / "tests/hil").mkdir(parents=True)
+        (self.repo / "config/targets").mkdir(parents=True)
+        for name in ("preflight.sh", "shapes.sh"):
+            shutil.copy(REPO / "tests/hil" / name, self.repo / "tests/hil")
+        for board in ("nucleo_l496zg", "nucleo_f746zg"):
+            (self.repo / f"config/targets/{board}.env").write_text(
+                "KFSW_STLINK_USB_ID=0483:374b\nKFSW_STLINK_SERIAL=fixture-probe\n")
+        self.bin = self.root / "bin"
+        self.bin.mkdir()
+        BootSelection.tool(self.bin / "robot", "exit 0")
+        BootSelection.tool(self.bin / "ip", "exit 1")
+        BootSelection.tool(self.bin / "udevadm", "exit 1")
+        BootSelection.tool(self.bin / "lsusb", "echo '  iSerial 3 fixture-probe'")
+        master, slave = pty.openpty()
+        self.addCleanup(os.close, master)
+        self.addCleanup(os.close, slave)
+        self.device = os.ttyname(slave)
+        self.env = {key: value for key, value in os.environ.items() if not key.startswith("KFSW_")}
+        self.env.update(PATH=f"{self.bin}:{os.environ['PATH']}",
+                        KFSW_DEBUG_SERIAL=self.device, KFSW_FTDI_DEVICE=self.device,
+                        KFSW_RADIO_SERIAL=self.device)
+
+    def run_preflight(self, shape):
+        return subprocess.run([str(self.repo / "tests/hil/preflight.sh"), shape],
+                              env=self.env, text=True, stdout=subprocess.PIPE,
+                              stderr=subprocess.STDOUT, timeout=5)
+
+    def test_valid_devices_and_probe(self):
+        for shape in ("software", "board", "board-uart", "radio"):
+            with self.subTest(shape=shape):
+                result = self.run_preflight(shape)
+                self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_direct_ftdi_uart_is_not_a_radio(self):
+        self.env.pop("KFSW_RADIO_SERIAL")
+        self.assertEqual(self.run_preflight("board-uart").returncode, 0)
+        result = self.run_preflight("radio")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("KFSW_RADIO_SERIAL", result.stdout)
+        exported = self.run_preflight("--export")
+        self.assertNotIn("KFSW_RADIO_SERIAL=", exported.stdout)
+        self.assertIn("KFSW_FTDI_DEVICE=", exported.stdout)
+
+    def test_invalid_overrides(self):
+        ordinary = self.root / "ordinary"
+        ordinary.touch()
+        missing = self.root / "missing"
+        dangling = self.root / "dangling"
+        dangling.symlink_to(missing)
+        for variable, shape in (("KFSW_DEBUG_SERIAL", "board"),
+                                ("KFSW_FTDI_DEVICE", "board-uart"),
+                                ("KFSW_F746_DEBUG_SERIAL", "board-uart"),
+                                ("KFSW_RADIO_SERIAL", "radio")):
+            for path in (ordinary, missing, dangling):
+                with self.subTest(variable=variable, path=path):
+                    self.env[variable] = str(path)
+                    result = self.run_preflight(shape)
+                    self.assertEqual(result.returncode, 1, result.stdout)
+                    self.assertIn(variable, result.stdout)
+                    self.assertIn("live character device", result.stdout)
+                    self.assertIn("USB", result.stdout)
+            self.env[variable] = self.device
+
+    def test_missing_or_wrong_probe(self):
+        for output in ("", "  iSerial 3 another-board"):
+            BootSelection.tool(self.bin / "lsusb", f"echo '{output}'")
+            for shape in ("board", "board-uart", "board-can", "radio"):
+                result = self.run_preflight(shape)
+                self.assertEqual(result.returncode, 1, result.stdout)
+                self.assertIn("ST-LINK USB 0483:374b serial fixture-probe", result.stdout)
+            self.assertEqual(self.run_preflight("software").returncode, 0)
+
+    def test_probe_override_and_export(self):
+        self.env["KFSW_STLINK_SERIAL"] = "selected-probe"
+        self.env["KFSW_STLINK_USB_ID"] = "0483:374e"
+        BootSelection.tool(self.bin / "lsusb", """
+[[ "$*" == '-v -d 0483:374e' ]] || exit 1
+echo '  iSerial 3 selected-probe'
+""")
+        result = self.run_preflight("board")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        result = self.run_preflight("--export")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("KFSW_STLINK_SERIAL=selected-probe", result.stdout)
+        self.env["KFSW_L496_STLINK"] = "selected-probe"
+        self.env["KFSW_STLINK_SERIAL"] = "ignored-probe"
+        self.assertEqual(self.run_preflight("board").returncode, 0)
+        self.env.pop("KFSW_L496_STLINK")
+        self.env["KFSW_STLINK_SERIAL"] = "absent-probe"
+        self.assertEqual(self.run_preflight("board").returncode, 1)
+
+    def test_unavailable_can(self):
+        result = self.run_preflight("board-can")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("a CAN interface with a board on it", result.stdout)
 
 
 class UartArguments(unittest.TestCase):
