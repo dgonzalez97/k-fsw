@@ -498,7 +498,21 @@ Reads are bounded (1 to 32 records), do not remove anything, and do not need
 UTC. A node that does not answer within `CONFIG_KFSW_LOG_REMOTE_TIMEOUT_MS`
 (3 s) is logged as a warning.
 
-The serving node's `log_remote_format` parameter picks how messages travel:
+The serving node's `log_remote_format` parameter picks how messages travel.
+Text remains the compiled default. To start in dictionary mode, add this to an
+extra configuration alongside `config/profiles/log-remote.conf`:
+
+```text
+CONFIG_KFSW_LOG_REMOTE_DEFAULT_DICTIONARY=y
+```
+
+`CONFIG_KFSW_LOG_REMOTE_DEFAULT_TEXT=y` selects text instead. This choice sets
+both the initial value and the parameter reset default. A restored persistent
+`log_remote_format` value still takes precedence, and runtime writes still
+select 0 or 1 immediately. Neither choice changes local formatted text,
+cbprintf packaging, text fallback, CRCs, or the remote wire representation.
+
+The formats are:
 
 | Value | Format | On the requesting shell |
 | --- | --- | --- |
@@ -800,8 +814,9 @@ property. The NUCLEO-L496ZG uses the last 64 KiB of its 1 MiB flash:
 
 `CONFIG_USE_DT_CODE_PARTITION=y` keeps the application out of the storage
 region. native_sim uses a 256 KiB partition backed by a host file,
-`build/linux/kfsw-storage.bin` when started with the runner. The FRDM-K64F and
-Pico W profiles have no storage.
+`build/linux/kfsw-storage.bin` when started with the runner. The FRDM-K64F profile keeps
+storage disabled. Pico W uses its own persistent and scratch layout; see the
+[target guide](@ref targets).
 
 ### Mount and format
 
@@ -810,6 +825,46 @@ partition as corrupt (`EFAULT`), the whole partition is scanned. A fully erased
 partition is formatted and mounted; anything else is reported as an error and
 left as it is. Services that need storage report their own errors when it is
 not mounted.
+
+### Optional ZMS block translation
+
+`config/profiles/f746-zms-storage.conf` and
+`config/profiles/f746-zms-storage.overlay` opt into the platform ZMS disk.
+Use them with the shared `f746-recovery-flash.overlay` map, after the
+minimal A profile. Existing target defaults do not enable this backend.
+The selected partition must contain two erase-aligned physical sectors;
+the F746 map reserves `[0x80000, 0x100000)`, two 256 KiB sectors.
+
+The disk exposes 48 sectors of 4096 bytes (192 KiB before LittleFS overhead).
+Logical sector N uses ZMS ID N+1. ZMS owns append, recovery and compaction;
+the adapter serializes access and checks complete records with data CRC.
+The mandatory `tools/zephyr-patch.sh` correction propagates close-ATE write
+errors before ZMS advances to another physical sector.
+Writes are synchronous. A multi-sector request validates its complete range
+before writing, but it is not atomic: earlier sectors can persist when a
+later sector fails. After a write error, unmount and reinitialize before
+using the disk again.
+
+Before ZMS mount, the adapter scans the partition and recognizes the pinned
+Zephyr 4.4.0 version 1, 32-bit-ID empty-sector headers. Blank media may be
+initialized. Unknown nonblank media, unsupported valid headers, and media
+with all headers destroyed are refused without writes. This guard is tied
+to the pinned on-media format and must be checked when updating Zephyr.
+LittleFS formatting remains allowed only when every logical sector is erased.
+
+The native suite is `tests/unit/platform_storage_zms`. Physical erase stalls,
+wear, watchdog margins, UART/CAN behavior and reset/power-loss acceptance
+require separate F746 measurements. No firmware update or recovery writer
+uses this disk.
+
+The opt-in `f746-zms-storage.conf` profile also enables persistent parameters
+and FTP in the running A image. Apply it after `f746-minimal.conf`, with the
+shared recovery flash map and `f746-zms-storage.overlay`. Keep this profile out
+of Golden: Golden uses the separate recovery uploader and never mounts the
+file region. The signed A build with these file services is 134,535 bytes
+within its 256 KiB partition, with 97,164 bytes of static RAM. These are build
+results; physical storage and interruption acceptance remain outstanding.
+
 
 ## File transfer
 

@@ -7,6 +7,36 @@ MCUboot restores the previous image if the trial is unconfirmed at the next rese
 The watchdog causes that reset only when it is configured and health
 monitoring stops feeding it.
 
+## Permanent Golden replacement of A
+
+The opt-in F746 recovery composition uses the existing FWU-lite CSP service.
+Apply `f746-minimal.conf`, `f746-golden.conf`, then
+`f746-golden-upload.conf`, with the shared `f746-recovery-flash.overlay`
+and `f746-golden-upload.overlay`. Retain the selected link configuration.
+The layout is boot 64 KiB, executable Golden 192 KiB, A 256 KiB and files
+512 KiB. There is no B slot. This profile does not enable storage.
+
+Only permanent Golden writes A. BEGIN erases all of A, destroying the previous
+image. ABORT also erases A. An interrupted upload may leave A incomplete;
+MCUboot must reject it and return to Golden. There is no previous-A rollback.
+A complete valid signed A may boot after a reset even if the sender did not
+receive the final acknowledgement. Transfer state is volatile; after a restart
+begin a new upload rather than resuming it.
+
+VERIFY checks the transit CRC and flushes flash. START_FLASHING finishes the
+canonical FWU transfer: READY means A is received and CRC checked, with
+`swap_scheduled=false`. It does not reset the board. Command a reset separately;
+MCUboot verifies the signature before selecting A. CRC is not authentication.
+Golden remains available for another upload if A is rejected. The existing L4
+swap profiles retain their offset, trailer and trial rollback behavior.
+
+The native FWU and FWU-lite suites include recovery variants. After building
+`tests/unit/services_fwu` with recovery enabled, run
+`python3 tests/unit/services_fwu/check_recovery.py /tmp/<build-directory>`
+to check rejected compositions and restart after a partial upload. These checks
+use simulated flash; they do not establish signature enforcement or physical
+Golden fallback.
+
 ## Firmware files
 
 With `CONFIG_KFSW_FWU_FILES`, FTP exposes both flash slots:

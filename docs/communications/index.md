@@ -385,6 +385,11 @@ the table is checked with `csp_rtable_check()`, the interface names, the
 parser's 99-character limit and the table size, and only then loaded. A bad
 table fails initialization.
 
+`KFSW_CSP_PEER` in a ground node file supplies the UART peer address
+(`KFSW_CSP_UART_PEER_ADDRESS`). It identifies the neighbor on that interface;
+it does not select routes or prove reachability. Select destinations separately
+with `KFSW_CSP_ROUTES` and check the effective table with `csp routes`.
+
 With several UARTs, each one is a child of a `kfsw,csp-kiss-uarts` devicetree
 node. Interface names are one to nine characters from `[A-Za-z0-9_-]`, which is
 the parser's limit.
