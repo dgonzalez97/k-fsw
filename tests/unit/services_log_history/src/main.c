@@ -2,11 +2,13 @@
 #include <string.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/crc.h>
 #include <zephyr/ztest.h>
 #include <csp/csp.h>
 #include <csp/csp_debug.h>
 #include <kfsw/comms/csp.h>
 #include <kfsw/services/log.h>
+#include <kfsw/services/parameter.h>
 #include <kfsw/services/log_history.h>
 #if CONFIG_KFSW_LOG_REMOTE
 #include <kfsw/services/log_remote.h>
@@ -32,6 +34,9 @@ static void before(void *fixture)
 {
 	ARG_UNUSED(fixture);
 	force_overwrite = false;
+#if CONFIG_KFSW_LOG_REMOTE
+	zassert_ok(kfsw_log_remote_set_format(KFSW_LOG_REMOTE_TEXT));
+#endif
 	zassert_ok(kfsw_log_set_level(0U));
 	for (unsigned int module = 0; module < KFSW_LOG_MODULE_COUNT; module++) {
 		zassert_ok(kfsw_log_set_module_level(module, 0U));
@@ -185,6 +190,38 @@ ZTEST(log_history, test_concurrent_writer_keeps_records_consistent)
 }
 
 #if CONFIG_KFSW_LOG_REMOTE
+ZTEST(log_history, test_remote_parameter_default_and_runtime_override)
+{
+	struct kfsw_param_value value;
+	uint8_t expected = IS_ENABLED(CONFIG_KFSW_LOG_REMOTE_DEFAULT_DICTIONARY)
+				   ? KFSW_LOG_REMOTE_DICTIONARY
+				   : KFSW_LOG_REMOTE_TEXT;
+	bool found = false;
+
+	for (size_t i = 0U; i < kfsw_log_param_definitions.count; i++) {
+		const struct kfsw_param_definition *definition =
+			&kfsw_log_param_definitions.definitions[i];
+
+		if (strcmp(definition->name, "log_remote_format") == 0) {
+			zassert_equal(definition->default_value.u8, expected);
+			found = true;
+		}
+	}
+	zassert_true(found);
+	zassert_ok(kfsw_log_remote_set_format(expected));
+	zassert_equal(kfsw_log_remote_format(), expected);
+	zassert_ok(kfsw_param_get("log_remote_format", &value));
+	zassert_equal(value.scalar.u8, expected);
+	value.scalar.u8 = expected ^ 1U;
+	zassert_ok(kfsw_param_set("log_remote_format", &value));
+	zassert_equal(kfsw_log_remote_format(), expected ^ 1U);
+	value.scalar.u8 = 2U;
+	zassert_equal(kfsw_param_set("log_remote_format", &value), -ERANGE);
+	zassert_equal(kfsw_log_remote_format(), expected ^ 1U);
+	zassert_ok(kfsw_log_remote_set_format(expected));
+	zassert_equal(kfsw_log_remote_format(), expected);
+}
+
 #define NONCE 0x123456789abcULL
 
 static csp_conn_t *query(uint8_t stream, uint8_t minimum, uint16_t count, size_t size,
@@ -322,6 +359,8 @@ ZTEST(log_history, test_remote_client_reads_both_formats)
 	zassert_equal(kfsw_log_remote_set_format(2U), -ERANGE);
 	zassert_equal(collected.start.format, KFSW_LOG_REMOTE_DICTIONARY);
 	zassert_true(collected.last.package);
+	zassert_true(collected.last.text_crc_present);
+	zassert_equal(collected.last.text_crc, crc32_ieee((const uint8_t *)"value 7", 7U));
 
 	/* The package is the record as held, so this image can rebuild its text. */
 	encoded.package = true;
@@ -329,6 +368,24 @@ ZTEST(log_history, test_remote_client_reads_both_formats)
 	memcpy(encoded.data, collected.last.data, collected.last.size);
 	kfsw_log_history_format(&encoded, &rebuilt);
 	zassert_str_equal(rebuilt.text, "value 7");
+}
+
+ZTEST(log_history, test_dictionary_retains_text_fallback)
+{
+	struct collected collected = {0};
+	char text[240];
+
+	memset(text, 'x', sizeof(text) - 1U);
+	text[sizeof(text) - 1U] = '\0';
+	kfsw_log_error("%s", text);
+	zassert_ok(kfsw_log_remote_set_format(KFSW_LOG_REMOTE_DICTIONARY));
+	zassert_ok(kfsw_log_remote_read(7U, KFSW_LOG_REMOTE_LOG, 1U, 0U, &collector, &collected));
+	zassert_equal(collected.start.format, KFSW_LOG_REMOTE_DICTIONARY);
+	zassert_false(collected.last.package);
+	zassert_false(collected.last.text_crc_present);
+	zassert_true(collected.last.truncated);
+	zassert_equal(collected.last.size, KFSW_LOG_ENCODED_SIZE - 1U);
+	zassert_mem_equal(collected.last.data, text, collected.last.size);
 }
 
 ZTEST(log_history, test_remote_client_arguments_and_streams)
@@ -391,12 +448,37 @@ ZTEST(log_history, test_remote_rejects_invalid_requests)
 
 static void *setup(void)
 {
+	const struct kfsw_param_definition_set *const sets[] = {&kfsw_log_param_definitions};
+
+#if CONFIG_KFSW_LOG_REMOTE
+	zassert_equal(kfsw_log_remote_format(),
+		      IS_ENABLED(CONFIG_KFSW_LOG_REMOTE_DEFAULT_DICTIONARY)
+			      ? KFSW_LOG_REMOTE_DICTIONARY
+			      : KFSW_LOG_REMOTE_TEXT);
+#endif
+	zassert_ok(kfsw_param_init(sets, ARRAY_SIZE(sets)));
 #if CONFIG_KFSW_LOG_REMOTE
 	zassert_equal(kfsw_log_remote_server_start(), -ENETDOWN);
+	zassert_equal(kfsw_log_remote_format(),
+		      IS_ENABLED(CONFIG_KFSW_LOG_REMOTE_DEFAULT_DICTIONARY)
+			      ? KFSW_LOG_REMOTE_DICTIONARY
+			      : KFSW_LOG_REMOTE_TEXT);
 	zassert_ok(kfsw_csp_init());
 	zassert_ok(kfsw_csp_start());
 	zassert_ok(kfsw_log_remote_server_start());
 	zassert_ok(kfsw_log_remote_server_start());
+	{
+		struct collected collected = {0};
+		bool dictionary = IS_ENABLED(CONFIG_KFSW_LOG_REMOTE_DEFAULT_DICTIONARY);
+
+		kfsw_log_error("compiled default");
+		zassert_ok(kfsw_log_remote_read(7U, KFSW_LOG_REMOTE_LOG, 1U, 0U, &collector,
+						&collected));
+		zassert_equal(collected.start.format,
+			      dictionary ? KFSW_LOG_REMOTE_DICTIONARY : KFSW_LOG_REMOTE_TEXT);
+		zassert_equal(collected.last.package, dictionary);
+		zassert_equal(collected.last.text_crc_present, dictionary);
+	}
 #endif
 	return NULL;
 }
