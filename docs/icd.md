@@ -220,7 +220,7 @@ The mode column is what the parameter service enforces: `r` is read only, `w` is
 | 0x61 | `fbo_sched_refusals` | u32 | r | - | Entries refused when they were added |
 | 0x65 | `fbo_sched_overdues` | u32 | r | - | Entries that went overdue since boot |
 | 0x69 | `fbo_sched_hash` | u32 | r | - | CRC32 over the queue, to compare against what was uploaded |
-| 0x6d | `fbo_sched_latency_s` | u32 | wb | s | An entry later than this reports overdue instead of running |
+| 0x6d | `fbo_sched_latency_s` | u32 | w | s | An entry later than this reports overdue instead of running |
 | 0x71 | `fbo_sched_next_due_utc` | i64 | r | - | UTC second of the earliest absolute entry, 0 for none |
 
 ### gndwdt (35)

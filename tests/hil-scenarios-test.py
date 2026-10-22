@@ -116,6 +116,8 @@ exit 0
 
     def test_uart_target_build_and_storage_selection(self):
         shutil.copy(REPO / "tests/uart-csp-smoke.sh", self.repo / "tests")
+        (self.repo / "tests/support").mkdir()
+        shutil.copy(REPO / "tests/support/csp-debug-checks.sh", self.repo / "tests/support")
         with (self.repo / "tools/_common.sh").open("a") as common:
             common.write('export KFSW_ROOT KFSW_BUILD_DIR\n')
         ftdi = self.root / "ftdi"
@@ -143,9 +145,9 @@ if [[ "$1" == linux ]]; then
     printf '#!/bin/sh\\nexit 0\\n' >"$KFSW_BUILD_DIR/zephyr/zephyr.exe"
     chmod +x "$KFSW_BUILD_DIR/zephyr/zephyr.exe"
 elif [[ "$1" == nucleo_f746zg ]]; then
-    printf 'CONFIG_KFSW_CSP_ADDRESS=3\\nCONFIG_BOARD_TARGET="nucleo_f746zg"\\n# CONFIG_KFSW_STORAGE is not set\\n' >"$KFSW_BUILD_DIR/zephyr/.config"
+    printf 'CONFIG_KFSW_DEBUG_SHELL=y\\nCONFIG_KFSW_CSP_ADDRESS=3\\nCONFIG_BOARD_TARGET="nucleo_f746zg"\\n# CONFIG_KFSW_STORAGE is not set\\n' >"$KFSW_BUILD_DIR/zephyr/.config"
 else
-    printf 'CONFIG_KFSW_CSP_ADDRESS=2\\nCONFIG_BOARD_TARGET="nucleo_l496zg/stm32l496xx"\\nCONFIG_KFSW_STORAGE=y\\n' >"$KFSW_BUILD_DIR/zephyr/.config"
+    printf 'CONFIG_KFSW_DEBUG_SHELL=y\\nCONFIG_KFSW_CSP_ADDRESS=2\\nCONFIG_BOARD_TARGET="nucleo_l496zg/stm32l496xx"\\nCONFIG_KFSW_STORAGE=y\\n' >"$KFSW_BUILD_DIR/zephyr/.config"
 fi
 ''')
         for target in (None, "nucleo_f746zg"):
