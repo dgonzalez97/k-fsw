@@ -1,0 +1,6 @@
+/* Requires the shared f746-recovery-flash.overlay partition map. */
+/ {
+	chosen {
+		kfsw,storage-partition = &storage_partition;
+	};
+};

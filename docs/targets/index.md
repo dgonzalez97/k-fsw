@@ -17,6 +17,27 @@ example `rpi_pico_w` maps to `rpi_pico/rp2040/w`.
 
 Only Linux and the NUCLEO are built in CI.
 
+### Required board transports
+
+Every supported hardware board must provide CSP over both CAN and UART/KISS.
+Board acceptance must check both links, including normal and Golden application
+images where provided. This requirement does not establish automatic route
+failover: each composition must define its routes explicitly.
+
+The table above describes current implementations. It does not establish that
+every target has completed this transport requirement.
+
+| Board | Current transport status | Remaining work |
+| --- | --- | --- |
+| NUCLEO-L496ZG | UART/KISS in the board configuration; CAN added by the CAN profile. Prepared update images enable both. | Make dual-link support part of the standard board composition and acceptance matrix. |
+| NUCLEO-F746ZG | Prepared A and Golden images enable both; their current default route selects CAN. | Consolidate the board profiles and verify explicit routes for each link. |
+| Pico W | UART/KISS configured; no CAN controller configured. | Select an external CAN controller with a Zephyr driver, define its wiring, check RAM use and test both links. |
+| FRDM-K64F | Current application is shell-only despite the board's CAN peripheral. | Include CAN and a dedicated UART/KISS link in the full-service work planned for 2.0. |
+
+The RP2040 has no built-in CAN controller. A CAN transceiver alone is not
+sufficient for Pico: the board also needs a CAN controller. Physical wiring and
+module selection must be recorded before hardware acceptance.
+
 ## Identifying a unit
 
 Every target reports its chip's unique ID: as `unit=` in the boot marker, in
@@ -217,6 +238,70 @@ KFSW_SERIAL=/dev/serial/by-id/<frdm-console> \
 
 The test builds, flashes, waits for `kfsw:~$` and runs `status`, `version` and
 `help`.
+
+## NUCLEO-F746ZG executable Golden prototype
+
+The default F746 bench profile is unchanged. The opt-in phase 1 composition
+uses pinned MCUboot firmware-loader mode, with this erase-aligned map:
+
+| Region | Flash offset range, half open | Budget |
+| --- | --- | --- |
+| MCUboot | `[0x00000, 0x10000)` | 64 KiB |
+| Permanent executable Golden | `[0x10000, 0x40000)` | 192 KiB |
+| Running A | `[0x40000, 0x80000)` | 256 KiB |
+| Reserved physical file region | `[0x80000, 0x100000)` | 512 KiB |
+
+Flash base is `0x08000000`. Golden links at its own recovery region, including
+its MCUboot header; A links at offset `0x40000`, including its header. MCUboot
+calls Golden the secondary image internally. This is permanent recovery code;
+there is no B update slot or previous-image rollback.
+
+`f746-minimal.conf` and `f746-uart.conf` compose A with direct USART6 CSP,
+PARAM and command/status. Golden adds `f746-golden.conf` and keeps CSP and PARAM
+status, with commands and shell disabled. Both use node 3, peer 1, route
+`0/0 KISS`, PG14 TX/PG9 RX at 115200 8N1. USART3 is not the CSP transport.
+These are source compositions, not measured fit or reachability results.
+
+The storage adapter and recovery upload writer are **not delivered in phase 1**.
+The physical file region is only reserved; no filesystem, persistence, usable
+logical capacity or upload service is claimed. Existing L4 FWU and Golden paths
+remain unchanged and are disabled here. Redirecting that FWU implementation to
+A would reserve a 256 KiB erase/trailer region and could erase executing code.
+
+Pinned `boot/zephyr/firmware_loader.c` uses `BOOT_VALIDATE_SLOT0` for both
+primary and recovery signature validation. `f746-mcuboot.conf` enables that
+check on every boot, invalid-A fallback (`BOOT_FIRMWARE_LOADER_NO_APPLICATION`)
+and GPIO recovery entrance. `mcuboot-button0` aliases the board user button,
+PC13 active high. Pressing the user button at reset requests Golden. If Golden
+is invalid on forced entrance, the pinned implementation still tries A; if A
+and Golden are invalid it cannot select a valid image. A correctly signed A
+that hangs is not detected by this fallback policy.
+
+From this repository root, using an existing signing key:
+
+```bash
+# KFSW_MCUBOOT_KEY defaults to ~/.config/kfsw/mcuboot-signing-key.pem.
+./tools/f746-proof.sh build "$PWD/build/f746-proof"
+./tools/f746-proof.sh check "$PWD/build/f746-proof"
+python3 tests/f746-proof-test.py
+```
+
+The tool has no flash subcommand. It uses `tools/build.sh` separately for A and
+Golden, with sysbuild firmware-updater mode and an MCUboot-only extra config.
+The checker reads generated devicetrees, Kconfig, ELF and signed binaries;
+checks the common map, execution addresses, complete signed lengths and headers;
+and verifies ECDSA signatures against the generated MCUboot public key. It
+rejects wrong modes, missing validation, overlap and oversized artifacts.
+Only use trusted locally generated `edt.pickle` files. `check` needs Python's
+`cryptography` package and the pinned Zephyr devicetree Python sources.
+
+Real F746 builds, signing and fit reports remain required. A successful offline
+proof does not establish boot execution. HIL is **NOT RUN**. Phase 2 still needs
+valid-A selection, invalid-A fallback, button entrance, invalid-Golden and
+wrong-key refusal evidence, then the platform storage adapter and recovery-only
+A writer in their owning repositories. Interrupted upload, bounded erase/write,
+filesystem durability and usable capacity need separate tests before physical
+power-cut trials. Do not enable the L4 swap path to supply those features.
 
 ## Raspberry Pi Pico W
 
