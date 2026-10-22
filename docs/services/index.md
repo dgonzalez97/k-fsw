@@ -549,9 +549,11 @@ application passes the enabled tables to `kfsw_param_init()`, which checks
 them and builds a sorted index. Persistence and the CSP adapter use the same
 index.
 
-Local writes call `validate` before updating storage, then call `changed`.
-A rejected local write keeps the previous value. Change callbacks run after
-the write and cannot reject it.
+Validators check values without changing hardware or owner state. A scalar
+`apply` callback performs work that can fail before storage is committed; its
+errno reaches the local caller. `changed` runs after a successful write and
+cannot reject it. Registry initialization copies defaults without calling
+`apply`, so it does not drive GPIO before the module initializes.
 
 ```text
 KFSW_PARAM              local tables and API
@@ -689,15 +691,20 @@ The cache holds `CONFIG_KFSW_PARAM_REMOTE_POOL_SIZE` descriptors. Value requests
 are handled by a worker thread; when its queue is full the request is dropped
 and `param_requests_dropped` increases.
 
-Each node validates remote writes with its own validators. An invalid remote
-value is rejected and the parameter goes back to its compiled default.
+Each node validates the complete remote write before applying it. A request
+containing a fallible scalar must contain exactly one value, including repeated
+writes to the same parameter. Software-only batches remain supported. Rejected
+writes keep the previous value; failed application receives no success ACK.
+Cached peer values never invoke local appliers.
 
 ### Defaults, save and load
 
 At boot every value starts from its compiled default, then the snapshot is
 restored. `param set` changes RAM and runs the change callback. With
 `param_autosave` on (the default), an accepted change to a persistent value
-also writes the snapshot.
+also writes the snapshot. Snapshot loads and persistent default resets refuse
+multi-value operations containing a fallible scalar before changing any value.
+Singleton operations return the applier's error if application fails.
 
 | Command | RAM | Saved snapshot |
 | --- | --- | --- |
@@ -759,6 +766,11 @@ A successful load keeps the values it replaced, and `table revert` puts them
 back. Only the most recent load can be undone, and only once; there is no stack
 of loads. The held values do not survive a reset, so a load that needs to outlive
 one is followed by `param save`.
+
+A file containing a fallible scalar must contain only that value. The same rule
+applies to undo. File validation performs no application. A failed load returns
+the application errno and preserves the previous undo state. A failed undo can
+be retried. No physical rollback is attempted.
 
 `table dump <table> <path>` writes what is running as a file, so the usual way
 to change a table is to fetch that, edit one value on the ground and upload it
