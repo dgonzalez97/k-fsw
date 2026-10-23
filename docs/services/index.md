@@ -826,6 +826,26 @@ partition is formatted and mounted; anything else is reported as an error and
 left as it is. Services that need storage report their own errors when it is
 not mounted.
 
+### One filesystem, two block layers
+
+LittleFS is the only filesystem K-FSW mounts, on every target. What changes
+between boards is what lies underneath it, and only because the flash does.
+LittleFS keeps directory metadata in a pair of erase blocks, so a partition
+needs more than two of them to hold a directory tree at all: measured on the
+hosted image, two and three 256 KiB blocks both fail on the first directory
+with `-28`, the F746's four 32 KiB sectors fail on the second, and 4 KiB blocks
+work. The STM32F746 has 256 KiB sectors, so LittleFS cannot sit on its internal
+flash directly.
+
+The ZMS disk below closes that gap: Zephyr's own ZMS subsystem presented as an
+ordinary `disk_access` device, with fine logical sectors over the coarse
+physical ones. Above it nothing changes. The mount path, the platform storage
+API and every service that reads or writes a file are identical on both boards,
+so a new MCU with coarse sectors is a profile and a sector count, not a port.
+That is why the L496, whose 2 KiB pages suit LittleFS, stays on flash directly:
+the uniformity that matters is the filesystem and the API, and both are already
+uniform.
+
 ### Optional ZMS block translation
 
 `config/profiles/f746-zms-storage.conf` and
