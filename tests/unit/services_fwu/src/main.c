@@ -1,4 +1,6 @@
+#include <cmdline.h>
 #include <errno.h>
+#include <posix_native_task.h>
 #include <string.h>
 
 #include <zephyr/devicetree.h>
@@ -21,10 +23,30 @@
  * stream buffer boundary are both crossed.
  */
 #define TEST_IMAGE_SIZE 10000U
+#define PARTIAL_IMAGE_SIZE 4096U
 
 static uint8_t test_image[TEST_IMAGE_SIZE];
 static int erase_error;
 static int write_error;
+static bool restart_inspection;
+
+static void add_restart_option(void)
+{
+	static struct args_struct_t options[] = {
+		{
+			.option = "fwu_restart_inspection",
+			.type = 'b',
+			.is_switch = true,
+			.dest = &restart_inspection,
+			.descript = "Inspect inherited partial FWU image without erasing it",
+		},
+		ARG_TABLE_ENDMARKER,
+	};
+
+	native_add_command_line_opts(options);
+}
+
+NATIVE_TASK(add_restart_option, PRE_BOOT_1, 10);
 
 static int test_write_byte(const struct device *dev, off_t offset, uint8_t data)
 {
@@ -385,7 +407,7 @@ ZTEST(services_fwu, test_abort_returns_to_idle_and_erases)
 	uint8_t readback[64];
 
 	zassert_ok(kfsw_fwu_begin(TEST_IMAGE_SIZE, 0U));
-	zassert_ok(kfsw_fwu_write(0U, test_image, 4096U));
+	zassert_ok(kfsw_fwu_write(0U, test_image, PARTIAL_IMAGE_SIZE));
 	zassert_ok(kfsw_fwu_abort());
 
 	zassert_ok(kfsw_fwu_get_status(&status));
@@ -635,10 +657,30 @@ ZTEST(services_fwu, test_interruption_leaves_partial_image)
 	uint8_t readback[8];
 
 	zassert_ok(kfsw_fwu_begin(TEST_IMAGE_SIZE, crc32_ieee(test_image, TEST_IMAGE_SIZE)));
-	zassert_ok(kfsw_fwu_write(0U, test_image, 4096U));
+	zassert_ok(kfsw_fwu_write(0U, test_image, PARTIAL_IMAGE_SIZE));
 	zassert_ok(read_slot(0U, readback, sizeof(readback)));
 	zassert_mem_equal(readback, test_image, sizeof(readback));
 	zassert_equal(kfsw_fwu_finish(), -EAGAIN);
 }
 
 ZTEST_SUITE(services_fwu, NULL, fwu_setup, fwu_before, NULL, NULL);
+
+ZTEST(services_fwu_restart, test_restart_is_idle_with_partial_image)
+{
+	struct kfsw_fwu_status status;
+	static uint8_t readback[PARTIAL_IMAGE_SIZE];
+
+	if (!restart_inspection) {
+		ztest_test_skip();
+	}
+
+	zassert_ok(kfsw_fwu_get_status(&status));
+	zassert_equal(status.state, KFSW_FWU_IDLE);
+	zassert_equal(status.received, 0U);
+	zassert_false(status.swap_scheduled);
+	fill_test_image();
+	zassert_ok(read_slot(0U, readback, sizeof(readback)));
+	zassert_mem_equal(readback, test_image, sizeof(readback));
+}
+
+ZTEST_SUITE(services_fwu_restart, NULL, NULL, NULL, NULL, NULL);

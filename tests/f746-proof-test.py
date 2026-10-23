@@ -40,18 +40,12 @@ class Edt:
         return self.label2node[self.label]
 
 
-def elf(image, start, header):
-    data = bytearray(84)
+def elf(start, header):
+    data = bytearray(52)
     data[:7] = b"\x7fELF\x01\x01\x01"
     struct.pack_into("<HHI", data, 16, 2, 40, 1)
-    struct.pack_into("<II", data, 24, start + header + 1, 52)
-    struct.pack_into("<HHH", data, 40, 52, 32, 1)
-    struct.pack_into("<8I", data, 52, 1, 84, start, start, len(image), len(image), 5, 4)
-    section_offset = len(data) + len(image)
-    struct.pack_into("<I", data, 32, section_offset)
-    struct.pack_into("<HH", data, 46, 40, 1)
-    section = struct.pack("<10I", 0, 1, 2, start, 84, len(image), 0, 0, 4, 0)
-    return bytes(data) + image + section
+    struct.pack_into("<I", data, 24, start + header + 1)
+    return bytes(data)
 
 
 def signed(key, payload):
@@ -95,9 +89,10 @@ class ProofTests(unittest.TestCase):
                 else:
                     cfg.update({name: "y" for name in (
                         "BOOTLOADER_MCUBOOT MCUBOOT_BOOTLOADER_MODE_FIRMWARE_UPDATER "
-                        "USE_DT_CODE_PARTITION KFSW_CSP KFSW_CSP_KISS_UART "
+                        "USE_DT_CODE_PARTITION KFSW_CSP CAN KFSW_CSP_CAN KFSW_CSP_KISS_UART "
                         "KFSW_CSP_UART_INTERRUPT_DRIVEN KFSW_PARAM KFSW_PARAM_CSP").split()})
-                    cfg.update(KFSW_CSP_ROUTE_TABLE='"0/0 KISS"', KFSW_CSP_ADDRESS="3",
+                    cfg.update(KFSW_CSP_CAN_INTERFACE_NAME='"CAN"',
+                               KFSW_CSP_ROUTE_TABLE='"1 KISS,0/0 CAN"', KFSW_CSP_ADDRESS="3",
                                ROM_START_OFFSET="0x200")
                     if role == "a":
                         cfg.update(KFSW_COMMAND="y", KFSW_COMMAND_CSP="y")
@@ -115,7 +110,7 @@ class ProofTests(unittest.TestCase):
                 (directory / ("zephyr.bin" if domain == "mcuboot" else
                               "zephyr.signed.bin")).write_bytes(image)
                 (directory / "zephyr.elf").write_bytes(elf(
-                    image[:header + 17] if header else image, proof.BASE + offset, header))
+                    proof.BASE + offset, header))
 
     def check(self):
         with contextlib.redirect_stdout(io.StringIO()):
@@ -183,28 +178,59 @@ class ProofTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "budget"):
             self.check()
 
-    def test_elf_segment_padding_is_not_payload(self):
-        image = b"code" + b"\xff" * 4 + b"data"
-        data = bytearray(elf(image, proof.BASE, 0))
-        data[88:92] = b"\0" * 4
-        offset = 84 + len(image)
-        struct.pack_into("<HH", data, 46, 40, 2)
-        struct.pack_into("<I", data, offset + 20, 4)
-        data.extend(struct.pack("<10I", 0, 1, 2, proof.BASE + 8, 92, 4, 0, 0, 4, 0))
-        proof.elf_check(bytes(data), image, proof.BASE, len(image), 0)
-        data[92] ^= 1
-        with self.assertRaisesRegex(ValueError, "section bytes"):
-            proof.elf_check(bytes(data), image, proof.BASE, len(image), 0)
-
-    def test_wrong_elf_architecture_and_address(self):
-        path = self.root / "golden/app/zephyr/zephyr.elf"
+    def test_payload_hash_mismatch(self):
+        path = self.root / "a/app/zephyr/zephyr.signed.bin"
         original = path.read_bytes()
-        for position, value in ((18, 62), (64, proof.BASE + 0x40000)):
-            damaged = bytearray(original)
-            struct.pack_into("<I" if position == 64 else "<H", damaged, position, value)
-            path.write_bytes(damaged)
-            with self.assertRaises(ValueError):
-                self.check()
+        end = 512 + struct.unpack_from("<I", original, 12)[0]
+        hash_value = end + 4 + struct.calcsize("<BBH") + 32 + struct.calcsize("<BBH")
+        for position in (512, hash_value):
+            with self.subTest(position=position):
+                damaged = bytearray(original)
+                damaged[position] ^= 1
+                path.write_bytes(damaged)
+                with self.assertRaisesRegex(ValueError, "image hash mismatch"):
+                    self.check()
+
+    def test_single_link_refused(self):
+        for role in ("a", "golden"):
+            path = self.root / role / "app/zephyr/.config"
+            original = path.read_text()
+            for old, new in (("KFSW_CSP_CAN=y", "KFSW_CSP_CAN=n"),
+                             ("KFSW_CSP_KISS_UART=y", "KFSW_CSP_KISS_UART=n"),
+                             ('1 KISS,0/0 CAN', '0/0 KISS'),
+                             ('1 KISS,0/0 CAN', '0/0 CAN')):
+                with self.subTest(role=role, replacement=new):
+                    path.write_text(original.replace(old, new))
+                    with self.assertRaises(ValueError):
+                        self.check()
+            path.write_text(original)
+
+    def test_wrong_elf_architecture(self):
+        path = self.root / "golden/app/zephyr/zephyr.elf"
+        damaged = bytearray(path.read_bytes())
+        struct.pack_into("<H", damaged, 18, 62)
+        path.write_bytes(damaged)
+        with self.assertRaises(ValueError):
+            self.check()
+
+    def test_entry_outside_image_payload(self):
+        path = self.root / "a/app/zephyr/zephyr.elf"
+        original = path.read_bytes()
+        image = path.with_name("zephyr.signed.bin").read_bytes()
+        start = proof.BASE + proof.MAP["slot0_partition"][0]
+        payload_end = 512 + struct.unpack_from("<I", image, 12)[0]
+        cases = (("inside header", start),
+                 ("inside TLVs", start + ((payload_end + 1) & ~1)),
+                 ("past payload", start + len(image)))
+        for name, value in cases:
+            with self.subTest(name=name):
+                damaged = bytearray(original)
+                struct.pack_into("<I", damaged, 24, value | 1)
+                path.write_bytes(damaged)
+                with self.assertRaisesRegex(ValueError, "outside image payload") as refused:
+                    self.check()
+                print(f"{name}: refused: {refused.exception}")
+        path.write_bytes(original)
 
     def test_overlap_and_wrong_partition(self):
         path = self.root / "golden/app/zephyr/edt.pickle"

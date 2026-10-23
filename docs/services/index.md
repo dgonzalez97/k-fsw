@@ -861,9 +861,9 @@ The opt-in `f746-zms-storage.conf` profile also enables persistent parameters
 and FTP in the running A image. Apply it after `f746-minimal.conf`, with the
 shared recovery flash map and `f746-zms-storage.overlay`. Keep this profile out
 of Golden: Golden uses the separate recovery uploader and never mounts the
-file region. The signed A build with these file services is 134,535 bytes
-within its 256 KiB partition, with 97,164 bytes of static RAM. These are build
-results; physical storage and interruption acceptance remain outstanding.
+file region. Check software fit for each build using the linker memory report and the
+`zephyr.signed.bin` size against the 256 KiB A partition. Physical storage and
+interruption acceptance remain outstanding.
 
 
 ## File transfer

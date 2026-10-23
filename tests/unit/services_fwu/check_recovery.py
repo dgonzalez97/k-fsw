@@ -54,15 +54,18 @@ with tempfile.TemporaryDirectory(prefix="kfsw-recovery-") as temporary:
 
     flash = output / "flash.bin"
     executable = build / "zephyr/zephyr.exe"
-    for iteration in range(2):
-        result = subprocess.run([str(executable), f"-flash={flash}",
-                                 "-test=services_fwu::test_interruption_leaves_partial_image"],
+    def run(test, *extra):
+        result = subprocess.run([str(executable), f"-flash={flash}", f"-test={test}", *extra],
                                 capture_output=True, text=True, check=False)
-        if result.returncode != 0 or "PROJECT EXECUTION SUCCESSFUL" not in result.stdout:
-            raise SystemExit(f"restart {iteration}: {result.stdout}\n{result.stderr}")
-        # The native board's primary slot starts at 0xc000. Verify the partial
-        # image survives process exit before testing that FWU starts idle again.
+        name = test.split("::")[1]
+        if (result.returncode != 0 or "PROJECT EXECUTION SUCCESSFUL" not in result.stdout
+                or f"PASS - {name}" not in result.stdout):
+            raise SystemExit(f"{test}: {result.stdout}\n{result.stderr}")
         with flash.open("rb") as stream:
             stream.seek(0xc000)
-            assert stream.read(8) == bytes((index * 31 + 7) & 255 for index in range(8))
-        print(f"partial upload process {iteration + 1}: exit 0, bytes persisted")
+            assert stream.read(4096) == bytes((index * 31 + 7) & 255 for index in range(4096))
+        print(f"{test}: PASS, exit 0, 4096 partial bytes persisted")
+
+    run("services_fwu::test_interruption_leaves_partial_image")
+    run("services_fwu_restart::test_restart_is_idle_with_partial_image",
+        "-fwu_restart_inspection")

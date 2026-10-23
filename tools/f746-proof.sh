@@ -27,13 +27,13 @@ if [[ "$action" == build ]]; then
     export KFSW_CMAKE_ARGS="-DSB_CONFIG_MCUBOOT_MODE_FIRMWARE_UPDATER=y -Dmcuboot_EXTRA_CONF_FILE=$p/f746-mcuboot.conf"
     for image in a golden; do
         export KFSW_BUILD_DIR="$out/$image"
-        export KFSW_EXTRA_CONF_FILE="$p/f746-uart.conf;$p/f746-minimal.conf"
+        export KFSW_EXTRA_CONF_FILE="$p/f746-uart.conf;$p/f746-can.conf;$p/f746-minimal.conf"
         overlay=f746-recovery.overlay
         if [[ "$image" == golden ]]; then
             KFSW_EXTRA_CONF_FILE+=";$p/f746-golden.conf"
             overlay=f746-golden.overlay
         fi
-        export KFSW_EXTRA_DTC_OVERLAY_FILE="$p/f746-recovery-flash.overlay;$p/$overlay;$p/f746-uart.overlay"
+        export KFSW_EXTRA_DTC_OVERLAY_FILE="$p/f746-recovery-flash.overlay;$p/$overlay;$p/f746-uart.overlay;$p/f746-can.overlay"
         "$repo/tools/build.sh" nucleo_f746zg
     done
 fi

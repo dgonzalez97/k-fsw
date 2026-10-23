@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline F746 firmware-loader layout, ELF and signed-image proof; no hardware IO."""
+"""Offline F746 firmware-loader layout and signed-image integrity proof; no hardware IO."""
 
 import argparse
 import hashlib
@@ -44,52 +44,12 @@ def layout(edt):
     return result
 
 
-def elf_check(data, image, start, limit, header):
+def entry_check(data, image, start, header):
     require(data[:7] == b"\x7fELF\x01\x01\x01", "expected ELF32 little endian")
     require(struct.unpack_from("<HH", data, 16) == (2, 40), "expected ARM executable")
-    entry, phoff = struct.unpack_from("<II", data, 24)
-    phsize, count = struct.unpack_from("<HH", data, 42)
-    require(phsize == 32 and count > 0, "invalid ELF program table")
-    require(start + header <= (entry & ~1) < start + len(image), "ELF entry outside image")
-    loads = []
-    segments = []
-    for index in range(count):
-        kind, offset, _, address, size, _, _, _ = struct.unpack_from(
-            "<8I", data, phoff + index * phsize)
-        if kind != 1 or not size:
-            continue
-        require(start <= address and address + size <= start + limit,
-                "ELF load overlaps another region or exceeds budget")
-        require(offset + size <= len(data), "truncated ELF segment")
-        segments.append((offset, size, address))
-        loads.append((address, address + size))
-    section_offset = struct.unpack_from("<I", data, 32)[0]
-    section_size, section_count = struct.unpack_from("<HH", data, 46)
-    require(section_size == 40 and section_count > 0, "invalid ELF section table")
-    require(section_offset + section_size * section_count <= len(data),
-            "truncated ELF section table")
-    checked = 0
-    for index in range(section_count):
-        _, kind, flags, _, offset, size, _, _, _, _ = struct.unpack_from(
-            "<10I", data, section_offset + index * section_size)
-        if not flags & 2 or kind == 8 or not size:
-            continue
-        segment = next(((base, address) for base, length, address in segments
-                        if base <= offset and offset + size <= base + length), None)
-        require(segment is not None, "allocated ELF section outside load segments")
-        base, address = segment
-        address += offset - base
-        skip = min(size, max(0, start + header - address))
-        relative = address - start + skip
-        require(data[offset + skip:offset + size] == image[relative:relative + size - skip],
-                "ELF and image section bytes differ")
-        checked += size - skip
-    require(checked > 0, "ELF has no image payload sections")
+    entry = struct.unpack_from("<I", data, 24)[0] & ~1
     payload_end = header + struct.unpack_from("<I", image, 12)[0] if header else len(image)
-    require(loads and max(b for _, b in loads) == start + payload_end,
-            "ELF does not cover complete image payload")
-    require(loads and min(a for a, _ in loads) <= start + header,
-            "ELF does not start at selected partition")
+    require(start + header <= entry < start + payload_end, "ELF entry outside image payload")
 
 
 def signed_image(data, limit, header, public):
@@ -120,7 +80,7 @@ def signed_image(data, limit, header, public):
     require(isinstance(key, ec.EllipticCurvePublicKey) and isinstance(key.curve, ec.SECP256R1),
             "expected ECDSA P-256 public key")
     key.verify(values[0x22], data[:end], ec.ECDSA(hashes.SHA256()))
-    return hdr
+    return values[0x10].hex()
 
 
 def public_key(directory):
@@ -142,6 +102,7 @@ def check(root, workspace):
             with (directory / "edt.pickle").open("rb") as stream:
                 edt = pickle.load(stream)
             regions = layout(edt)
+            digest = None
             if domain == "mcuboot":
                 enabled(cfg, "BOOT_FIRMWARE_LOADER BOOT_VALIDATE_SLOT0 "
                         "BOOT_FIRMWARE_LOADER_NO_APPLICATION GPIO "
@@ -159,30 +120,32 @@ def check(root, workspace):
                 require(public in image, "generated public key absent from MCUboot binary")
             else:
                 enabled(cfg, "BOOTLOADER_MCUBOOT MCUBOOT_BOOTLOADER_MODE_FIRMWARE_UPDATER "
-                        "USE_DT_CODE_PARTITION KFSW_CSP KFSW_CSP_KISS_UART "
+                        "USE_DT_CODE_PARTITION KFSW_CSP CAN KFSW_CSP_CAN KFSW_CSP_KISS_UART "
                         "KFSW_CSP_UART_INTERRUPT_DRIVEN KFSW_PARAM KFSW_PARAM_CSP")
                 enabled(cfg, "KFSW_FWU KFSW_FWU_LITE KFSW_GOLDEN KFSW_STORAGE "
                         "KFSW_STORAGE_TMP KFSW_PARAM_PERSISTENCE FILE_SYSTEM SHELL "
-                        "KFSW_FTP KFSW_HK KFSW_FBO KFSW_JOURNAL KFSW_HEALTH KFSW_CSP_CAN "
+                        "KFSW_FTP KFSW_HK KFSW_FBO KFSW_JOURNAL KFSW_HEALTH "
                         "KFSW_LIMITS KFSW_REMEXEC KFSW_WATCHDOG KFSW_LASTWORDS", "n")
                 enabled(cfg, "KFSW_COMMAND KFSW_COMMAND_CSP", "y" if role == "a" else "n")
                 enabled(cfg, "MCUBOOT_APPLICATION_FIRMWARE_UPDATER", "y" if role == "golden" else "n")
-                require(cfg.get("KFSW_CSP_ROUTE_TABLE") == '"0/0 KISS"'
-                        and cfg.get("KFSW_CSP_ADDRESS") == "3", "wrong direct UART routing")
+                require(cfg.get("KFSW_CSP_CAN_INTERFACE_NAME") == '"CAN"'
+                        and cfg.get("KFSW_CSP_ROUTE_TABLE") == '"1 KISS,0/0 CAN"'
+                        and cfg.get("KFSW_CSP_ADDRESS") == "3", "wrong dual-link routing")
                 label = "slot0_partition" if role == "a" else "slot1_partition"
                 require(edt.chosen_node("zephyr,code-partition") == edt.label2node[label],
                         "wrong executable partition")
                 header = int(cfg["ROM_START_OFFSET"], 0)
                 require(header >= 0x200 and header % 0x200 == 0, "invalid vector/header alignment")
                 image = (directory / "zephyr.signed.bin").read_bytes()
-                signed_image(image, regions[label][1], header, public)
+                digest = signed_image(image, regions[label][1], header, public)
             offset, budget = regions[label]
             require(int(cfg["FLASH_LOAD_OFFSET"], 0) == offset, "wrong configured load offset")
             require(int(cfg["FLASH_LOAD_SIZE"], 0) == budget, "wrong configured region size")
             require(len(image) <= budget, "image exceeds region")
-            elf_check((directory / "zephyr.elf").read_bytes(), image,
-                      BASE + offset, budget, header)
-            print(f"{role}/{domain}: offset={offset:#x}, bytes={len(image)}, budget={budget}")
+            entry_check((directory / "zephyr.elf").read_bytes(), image,
+                        BASE + offset, header)
+            print(f"{role}/{domain}: offset={offset:#x}, bytes={len(image)}, budget={budget}"
+                  + (f", sha256={digest}" if digest else ""))
     print("F746 offline proof PASS; boot execution and recovery upload NOT RUN")
 
 

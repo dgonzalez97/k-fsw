@@ -33,7 +33,9 @@ swap profiles retain their offset, trailer and trial rollback behavior.
 The native FWU and FWU-lite suites include recovery variants. After building
 `tests/unit/services_fwu` with recovery enabled, run
 `python3 tests/unit/services_fwu/check_recovery.py /tmp/<build-directory>`
-to check rejected compositions and restart after a partial upload. These checks
+to check rejected compositions and restart after a partial upload. The restart
+process selects only the inspection test, which checks idle service state and
+inherited partial bytes before any abort or BEGIN. These checks
 use simulated flash; they do not establish signature enforcement or physical
 Golden fallback.
 

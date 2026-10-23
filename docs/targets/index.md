@@ -30,7 +30,7 @@ every target has completed this transport requirement.
 | Board | Current transport status | Remaining work |
 | --- | --- | --- |
 | NUCLEO-L496ZG | UART/KISS in the board configuration; CAN added by the CAN profile. Prepared update images enable both. | Make dual-link support part of the standard board composition and acceptance matrix. |
-| NUCLEO-F746ZG | Prepared A and Golden images enable both; their current default route selects CAN. | Consolidate the board profiles and verify explicit routes for each link. |
+| NUCLEO-F746ZG | Prepared A and Golden images (`tools/f746-proof.sh`) use CAN1 PD0/PD1 at 500 kbit/s as the default bus and USART6 UART/KISS for node 1, with route `1 KISS,0/0 CAN`. CAN requires an external transceiver. | Verify both links physically on A and Golden. No observed hardware evidence yet. |
 | Pico W | UART/KISS configured; no CAN controller configured. | Select an external CAN controller with a Zephyr driver, define its wiring, check RAM use and test both links. |
 | FRDM-K64F | Current application is shell-only despite the board's CAN peripheral. | Include CAN and a dedicated UART/KISS link in the full-service work planned for 2.0. |
 
@@ -256,10 +256,11 @@ its MCUboot header; A links at offset `0x40000`, including its header. MCUboot
 calls Golden the secondary image internally. This is permanent recovery code;
 there is no B update slot or previous-image rollback.
 
-`f746-minimal.conf` and `f746-uart.conf` compose A with direct USART6 CSP,
+`f746-uart.conf`, `f746-can.conf` and `f746-minimal.conf` compose A with both CSP links,
 PARAM and command/status. Golden adds `f746-golden.conf` and keeps CSP and PARAM
 status, with commands and shell disabled. Both use node 3, peer 1, route
-`0/0 KISS`, PG14 TX/PG9 RX at 115200 8N1. USART3 is not the CSP transport.
+`1 KISS,0/0 CAN`: CAN is the default bus; UART/KISS uses PG14 TX/PG9 RX
+at 115200 8N1. USART3 is not the CSP transport.
 These are source compositions, not measured fit or reachability results.
 
 The storage adapter and recovery upload writer are **not delivered in phase 1**.
@@ -289,9 +290,11 @@ python3 tests/f746-proof-test.py
 The tool has no flash subcommand. It uses `tools/build.sh` separately for A and
 Golden, with sysbuild firmware-updater mode and an MCUboot-only extra config.
 The checker reads generated devicetrees, Kconfig, ELF and signed binaries;
-checks the common map, execution addresses, complete signed lengths and headers;
-and verifies ECDSA signatures against the generated MCUboot public key. It
-rejects wrong modes, missing validation, overlap and oversized artifacts.
+checks the common map, entry bounds, complete signed lengths and headers.
+Its primary integrity check compares the SHA-256 TLV (type `0x10`) with the hash
+of the MCUboot header and payload. It also verifies existing ECDSA signatures
+against the generated MCUboot public key. It rejects wrong modes, missing
+validation, overlap and oversized artifacts.
 Only use trusted locally generated `edt.pickle` files. `check` needs Python's
 `cryptography` package and the pinned Zephyr devicetree Python sources.
 
