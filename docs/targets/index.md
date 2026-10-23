@@ -153,7 +153,8 @@ flash for it.
 | `boot_partition` | `0x000000` | 64 KB |
 | `slot0_partition` | `0x010000` | 352 KB |
 | `slot1_partition` | `0x068000` | 352 KB |
-| `kfsw_golden_partition` | `0x0C0000` | 192 KB, recovery image |
+| `kfsw_golden_partition` | `0x0C0000` | 188 KiB, recovery image |
+| `kfsw_boot_budget_partition` | `0x0EF000` | 4 KiB, early flash budget |
 | `kfsw_storage_partition` | `0x0F0000` | 64 KB |
 
 The bootloader and the application use the same flash map overlay. The
@@ -164,8 +165,9 @@ after every swap. The golden partition holds the recovery image built by
 CSP, parameters, the command server and both update routes and nothing else. It
 is signed and linked like any other image. The bootloader only boots the slots,
 so installing it means copying it into the secondary slot and swapping, which
-`golden_install` does on command and the boot service does on its own once an
-image has booted unconfirmed more times than `boot_retries` allows.
+`golden_install` does on command and the boot service does on its own once
+`boot_attempts_left` reaches zero. The early flash record occupies 4 KiB at
+`0xEF000`; Golden now has 188 KiB.
 
 #### Signing
 

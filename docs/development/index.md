@@ -326,9 +326,9 @@ tree by `tools/golden.sh` and recorded in `release.json` as `recovery_image`.
 It is the composition in `config/profiles/nucleo-golden.conf`: CSP over the
 UART and CAN links, remote parameters, the command server and both update
 routes, and nothing else. No console, no filesystem, no housekeeping. It exists
-to be reachable and to take a new image, and it is around 143 KB against the
-192 KB the golden partition holds, where the flight image is 247 KB. A target
-without that partition has no recovery image and `recovery_image` is null.
+to be reachable and to take a new image, and `tools/golden.sh` checks that it
+fits the 188 KiB golden partition. A target without that partition has no
+recovery image and `recovery_image` is null.
 
 Flash it once per board, at `0x080C0000`, with `tools/golden.sh flash`. It is
 not flashed by the release and it does not change when the flight image does,
@@ -345,10 +345,9 @@ Two things can ask for that:
 
 - `golden_install <pin>`, a command like `reboot`, over CSP or from the shell.
   An operator who already knows the image is bad does not have to wait.
-- The boot service, once an image has booted unconfirmed more times than
-  `boot_retries` allows. That parameter is persistent and between one and ten;
-  without the parameter snapshot it restarts at its compiled default every
-  boot, so the build warns and so does the log at startup.
+- The early boot service, when `boot_attempts_left` reaches zero. The count
+  and `boot_attempts_max` live in a dedicated flash record, independent of the
+  parameter snapshot. See [boot budget and MCUboot](../fwu/README.md#boot-budget-and-mcuboot).
 
 The swap is a trial, not a permanent one: if the recovery image cannot boot
 either, the bootloader still has somewhere to go back to. The recovery image
@@ -357,12 +356,9 @@ confirm it for a node that is already in trouble. That is
 `CONFIG_KFSW_BOOT_CONFIRM_AT_START`, and an image an operator confirms should
 leave it off.
 
-The automatic path is the one to be careful about. The retry budget is only
-spent by repeated unconfirmed boots, and MCUboot's own revert rescues a node
-before that happens: it puts the previous image back after a single failed
-trial. So the budget is reached only by a node whose revert is not rescuing it,
-which is the case recovery exists for and which a bench with a working
-bootloader cannot reproduce. What is verified on hardware is the mechanism
-underneath: `tests/hil/golden-recovery-smoke.sh` installs the image on command
-and checks from the ground node over CAN that the node comes back carrying the
-recovery parameter set.
+The early budget survives both confirmation and MCUboot revert. A node with
+no ground contact can exhaust it even when MCUboot restores the previous image.
+`tests/boot-budget-smoke.sh` exercises that budget and installation through a
+hosted bootloader model, and `tests/hil/golden-recovery-smoke.sh` installs the
+image on command and checks the recovery parameter set over CAN. Automatic
+expiry and real power cuts are bench work.

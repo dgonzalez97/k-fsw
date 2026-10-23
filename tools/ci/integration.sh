@@ -37,6 +37,8 @@ gndwdt_output="$(mktemp -d /tmp/kfsw-gndwdt.XXXXXX)"
 rm -rf -- "$gndwdt_output"
 echo "INTEGRATION: ground watchdog expiry and reboot (accelerated native_sim)"
 "$KFSW_REPO_DIR/tests/gndwdt-expiry-smoke.sh"
+echo "INTEGRATION: early boot budget and Golden recovery"
+"$KFSW_REPO_DIR/tests/boot-budget-smoke.sh"
 
 echo "INTEGRATION: ground operator requests over PTY KISS"
 "$kfsw_python" "$KFSW_REPO_DIR/tests/ground-services-smoke.py"

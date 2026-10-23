@@ -19,7 +19,7 @@ The mode column is what the parameter service enforces: `r` is read only, `w` is
 | 28 | service | `command` | 7 | 0 | Command counters, timeout and echo |
 | 29 | service | `ftp` | 7 | 0 | File transfers and limits |
 | 30 | service | `fwu` | 10 | 0 | Firmware update state and checks |
-| 32 | service | `boot` | 8 | 1 | Running image, revisions, restarts |
+| 32 | service | `boot` | 10 | 3 | Running image, revisions, restarts |
 | 33 | service | `hk` | 14 | 0 | Housekeeping reports and counters |
 | 34 | service | `fbo` | 19 | 0 | Procedure runs, progress and the time-tagged queue |
 | 35 | service | `gndwdt` | 8 | 0 | Ground watchdog countdown |
@@ -177,7 +177,9 @@ The mode column is what the parameter service enforces: `r` is read only, `w` is
 | 0x28 | `boot_confirmed` | u8 | w | - | Mark the running image good; can only be set, never cleared |
 | 0x29 | `boot_revert_reason` | u8 | r | - | 0 none, 1 missed confirmation, 2 replaced unknown, 255 invalid |
 | 0x2a | `boot_trial_valid` | u8 | r | - | Trial diagnostics were recovered and saved successfully |
+| 0x2b | `boot_attempts_left` | u8 | wp | - | Attempts remaining; ground writes persist in early flash |
 | 0x2c | `boot_attempts` | u32 | r | - | Persisted unconfirmed boots of this image; UINT32_MAX invalid |
+| 0x3c | `boot_attempts_max` | u8 | wp | - | Boot attempt limit: 3, 5 or 10; raising never refills |
 | 0x40 | `boot_revisions` | string | r | - | Short revision of each repository compiled into this image |
 
 ### hk (33)

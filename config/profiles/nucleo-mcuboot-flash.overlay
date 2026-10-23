@@ -31,7 +31,12 @@
 
 		kfsw_golden_partition: partition@c0000 {
 			label = "kfsw-golden";
-			reg = <0x000c0000 0x00030000>;
+			reg = <0x000c0000 0x0002f000>;
+		};
+
+		kfsw_boot_budget_partition: partition@ef000 {
+			label = "kfsw-boot-budget";
+			reg = <0x000ef000 0x00001000>;
 		};
 	};
 };

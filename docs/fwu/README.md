@@ -243,3 +243,94 @@ stays running. These software checks provide no physical boot evidence.
 
 - @ref targets has the flash map and MCUboot configuration.
 - `tests/hil/mcuboot/rollback.sh`: bootloader revert and wrong-key tests.
+
+## Boot budget and MCUboot
+
+The NUCLEO swap composition uses two recovery mechanisms in this order:
+
+1. MCUboot runs first. It swaps a trial image in and reverts an unconfirmed
+   image on the following reset. The application cannot override that decision.
+2. After flash and reset-cause drivers initialize, before `main()` and any
+   filesystem mount, K-FSW reads the early flash record and consumes one attempt
+   for an unexplained reset. Confirmation and reversion never refill it.
+3. At zero, K-FSW calls `kfsw_golden_install()`. A pending revert returns
+   `-EBUSY`: K-FSW resets immediately and lets MCUboot revert first. The reverted
+   application's zero budget then installs Golden. A missing Golden image or
+   an installation error is reported once at startup and normal startup proceeds.
+4. Golden has no budget and cannot install itself. It confirms its trial image
+   at startup and remains reachable for an operator to install a replacement.
+5. Either front end refills the budget, because both reach it through the same
+   activation. Golden runs the lite front end, so the image it installs starts
+   with a full budget.
+
+`boot_attempts_left` (table 32, offset `0x2b`) and `boot_attempts_max`
+(offset `0x3c`) are readable and writable u8 parameters. The compiled maximum
+is `CONFIG_KFSW_BOOT_ATTEMPTS_MAX=3`; accepted maxima are 3, 5 and 10. Raising
+it does not refill the count. Lowering it clamps the count. Remaining attempts
+must be between zero and the live maximum. No healthy boot or watchdog feed
+refills anything. FWU activation refills the record to the live maximum after
+installing an image; a store failure is reported without invalidating the image.
+
+`golden attempts` reads the count and `golden attempts 3` writes it, in the
+style of `gndwdt timeout`; it touches that parameter and nothing else. The
+equivalent parameter operation is `param set boot_attempts_left 3`, followed by
+`param save`.
+These two parameters persist on an accepted write through their owner, so save
+is harmless but unnecessary for them. They are excluded from filesystem
+snapshot save, restore and `param defaults`: restoring an older snapshot must
+never undo early boot consumption. Golden carries no budget of its own, but it
+does serve both parameters, because an operator who has just recovered a node
+needs to see and prime the budget of the image they are about to install.
+
+The NUCLEO record uses the two 2 KiB erase pages at `0xEF000..0xEFFFF`, taken
+from Golden's end. Boot and slot boundaries stay unchanged. Golden has 188 KiB
+and the filesystem still starts at `0xF0000`. Zephyr NVS appends an 8-byte
+versioned, CRC32-protected record and an 8-byte allocation entry, about 16 bytes
+per changed budget on this target, plus sector-management entries. Garbage
+collection rotates the two pages; an interrupted append leaves the preceding
+committed record available. native_sim uses two 4 KiB erase pages because its
+flash geometry differs. A read or write failure is reported and never prevents
+a later reset; durable consumption cannot be guaranteed while flash is faulty.
+
+A commanded reboot is exempt only with both a software reset mask and a
+CRC-valid `KFSW_LASTWORDS_COMMANDED` note. STM32 can also report the PIN flag
+with a software reset; any watchdog, brownout, power-on or unknown bit defeats
+the exemption. Ground-watchdog expiry calls `sys_reboot()` without writing a
+commanded note. native_sim cannot preserve the retained note across its process
+restart and always spends an attempt, including on commanded reboot. NUCLEO
+has the reset-mask and retained-note mechanism, but the note is ordinary
+`.noinit` RAM without a bootloader-reserved handoff region. Its survival through
+MCUboot is not established. Missing or invalid evidence spends an attempt,
+which drains toward Golden instead of permitting an endless crash loop.
+A power cut correctly spends an attempt regardless of any old note.
+
+A budget of three is three startups. Blank budget flash starts at the compiled
+maximum, so the application observes 2, then 1, then 0, and the startup that
+spends the last attempt still runs: the one after it finds nothing left and
+installs Golden. FWU writes the maximum before the reset, so the ground reads 3
+on the image it has just installed. An image that never reaches the flash-ready
+initialization cannot spend anything, and MCUboot's trial revert is what
+answers for it.
+
+Software checks:
+
+```sh
+./k-fsw/tests/boot-budget-smoke.sh
+./k-fsw/tools/ci/unit.sh -s kfsw.services.boot_budget -s kfsw.services.gndwdt
+```
+
+The smoke uses the real flash record, early boot service, FWU writer and Golden
+installer across process restarts. Its hosted bootloader model verifies the
+copied bytes and then selects the Golden executable. It does not execute
+MCUboot or validate a signature. The unit fixture supplies MCUboot TEST/REVERT
+responses to prove that an outstanding revert protects the secondary slot and
+does not refill the budget. NUCLEO acceptance must still exercise the actual
+bootloader, commanded reboot, watchdog expiry and interrupted flash updates.
+
+On the bench, install Golden first, read both table 32 budget parameters,
+set the maximum to 3, then write `boot_attempts_left 3`. Record a commanded
+reboot and its reset mask/lastwords note, then withhold watchdog contact across
+restarts until Golden is reached. Repeat with real power cuts during record
+updates and page rotation, checking that the previous valid record remains
+readable. This sequence resets and replaces the application; run it only in
+the owner's bench session with the recovery image and links verified.

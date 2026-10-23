@@ -1,0 +1,13 @@
+/ {
+    chosen {
+        kfsw,boot-budget-partition = &test_budget;
+    };
+};
+&flash0 {
+    partitions {
+        test_budget: partition@181000 {
+            label = "test-budget";
+            reg = <0x00181000 0x2000>;
+        };
+    };
+};

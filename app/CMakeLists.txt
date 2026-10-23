@@ -202,9 +202,11 @@ if(CONFIG_KFSW_DEBUG_SHELL)
     target_sources_ifdef(CONFIG_KFSW_FWU_LITE_CSP app PRIVATE
         src/shell/shell_fwu_lite.c
     )
-    target_sources_ifdef(CONFIG_KFSW_GOLDEN app PRIVATE
-        src/shell/shell_golden.c
-    )
+    # Also where there is no recovery partition: the boot budget is read and
+    # written here, and the hosted target carries it without a bootloader.
+    if(CONFIG_KFSW_GOLDEN OR (CONFIG_KFSW_BOOT_STORE AND CONFIG_KFSW_PARAM))
+        target_sources(app PRIVATE src/shell/shell_golden.c)
+    endif()
     target_sources_ifdef(CONFIG_KFSW_HEALTH app PRIVATE
         src/shell/shell_health.c
     )

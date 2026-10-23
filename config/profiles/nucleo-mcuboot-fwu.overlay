@@ -3,5 +3,6 @@
 	chosen {
 		kfsw,fwu-partition = &slot1_partition;
 		kfsw,golden-partition = &kfsw_golden_partition;
+		kfsw,boot-budget-partition = &kfsw_boot_budget_partition;
 	};
 };

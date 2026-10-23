@@ -13,6 +13,7 @@
 		/* Always set; it costs nothing when the update service is not built in. */
 		kfsw,fwu-partition = &slot1_partition;
 		kfsw,tmp-disk = &tmp_disk;
+		kfsw,boot-budget-partition = &kfsw_boot_budget_partition;
 	};
 
 	/* 32 KB of RAM behind /kfsw/tmp, formatted at every boot. */
@@ -21,6 +22,22 @@
 		disk-name = "TMP";
 		sector-size = <512>;
 		sector-count = <64>;
+	};
+};
+
+/* The last 8 kB of the unused swap scratch, so that it stays below the storage
+ * partition: a test overlay that grows storage must not land on top of it.
+ */
+&scratch_partition {
+	reg = <0x000de000 0x0001c000>;
+};
+
+&flash0 {
+	partitions {
+		kfsw_boot_budget_partition: partition@fa000 {
+			label = "kfsw-boot-budget";
+			reg = <0x000fa000 0x00002000>;
+		};
 	};
 };
 

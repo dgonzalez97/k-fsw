@@ -21,7 +21,7 @@ image="$build_dir/app/zephyr/zephyr.signed.bin"
 # kfsw_golden_partition in nucleo-mcuboot-flash.overlay gives an offset inside
 # flash0; the debugger addresses memory, and this part maps flash at 0x08000000.
 golden_offset="${KFSW_GOLDEN_OFFSET:-0x080C0000}"
-golden_size="${KFSW_GOLDEN_SIZE:-196608}"
+golden_size="${KFSW_GOLDEN_SIZE:-192512}"
 
 fail() { echo "GOLDEN: FAIL $*" >&2; exit 1; }
 
@@ -45,8 +45,9 @@ size()
 	if (( bytes > golden_size )); then
 		fail "the image is $bytes bytes and the golden partition holds $golden_size"
 	fi
-	printf 'GOLDEN: %s bytes of %s, %s%% spare\n' \
-		"$bytes" "$golden_size" "$(( 100 * (golden_size - bytes) / golden_size ))"
+	printf 'GOLDEN: %s bytes of %s, %s bytes spare (%s%%)\n' \
+		"$bytes" "$golden_size" "$((golden_size - bytes))" \
+		"$(( 100 * (golden_size - bytes) / golden_size ))"
 }
 
 case "${1:-build}" in

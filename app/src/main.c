@@ -156,23 +156,6 @@ int main(void)
 	}
 #endif
 
-#if CONFIG_KFSW_GOLDEN
-	/* Before anything else starts, because this image has already failed to
-	   stay up often enough. */
-	{
-		enum kfsw_golden_outcome recovery;
-
-		result = kfsw_golden_check(&recovery);
-		if (result != 0) {
-			startup_failures++;
-			kfsw_log_error("Recovery decision unavailable: %d", result);
-		} else if (recovery == KFSW_GOLDEN_INSTALLED) {
-			kfsw_log_warning("Restarting into the recovery image");
-			sys_reboot(SYS_REBOOT_COLD);
-		}
-	}
-#endif
-
 #if CONFIG_KFSW_STORAGE_TMP
 	result = kfsw_storage_tmp_mount();
 	if (result != 0) {

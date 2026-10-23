@@ -4,12 +4,15 @@
 #include <string.h>
 
 #include <zephyr/kernel.h>
+#include <zephyr/kvss/nvs.h>
 #include <zephyr/sys/atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/reboot.h>
 #include <zephyr/ztest.h>
 
 #include <kfsw/services/gndwdt.h>
+#include <kfsw/platform/lastwords.h>
+#include <kfsw/services/boot_budget.h>
 #if CONFIG_KFSW_EVENT
 #include <kfsw/services/event.h>
 #endif
@@ -20,6 +23,16 @@ static uint64_t now_ms;
 uint64_t __wrap_kfsw_time_monotonic_ms(void)
 {
 	return now_ms;
+}
+
+static bool store_fails;
+static unsigned int store_writes;
+
+ssize_t __real_nvs_write(struct nvs_fs *fs, uint16_t id, const void *data, size_t size);
+ssize_t __wrap_nvs_write(struct nvs_fs *fs, uint16_t id, const void *data, size_t size)
+{
+	store_writes++;
+	return store_fails ? -EIO : __real_nvs_write(fs, id, data, size);
 }
 
 static atomic_t reboots;
@@ -280,6 +293,11 @@ ZTEST(services_gndwdt, test_expiry_resets_the_node_once)
 	struct kfsw_gndwdt_status before;
 	struct kfsw_gndwdt_status after;
 
+	zassert_ok(kfsw_boot_budget_refill());
+	store_fails = true;
+	zassert_equal(kfsw_boot_budget_start(false), -EIO);
+	unsigned int writes_before_reset = store_writes;
+
 	zassert_ok(kfsw_gndwdt_start());
 	kfsw_gndwdt_get_status(&before);
 	now_ms += TIMEOUT_MS;
@@ -318,6 +336,11 @@ ZTEST(services_gndwdt, test_expiry_resets_the_node_once)
 	zassert_ok(k_sem_take(&reboot_seen, K_SECONDS(5)));
 	zassert_equal(reboot_type, SYS_REBOOT_COLD);
 	zassert_equal(atomic_get(&reboots), 1);
+	zassert_equal(store_writes, writes_before_reset, "reset path must not write flash");
+	store_fails = false;
+	struct kfsw_lastwords note;
+
+	zassert_false(kfsw_lastwords_take(&note), "expiry must not leave a commanded note");
 }
 
 ZTEST_SUITE(services_gndwdt, NULL, setup, before, after, NULL);
