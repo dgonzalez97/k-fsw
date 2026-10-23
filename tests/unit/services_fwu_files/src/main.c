@@ -34,7 +34,12 @@ static void before(void *fixture)
 	const uint32_t tlv_offset = protected_offset + PROTECTED_SIZE;
 
 	ARG_UNUSED(fixture);
-	zassert_ok(kfsw_fwu_abort());
+	struct kfsw_fwu_status status;
+
+	zassert_ok(kfsw_fwu_get_status(&status));
+	if (status.handle.generation != 0U) {
+		zassert_ok(kfsw_fwu_session_abort(&status.handle, &status));
+	}
 	zassert_ok(flash_area_open(DT_FIXED_PARTITION_ID(DT_NODELABEL(slot0_partition)), &area));
 	zassert_ok(flash_area_flatten(area, 0, area->fa_size));
 	flash_area_close(area);
@@ -201,3 +206,29 @@ ZTEST(services_fwu_files, test_slot_files_reject_writes)
 }
 
 ZTEST_SUITE(services_fwu_files, NULL, setup, before, NULL, NULL);
+
+ZTEST(services_fwu_files, test_owned_activation_and_abort_respect_secondary_reader)
+{
+	const struct kfsw_fwu_owner owner = {.kind = KFSW_FWU_OWNER_FTP, .peer = 16U};
+	struct kfsw_fwu_image descriptor = {
+		.size = IMAGE_SIZE,
+		.crc32 = crc32_ieee(image, IMAGE_SIZE),
+	};
+	struct kfsw_fwu_status status;
+	struct kfsw_fwu_handle handle;
+	struct kfsw_fwu_handle ignored;
+	struct fs_file_t reader;
+
+	zassert_ok(kfsw_fwu_session_begin(&owner, &descriptor, 0U, &handle, &status));
+	zassert_ok(kfsw_fwu_session_write(&handle, 0U, image, IMAGE_SIZE, &status));
+	zassert_ok(kfsw_fwu_session_verify(&handle, &status));
+	fs_file_t_init(&reader);
+	zassert_ok(fs_open(&reader, SECONDARY, FS_O_READ));
+	zassert_equal(kfsw_fwu_session_activate(&handle, &status), -EBUSY);
+	zassert_equal(kfsw_fwu_session_abort(&handle, &status), -EBUSY);
+	zassert_equal(kfsw_fwu_session_begin(&owner, &descriptor, 0U, &ignored, &status), -EBUSY);
+	zassert_equal(status.state, KFSW_FWU_VERIFIED);
+	zassert_ok(fs_close(&reader));
+	zassert_ok(kfsw_fwu_session_activate(&handle, &status));
+	zassert_ok(kfsw_fwu_session_abort(&handle, &status));
+}

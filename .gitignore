@@ -12,3 +12,7 @@ twister-out*/
 
 # native_sim flash images left by a hosted run
 flash.bin
+
+# Local firmware upload artifacts at the checkout root
+/firmware.bin
+/.fwu-test-*.bin

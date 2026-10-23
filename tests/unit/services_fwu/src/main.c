@@ -1,5 +1,6 @@
 #include <cmdline.h>
 #include <errno.h>
+#include <psa/crypto.h>
 #include <posix_native_task.h>
 #include <string.h>
 
@@ -27,7 +28,11 @@
 
 static uint8_t test_image[TEST_IMAGE_SIZE];
 static int erase_error;
+static unsigned int erase_calls;
 static int write_error;
+static int read_error;
+static bool corrupt_read;
+static size_t bytes_read;
 static bool restart_inspection;
 
 static void add_restart_option(void)
@@ -63,7 +68,27 @@ int __real_flash_area_flatten(const struct flash_area *area, off_t offset, size_
 
 int __wrap_flash_area_flatten(const struct flash_area *area, off_t offset, size_t size)
 {
+	erase_calls++;
 	return erase_error != 0 ? erase_error : __real_flash_area_flatten(area, offset, size);
+}
+
+int __real_flash_area_read(const struct flash_area *area, off_t offset, void *data, size_t size);
+
+int __wrap_flash_area_read(const struct flash_area *area, off_t offset, void *data, size_t size)
+{
+	int result;
+
+	if (read_error != 0) {
+		return read_error;
+	}
+	result = __real_flash_area_read(area, offset, data, size);
+	if (result == 0) {
+		bytes_read += size;
+		if (corrupt_read && size > 0U) {
+			((uint8_t *)data)[0] ^= 1U;
+		}
+	}
+	return result;
 }
 
 static void fill_test_image(void)
@@ -93,7 +118,15 @@ static void fwu_before(void *fixture)
 	ARG_UNUSED(fixture);
 	erase_error = 0;
 	write_error = 0;
-	(void)kfsw_fwu_abort();
+	read_error = 0;
+	corrupt_read = false;
+	bytes_read = 0U;
+	struct kfsw_fwu_status status;
+
+	zassert_ok(kfsw_fwu_get_status(&status));
+	if (status.handle.generation != 0U) {
+		zassert_ok(kfsw_fwu_session_abort(&status.handle, &status));
+	}
 }
 
 ZTEST(services_fwu, test_failed_abort_retains_details_until_cleanup_succeeds)
@@ -259,6 +292,7 @@ ZTEST(services_fwu, test_write_rejects_running_past_the_declared_size)
 	zassert_ok(kfsw_fwu_begin(100U, 0U));
 	zassert_equal(kfsw_fwu_write(0U, test_image, 101U), -EFBIG);
 	zassert_ok(kfsw_fwu_write(0U, test_image, 100U));
+	zassert_equal(kfsw_fwu_write(100U, test_image, SIZE_MAX), -EFBIG);
 	zassert_equal(kfsw_fwu_write(100U, test_image, 1U), -EFBIG);
 	zassert_ok(kfsw_fwu_abort());
 }
@@ -490,13 +524,54 @@ ZTEST(services_fwu, test_image_sizes_around_a_sector_boundary)
 	}
 }
 
-ZTEST(services_fwu, test_finish_twice_is_rejected)
+ZTEST(services_fwu, test_finish_replay_preserves_outcome_and_counters)
 {
+	struct kfsw_fwu_status before;
+	struct kfsw_fwu_status after;
 	uint32_t crc = crc32_ieee(test_image, 1024U);
 
 	zassert_ok(transfer_whole_image(1024U, crc, 256U));
-	zassert_equal(kfsw_fwu_finish(), -EINVAL,
-		      "a completed transfer must not be offered a second time");
+	zassert_ok(kfsw_fwu_get_status(&before));
+	zassert_ok(kfsw_fwu_finish());
+	zassert_ok(kfsw_fwu_get_status(&after));
+	zassert_mem_equal(&before, &after, sizeof(before));
+}
+
+ZTEST(services_fwu, test_validation_reads_exact_declared_image)
+{
+	const uint32_t size = 513U;
+
+	zassert_ok(kfsw_fwu_begin(size, crc32_ieee(test_image, size)));
+	zassert_ok(kfsw_fwu_write(0U, test_image, size));
+	bytes_read = 0U;
+	zassert_ok(kfsw_fwu_verify());
+	zassert_equal(bytes_read, size);
+}
+
+ZTEST(services_fwu, test_validation_rejects_flash_read_failure)
+{
+	struct kfsw_fwu_status status;
+
+	zassert_ok(kfsw_fwu_begin(513U, crc32_ieee(test_image, 513U)));
+	zassert_ok(kfsw_fwu_write(0U, test_image, 513U));
+	read_error = -EIO;
+	zassert_equal(kfsw_fwu_verify(), -EIO);
+	zassert_ok(kfsw_fwu_get_status(&status));
+	zassert_equal(status.state, KFSW_FWU_FAILED);
+	zassert_false(status.swap_scheduled);
+}
+
+ZTEST(services_fwu, test_validation_rejects_corrupt_stored_bytes)
+{
+	struct kfsw_fwu_status status;
+
+	zassert_ok(kfsw_fwu_begin(513U, crc32_ieee(test_image, 513U)));
+	zassert_ok(kfsw_fwu_write(0U, test_image, 513U));
+	corrupt_read = true;
+	zassert_equal(kfsw_fwu_verify(), -EILSEQ);
+	zassert_ok(kfsw_fwu_get_status(&status));
+	zassert_equal(status.state, KFSW_FWU_FAILED);
+	zassert_false(status.swap_scheduled);
 }
 
 ZTEST(services_fwu, test_write_after_finish_is_rejected)
@@ -661,6 +736,326 @@ ZTEST(services_fwu, test_interruption_leaves_partial_image)
 	zassert_ok(read_slot(0U, readback, sizeof(readback)));
 	zassert_mem_equal(readback, test_image, sizeof(readback));
 	zassert_equal(kfsw_fwu_finish(), -EAGAIN);
+}
+
+static const struct kfsw_fwu_owner remote = {.kind = KFSW_FWU_OWNER_LITE, .peer = 16U};
+
+static struct kfsw_fwu_image digest_image(void)
+{
+	struct kfsw_fwu_image image = {
+		.size = 513U,
+		.block_size = 160U,
+		.digest_present = true,
+	};
+	size_t digest_size;
+
+	image.crc32 = crc32_ieee(test_image, image.size);
+	zassert_equal(psa_hash_compute(PSA_ALG_SHA_256, test_image, image.size, image.sha256,
+				       sizeof(image.sha256), &digest_size),
+		      PSA_SUCCESS);
+	zassert_equal(digest_size, KFSW_FWU_SHA256_SIZE);
+	return image;
+}
+
+ZTEST(services_fwu, test_remote_owner_excludes_local_and_other_principals)
+{
+	struct kfsw_fwu_image image = digest_image();
+	struct kfsw_fwu_handle handle;
+	struct kfsw_fwu_handle wrong;
+	struct kfsw_fwu_status status;
+	unsigned int erases = erase_calls;
+
+	zassert_ok(kfsw_fwu_session_begin(&remote, &image, 10U, &handle, &status));
+	wrong = handle;
+	wrong.owner.peer++;
+	zassert_equal(kfsw_fwu_write(0U, test_image, 1U), -EACCES);
+	zassert_equal(kfsw_fwu_verify(), -EACCES);
+	zassert_equal(kfsw_fwu_finish(), -EACCES);
+	zassert_equal(kfsw_fwu_abort(), -EACCES);
+	zassert_equal(kfsw_fwu_begin(1U, 0U), -EBUSY);
+	zassert_equal(kfsw_fwu_session_write(&wrong, 0U, test_image, 1U, &status), -EACCES);
+	zassert_equal(kfsw_fwu_session_verify(&wrong, &status), -EACCES);
+	zassert_equal(kfsw_fwu_session_activate(&wrong, &status), -EACCES);
+	zassert_equal(kfsw_fwu_session_abort(&wrong, &status), -EACCES);
+	zassert_equal(kfsw_fwu_session_status(&wrong, &status), -EACCES);
+	wrong = handle;
+	wrong.owner.kind = KFSW_FWU_OWNER_FTP;
+	zassert_equal(kfsw_fwu_session_abort(&wrong, &status), -EACCES);
+	zassert_equal(erase_calls, erases + 1U);
+	zassert_equal(status.received, 0U);
+	zassert_ok(kfsw_fwu_session_abort(&handle, &status));
+}
+
+ZTEST(services_fwu, test_digest_begin_resumes_only_exact_owner_identity_and_descriptor)
+{
+	struct kfsw_fwu_image image = digest_image();
+	struct kfsw_fwu_image other;
+	struct kfsw_fwu_owner owner = remote;
+	struct kfsw_fwu_handle handle;
+	struct kfsw_fwu_handle replay;
+	struct kfsw_fwu_status status;
+	unsigned int erases;
+
+	zassert_ok(kfsw_fwu_session_begin(&remote, &image, 11U, &handle, &status));
+	zassert_ok(kfsw_fwu_session_write(&handle, 0U, test_image, 17U, &status));
+	erases = erase_calls;
+	zassert_ok(kfsw_fwu_session_begin(&remote, &image, 11U, &replay, &status));
+	zassert_equal(replay.generation, handle.generation);
+	zassert_equal(status.received, 17U);
+	zassert_equal(status.committed, 0U);
+	other = image;
+	other.sha256[0] ^= 1U;
+	zassert_equal(kfsw_fwu_session_begin(&remote, &other, 11U, &replay, &status), -EBUSY);
+	other = image;
+	other.size++;
+	zassert_equal(kfsw_fwu_session_begin(&remote, &other, 11U, &replay, &status), -EBUSY);
+	other = image;
+	other.crc32++;
+	zassert_equal(kfsw_fwu_session_begin(&remote, &other, 11U, &replay, &status), -EBUSY);
+	other = image;
+	other.block_size++;
+	zassert_equal(kfsw_fwu_session_begin(&remote, &other, 11U, &replay, &status), -EBUSY);
+	owner.peer++;
+	zassert_equal(kfsw_fwu_session_begin(&owner, &image, 11U, &replay, &status), -EBUSY);
+	owner = remote;
+	owner.kind = KFSW_FWU_OWNER_FTP;
+	other = image;
+	other.digest_present = false;
+	zassert_equal(kfsw_fwu_session_begin(&owner, &other, 0U, &replay, &status), -EBUSY);
+	zassert_equal(kfsw_fwu_session_begin(&remote, &image, 12U, &replay, &status), -EBUSY);
+	zassert_equal(erase_calls, erases);
+	zassert_ok(kfsw_fwu_session_abort(&handle, &status));
+}
+
+ZTEST(services_fwu, test_abort_tombstone_and_stale_handles_cannot_mutate_successor)
+{
+	struct kfsw_fwu_image image = digest_image();
+	struct kfsw_fwu_handle old;
+	struct kfsw_fwu_handle next;
+	struct kfsw_fwu_status status;
+	unsigned int erases;
+
+	zassert_ok(kfsw_fwu_session_begin(&remote, &image, 13U, &old, &status));
+	zassert_ok(kfsw_fwu_session_abort(&old, &status));
+	zassert_true(status.aborted);
+	erases = erase_calls;
+	zassert_ok(kfsw_fwu_session_abort(&old, &status));
+	zassert_equal(kfsw_fwu_session_begin(&remote, &image, 13U, &next, &status), -ESTALE);
+	zassert_equal(erase_calls, erases);
+	zassert_ok(kfsw_fwu_session_begin(&remote, &image, 14U, &next, &status));
+	zassert_true(next.generation > old.generation);
+	erases = erase_calls;
+	zassert_equal(kfsw_fwu_session_write(&old, 0U, test_image, 1U, &status), -ESTALE);
+	zassert_equal(kfsw_fwu_session_verify(&old, &status), -ESTALE);
+	zassert_equal(kfsw_fwu_session_activate(&old, &status), -ESTALE);
+	zassert_equal(kfsw_fwu_session_abort(&old, &status), -ESTALE);
+	zassert_equal(kfsw_fwu_session_status(&old, &status), -ESTALE);
+	zassert_equal(status.handle.generation, next.generation);
+	zassert_equal(status.received, 0U);
+	zassert_equal(erase_calls, erases);
+	zassert_ok(kfsw_fwu_session_abort(&next, &status));
+}
+
+ZTEST(services_fwu, test_crc_only_ftp_and_golden_descriptors_do_not_resume)
+{
+	struct kfsw_fwu_image image = {.size = 10U};
+	struct kfsw_fwu_handle handle;
+	struct kfsw_fwu_handle ignored;
+	struct kfsw_fwu_status status;
+	const struct kfsw_fwu_owner owners[] = {
+		{.kind = KFSW_FWU_OWNER_FTP, .peer = 16U},
+		{.kind = KFSW_FWU_OWNER_LOCAL, .peer = 1U},
+		{.kind = KFSW_FWU_OWNER_LITE, .peer = 16U},
+	};
+
+	for (size_t i = 0U; i < ARRAY_SIZE(owners); i++) {
+		zassert_ok(kfsw_fwu_session_begin(&owners[i], &image, 0U, &handle, &status));
+		unsigned int erases = erase_calls;
+
+		zassert_equal(kfsw_fwu_session_begin(&owners[i], &image, 0U, &ignored, &status),
+			      -EBUSY);
+		zassert_equal(erase_calls, erases);
+		zassert_equal(kfsw_fwu_abort(), -EACCES);
+		zassert_ok(kfsw_fwu_session_abort(&handle, &status));
+	}
+}
+
+ZTEST(services_fwu, test_remote_begin_failure_retains_owner_and_cleanup_retry_errors)
+{
+	struct kfsw_fwu_image image = digest_image();
+	struct kfsw_fwu_handle handle;
+	struct kfsw_fwu_handle ignored;
+	struct kfsw_fwu_status status;
+	uint32_t failures;
+
+	erase_error = -EIO;
+	zassert_equal(kfsw_fwu_session_begin(&remote, &image, 15U, &handle, &status), -EIO);
+	zassert_equal(status.state, KFSW_FWU_FAILED);
+	zassert_equal(status.image.size, image.size);
+	zassert_equal(status.handle.owner.peer, remote.peer);
+	failures = status.failed;
+	zassert_equal(kfsw_fwu_session_begin(&remote, &image, 15U, &ignored, &status), -EBUSY);
+	zassert_equal(kfsw_fwu_abort(), -EACCES);
+	zassert_equal(kfsw_fwu_session_abort(&handle, &status), -EIO);
+	zassert_equal(kfsw_fwu_session_abort(&handle, &status), -EIO);
+	zassert_equal(status.failed, failures);
+	zassert_false(status.aborted);
+	erase_error = 0;
+	zassert_ok(kfsw_fwu_session_abort(&handle, &status));
+	zassert_true(status.aborted);
+	zassert_ok(kfsw_fwu_session_begin(&remote, &image, 16U, &handle, &status));
+	zassert_ok(kfsw_fwu_session_abort(&handle, &status));
+}
+
+ZTEST(services_fwu, test_digest_verifies_exact_stored_bytes_then_explicit_activation)
+{
+	struct kfsw_fwu_image image = digest_image();
+	struct kfsw_fwu_handle handle;
+	struct kfsw_fwu_status status;
+	uint8_t readback[513];
+	uint32_t completed;
+
+	zassert_ok(kfsw_fwu_session_begin(&remote, &image, 17U, &handle, &status));
+	completed = status.completed;
+	zassert_equal(kfsw_fwu_session_activate(&handle, &status), -EINVAL);
+	zassert_equal(kfsw_fwu_session_verify(&handle, &status), -EAGAIN);
+	zassert_ok(kfsw_fwu_session_write(&handle, 0U, test_image, image.size, &status));
+	zassert_equal(status.state, KFSW_FWU_RECEIVING);
+	zassert_false(status.swap_scheduled);
+	zassert_equal(kfsw_fwu_session_activate(&handle, &status), -EINVAL);
+	bytes_read = 0U;
+	zassert_ok(kfsw_fwu_session_verify(&handle, &status));
+	zassert_equal(bytes_read, image.size);
+	zassert_equal(status.state, KFSW_FWU_VERIFIED);
+	zassert_equal(status.committed, image.size);
+	zassert_equal(status.completed, completed);
+	zassert_false(status.swap_scheduled);
+	zassert_ok(read_slot(0U, readback, sizeof(readback)));
+	zassert_mem_equal(readback, test_image, sizeof(readback));
+	struct kfsw_fwu_handle replay;
+	unsigned int erases = erase_calls;
+
+	zassert_ok(kfsw_fwu_session_begin(&remote, &image, 17U, &replay, &status));
+	zassert_equal(replay.generation, handle.generation);
+	zassert_equal(status.state, KFSW_FWU_VERIFIED);
+	zassert_equal(erase_calls, erases);
+	zassert_ok(kfsw_fwu_session_verify(&handle, &status));
+	zassert_equal(kfsw_fwu_session_write(&handle, 0U, test_image, 1U, &status), -EINVAL);
+	zassert_ok(kfsw_fwu_session_activate(&handle, &status));
+	zassert_equal(status.state, KFSW_FWU_READY);
+	zassert_equal(status.completed, completed + 1U);
+	zassert_ok(kfsw_fwu_session_activate(&handle, &status));
+	zassert_equal(status.completed, completed + 1U);
+	zassert_ok(kfsw_fwu_session_begin(&remote, &image, 17U, &replay, &status));
+	zassert_equal(status.state, KFSW_FWU_READY);
+	zassert_equal(erase_calls, erases);
+	zassert_ok(kfsw_fwu_session_abort(&handle, &status));
+}
+
+ZTEST(services_fwu, test_correct_crc_with_wrong_digest_is_rejected_and_owner_retained)
+{
+	struct kfsw_fwu_image image = digest_image();
+	struct kfsw_fwu_handle handle;
+	struct kfsw_fwu_status status;
+
+	image.sha256[0] ^= 1U;
+	zassert_ok(kfsw_fwu_session_begin(&remote, &image, 18U, &handle, &status));
+	zassert_ok(kfsw_fwu_session_write(&handle, 0U, test_image, image.size, &status));
+	erase_error = -EIO;
+	zassert_equal(kfsw_fwu_session_verify(&handle, &status), -EILSEQ);
+	zassert_equal(status.state, KFSW_FWU_FAILED);
+	zassert_equal(status.handle.generation, handle.generation);
+	zassert_equal(kfsw_fwu_abort(), -EACCES);
+	zassert_equal(kfsw_fwu_session_abort(&handle, &status), -EIO);
+	erase_error = 0;
+	zassert_ok(kfsw_fwu_session_abort(&handle, &status));
+}
+
+ZTEST(services_fwu, test_remote_read_and_flush_failures_retain_handle)
+{
+	struct kfsw_fwu_image image = digest_image();
+	struct kfsw_fwu_handle handle;
+	struct kfsw_fwu_status status;
+
+	for (uint32_t attempt = 0U; attempt < 2U; attempt++) {
+		zassert_ok(
+			kfsw_fwu_session_begin(&remote, &image, 19U + attempt, &handle, &status));
+		zassert_ok(kfsw_fwu_session_write(&handle, 0U, test_image, image.size, &status));
+		if (attempt == 0U) {
+			read_error = -EIO;
+		} else {
+			write_error = -EIO;
+		}
+		zassert_equal(kfsw_fwu_session_verify(&handle, &status), -EIO);
+		zassert_equal(status.state, KFSW_FWU_FAILED);
+		zassert_equal(kfsw_fwu_session_activate(&handle, &status), -EINVAL);
+		read_error = 0;
+		write_error = 0;
+		zassert_ok(kfsw_fwu_session_abort(&handle, &status));
+	}
+}
+
+ZTEST(services_fwu, test_descriptor_validation_does_not_acquire_or_erase)
+{
+	struct kfsw_fwu_image image = digest_image();
+	struct kfsw_fwu_owner owner = remote;
+	struct kfsw_fwu_handle handle = {0};
+	struct kfsw_fwu_status status;
+	unsigned int erases = erase_calls;
+
+	zassert_equal(kfsw_fwu_session_begin(NULL, &image, 1U, &handle, &status), -EINVAL);
+	zassert_equal(kfsw_fwu_session_begin(&owner, NULL, 1U, &handle, &status), -EINVAL);
+	zassert_equal(kfsw_fwu_session_begin(&owner, &image, 0U, &handle, &status), -EINVAL);
+	owner.kind = (enum kfsw_fwu_owner_kind)99;
+	zassert_equal(kfsw_fwu_session_begin(&owner, &image, 1U, &handle, &status), -EINVAL);
+	owner.kind = KFSW_FWU_OWNER_FTP;
+	zassert_equal(kfsw_fwu_session_begin(&owner, &image, 1U, &handle, &status), -EINVAL);
+	owner = remote;
+	image.block_size = 0U;
+	zassert_equal(kfsw_fwu_session_begin(&owner, &image, 1U, &handle, &status), -EINVAL);
+	zassert_equal(handle.generation, 0U);
+	zassert_equal(erase_calls, erases);
+	zassert_equal(kfsw_fwu_session_write(NULL, 0U, test_image, 1U, &status), -EINVAL);
+	zassert_equal(kfsw_fwu_session_verify(NULL, &status), -EINVAL);
+	zassert_equal(kfsw_fwu_session_activate(NULL, &status), -EINVAL);
+	zassert_equal(kfsw_fwu_session_abort(NULL, &status), -EINVAL);
+	zassert_equal(kfsw_fwu_session_status(NULL, &status), -EINVAL);
+}
+
+ZTEST(services_fwu, test_implicit_local_handle_cannot_mutate_explicit_local_successor)
+{
+	const struct kfsw_fwu_owner owner = {.kind = KFSW_FWU_OWNER_LOCAL};
+	const struct kfsw_fwu_image image = {.size = 8U};
+	struct kfsw_fwu_handle successor;
+	struct kfsw_fwu_status status;
+
+	zassert_ok(kfsw_fwu_begin(8U, 0U));
+	zassert_ok(kfsw_fwu_abort());
+	zassert_ok(kfsw_fwu_session_begin(&owner, &image, 0U, &successor, &status));
+	zassert_equal(kfsw_fwu_begin(8U, 0U), -EBUSY);
+	zassert_equal(kfsw_fwu_write(0U, test_image, 1U), -ESTALE);
+	zassert_equal(kfsw_fwu_verify(), -ESTALE);
+	zassert_equal(kfsw_fwu_finish(), -ESTALE);
+	zassert_equal(kfsw_fwu_abort(), -ESTALE);
+	zassert_ok(kfsw_fwu_session_abort(&successor, &status));
+}
+
+ZTEST(services_fwu, test_crc_only_abort_tombstone_rejects_explicit_id_replay)
+{
+	const struct kfsw_fwu_owner owner = {.kind = KFSW_FWU_OWNER_FTP, .peer = 16U};
+	const struct kfsw_fwu_image image = {.size = 8U};
+	struct kfsw_fwu_handle handle;
+	struct kfsw_fwu_handle ignored;
+	struct kfsw_fwu_status status;
+	unsigned int erases;
+
+	zassert_ok(kfsw_fwu_session_begin(&owner, &image, 123U, &handle, &status));
+	zassert_ok(kfsw_fwu_session_abort(&handle, &status));
+	erases = erase_calls;
+	zassert_equal(kfsw_fwu_session_begin(&owner, &image, 123U, &ignored, &status), -ESTALE);
+	zassert_equal(erase_calls, erases);
+	zassert_ok(kfsw_fwu_session_begin(&owner, &image, 0U, &handle, &status));
+	zassert_ok(kfsw_fwu_session_abort(&handle, &status));
 }
 
 ZTEST_SUITE(services_fwu, NULL, fwu_setup, fwu_before, NULL, NULL);

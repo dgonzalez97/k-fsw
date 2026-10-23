@@ -6,15 +6,10 @@
 
 #include <zephyr/shell/shell.h>
 
+#include "shell_remote.h"
+
 /** Node meaning "run it here" for kfsw_shell_run_command(). */
 #define KFSW_SHELL_THIS_NODE 0U
-
-/**
- * Parse a node for a remote request: 1 up to the broadcast address, which is
- * left out because a request goes to one node (1..30 in CSP 1, 1..16382 in
- * CSP 2).
- */
-int kfsw_shell_parse_node(const struct shell *sh, const char *text, uint16_t *node);
 
 /**
  * Run a registered command here or on another node and print its reply, one

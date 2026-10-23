@@ -119,9 +119,9 @@ def main() -> int:
                                 continue
                             block = bytes(payload[4:12])  # request ID and offset
                         else:
-                            if header['dport'] != 13 or payload[:1] != b'\x02':
+                            if header['dport'] != 13 or payload[:3] != b'\x01\x00\x02':
                                 continue
-                            block = bytes(payload[2:4])  # block index
+                            block = bytes(payload[8:20])  # transfer, generation and byte offset
                         if block in blocks:
                             resent += 1
                         else:

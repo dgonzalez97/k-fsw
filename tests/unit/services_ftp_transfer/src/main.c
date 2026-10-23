@@ -48,6 +48,18 @@ static uint8_t payload[3][8];
 static struct kfsw_ftp_link link_stub;
 static struct kfsw_ftp_workspace workspace;
 static struct kfsw_ftp_transfer transfer;
+static int firmware_erase_error;
+
+int __real_flash_area_flatten(const struct flash_area *area, off_t offset, size_t size);
+
+int __wrap_flash_area_flatten(const struct flash_area *area, off_t offset, size_t size)
+{
+	if ((area->fa_id == DT_FIXED_PARTITION_ID(DT_CHOSEN(kfsw_fwu_partition))) &&
+	    (firmware_erase_error != 0)) {
+		return firmware_erase_error;
+	}
+	return __real_flash_area_flatten(area, offset, size);
+}
 
 static int deliver_scripted(struct kfsw_ftp_link *link, struct kfsw_ftp_link_frame *frame)
 {
@@ -105,7 +117,14 @@ static void *transfer_setup(void)
 
 static void reset_transfer(void *fixture)
 {
+	struct kfsw_fwu_status status;
+
 	ARG_UNUSED(fixture);
+	firmware_erase_error = 0;
+	zassert_ok(kfsw_fwu_get_status(&status));
+	if (status.handle.generation != 0U) {
+		zassert_ok(kfsw_fwu_session_abort(&status.handle, &status));
+	}
 
 	RESET_FAKE(__wrap_kfsw_ftp_link_send);
 	RESET_FAKE(__wrap_kfsw_ftp_link_receive);
@@ -419,4 +438,171 @@ ZTEST(services_ftp_transfer, test_the_reserved_firmware_path_is_matched_by_lengt
 		      "a longer path that starts the same is a different file");
 	zassert_false(kfsw_ftp_path_is_firmware((const uint8_t *)reserved, 0U));
 	zassert_false(kfsw_ftp_path_is_firmware(NULL, size));
+}
+
+ZTEST(services_ftp_transfer, test_firmware_uses_peer_owner_and_preserves_normal_finish)
+{
+	struct kfsw_fwu_status status;
+	const struct flash_area *area;
+	uint8_t readback[sizeof(payload[0])];
+
+	link_stub.peer = 16U;
+	transfer.total_size = sizeof(payload[0]);
+	transfer.crc32 = crc32_ieee(payload[0], sizeof(payload[0]));
+	scripted[0] = good_message(0U, 0U, transfer.total_size, transfer.crc32);
+	scripted_count = 1U;
+	zassert_ok(kfsw_ftp_transfer_open_firmware_sink(&transfer));
+	zassert_equal(transfer.firmware_handle.owner.kind, KFSW_FWU_OWNER_FTP);
+	zassert_equal(transfer.firmware_handle.owner.peer, link_stub.peer);
+	zassert_equal(kfsw_fwu_abort(), -EACCES);
+	zassert_ok(kfsw_ftp_transfer_receive(&transfer));
+	zassert_ok(kfsw_ftp_transfer_finish(&transfer, TEST_TARGET_PATH, TEST_SINK_PATH, 0));
+	zassert_ok(kfsw_fwu_session_status(&transfer.firmware_handle, &status));
+	zassert_equal(status.state, KFSW_FWU_READY);
+	zassert_false(status.image.digest_present);
+	zassert_ok(flash_area_open(DT_FIXED_PARTITION_ID(DT_CHOSEN(kfsw_fwu_partition)), &area));
+	zassert_ok(flash_area_read(area, kfsw_fwu_slot_write_offset(), readback, sizeof(readback)));
+	zassert_mem_equal(readback, payload[0], sizeof(readback));
+	flash_area_close(area);
+	zassert_ok(kfsw_fwu_session_abort(&transfer.firmware_handle, &status));
+}
+
+ZTEST(services_ftp_transfer, test_stale_firmware_cleanup_cannot_erase_successor)
+{
+	struct kfsw_fwu_status status;
+	struct kfsw_fwu_handle next;
+	const struct kfsw_fwu_owner owner = {.kind = KFSW_FWU_OWNER_FTP, .peer = 16U};
+	const struct kfsw_fwu_image image = {.size = sizeof(payload[0])};
+
+	link_stub.peer = owner.peer;
+	transfer.total_size = image.size;
+	zassert_ok(kfsw_ftp_transfer_open_firmware_sink(&transfer));
+	zassert_ok(kfsw_fwu_session_abort(&transfer.firmware_handle, &status));
+	zassert_ok(kfsw_fwu_session_begin(&owner, &image, 0U, &next, &status));
+	zassert_equal(
+		kfsw_ftp_transfer_finish(&transfer, TEST_TARGET_PATH, TEST_SINK_PATH, -ETIMEDOUT),
+		-ETIMEDOUT);
+	zassert_ok(kfsw_fwu_session_status(&next, &status));
+	zassert_equal(status.state, KFSW_FWU_RECEIVING);
+	zassert_ok(kfsw_fwu_session_write(&next, 0U, payload[0], sizeof(payload[0]), &status));
+	zassert_ok(kfsw_fwu_session_abort(&next, &status));
+}
+
+ZTEST(services_ftp_transfer, test_busy_firmware_open_does_not_cleanup_lite_owner)
+{
+	const struct kfsw_fwu_owner owner = {.kind = KFSW_FWU_OWNER_LITE, .peer = 16U};
+	const struct kfsw_fwu_image image = {.size = sizeof(payload[0])};
+	struct kfsw_fwu_handle handle;
+	struct kfsw_fwu_status status;
+
+	zassert_ok(kfsw_fwu_session_begin(&owner, &image, 0U, &handle, &status));
+	transfer.total_size = image.size;
+	zassert_equal(kfsw_ftp_transfer_open_firmware_sink(&transfer), -EBUSY);
+	zassert_false(transfer.firmware);
+	zassert_ok(kfsw_fwu_session_status(&handle, &status));
+	zassert_equal(status.state, KFSW_FWU_RECEIVING);
+	zassert_false(status.aborted);
+	zassert_ok(kfsw_fwu_session_abort(&handle, &status));
+}
+
+ZTEST(services_ftp_transfer, test_firmware_cleanup_errors_retain_failed_peer_and_original_error)
+{
+	struct kfsw_fwu_status status;
+
+	link_stub.peer = 16U;
+	transfer.total_size = sizeof(payload[0]);
+	zassert_ok(kfsw_ftp_transfer_open_firmware_sink(&transfer));
+	firmware_erase_error = -EIO;
+	zassert_equal(
+		kfsw_ftp_transfer_finish(&transfer, TEST_TARGET_PATH, TEST_SINK_PATH, -ETIMEDOUT),
+		-ETIMEDOUT);
+	zassert_ok(kfsw_fwu_session_status(&transfer.firmware_handle, &status));
+	zassert_equal(status.state, KFSW_FWU_FAILED);
+	zassert_equal(status.handle.owner.peer, link_stub.peer);
+	zassert_equal(kfsw_fwu_abort(), -EACCES);
+	zassert_equal(kfsw_fwu_session_abort(&transfer.firmware_handle, &status), -EIO);
+	firmware_erase_error = 0;
+	zassert_ok(kfsw_fwu_session_abort(&transfer.firmware_handle, &status));
+}
+
+ZTEST(services_ftp_transfer, test_failed_firmware_begin_retains_owner_if_cleanup_also_fails)
+{
+	struct kfsw_fwu_status status;
+
+	link_stub.peer = 17U;
+	transfer.total_size = sizeof(payload[0]);
+	firmware_erase_error = -EIO;
+	zassert_equal(kfsw_ftp_transfer_open_firmware_sink(&transfer), -EIO);
+	zassert_ok(kfsw_fwu_get_status(&status));
+	zassert_equal(status.state, KFSW_FWU_FAILED);
+	zassert_equal(status.handle.owner.kind, KFSW_FWU_OWNER_FTP);
+	zassert_equal(status.handle.owner.peer, link_stub.peer);
+	zassert_false(status.aborted);
+	zassert_equal(kfsw_fwu_abort(), -EACCES);
+	firmware_erase_error = 0;
+	zassert_ok(kfsw_fwu_session_abort(&status.handle, &status));
+}
+
+ZTEST(services_ftp_transfer, test_next_firmware_request_retries_saved_cleanup)
+{
+	struct kfsw_fwu_status status;
+	struct kfsw_ftp_transfer next = {0};
+
+	link_stub.peer = 18U;
+	transfer.total_size = sizeof(payload[0]);
+	zassert_ok(kfsw_ftp_transfer_open_firmware_sink(&transfer));
+	firmware_erase_error = -EIO;
+	zassert_equal(
+		kfsw_ftp_transfer_finish(&transfer, TEST_TARGET_PATH, TEST_SINK_PATH, -ETIMEDOUT),
+		-ETIMEDOUT);
+	firmware_erase_error = 0;
+	next.link = &link_stub;
+	next.total_size = sizeof(payload[0]);
+	zassert_ok(kfsw_ftp_transfer_open_firmware_sink(&next));
+	zassert_not_equal(next.firmware_handle.generation, transfer.firmware_handle.generation);
+	zassert_ok(kfsw_fwu_session_abort(&next.firmware_handle, &status));
+}
+
+ZTEST(services_ftp_transfer, test_failed_open_cleanup_retry_survives_old_context)
+{
+	struct kfsw_fwu_status status;
+	struct kfsw_ftp_transfer next = {0};
+
+	link_stub.peer = 19U;
+	transfer.total_size = sizeof(payload[0]);
+	firmware_erase_error = -EIO;
+	zassert_equal(kfsw_ftp_transfer_open_firmware_sink(&transfer), -EIO);
+	next.link = &link_stub;
+	next.total_size = sizeof(payload[0]);
+	zassert_equal(kfsw_ftp_transfer_open_firmware_sink(&next), -EIO);
+	firmware_erase_error = 0;
+	zassert_ok(kfsw_ftp_transfer_open_firmware_sink(&next));
+	zassert_ok(kfsw_fwu_session_abort(&next.firmware_handle, &status));
+}
+
+ZTEST(services_ftp_transfer, test_cached_cleanup_cannot_adopt_successor)
+{
+	const struct kfsw_fwu_owner owner = {.kind = KFSW_FWU_OWNER_FTP, .peer = 20U};
+	const struct kfsw_fwu_image image = {.size = sizeof(payload[0])};
+	struct kfsw_fwu_handle successor;
+	struct kfsw_fwu_status status;
+	struct kfsw_ftp_transfer next = {0};
+
+	link_stub.peer = owner.peer;
+	transfer.total_size = image.size;
+	zassert_ok(kfsw_ftp_transfer_open_firmware_sink(&transfer));
+	firmware_erase_error = -EIO;
+	zassert_equal(
+		kfsw_ftp_transfer_finish(&transfer, TEST_TARGET_PATH, TEST_SINK_PATH, -ETIMEDOUT),
+		-ETIMEDOUT);
+	firmware_erase_error = 0;
+	zassert_ok(kfsw_fwu_session_abort(&transfer.firmware_handle, &status));
+	zassert_ok(kfsw_fwu_session_begin(&owner, &image, 0U, &successor, &status));
+	next.link = &link_stub;
+	next.total_size = image.size;
+	zassert_equal(kfsw_ftp_transfer_open_firmware_sink(&next), -EBUSY);
+	zassert_ok(kfsw_fwu_session_status(&successor, &status));
+	zassert_equal(status.state, KFSW_FWU_RECEIVING);
+	zassert_false(status.aborted);
+	zassert_ok(kfsw_fwu_session_abort(&successor, &status));
 }

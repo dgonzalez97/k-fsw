@@ -36,7 +36,7 @@ Direct Upload Carries An Image Between Two Nodes
     Require Hosted Ground Dependencies
     ${result}=    Run FWU Lite Smoke
     HIL Command Should Pass    ${result}    K-GROUND FWU-LITE RESULT: PASS
-    Should Match Regexp    ${result.stdout}    crc32=[0-9a-f]{8} bytes=20000(?![0-9]) blocks=105(?![0-9]) resent=[0-9]+
+    Should Match Regexp    ${result.stdout}    crc32=[0-9a-f]{8} bytes=20017(?![0-9]) blocks=126(?![0-9]) resent=[0-9]+
 
 Direct Upload Recovers From A Link That Drops Bytes
     [Documentation]    The same transfer over a bridge that drops runs of bytes.
@@ -45,7 +45,7 @@ Direct Upload Recovers From A Link That Drops Bytes
     Require Hosted Ground Dependencies
     ${result}=    Run FWU Lite Smoke    --lossy
     HIL Command Should Pass    ${result}    K-GROUND FWU-LITE RESULT: PASS
-    Should Match Regexp    ${result.stdout}    crc32=[0-9a-f]{8} bytes=20000(?![0-9]) blocks=105(?![0-9]) lossy=yes resent=[1-9][0-9]*
+    Should Match Regexp    ${result.stdout}    crc32=[0-9a-f]{8} bytes=20017(?![0-9]) blocks=126(?![0-9]) lossy=yes resent=[1-9][0-9]*
     Should Not Contain    ${result.stdout}    resent=0
 
 File Transfer Route Reaches The Update Service
@@ -55,7 +55,7 @@ File Transfer Route Reaches The Update Service
     Require Hosted Ground Dependencies
     ${result}=    Run FWU FTP Route Smoke
     HIL Command Should Pass    ${result}    K-GROUND FWU-FTP RESULT: PASS
-    Should Match Regexp    ${result.stdout}    crc32=[0-9a-f]{8} bytes=20000(?![0-9]) blocks=105(?![0-9]) resent=[0-9]+
+    Should Match Regexp    ${result.stdout}    crc32=[0-9a-f]{8} bytes=20017(?![0-9]) blocks=105(?![0-9]) resent=[0-9]+
 
 File Transfer Update Recovers From A Link That Drops Bytes
     [Documentation]    FTP retries preserve the image over a PTY bridge dropping bytes.
@@ -63,15 +63,15 @@ File Transfer Update Recovers From A Link That Drops Bytes
     Require Hosted Ground Dependencies
     ${result}=    Run FWU FTP Route Smoke    --lossy
     HIL Command Should Pass    ${result}    K-GROUND FWU-FTP RESULT: PASS
-    Should Match Regexp    ${result.stdout}    crc32=[0-9a-f]{8} bytes=20000(?![0-9]) blocks=105(?![0-9]) lossy=yes resent=[1-9][0-9]*
+    Should Match Regexp    ${result.stdout}    crc32=[0-9a-f]{8} bytes=20017(?![0-9]) blocks=105(?![0-9]) lossy=yes resent=[1-9][0-9]*
 
 CSP 1 Direct Upload Reaches The Receiver
     [Tags]    software    csp1    fwu    fwu-lite
     Require Hosted Ground Dependencies
     ${result}=    Run FWU Lite Smoke    csp_version=1
     HIL Command Should Pass    ${result}    K-GROUND FWU-LITE RESULT: PASS
-    Should Match Regexp    ${result.stdout}    crc32=([0-9a-f]{8}) bytes=20000(?![0-9]) blocks=105(?![0-9]) resent=[0-9]+
-    Should Contain    ${result.stdout}    16:fwu_received = 20000
+    Should Match Regexp    ${result.stdout}    crc32=([0-9a-f]{8}) bytes=20017(?![0-9]) blocks=126(?![0-9]) resent=[0-9]+
+    Should Contain    ${result.stdout}    16:fwu_received = 20017
     ${crc}=    Evaluate    __import__('re').search(r'RESULT: PASS crc32=([0-9a-f]{8})', $result.stdout)[1]
     Should Contain    ${result.stdout}    16:fwu_actual_crc = 0x${crc}
     Should Contain    ${result.stdout}    16:fwu_expected_crc = 0x${crc}
@@ -81,8 +81,8 @@ CSP 1 Direct Upload Recovers From Lost Bytes
     Require Hosted Ground Dependencies
     ${result}=    Run FWU Lite Smoke    --lossy    csp_version=1
     HIL Command Should Pass    ${result}    K-GROUND FWU-LITE RESULT: PASS
-    Should Match Regexp    ${result.stdout}    crc32=([0-9a-f]{8}) bytes=20000(?![0-9]) blocks=105(?![0-9]) lossy=yes resent=[1-9][0-9]*
-    Should Contain    ${result.stdout}    16:fwu_received = 20000
+    Should Match Regexp    ${result.stdout}    crc32=([0-9a-f]{8}) bytes=20017(?![0-9]) blocks=126(?![0-9]) lossy=yes resent=[1-9][0-9]*
+    Should Contain    ${result.stdout}    16:fwu_received = 20017
     ${crc}=    Evaluate    __import__('re').search(r'RESULT: PASS crc32=([0-9a-f]{8})', $result.stdout)[1]
     Should Contain    ${result.stdout}    16:fwu_actual_crc = 0x${crc}
     Should Contain    ${result.stdout}    16:fwu_expected_crc = 0x${crc}
@@ -92,8 +92,8 @@ CSP 1 File Transfer Update Reaches The Receiver
     Require Hosted Ground Dependencies
     ${result}=    Run FWU FTP Route Smoke    csp_version=1
     HIL Command Should Pass    ${result}    K-GROUND FWU-FTP RESULT: PASS
-    Should Match Regexp    ${result.stdout}    crc32=([0-9a-f]{8}) bytes=20000(?![0-9]) blocks=105(?![0-9]) resent=[0-9]+
-    Should Contain    ${result.stdout}    16:fwu_received = 20000
+    Should Match Regexp    ${result.stdout}    crc32=([0-9a-f]{8}) bytes=20017(?![0-9]) blocks=105(?![0-9]) resent=[0-9]+
+    Should Contain    ${result.stdout}    16:fwu_received = 20017
     ${crc}=    Evaluate    __import__('re').search(r'RESULT: PASS crc32=([0-9a-f]{8})', $result.stdout)[1]
     Should Contain    ${result.stdout}    16:fwu_actual_crc = 0x${crc}
     Should Contain    ${result.stdout}    16:fwu_expected_crc = 0x${crc}
@@ -103,8 +103,8 @@ CSP 1 File Transfer Update Recovers From Lost Bytes
     Require Hosted Ground Dependencies
     ${result}=    Run FWU FTP Route Smoke    --lossy    csp_version=1
     HIL Command Should Pass    ${result}    K-GROUND FWU-FTP RESULT: PASS
-    Should Match Regexp    ${result.stdout}    crc32=([0-9a-f]{8}) bytes=20000(?![0-9]) blocks=105(?![0-9]) lossy=yes resent=[1-9][0-9]*
-    Should Contain    ${result.stdout}    16:fwu_received = 20000
+    Should Match Regexp    ${result.stdout}    crc32=([0-9a-f]{8}) bytes=20017(?![0-9]) blocks=105(?![0-9]) lossy=yes resent=[1-9][0-9]*
+    Should Contain    ${result.stdout}    16:fwu_received = 20017
     ${crc}=    Evaluate    __import__('re').search(r'RESULT: PASS crc32=([0-9a-f]{8})', $result.stdout)[1]
     Should Contain    ${result.stdout}    16:fwu_actual_crc = 0x${crc}
     Should Contain    ${result.stdout}    16:fwu_expected_crc = 0x${crc}

@@ -1,0 +1,16 @@
+/ {
+	chosen {
+		kfsw,fwu-partition = &slot1_partition;
+		kfsw,golden-partition = &test_golden;
+	};
+};
+
+&flash0 {
+	write-block-size = <8>;
+	partitions {
+		test_golden: partition@180000 {
+			label = "test-golden";
+			reg = <0x00180000 0x1000>;
+		};
+	};
+};

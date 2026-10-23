@@ -40,6 +40,11 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 
 project(kfsw LANGUAGES C)
 
+if(NOT CONFIG_KFSW_FWU_STANDARD AND NOT CONFIG_KFSW_FWU_LITE)
+    message(WARNING
+        "No firmware update front end is enabled. Include CONFIG_KFSW_FWU_STANDARD or CONFIG_KFSW_FWU_LITE.")
+endif()
+
 if(NOT TARGET kfsw_services)
     message(FATAL_ERROR
         "kfsw-services was not discovered as a Zephyr module")
@@ -136,8 +141,10 @@ if(CONFIG_KFSW_DEBUG_SHELL)
     target_sources_ifdef(CONFIG_KFSW_CSP app PRIVATE
         src/shell/shell_comms.c
         src/shell/shell_csp.c
-        src/shell/shell_remote.c
     )
+    if(CONFIG_KFSW_CSP OR CONFIG_KFSW_COMMAND)
+        target_sources(app PRIVATE src/shell/shell_remote.c)
+    endif()
     target_sources_ifdef(CONFIG_KFSW_CSP_KISS_UART app PRIVATE
         src/shell/shell_uart.c
     )
@@ -189,8 +196,11 @@ if(CONFIG_KFSW_DEBUG_SHELL)
     target_sources_ifdef(CONFIG_KFSW_WATCHDOG app PRIVATE
         src/shell/shell_watchdog.c
     )
-    target_sources_ifdef(CONFIG_KFSW_FWU app PRIVATE
+    target_sources_ifdef(CONFIG_KFSW_FWU_STANDARD app PRIVATE
         src/shell/shell_fwu.c
+    )
+    target_sources_ifdef(CONFIG_KFSW_FWU_LITE_CSP app PRIVATE
+        src/shell/shell_fwu_lite.c
     )
     target_sources_ifdef(CONFIG_KFSW_GOLDEN app PRIVATE
         src/shell/shell_golden.c

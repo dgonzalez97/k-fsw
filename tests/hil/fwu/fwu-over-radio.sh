@@ -247,17 +247,17 @@ printf 'node %s reports revision %s\n' "$FLIGHT_NODE" "$revision_before"
 
 banner "Upload the second image over the radio"
 printf 'this is tens of minutes at %s baud\n' "$radio_baud"
-printf '%s\n' "fwu send $FLIGHT_NODE $after_image" >&3
+printf '%s\n' "fwu_lite send $FLIGHT_NODE $after_image" >&3
 
 # Stop at the first failure instead of waiting for the full timeout.
 upload_done=0
 for _ in $(seq 1 3600); do
-	if grep -aq "Image accepted and verified" "$work_dir/ground.log"; then
+	if grep -aq "Upload complete" "$work_dir/ground.log"; then
 		upload_done=1
 		break
 	fi
-	if grep -aq "firmware upload failed" "$work_dir/ground.log"; then
-		printf '%s\n' "$(grep -a "refused\|firmware upload failed" \
+	if grep -aq "Upload stopped" "$work_dir/ground.log"; then
+		printf '%s\n' "$(grep -a "refused\|Upload stopped" \
 			"$work_dir/ground.log" | tail -2)" >&2
 		fail "the flight node rejected the upload"
 	fi
@@ -266,12 +266,17 @@ for _ in $(seq 1 3600); do
 done
 [[ "$upload_done" -eq 1 ]] || fail "the upload did not finish in time"
 
-resent="$(sed -n 's/.*verified; \([0-9]*\) block(s) resent.*/\1/p' "$work_dir/ground.log" | tail -1)"
+resent="$(sed -n 's/.*; \([0-9]*\) block(s) resent.*/\1/p' "$work_dir/ground.log" | tail -1)"
 printf 'accepted after %s resent block(s)\n' "${resent:-0}"
 
+banner "Validate stored image"
+printf '%s\n' "fwu_lite validate $FLIGHT_NODE" >&3
+wait_for_output "$work_dir/ground.log" "Stored image verified" "$ground_pid" 120 || \
+	fail "the stored image did not validate"
+
 banner "Flash and reboot"
-printf '%s\n' "fwu flash $FLIGHT_NODE" >&3
-wait_for_output "$work_dir/ground.log" "scheduled a swap" "$ground_pid" 120 || \
+printf '%s\n' "fwu_lite flash $FLIGHT_NODE" >&3
+wait_for_output "$work_dir/ground.log" "image ready; swap scheduled: yes" "$ground_pid" 120 || \
 	fail "the node did not schedule a swap"
 
 printf '%s\r' "reboot ${KFSW_REBOOT_PIN:-0000}" >"$debug_serial"

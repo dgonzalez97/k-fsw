@@ -228,12 +228,13 @@ def run_test(arguments, output):
         compare(ground, "/before.bin", "/readback.bin")
 
         print("CAN FWU: FWU lite upload and readback", flush=True)
-        ground.run(f"fwu send {FLIGHT} {image}", "Image accepted and verified", timeout=600)
+        ground.run(f"fwu_lite send {FLIGHT} {image}", "Upload complete", timeout=600)
+        ground.run(f"fwu_lite validate {FLIGHT}", "Stored image verified", timeout=60)
         status = board.run("fwu status", "state: verified")
         require(status, "swap_scheduled: no")
         read_slot(ground, 2, "/readback.bin")
         compare(ground, "/candidate.bin", "/readback.bin")
-        ground.run(f"fwu flash {FLIGHT}", f"Node {FLIGHT} scheduled a swap")
+        ground.run(f"fwu_lite flash {FLIGHT}", f"Node {FLIGHT} image ready; swap scheduled: yes")
         board.reboot(arguments.reboot_pin)
         check_trial(ground, board, arguments.revision)
 

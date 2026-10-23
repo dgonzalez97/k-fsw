@@ -83,7 +83,7 @@ def interruptions(board, ground, image, output):
             board.run("mcuboot", "confirmed: 1")
             board.run(f"hil cut {operation} {count}", "Reset armed:")
             command = ("ftp put 2 /candidate.bin /firmware.bin" if protocol == "ftp"
-                       else f"fwu send 2 {image}")
+                       else f"fwu_lite send 2 {image}")
             reply = ground.run(command, timeout=600)
             board.wait_for("@HIL_CUT ", timeout=30)
             boot = board.wait_for("@READY ", timeout=60)
@@ -97,12 +97,12 @@ def interruptions(board, ground, image, output):
             bench.read_slot(ground, 1, "/readback.bin")
             bench.compare(ground, "/original.bin", "/readback.bin")
             results.append({"protocol": protocol, "operation": operation, "after": count,
-                            "sender_recovered": ": PASS" in reply or "Image accepted and verified" in reply,
+                            "sender_recovered": ": PASS" in reply or "Upload complete" in reply,
                             "result": "PASS", "reset_marker": boot.splitlines()[0]})
             (output / "interruptions.json").write_text(json.dumps(results, indent=2))
             print(f"Reset test: {protocol} {operation} {count}: PASS", flush=True)
-    ground.run(f"fwu send 2 {image}", "Image accepted and verified", timeout=600)
-    board.run("fwu abort", timeout=60)
+    ground.run(f"fwu_lite send 2 {image}", "Upload complete", timeout=600)
+    ground.run("fwu_lite abort 2", "Owned transfer aborted", timeout=60)
     board.run("mcuboot", "confirmed: 1")
     bench.read_slot(ground, 1, "/readback.bin")
     bench.compare(ground, "/original.bin", "/readback.bin")

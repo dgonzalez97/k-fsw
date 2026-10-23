@@ -75,4 +75,19 @@ echo "INTEGRATION: multi-interface CSP/KISS routing and transit"
 "$KFSW_REPO_DIR/tests/build-multi-kiss.sh"
 "$KFSW_REPO_DIR/tests/multi-kiss-smoke.sh"
 
+echo "INTEGRATION: independent firmware update front ends"
+"$kfsw_python" "$KFSW_REPO_DIR/tests/fwu-composition-smoke.py"
+
+echo "INTEGRATION: firmware update over FWU lite and FTP"
+for route in lite ftp; do
+	for variant in clean lossy; do
+		options=()
+		if [[ "$variant" == lossy ]]; then
+			options+=(--lossy)
+			[[ "$route" != lite ]] || options+=(--contacts)
+		fi
+		KFSW_CSP_VERSION=2 "$KFSW_REPO_DIR/tests/k-ground-fwu-$route-smoke.sh" "${options[@]}"
+	done
+done
+
 echo "INTEGRATION RESULT: PASS"
