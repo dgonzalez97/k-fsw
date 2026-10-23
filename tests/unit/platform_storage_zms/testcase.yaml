@@ -1,5 +1,8 @@
 tests:
   kfsw.platform.storage_zms:
+    # The interrupted-write cases replay every cut point, which takes about a
+    # minute and a half on its own and longer beside the other suites.
+    timeout: 400
     tags:
       - unit
       - platform
