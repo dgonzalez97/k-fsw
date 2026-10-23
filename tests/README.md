@@ -29,7 +29,12 @@ Run them from the west workspace root:
   `KFSW_ROBOT_ACCEPTANCE=1` to require all software prerequisites and zero skips.
   `KFSW_HOST_TOOLS=1` separately opts into building the Rust host tools.
 - `tools/ci/all.sh` runs all of these plus the build, quality and
-  documentation checks.
+  documentation checks. Use it before a commit; before a tag use
+  `tools/ci/all.sh --suite board` on a prepared bench. The board stage reports
+  unavailable cases as NOT RUN with reasons and fails only executed failures.
+  See `docs/testing/index.md` for inputs and destructive effects.
+- `tools/ci/unit.sh` also runs `services_fwu/check_recovery.py` against the
+  recovery build Twister made. `tools/ci/quality.sh` runs `f746-proof-test.py`.
 
 `tests/param-local-smoke.sh` builds a native image with local parameters and
 persistence but without CSP, and checks list, get, set, defaults, save, load

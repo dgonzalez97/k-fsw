@@ -30,8 +30,9 @@ MCUboot verifies the signature before selecting A. CRC is not authentication.
 Golden remains available for another upload if A is rejected. The existing L4
 swap profiles retain their offset, trailer and trial rollback behavior.
 
-The native FWU and FWU-lite suites include recovery variants. After building
-`tests/unit/services_fwu` with recovery enabled, run
+The native FWU and FWU-lite suites include recovery variants. `tools/ci/unit.sh`
+runs the recovery guard and restart check after Twister. For a focused run,
+build `tests/unit/services_fwu` with recovery enabled, then run
 `python3 tests/unit/services_fwu/check_recovery.py /tmp/<build-directory>`
 to check rejected compositions and restart after a partial upload. The restart
 process selects only the inspection test, which checks idle service state and

@@ -36,4 +36,17 @@ west twister \
 	--testsuite-root "$KFSW_ROOT/kfsw-modules/tests" \
 	"${cache_args[@]}" "$@"
 
+recovery_build="$(find "$twister_out_dir" -type d -path '*/kfsw.services.fwu.recovery' -print -quit)"
+if [[ -n "$recovery_build" ]]; then
+	echo "UNIT: FWU recovery guards and restart"
+	started=$SECONDS
+	python3 "$KFSW_REPO_DIR/tests/unit/services_fwu/check_recovery.py" "$recovery_build"
+	echo "UNIT: FWU recovery guards and restart added $((SECONDS - started))s"
+elif [[ $# -eq 0 ]]; then
+	echo "ERROR: Twister did not produce the FWU recovery build" >&2
+	exit 1
+else
+	echo "UNIT: FWU recovery guards and restart NOT RUN: selection has no recovery build"
+fi
+
 echo "UNIT RESULT: PASS ($twister_out_dir)"

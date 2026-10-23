@@ -198,18 +198,22 @@ Software CI says the code builds and behaves in simulation. It cannot say the
 board keeps a log across a reset, answers over CAN, or comes back from an
 interrupted update. A tag claims all of it, so the bench runs first.
 
-Run it in this order. Each step is cheap compared to the one below it, and a
-failure early usually explains the ones after.
+Run `tools/ci/all.sh` before a commit. Before a tag, prepare and back up the
+bench, then run the board suite. See @ref testing for optional baseline inputs.
 
 | Step | Command | Needs |
 | --- | --- | --- |
-| 1 | `tools/ci/all.sh` | nothing; this is what CI runs |
-| 2 | `tests/hil/preflight.sh` | nothing; says what the bench can serve |
-| 3 | `tests/hil/run.sh board` | the board on its ST-LINK |
-| 4 | `tests/hil/run.sh board-uart` | a serial bridge on the CSP UART |
-| 5 | `tests/hil/run.sh board-can` | a CAN transceiver and a host adapter |
-| 6 | `tests/hil/run.sh radio` | the radio pair |
-| 7 | firmware update over CAN, below | a backup, and MCUboot on the board |
+| 1 | `tests/hil/preflight.sh` | device inventory; confirm wiring separately |
+| 2 | `tools/ci/all.sh --suite board` | software first, then every available automatic board check; reflashes and resets boards |
+| 3 | `tests/hil/shell-smoke.sh rpi_pico_w` | a person to copy the UF2 and reconnect the console |
+| 4 | `tests/hil/boton-test/button-acceptance.sh` | a person to press the button and judge its behaviour |
+
+The suite reports the last two checks as NOT RUN. CAN acceptance needs a
+confirmed probes-enabled baseline; encrypted radio needs its prepared flight
+image. Supply their inputs as described in @ref testing. Run them separately
+if another fixture has replaced those baselines. `tools/f746-proof.sh build`
+is included only with an explicitly set readable `KFSW_MCUBOOT_KEY`; it is
+an offline artifact check, not physical evidence.
 
 Record which steps ran, which were skipped for want of hardware, and the exact
 output of each. A step nobody ran is not a step that passed, and the tag notes

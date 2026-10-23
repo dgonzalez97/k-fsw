@@ -287,6 +287,10 @@ From this repository root, using an existing signing key:
 python3 tests/f746-proof-test.py
 ```
 
+`tools/ci/quality.sh` runs the synthetic `f746-proof-test.py` checks in the
+software sequence. `tools/ci/all.sh --suite board` also runs the real offline
+build and proof when `KFSW_MCUBOOT_KEY` explicitly names a readable file.
+
 The tool has no flash subcommand. It uses `tools/build.sh` separately for A and
 Golden, with sysbuild firmware-updater mode and an MCUboot-only extra config.
 The checker reads generated devicetrees, Kconfig, ELF and signed binaries;

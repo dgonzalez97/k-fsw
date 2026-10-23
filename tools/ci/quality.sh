@@ -9,6 +9,14 @@ KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
 clang_format=""
 
 bash "$KFSW_REPO_DIR/tests/build-options-test.sh"
+python3 "$KFSW_REPO_DIR/tests/ci-suite-test.py"
+
+quality_python="$KFSW_WORKSPACE_ROOT/.venv/bin/python"
+[[ -x "$quality_python" ]] || quality_python=python3
+echo "QUALITY: F746 offline proof tests"
+started=$SECONDS
+"$quality_python" "$KFSW_REPO_DIR/tests/f746-proof-test.py"
+echo "QUALITY: F746 offline proof tests added $((SECONDS - started))s"
 
 if [[ -x "$KFSW_WORKSPACE_ROOT/.venv/bin/clang-format" ]]; then
 	clang_format="$KFSW_WORKSPACE_ROOT/.venv/bin/clang-format"

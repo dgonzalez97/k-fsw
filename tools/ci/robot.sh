@@ -47,18 +47,7 @@ robot_status=0
 KFSW_ROBOT_OUT_DIR="${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/robot/software" \
 	"$KFSW_ROBOT_RUNNER" --exclude physical || robot_status=$?
 
-"$robot_python" - "${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/robot/software/output.xml" <<'PYCOUNTS'
-import os
-import sys
-import xml.etree.ElementTree as ET
-statuses = [test.find('status').get('status') for test in ET.parse(sys.argv[1]).iter('test')]
-skipped = statuses.count('SKIP')
-failed = statuses.count('FAIL')
-executed = len(statuses) - skipped
-print(f'ROBOT COUNTS: executed={executed} skipped={skipped} failed={failed}')
-acceptance = os.environ.get('KFSW_ROBOT_ACCEPTANCE', '0') == '1'
-if failed or (acceptance and (skipped or not executed)):
-    sys.exit(1)
-PYCOUNTS
+"$robot_python" "$KFSW_CI_DIR/robot-counts.py" \
+	"${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/robot/software/output.xml"
 [[ "$robot_status" -eq 0 ]] || exit "$robot_status"
 echo "ROBOT RESULT: PASS"

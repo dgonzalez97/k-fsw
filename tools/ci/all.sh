@@ -6,6 +6,15 @@ KFSW_CI_DIR="$(dirname "$KFSW_ALL_TOOL")"
 KFSW_REPO_DIR="$(dirname "$(dirname "$KFSW_CI_DIR")")"
 KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
 
+suite=software
+if [[ $# -ne 0 ]]; then
+	if [[ $# -ne 2 || "$1" != --suite || ( "$2" != software && "$2" != board ) ]]; then
+		echo "Usage: $0 [--suite software|board]" >&2
+		exit 2
+	fi
+	suite="$2"
+fi
+
 cd "$KFSW_WORKSPACE_ROOT"
 
 # Only the environment, never a target: sourcing _common.sh here would export
@@ -31,3 +40,7 @@ python3 "$KFSW_CI_DIR/golden.py"
 "$KFSW_CI_DIR/valgrind.sh"
 "$KFSW_CI_DIR/robot.sh"
 "$KFSW_CI_DIR/docs.sh"
+
+if [[ "$suite" == board ]]; then
+	"$KFSW_CI_DIR/board.sh"
+fi
