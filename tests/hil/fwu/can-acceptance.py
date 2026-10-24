@@ -74,13 +74,24 @@ def soak(board, ground, seconds, output):
         raise RuntimeError(str(errors))
 
 
+def boot_attempts_max(board):
+    """The limit a cut reset spends one of. Eight cuts outlast a budget of three."""
+    reply = board.run("golden attempts")
+    match = re.search(r"attempts left: \d+ of (\d+)", reply)
+    if match is None:
+        raise RuntimeError(f"No boot attempt budget on this image: {reply[:120]}")
+    return int(match[1])
+
+
 def interruptions(board, ground, image, output):
     revision = bench.remote_revision(ground)
     bench.read_slot(ground, 1, "/original.bin")
+    limit = boot_attempts_max(board)
     results = []
     for protocol in ("ftp", "lite"):
         for operation, count in (("erase", 1), ("erase", 80), ("write", 512), ("write", 65536)):
             board.run("mcuboot", "confirmed: 1")
+            board.run(f"golden attempts {limit}", f"attempts left: {limit} of {limit}")
             board.run(f"hil cut {operation} {count}", "Reset armed:")
             command = ("ftp put 2 /candidate.bin /firmware.bin" if protocol == "ftp"
                        else f"fwu_lite send 2 {image}")
@@ -94,6 +105,9 @@ def interruptions(board, ground, image, output):
             board.run("mcuboot", "confirmed: 1")
             if bench.remote_revision(ground) != revision:
                 raise RuntimeError("Interrupted upload changed the running image")
+            spent = board.run("golden attempts")
+            if f"attempts left: {limit - 1} of {limit}" not in spent:
+                raise RuntimeError(f"Cut reset did not spend one attempt: {spent[:120]}")
             bench.read_slot(ground, 1, "/readback.bin")
             bench.compare(ground, "/original.bin", "/readback.bin")
             results.append({"protocol": protocol, "operation": operation, "after": count,
