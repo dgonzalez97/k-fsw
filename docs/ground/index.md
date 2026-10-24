@@ -12,7 +12,9 @@ build options.
 | --- | --- | --- |
 | `kfsw-gnd-uhf` | 16 | Opens the UHF radio for the ground network |
 | `kfsw-gnd-can` | 17 | Reaches a flight node over a SocketCAN interface |
+| `kfsw-beacon` | 18 | Receives beacons from a flight node |
 | `kfsw-ops` | 19 | Operator shell; doesn't open the radio |
+| `kfsw-rotctl` | 20 | Antenna rotator control |
 
 The address says which link the ground node is on: 16 is reached over KISS and
 17 over CAN. A flight profile that carries both links can then name one route
