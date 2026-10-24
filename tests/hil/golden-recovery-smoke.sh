@@ -21,7 +21,7 @@ trap '[[ "$keep" == 1 ]] && echo "GOLDEN RECOVERY: logs in $work" || rm -rf "$wo
 set -a; . "$here/stm32/nucleo-l496zg/can-bench.env"; set +a
 interface="${KFSW_CAN_INTERFACE:-can0}"
 flight="${KFSW_CAN_FLIGHT_NODE:-2}"
-ground="${KFSW_CAN_GROUND_NODE:-16}"
+ground="${KFSW_CAN_GROUND_NODE:-17}"
 pin="${KFSW_REBOOT_PIN:-0000}"
 
 fail() { keep=1; echo "GOLDEN RECOVERY RESULT: FAIL - $*"; exit 1; }

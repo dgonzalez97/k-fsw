@@ -11,8 +11,13 @@ build options.
 | Role | CSP address | Use |
 | --- | --- | --- |
 | `kfsw-gnd-uhf` | 16 | Opens the UHF radio for the ground network |
-| `kfsw-gnd-can` | 16 | Reaches a flight node over a SocketCAN interface |
+| `kfsw-gnd-can` | 17 | Reaches a flight node over a SocketCAN interface |
 | `kfsw-ops` | 19 | Operator shell; doesn't open the radio |
+
+The address says which link the ground node is on: 16 is reached over KISS and
+17 over CAN. A flight profile that carries both links can then name one route
+per link and never has to guess which one a ground address belongs to, which is
+what `nucleo-can.conf` does with `"3 CAN,17 CAN,16 KISS,0/0 KISS"`.
 
 These are the reference settings. Each node file sets two addresses:
 

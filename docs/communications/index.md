@@ -431,7 +431,7 @@ sudo k-fsw/tests/vcan-up.sh
 ```
 
 The first command needs root and only has to run once after a boot. The test
-runs a node at address 2 against the `kfsw-gnd-can` ground role at 16, pings
+runs a node at address 2 against the `kfsw-gnd-can` ground role at 17, pings
 both ways, reads remote parameters and checks the counters afterwards.
 
 The interface name comes from `--can-if` at run time, so the same images run

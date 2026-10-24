@@ -236,9 +236,9 @@ Every one of these has cost a bench session at least once.
   `sudo tests/hil/stm32/nucleo-l496zg/can-up.sh 500000 normal`
 - **One ground profile per build directory.** `tools/k-ground` includes the
   profile and node number in each build directory, so `kfsw-gnd-can`,
-  `kfsw-gnd-uhf` and a local `-bench.env` variant can share node 16 without
-  overwriting each other's configuration. For example, CAN uses
-  `build/k-ground/kfsw-gnd-can-node-16`; CSP v1 adds the `-csp1` suffix.
+  `kfsw-gnd-uhf` and a local `-bench.env` variant never overwrite each other's
+  configuration. For example, CAN uses `build/k-ground/kfsw-gnd-can-node-17`;
+  CSP v1 adds the `-csp1` suffix.
 - **A serial bridge needs its driver.** On a kernel that builds `ftdi_sio` as a
   module it has to be loaded, and a module whose BTF does not validate has to have
   that section stripped before it will load.
