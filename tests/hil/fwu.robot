@@ -26,7 +26,7 @@ CAN Update Keeps Both Images Readable
     ...    --revision    ${FWU_CAN_REVISION}
     ...    --serial    ${DEBUG_SERIAL}
     ...    --output    ${FWU_CAN_OUTPUT}
-    ...    stdout=PIPE    stderr=STDOUT    timeout=1800
+    ...    stdout=${OUTPUT DIR}/${TEST NAME}.out    stderr=STDOUT    timeout=1800
     HIL Command Should Pass    ${result}    CAN FWU RESULT: PASS
 
 Direct Upload Carries An Image Between Two Nodes
