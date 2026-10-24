@@ -19,7 +19,7 @@ import serial
 
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 FLIGHT = 2
-GROUND = 16
+GROUND = 17
 
 
 def require(text, expected):
@@ -181,11 +181,11 @@ def run_test(arguments, output):
         board = Console(port.fileno(), port.write, arguments.board_prompt, board_log)
         board.run("")
         board.run("fwu status", "target: bound")
-        board.run("csp routes", "16/14 -> CAN direct")
+        board.run("csp routes", f"{GROUND}/14 -> CAN direct")
         board.run("mcuboot", "confirmed: 1")
 
         process = subprocess.Popen([str(arguments.ground.resolve()),
-            "--uart_stdinout", "--device_id=16", "--no-color",
+            "--uart_stdinout", f"--device_id={GROUND}", "--no-color",
             f"--can-if={arguments.interface}", f"-flash={flash}",
         ], cwd=output, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, bufsize=0)
@@ -195,7 +195,7 @@ def run_test(arguments, output):
                          "kfsw-gnd-can# ", ground_log)
         ground.ready()
         ground.run("csp routes", "0/0 -> CAN direct")
-        ground.run("csp interfaces", "CAN addr=16/")
+        ground.run("csp interfaces", f"CAN addr={GROUND}/")
         board.run("csp interfaces", "CAN addr=2/")
         check_link(ground, board)
         original_revision = remote_revision(ground)
@@ -253,7 +253,7 @@ def run_test(arguments, output):
             ground.run(f"param get {FLIGHT} param_requests_dropped", f"{FLIGHT}:param_requests_dropped = ")
             stacks = board.run("kernel thread stacks", "unused")
             (output / "stacks.txt").write_text(stacks)
-        ground.run("csp interfaces", "CAN addr=16/")
+        ground.run("csp interfaces", f"CAN addr={GROUND}/")
         board.run("csp interfaces", "CAN addr=2/")
 
     after = can_state(arguments.interface)
