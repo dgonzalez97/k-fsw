@@ -705,6 +705,20 @@ The cache holds `CONFIG_KFSW_PARAM_REMOTE_POOL_SIZE` descriptors. Value requests
 are handled by a worker thread; when its queue is full the request is dropped
 and `param_requests_dropped` increases.
 
+Remote reads retry only `-ETIMEDOUT`, with at most three total read attempts
+inside the caller's original deadline, including mutex waits. The default
+budget is `CONFIG_KFSW_PARAM_LIST_TIMEOUT_MS + CONFIG_KFSW_PARAM_TIMEOUT_MS`.
+Earlier successful batches may be requested again; the values are not a snapshot.
+Other errors return immediately. Remote writes remain single-shot.
+
+On the requesting node, read-only `param_read_resends` (table 26, offset `0x20`,
+wire ID `0x1a20`) counts extra request packets sent during read retries,
+including descriptor requests. It starts at boot, saturates at `4294967295`,
+and survives service restarts. Read it locally with `param get param_read_resends`,
+or from another node with `param get <requesting-node> param_read_resends`.
+It indicates timeout recovery traffic, without distinguishing request loss,
+reply loss, congestion or server drops. FWU's `resent` count is separate.
+
 Each node validates the complete remote write before applying it. A request
 containing a fallible scalar must contain exactly one value, including repeated
 writes to the same parameter. Software-only batches remain supported. Rejected

@@ -14,7 +14,7 @@ The mode column is what the parameter service enforces: `r` is read only, `w` is
 | 4 | core | `csp` | 17 | 0 | CSP counters and the route table |
 | 5 | core | `storage` | 4 | 0 | Filesystem size, free space, mount |
 | 25 | service | `log` | 6 | 3 | Log levels, colour and counters |
-| 26 | service | `param` | 9 | 1 | Parameter counts and snapshot saves |
+| 26 | service | `param` | 10 | 1 | Parameter counts and snapshot saves |
 | 27 | service | `event` | 5 | 0 | Event record counters |
 | 28 | service | `command` | 7 | 0 | Command counters, timeout and echo |
 | 29 | service | `ftp` | 7 | 0 | File transfers and limits |
@@ -117,6 +117,7 @@ The mode column is what the parameter service enforces: `r` is read only, `w` is
 | 0x14 | `param_persist_bytes` | u32 | r | - | Space the last snapshot occupied |
 | 0x18 | `param_persist_max_bytes` | u32 | r | - | Most space a snapshot is allowed |
 | 0x1c | `param_requests_dropped` | u32 | r | - | Value requests dropped before worker admission |
+| 0x20 | `param_read_resends` | u32 | r | - | Extra read request packets after timeouts since boot; saturates |
 
 ### event (27)
 
