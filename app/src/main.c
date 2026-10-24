@@ -112,6 +112,31 @@ int main(void)
 	int result;
 #endif
 
+#if CONFIG_KFSW_WATCHDOG
+	/* Armed before the flash and filesystem work, where a fault would
+	 * otherwise stop the node for good: neither the boot budget nor the
+	 * ground watchdog can act on a core that has halted. The IWDG cannot be
+	 * retimed or stopped once started, so it is armed once, here, and the
+	 * keep-alive runs on the system workqueue above this thread and feeds
+	 * through a slow start-up on its own. */
+	result = kfsw_platform_watchdog_init();
+	if (result == -ENODEV) {
+		kfsw_log_info("No watchdog device bound; running unguarded");
+	} else if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Failed to initialize the watchdog: %d", result);
+	} else if (IS_ENABLED(CONFIG_KFSW_WATCHDOG_AUTO_START)) {
+		result = kfsw_platform_watchdog_start();
+		if (result != 0) {
+			startup_failures++;
+			kfsw_log_error("Failed to start the watchdog: %d", result);
+		} else {
+			kfsw_log_info("Watchdog armed with a %d ms timeout",
+				      CONFIG_KFSW_WATCHDOG_TIMEOUT_MS);
+		}
+	}
+#endif
+
 	kfsw_log_info("K-FSW application starting");
 
 #if CONFIG_KFSW_RADIO_UHF
@@ -499,26 +524,6 @@ int main(void)
 			}
 		}
 #endif
-	}
-#endif
-
-#if CONFIG_KFSW_WATCHDOG
-	/* Armed last, so a slow start-up isn't reset before the shell is up. */
-	result = kfsw_platform_watchdog_init();
-	if (result == -ENODEV) {
-		kfsw_log_info("No watchdog device bound; running unguarded");
-	} else if (result != 0) {
-		startup_failures++;
-		kfsw_log_error("Failed to initialize the watchdog: %d", result);
-	} else if (IS_ENABLED(CONFIG_KFSW_WATCHDOG_AUTO_START)) {
-		result = kfsw_platform_watchdog_start();
-		if (result != 0) {
-			startup_failures++;
-			kfsw_log_error("Failed to start the watchdog: %d", result);
-		} else {
-			kfsw_log_info("Watchdog armed with a %d ms timeout",
-				      CONFIG_KFSW_WATCHDOG_TIMEOUT_MS);
-		}
 	}
 #endif
 
