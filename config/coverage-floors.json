@@ -7,8 +7,8 @@
       "branches": 60
     },
     "kfsw-services/src/boot.c": {
-      "lines": 17,
-      "branches": 0
+      "lines": 78,
+      "branches": 43
     },
     "kfsw-services/src/boot_budget.c": {
       "lines": 97,
