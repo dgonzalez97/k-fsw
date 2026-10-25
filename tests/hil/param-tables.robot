@@ -81,3 +81,25 @@ Hosted Boot Diagnostics Are Explicitly Unavailable Remotely
     FINALLY
         Close Ground Pair
     END
+
+Remote Parameter Read Recovers After A Lost Reply
+    [Documentation]    Drop one value reply over PTY KISS and check the caller's
+    ...    resend counter as well as the returned value. No physical link evidence.
+    [Tags]    software    param    tables    ground    lossy
+    [Timeout]    360 seconds
+    Require Hosted Ground Dependencies
+    Open Ground Pair    ${OUTPUT DIR}/ground-param-retry    drop_param_reply=${TRUE}
+    TRY
+        ${out}=    Ground Command    param get param_read_resends    param_read_resends =
+        ${before}=    Evaluate    int(__import__('re').search(r'param_read_resends = ([0-9]+)', $out)[1])
+        Ground Command    param get 1 node_id    1:node_id = 1
+        ${out}=    Ground Command    param get param_read_resends    param_read_resends =
+        ${after}=    Evaluate    int(__import__('re').search(r'param_read_resends = ([0-9]+)', $out)[1])
+        Should Be True    ${after} > ${before}
+        ${stats}=    Ground Link Statistics
+        Should Be Equal As Integers    ${stats}[param_reply_dropped]    1
+        Should Be True    ${stats}[param_pulls] >= 2
+        Log    param_read_resends: ${before} -> ${after}    console=yes
+    FINALLY
+        Close Ground Pair
+    END

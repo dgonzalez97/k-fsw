@@ -1,6 +1,7 @@
 """Hosted flight/ground pair over PTY KISS; no UART wiring or RF evidence."""
 
 from contextlib import ExitStack
+import json
 import os
 import shutil
 import struct
@@ -9,6 +10,7 @@ import re
 import subprocess
 import sys
 import time
+import tty
 
 REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO / 'tests'))
@@ -18,7 +20,7 @@ from firmware_fixture import NativeNode
 class Ground:
     ROBOT_LIBRARY_SCOPE = 'TEST'
 
-    def open_ground_pair(self, output, procedure='', baud=''):
+    def open_ground_pair(self, output, procedure='', baud='', drop_param_reply=False):
         self.stack = ExitStack()
         self.output = Path(output)
         self.output.mkdir(parents=True, exist_ok=False)
@@ -26,30 +28,52 @@ class Ground:
         self.flight_image = root / 'linux/zephyr/zephyr.exe'
         ground_root = Path(os.environ.get('KGROUND_BUILD_ROOT', root / 'k-ground'))
         self.ground_image = ground_root / 'kfsw-ops-node-19/zephyr/zephyr.exe'
-        subprocess.run([str(REPO / 'tools/k-ground'), 'build', 'kfsw-ops'], check=True)
+        subprocess.run([str(REPO / 'tools/k-ground'), 'build', 'kfsw-ops'], check=True,
+                       timeout=300)
         flash = self.output / 'ground.bin'
         if procedure:
             subprocess.run([sys.executable, str(REPO / 'tools/ground/stage-file.py'),
                             '--flash', str(flash), '--offset', '0xfc000', '--size', '0x40000',
                             str(REPO / 'tests/procedures' / procedure),
-                            '/ftp/procedures/' + Path(procedure).name], check=True)
+                            '/ftp/procedures/' + Path(procedure).name], check=True, timeout=60)
         try:
             self.flight = self.stack.enter_context(NativeNode(self.flight_image, self.output / 'flight'))
             self.ground = self.stack.enter_context(NativeNode(self.ground_image, self.output / 'ground', flash))
             self.bridge_log = self.stack.enter_context((self.output / 'bridge.log').open('w'))
             baud = baud or os.environ.get('KFSW_GROUND_LINK_BAUD', '')
-            if baud:
+            if drop_param_reply:
+                assert not baud, 'PARAM loss and baud pacing are separate fixtures'
+                for device in (self.flight.device, self.ground.device):
+                    with open(device, 'rb', buffering=0) as port:
+                        tty.setraw(port)
+                bridge = [sys.executable, str(REPO / 'tests/support/fwu-link.py'),
+                          '--left', self.flight.device, '--right', self.ground.device,
+                          '--stats', str(self.output / 'link.json'),
+                          '--ready-file', str(self.output / 'link.ready'), '--drop-param-reply']
+            elif baud:
                 # A pseudo terminal ignores its termios speed, so the rate has
                 # to be paced by the relay for the pair to feel a slow link.
                 bridge = [sys.executable, str(Path(__file__).with_name('4800baud_link.py')),
-                          self.flight.device, self.ground.device, '--baud', baud]
+                          self.flight.device, self.ground.device, '--baud', baud,
+                          '--ready-file', str(self.output / 'link.ready')]
             else:
-                bridge = ['socat', self.flight.device + ',raw,echo=0',
+                bridge = ['socat', '-d', '-d', self.flight.device + ',raw,echo=0',
                           self.ground.device + ',raw,echo=0']
             self.bridge = subprocess.Popen(bridge, stdout=self.bridge_log,
                                            stderr=subprocess.STDOUT)
             self.stack.callback(self.stop_bridge)
-            time.sleep(.2)
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                assert self.bridge.poll() is None, 'KISS bridge exited'
+                if drop_param_reply or baud:
+                    ready = (self.output / 'link.ready').exists()
+                else:
+                    ready = 'starting data transfer loop' in (self.output / 'bridge.log').read_text()
+                if ready:
+                    break
+                time.sleep(.02)
+            else:
+                raise AssertionError('KISS bridge did not report readiness')
             self.ground_command('csp routes', '0/0 -> KISS direct')
             self.ground_command('csp ping 1', 'CSP ping 1: success')
         except BaseException:
@@ -100,6 +124,11 @@ class Ground:
 
     def flight_command(self, command, expected, timeout=20):
         return self.node_command(self.flight, r'kfsw:~\$ ', command, expected, timeout)
+
+    def ground_link_statistics(self):
+        stats = json.loads((self.output / 'link.json').read_text())
+        print(stats)
+        return stats
 
     def decode_ground_capture(self, capture, wrong_image=False):
         path = self.output / 'capture.log'

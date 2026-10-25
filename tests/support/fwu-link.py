@@ -19,6 +19,7 @@ def main():
     parser.add_argument('--csp-version', type=int, choices=(1, 2), default=2)
     parser.add_argument('--lossy', action='store_true')
     parser.add_argument('--contacts', action='store_true')
+    parser.add_argument('--drop-param-reply', action='store_true')
     args = parser.parse_args()
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from firmware_fixture import wire
@@ -32,7 +33,7 @@ def main():
     readers = {left: wire.KissReader(), right: wire.KissReader()}
     blocks = set()
     stats = dict(blocks=0, resent=0, dropped=0, begin_reply_dropped=0,
-                 tail_reply_dropped=0, contacts=0)
+                 tail_reply_dropped=0, contacts=0, param_pulls=0, param_reply_dropped=0)
     forwarded = 0
     skip = 0
     deaf_until = 0.0
@@ -54,6 +55,17 @@ def main():
                 for frame in readers[key.fileobj].feed(data):
                     encoded = wire.kiss_encode(frame)
                     drop = time.monotonic() < deaf_until
+                    if args.drop_param_reply and len(frame) >= wire.csp_header_bytes() + 10:
+                        header = wire.parse_csp_header(frame)
+                        payload = frame[wire.csp_header_bytes():]
+                        if (header['source'] == 19 and header['destination'] == 1
+                                and header['dport'] == 10 and payload[0] == 5):
+                            stats['param_pulls'] += 1
+                        if (header['source'] == 1 and header['destination'] == 19
+                                and header['sport'] == 10 and payload[0] == 6
+                                and not stats['param_reply_dropped']):
+                            stats['param_reply_dropped'] = 1
+                            drop = True
                     if len(frame) >= wire.csp_header_bytes() + 28:
                         header = wire.parse_csp_header(frame)
                         payload = frame[wire.csp_header_bytes():]

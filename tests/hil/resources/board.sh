@@ -30,6 +30,7 @@ hil_board() {
 	hil_board_boot_overlay=""
 	hil_board_openocd=""
 	case "$board:$composition" in
+	nucleo_l496zg:fwu-can-acceptance) ;;
 	nucleo_l496zg:limits-can | nucleo_l496zg:limits-links | nucleo_l496zg:fbo-can)
 		hil_board_conf="$profiles/nucleo-can.conf;$profiles/nucleo-$composition.conf"
 		hil_board_overlay="$profiles/nucleo-can.overlay"

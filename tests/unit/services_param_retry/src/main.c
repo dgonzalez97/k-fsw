@@ -20,6 +20,7 @@
 #define ID_A 0x100U
 #define ID_B 0x101U
 #define DESCRIPTOR_SIZE (offsetof(param_transfer3_t, help) + 1U)
+#define LOOKUP_VERSION 5U
 
 enum response_mode {
 	GOOD,
@@ -31,7 +32,8 @@ enum response_mode {
 	DENIED,
 	WAIT_TIMEOUT,
 	RETRY_NO_BUFFER,
-	RETRY_REFUSED
+	RETRY_REFUSED,
+	DISCOVERY_RETRY
 };
 static enum response_mode mode;
 static unsigned int losses;
@@ -42,6 +44,8 @@ static unsigned int sends;
 static unsigned int opened;
 static unsigned int closed;
 static unsigned int reads;
+static unsigned int list_requests;
+static unsigned int lookups;
 static uint8_t port;
 static uint8_t operation;
 static uint16_t requested_index;
@@ -49,6 +53,11 @@ static uint8_t connection_storage;
 static uint16_t zero;
 static param_transfer3_t descriptors[2];
 static uint32_t list_crc;
+extern struct k_mutex kfsw_param_remote_lock;
+K_SEM_DEFINE(lock_held, 0, 1);
+K_SEM_DEFINE(release_lock, 0, 1);
+K_THREAD_STACK_DEFINE(lock_stack, 1024);
+static struct k_thread lock_thread;
 
 void __wrap_kfsw_csp_get_info(struct kfsw_csp_info *info)
 {
@@ -90,8 +99,14 @@ void __wrap_csp_send(csp_conn_t *connection, csp_packet_t *packet)
 	operation = packet->data[0];
 	sends++;
 	if (port == CONFIG_KFSW_PARAM_LIST_PORT) {
-		zassert_equal(operation, 4);
-		requested_index = sys_get_be16(&packet->data[1]);
+		if (operation == LOOKUP_VERSION) {
+			zassert_equal(mode, DISCOVERY_RETRY);
+			lookups++;
+		} else {
+			zassert_equal(operation, 4);
+			list_requests++;
+			requested_index = sys_get_be16(&packet->data[1]);
+		}
 	} else if (operation == PARAM_PULL_REQUEST_V2) {
 		pulls++;
 	} else {
@@ -124,6 +139,10 @@ csp_packet_t *__wrap_csp_read(csp_conn_t *connection, uint32_t timeout)
 {
 	ARG_UNUSED(connection);
 	zassert_true(timeout > 0);
+	if (port == CONFIG_KFSW_PARAM_LIST_PORT &&
+	    (operation == LOOKUP_VERSION || (mode == DISCOVERY_RETRY && list_requests == 1U))) {
+		return NULL;
+	}
 	if (port != CONFIG_KFSW_PARAM_LIST_PORT &&
 	    (operation == PARAM_PUSH_REQUEST_V2 || mode == SILENT || pulls <= losses ||
 	     pulls == lost_pull)) {
@@ -192,7 +211,7 @@ static void before(void *unused)
 	losses = 0;
 	lost_pull = 0;
 	zassert_ok(kfsw_param_remote_refresh(PEER));
-	pulls = pushes = sends = opened = closed = 0;
+	pulls = pushes = sends = opened = closed = list_requests = lookups = 0;
 }
 
 static uint32_t resend_count(void)
@@ -247,6 +266,56 @@ ZTEST(param_retry, test_attempt_ceiling)
 	zassert_equal(read_pair(k_uptime_get() + 1000), -ETIMEDOUT);
 	zassert_equal(pulls, 3);
 	zassert_equal(resend_count() - previous, 2);
+}
+
+static void hold_remote_lock(void *first, void *second, void *third)
+{
+	ARG_UNUSED(first);
+	ARG_UNUSED(second);
+	ARG_UNUSED(third);
+	zassert_ok(k_mutex_lock(&kfsw_param_remote_lock, K_MSEC(100)));
+	k_sem_give(&lock_held);
+	zassert_ok(k_sem_take(&release_lock, K_MSEC(1000)));
+	k_mutex_unlock(&kfsw_param_remote_lock);
+}
+
+ZTEST(param_retry, test_lock_admission_uses_the_deadline)
+{
+	uint32_t previous = resend_count();
+
+	k_thread_create(&lock_thread, lock_stack, K_THREAD_STACK_SIZEOF(lock_stack),
+			hold_remote_lock, NULL, NULL, NULL, K_PRIO_PREEMPT(1), 0, K_NO_WAIT);
+	zassert_ok(k_sem_take(&lock_held, K_MSEC(100)));
+	int64_t start = k_uptime_get();
+	int result = read_pair(start + 20);
+
+	k_sem_give(&release_lock);
+	zassert_ok(k_thread_join(&lock_thread, K_MSEC(100)));
+	zassert_equal(result, -ETIMEDOUT);
+	zassert_between_inclusive(k_uptime_get() - start, 20, 50);
+	zassert_equal(sends, 0);
+	zassert_equal(resend_count(), previous);
+}
+
+ZTEST(param_retry, test_descriptor_requests_on_retry_are_counted)
+{
+	const char *names[] = {"a", "b"};
+	struct kfsw_param_value values[2];
+	uint32_t previous = resend_count();
+	int buffers = csp_buffer_remaining();
+
+	mode = DISCOVERY_RETRY;
+	zassert_ok(kfsw_param_remote_get_many_until(PEER + 1U, names, ARRAY_SIZE(names), values,
+						    k_uptime_get() + 1000));
+	zassert_equal(lookups, 2);
+	zassert_equal(list_requests, 4);
+	zassert_equal(pulls, 1);
+	zassert_equal(sends, 7);
+	zassert_equal(resend_count() - previous, 5);
+	zassert_equal(values[0].scalar.u32, 42);
+	zassert_equal(values[1].scalar.u32, 84);
+	zassert_equal(opened, closed);
+	zassert_equal(csp_buffer_remaining(), buffers);
 }
 
 ZTEST(param_retry, test_deadline_limits_attempts)

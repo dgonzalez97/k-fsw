@@ -29,6 +29,23 @@ CAN Update Keeps Both Images Readable
     ...    stdout=${OUTPUT DIR}/${TEST NAME}.out    stderr=STDOUT    timeout=1800
     HIL Command Should Pass    ${result}    CAN FWU RESULT: PASS
 
+Interrupted CAN Updates Spend One Boot Attempt Per Reset
+    [Documentation]    Refills the boot budget before each of eight FTP/lite cut
+    ...    resets, checks exactly one attempt spent and unchanged primary readback.
+    [Tags]    physical    nucleo    can    fwu    needs-can
+    ${result}=    Run Process    ${KFSW_REPO_DIR}/tests/hil/fwu/can-interruptions.sh
+    ...    ${OUTPUT DIR}/can-interruptions
+    ...    stdout=${OUTPUT DIR}/${TEST NAME}.out    stderr=STDOUT    timeout=10800
+    Log    ${result.stdout}
+    Should Be Equal As Integers    ${result.rc}    0    msg=${result.stdout}
+    Skip If    "CAN INTERRUPTIONS RESULT: NOT RUN" in $result.stdout    ${result.stdout}
+    Should Contain    ${result.stdout}    CAN acceptance: PASS
+    FOR    ${protocol}    IN    ftp    lite
+        FOR    ${boundary}    IN    erase 1    erase 80    write 512    write 65536
+            Should Contain    ${result.stdout}    Reset test: ${protocol} ${boundary}: PASS
+        END
+    END
+
 Direct Upload Carries An Image Between Two Nodes
     [Documentation]    Sends an image over CSP block by block and checks that the
     ...    receiving node has the same byte count and checksum.
