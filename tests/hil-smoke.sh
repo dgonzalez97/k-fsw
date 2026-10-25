@@ -143,7 +143,28 @@ grep -Fq '@READY ' "$capture_file" && ready_ok=1
 ready_ms="$(sed -n 's/.*@READY uptime_ms=\([0-9]\+\).*/\1/p' "$capture_file" | head -1)"
 ceiling="${KFSW_BOOT_CEILING_MS:-2000}"
 
-if [[ "$boot_ok" == 1 && "$ready_ok" == 1 ]]; then
+# The storage and boot-record work runs before any service, and an assert
+# there halts a core that nothing else can recover: the ground watchdog needs a
+# running node and the boot budget needs a restart. So the hardware watchdog
+# has to be armed before it, not after the services as it once was.
+# sed rather than grep: a capture without these lines is normal, and grep's
+# exit status would end the script under pipefail.
+armed_line="$(sed -n '/Watchdog armed/{=;q;}' "$capture_file")"
+mounted_line="$(sed -n '/Storage mounted at/{=;q;}' "$capture_file")"
+watchdog_ok=1
+watchdog_note="no watchdog message; composition runs unguarded"
+if [[ -n "$armed_line" && -n "$mounted_line" ]]; then
+    if (( armed_line < mounted_line )); then
+        watchdog_note="watchdog armed before storage"
+    else
+        watchdog_ok=0
+        watchdog_note="watchdog armed after storage, leaving early start-up unguarded"
+    fi
+elif [[ -n "$armed_line" ]]; then
+    watchdog_note="watchdog armed; this composition mounts no storage"
+fi
+
+if [[ "$boot_ok" == 1 && "$ready_ok" == 1 && "$watchdog_ok" == 1 ]]; then
     if [[ -n "$ready_ms" ]] && (( ready_ms > ceiling )); then
         echo "HIL RESULT: FAIL"
         echo "  [x] ready in ${ready_ms} ms, over the ${ceiling} ms ceiling"
@@ -152,11 +173,13 @@ if [[ "$boot_ok" == 1 && "$ready_ok" == 1 ]]; then
     echo "HIL RESULT: PASS"
     echo "  [ok] @BOOT"
     echo "  [ok] @READY${ready_ms:+ in ${ready_ms} ms, ceiling ${ceiling} ms}"
+    echo "  [ok] $watchdog_note"
     exit 0
 fi
 
 echo "HIL RESULT: FAIL"
 
+[[ "$watchdog_ok" == 0 ]] && echo "  [x] $watchdog_note"
 [[ "$boot_ok" == 0 ]] && echo "  [x] @BOOT"
 [[ "$ready_ok" == 0 ]] && echo "  [x] @READY"
 
