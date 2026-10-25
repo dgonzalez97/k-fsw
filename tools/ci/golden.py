@@ -16,12 +16,17 @@ REQUIRED = {
     "KFSW_FWU": "recovery must accept a replacement firmware image",
     "KFSW_FWU_LITE": "recovery must provide the lite update path",
     "KFSW_PARAM": "operators must be able to inspect recovery parameters",
+    "KFSW_GOLDEN_IMAGE": "the image must identify itself as recovery in @BOOT",
+    "KFSW_LOG_REMOTE": "a failed recovery upload must be diagnosable from the ground",
 }
 FORBIDDEN = {
     "KFSW_STORAGE": "recovery must work without a filesystem",
     "KFSW_PARAM_PERSISTENCE": "persistent state must not prevent recovery",
     "KFSW_FTP": "recovery updates use FWU rather than filesystem transfer",
     "KFSW_CSP_HMAC_REQUIRE": "authentication must not lock operators out of recovery",
+    "KFSW_DEBUG_SHELL": "recovery is commanded over CSP; there is no shell in orbit",
+    "SHELL": "recovery is commanded over CSP; there is no shell in orbit",
+    "MCUBOOT_SHELL": "recovery does not administer the bootloader locally",
 }
 
 
@@ -71,11 +76,19 @@ def main():
     args = parser.parse_args()
     profile = args.profile.resolve(strict=True)
     build = args.build_dir.resolve()
-    key = pathlib.Path(os.environ.get(
-        "KFSW_MCUBOOT_KEY", "~/.config/kfsw/mcuboot-signing-key.pem")).expanduser()
-    if not key.is_file() or not os.access(key, os.R_OK):
-        print("GOLDEN: NOT RUN - no readable MCUboot signing key; set KFSW_MCUBOOT_KEY")
-        return 0
+    # Recovery is the last resort, so this gate may not pass without verifying.
+    # MCUboot's own development key is in the tree and is enough to prove the
+    # composition signs and fits; a release key only changes who signed it.
+    candidates = [pathlib.Path(os.environ[name]).expanduser()
+                  for name in ("KFSW_MCUBOOT_KEY",) if name in os.environ]
+    candidates += [pathlib.Path("~/.config/kfsw/mcuboot-signing-key.pem").expanduser(),
+                   WORKSPACE / "bootloader/mcuboot/root-ec-p256.pem"]
+    key = next((path for path in candidates
+                if path.is_file() and os.access(path, os.R_OK)), None)
+    if key is None:
+        print("GOLDEN: FAIL - no readable signing key; tried "
+              + ", ".join(str(path) for path in candidates))
+        return 1
     env = os.environ.copy()
     env.update(
         KFSW_SYSBUILD="1", KFSW_PRISTINE="always", KFSW_BUILD_DIR=str(build),
