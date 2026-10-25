@@ -68,7 +68,7 @@ class Suites(unittest.TestCase):
         return result
 
     def test_selection(self):
-        stages = ('build', 'quality', 'unit', 'integration', 'csp-v1',
+        stages = ('build', 'quality', 'unit', 'coverage', 'integration', 'csp-v1',
                   'valgrind', 'robot', 'docs', 'board')
         for stage in stages:
             self.script(self.ci / f'{stage}.sh', f'echo {stage} >> "$TRACE"')

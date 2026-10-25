@@ -35,6 +35,7 @@ west manifest --validate
 python3 "$KFSW_CI_DIR/golden.py"
 "$KFSW_CI_DIR/quality.sh"
 "$KFSW_CI_DIR/unit.sh"
+"$KFSW_CI_DIR/coverage.sh"
 "$KFSW_CI_DIR/integration.sh"
 "$KFSW_CI_DIR/csp-v1.sh"
 "$KFSW_CI_DIR/valgrind.sh"

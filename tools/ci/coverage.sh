@@ -68,6 +68,52 @@ for key, label in (("line", "lines"), ("function", "functions"), ("branch", "bra
         label, d[key + "_percent"], d[key + "_covered"], d[key + "_total"]))
 ' "$summary"
 
+# Recovery and boot code may not lose coverage. The floors are what the suites
+# reach today; the target is in the same file. gcovr's own thresholds only
+# colour the report, so the gate is here. Percentages are computed from the
+# detailed report, which is the one Twister writes.
+python3 - "$twister_out_dir/coverage.json" "$KFSW_REPO_DIR/config/coverage-floors.json" <<'PYGATE'
+import json, sys
+
+report, floors_path = sys.argv[1], sys.argv[2]
+floors = json.load(open(floors_path))
+
+
+def percentages(entry):
+    lines = entry["lines"]
+    covered = sum(1 for line in lines if line["count"] > 0)
+    branches = [branch for line in lines for branch in line["branches"]]
+    taken = sum(1 for branch in branches if branch["count"] > 0)
+    return (100.0 * covered / len(lines) if lines else 0.0,
+            100.0 * taken / len(branches) if branches else 0.0)
+
+
+measured = {}
+for entry in json.load(open(report))["files"]:
+    for name in floors["files"]:
+        if entry["file"].endswith(name):
+            measured[name] = percentages(entry)
+
+failures = []
+for name, limit in sorted(floors["files"].items()):
+    if name not in measured:
+        failures.append(f"{name}: not in the coverage report")
+        continue
+    line_percent, branch_percent = measured[name]
+    print("COVERAGE FLOOR: %-44s lines %5.1f%% (>=%d)  branches %5.1f%% (>=%d)"
+          % (name, line_percent, limit["lines"], branch_percent, limit["branches"]))
+    for value, label in ((line_percent, "lines"), (branch_percent, "branches")):
+        if value + 0.05 < limit[label]:
+            failures.append(f"{name}: {label} {value:.1f}% below the {limit[label]}% floor")
+
+if failures:
+    print("COVERAGE RESULT: FAIL - recovery and boot coverage regressed")
+    for line in failures:
+        print(f"  {line}")
+    raise SystemExit(1)
+print(f"COVERAGE FLOORS: PASS (target {floors['target']}%)")
+PYGATE
+
 echo
 echo "COVERAGE: $html_dir/index.html"
 echo "COVERAGE: serve it with $KFSW_REPO_DIR/tools/coverage/serve.sh"
