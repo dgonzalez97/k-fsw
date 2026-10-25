@@ -80,9 +80,13 @@ floors = json.load(open(floors_path))
 
 
 def percentages(entry):
-    lines = entry["lines"]
+    """What gcovr reports, which is not what the raw line list says: lines and
+    branches it marked gcovr/excluded are left out of its own percentages, so
+    counting them here would read an exclusion as a regression."""
+    lines = [line for line in entry["lines"] if not line.get("gcovr/excluded")]
     covered = sum(1 for line in lines if line["count"] > 0)
-    branches = [branch for line in lines for branch in line["branches"]]
+    branches = [branch for line in lines for branch in line["branches"]
+                if not branch.get("gcovr/excluded")]
     taken = sum(1 for branch in branches if branch["count"] > 0)
     return (100.0 * covered / len(lines) if lines else 0.0,
             100.0 * taken / len(branches) if branches else 0.0)
