@@ -31,6 +31,7 @@ static int show_local(const struct shell *sh)
 	shell_print(sh, "since_contact_s: %u", status.since_contact_s);
 	shell_print(sh, "contacts: %u last_node: %u", status.contacts, status.last_node);
 	shell_print(sh, "expiries: %u", status.expiries);
+	shell_print(sh, "reschedule failures: %u", status.reschedule_failures);
 	return 0;
 }
 
