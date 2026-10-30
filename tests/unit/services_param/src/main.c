@@ -33,6 +33,13 @@ static bool summarize_parameter(const struct kfsw_param_info *info, void *contex
 	return true;
 }
 
+/* Only its address matters: the registration is refused before it could run. */
+static int note_apply(const union kfsw_param_scalar *value)
+{
+	ARG_UNUSED(value);
+	return 0;
+}
+
 ZTEST(services_param, test_kfsw_parameter_lifecycle)
 {
 	static uint8_t duplicate_value;
@@ -80,6 +87,19 @@ ZTEST(services_param, test_kfsw_parameter_lifecycle)
 			.type = KFSW_PARAM_U8,
 			.name = "a_name_of_exactly_thirty_three_ch",
 			.value = &spare_value,
+		},
+	};
+	/* Persistent and applied: a snapshot with more than one entry refuses
+	 * every parameter in it, so the combination is refused here instead.
+	 */
+	static const struct kfsw_param_definition applied_persistent_definition[] = {
+		{
+			.offset = 0x00U,
+			.type = KFSW_PARAM_U8,
+			.flags = KFSW_PARAM_FLAG_PERSISTENT,
+			.name = "applied_persistent",
+			.value = &spare_value,
+			.apply = note_apply,
 		},
 	};
 	/* Different names, one address. */
@@ -134,6 +154,15 @@ ZTEST(services_param, test_kfsw_parameter_lifecycle)
 	const struct kfsw_param_definition_set *const unnamed_table_sets[] = {&unnamed_table};
 	const struct kfsw_param_definition_set *const long_name_sets[] = {&long_name_table};
 	const struct kfsw_param_definition_set *const colliding_sets[] = {&colliding_table};
+	static const struct kfsw_param_definition_set applied_persistent_table = {
+		.table = KFSW_PARAM_TABLE_CORE_FIRST,
+		.name = "applied",
+		.definitions = applied_persistent_definition,
+		.count = ARRAY_SIZE(applied_persistent_definition),
+	};
+	const struct kfsw_param_definition_set *const applied_persistent_sets[] = {
+		&applied_persistent_table,
+	};
 
 	zassert_false(kfsw_param_is_initialized());
 	zassert_equal(kfsw_param_get("test_u32", &value), -EACCES);
@@ -155,6 +184,9 @@ ZTEST(services_param, test_kfsw_parameter_lifecycle)
 		      "a truncated name would be printed but could not be typed");
 	zassert_equal(kfsw_param_init(colliding_sets, 1U), -EEXIST,
 		      "two parameters at one address would shadow each other on the link");
+	zassert_equal(
+		kfsw_param_init(applied_persistent_sets, 1U), -EINVAL,
+		"one persistent parameter with an apply callback would refuse a whole snapshot");
 	zassert_false(kfsw_param_is_initialized());
 #if CONFIG_KFSW_PARAM_CSP
 	zassert_equal(kfsw_param_server_start(), -EACCES);
