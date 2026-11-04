@@ -35,6 +35,17 @@ ssize_t __wrap_nvs_write(struct nvs_fs *fs, uint16_t id, const void *data, size_
 	return store_fails ? -EIO : __real_nvs_write(fs, id, data, size);
 }
 
+/* The service exists to notice a lost link, so a check it could not schedule
+ * has to be visible rather than discarded.
+ */
+static bool reschedule_fails;
+
+int __real_k_work_reschedule(struct k_work_delayable *dwork, k_timeout_t delay);
+int __wrap_k_work_reschedule(struct k_work_delayable *dwork, k_timeout_t delay)
+{
+	return reschedule_fails ? -EBUSY : __real_k_work_reschedule(dwork, delay);
+}
+
 static atomic_t reboots;
 static int reboot_type = -1;
 K_SEM_DEFINE(reboot_seen, 0, 1);
@@ -287,6 +298,24 @@ ZTEST(services_gndwdt, test_parameters_match_reply_and_validate_writes)
 	zassert_equal(value.scalar.u32, 432000U - 123U);
 }
 #endif
+
+ZTEST(services_gndwdt, test_a_check_that_cannot_be_scheduled_is_counted)
+{
+	struct kfsw_gndwdt_status before;
+	struct kfsw_gndwdt_status after;
+
+	(void)kfsw_gndwdt_stop();
+	kfsw_gndwdt_get_status(&before);
+
+	reschedule_fails = true;
+	zassert_ok(kfsw_gndwdt_start());
+	reschedule_fails = false;
+
+	kfsw_gndwdt_get_status(&after);
+	zassert_equal(after.reschedule_failures, before.reschedule_failures + 1U,
+		      "a check that could not be scheduled must be counted, not dropped");
+	zassert_ok(kfsw_gndwdt_stop());
+}
 
 ZTEST(services_gndwdt, test_expiry_resets_the_node_once)
 {
