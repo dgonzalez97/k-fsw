@@ -8,6 +8,8 @@
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/ztest.h>
 
+#include "golden_image.h"
+
 #define TARGET DT_CHOSEN(kfsw_fwu_partition)
 #define GOLDEN DT_CHOSEN(kfsw_golden_partition)
 static uint8_t image[DT_REG_SIZE(GOLDEN)];
@@ -55,10 +57,7 @@ static void before(void *fixture)
 	if (status.handle.generation != 0U) {
 		zassert_ok(kfsw_fwu_session_abort(&status.handle, &status));
 	}
-	for (size_t i = 0U; i < sizeof(image); i++) {
-		image[i] = (uint8_t)(i * 7U);
-	}
-	sys_put_le32(IMAGE_MAGIC, image);
+	golden_image_build(image, sizeof(image), 0U);
 	zassert_ok(flash_area_open(DT_FIXED_PARTITION_ID(GOLDEN), &area));
 	zassert_ok(flash_area_flatten(area, 0, area->fa_size));
 	zassert_ok(flash_area_write(area, 0, image, sizeof(image)));
@@ -121,6 +120,23 @@ ZTEST(golden, test_cached_cleanup_cannot_adopt_successor)
 	zassert_ok(kfsw_fwu_session_status(&next, &status));
 	zassert_equal(status.state, KFSW_FWU_RECEIVING);
 	zassert_false(status.aborted);
+}
+
+ZTEST(golden, test_damaged_image_refused_before_the_slot_erase)
+{
+	const struct flash_area *area;
+	struct kfsw_fwu_status status;
+
+	image[IMAGE_HEADER_SIZE] ^= 0x01U;
+	zassert_ok(flash_area_open(DT_FIXED_PARTITION_ID(GOLDEN), &area));
+	zassert_ok(flash_area_flatten(area, 0, area->fa_size));
+	zassert_ok(flash_area_write(area, 0, image, sizeof(image)));
+	flash_area_close(area);
+	zassert_true(kfsw_golden_present());
+	zassert_equal(kfsw_golden_install(), -EBADMSG);
+	zassert_equal(erase_calls, 0U, "the secondary slot must stay untouched");
+	zassert_ok(kfsw_fwu_get_status(&status));
+	zassert_equal(status.state, KFSW_FWU_IDLE);
 }
 
 ZTEST_SUITE(golden, NULL, NULL, before, NULL, NULL);

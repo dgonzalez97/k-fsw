@@ -21,6 +21,8 @@
 #include <kfsw/services/golden.h>
 #include <kfsw/services/parameter.h>
 
+#include "../../services_golden/src/golden_image.h"
+
 static bool hosted;
 static bool bad_note_crc;
 
@@ -207,8 +209,7 @@ ZTEST(boot_budget, test_mcuboot_revert_precedes_golden_and_does_not_refill)
 	struct kfsw_fwu_status status;
 	uint8_t actual[32];
 
-	memset(image, 0x77, sizeof(image));
-	sys_put_le32(IMAGE_MAGIC, image);
+	golden_image_build(image, sizeof(image), 0x77U);
 	zassert_ok(flash_area_open(DT_FIXED_PARTITION_ID(DT_CHOSEN(kfsw_golden_partition)), &area));
 	zassert_ok(flash_area_flatten(area, 0U, area->fa_size));
 	zassert_ok(flash_area_write(area, 0U, image, sizeof(image)));
@@ -252,8 +253,7 @@ ZTEST(boot_budget, test_hosted_prepare)
 	if (!hosted) {
 		ztest_test_skip();
 	}
-	memset(image, 0x77, sizeof(image));
-	sys_put_le32(IMAGE_MAGIC, image);
+	golden_image_build(image, sizeof(image), 0x77U);
 	zassert_ok(flash_area_open(DT_FIXED_PARTITION_ID(DT_CHOSEN(kfsw_golden_partition)), &area));
 	zassert_ok(flash_area_flatten(area, 0U, area->fa_size));
 	zassert_ok(flash_area_write(area, 0U, image, sizeof(image)));
@@ -318,6 +318,22 @@ ZTEST(boot_budget, test_empty_golden_keeps_application_behavior)
 	zassert_ok(kfsw_boot_budget_set_left(0U));
 	zassert_equal(kfsw_golden_check(&outcome), -ENOENT);
 	zassert_equal(outcome, KFSW_GOLDEN_NOT_NEEDED);
+}
+
+ZTEST(boot_budget, test_invalid_record_restarts_from_the_compiled_maximum)
+{
+	zassert_ok(kfsw_boot_store_write(7U, 3U));
+	zassert_ok(kfsw_boot_budget_start(false));
+	zassert_equal(remaining(), CONFIG_KFSW_BOOT_ATTEMPTS_MAX - 1U);
+	zassert_ok(kfsw_boot_store_write(1U, 4U));
+	zassert_ok(kfsw_boot_budget_start(false));
+	zassert_equal(remaining(), CONFIG_KFSW_BOOT_ATTEMPTS_MAX - 1U);
+	zassert_ok(kfsw_boot_store_write(9U, 3U));
+	zassert_ok(kfsw_boot_budget_start(true));
+	zassert_equal(remaining(), CONFIG_KFSW_BOOT_ATTEMPTS_MAX);
+	zassert_ok(kfsw_boot_budget_set_left(1U), "the ground must be able to repair it");
+	zassert_ok(kfsw_boot_budget_start(false));
+	zassert_equal(remaining(), 0U);
 }
 
 ZTEST(boot_budget, test_maximum_changes_never_refill)
