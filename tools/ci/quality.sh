@@ -37,75 +37,15 @@ format_roots+=("$KFSW_REPO_DIR/tests/hil/fwu")
 	format_roots+=("$KFSW_REPO_DIR/tests/hil/radio-uhf/holybro/raw-peer/src")
 [[ -d "$KFSW_WORKSPACE_ROOT/kfsw-modules" ]] && \
 	format_roots+=("$KFSW_WORKSPACE_ROOT/kfsw-modules")
+for library in kfsw-platform kfsw-services kfsw-comms; do
+	format_roots+=("$KFSW_WORKSPACE_ROOT/$library/include" "$KFSW_WORKSPACE_ROOT/$library/src")
+done
 
 mapfile -d '' format_sources < <(
 	find "${format_roots[@]}" \
 		-type f \( -name '*.c' -o -name '*.h' \) \
 		! -path '*/third_party/*' \
 		-print0 | sort -z
-)
-
-format_sources+=(
-	"$KFSW_WORKSPACE_ROOT/kfsw-platform/include/kfsw/platform/semihost.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-platform/src/semihost.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-platform/src/semihost_internal.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-platform/src/semihost_target.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-platform/include/kfsw/platform/storage.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-platform/src/storage.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-platform/include/kfsw/platform/watchdog.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-platform/src/watchdog.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/health.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/health/health.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/log.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/parameter.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/ftp.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command/command.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command/command_csp.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command/command_internal.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command/command_protocol.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command/command_retry.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command/command_retry.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/fbo/fbo.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/fbo/fbo_clock.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/fbo/fbo_internal.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/journal.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/journal/journal.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/journal/journal_store.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/journal/journal_store.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/command.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/event.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/event/event.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp/ftp_client.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp/ftp_internal.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp/ftp_link.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp/ftp_link_csp.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp/ftp_protocol.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp/ftp_server.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp/ftp_store.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp/ftp_transfer.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/log.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/log_history.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/log_remote.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/log_remote.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/log_history_internal.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/log_history.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/libparam_print.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/libparam_print.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/parameter.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/parameter_csp.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/parameter_internal.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/parameter_persistence.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-platform/include/kfsw/platform/boot_store.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-platform/src/boot_store.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/boot_budget.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/boot_budget.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/boot-parameters/boot_table.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/scrub.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/scrub/scrub.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/scrub-parameters/scrub_table.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/limits.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/limits/limits.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/limits-parameters/limits_table.c"
 )
 
 echo "QUALITY: clang-format (${#format_sources[@]} files)"
