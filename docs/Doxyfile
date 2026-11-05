@@ -59,6 +59,7 @@ RECURSIVE              = YES
 EXCLUDE                = docs/theme
 EXCLUDE_PATTERNS       = */third_party/* */build/* */bootloader/*
 EXAMPLE_PATH           = docs
+FILTER_PATTERNS        = *.md=tools/docs/mermaid-filter.py
 IMAGE_PATH             = docs/media
 
 REFERENCES_RELATION    = NO

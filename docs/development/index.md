@@ -180,6 +180,12 @@ Use short descriptions of what the code does. For procedures, give the command,
 expected result and relevant limits. Link to upstream references for RTOS and
 protocol background.
 
+Draw diagrams as fenced code blocks marked `mermaid`. GitHub draws them in
+place, and `tools/docs/build.sh` passes them through `tools/docs/mermaid-filter.py`
+so the HTML manual draws the same source with a pinned Mermaid release. To read
+the manual offline, point `KFSW_MERMAID_JS` at a local `mermaid.min.js` before
+building. The PDF shows the diagram source.
+
 From the workspace root:
 
 ```bash
