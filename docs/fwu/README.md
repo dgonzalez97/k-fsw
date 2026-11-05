@@ -8,6 +8,97 @@ the next reset. F7 uses the A + Golden recovery arrangement described below.
 The watchdog causes that reset only when it is configured and health
 monitoring stops feeding it.
 
+## Slots and image states
+
+On the NUCLEO swap profile the flash holds three images. Slot 0 is the one
+that runs. Slot 1 receives an upload and, after a swap, keeps the image that
+ran before it. The Golden partition holds the recovery image as data; MCUboot
+never boots it from there. @ref targets has the addresses.
+
+The state that matters is the state of the image in slot 0:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Confirmed: flashed and confirmed
+    Confirmed --> Staged: upload verified, trial swap requested
+    Staged --> Confirmed: fwu abort erases slot 1
+    Staged --> Trial: reset, MCUboot checks slot 1 and swaps
+    Trial --> Confirmed: ground writes boot_confirmed
+    Trial --> Confirmed: reset before confirmation, MCUboot reverts
+    Confirmed --> GoldenTrial: no boot attempts left, Golden copied to slot 1
+    GoldenTrial --> Golden: Golden confirms itself at start
+    Golden --> Staged: operator uploads a new image
+```
+
+`Confirmed` is a normal node. An update moves it to `Staged`: the image is in
+slot 1, checked, and MCUboot has been asked for a trial swap
+(`boot_request_upgrade(BOOT_UPGRADE_TEST)` in `kfsw-services/src/fwu/fwu.c`).
+Nothing changes until the next reset. At that reset MCUboot checks the
+signature of slot 1, swaps the two slots and starts the new image as a
+`Trial`.
+
+A trial ends in one of two ways. The operator checks the node and writes
+`boot_confirmed` (table 32, offset `0x28`), and the new image stays. Or the
+node resets for any reason before that, and MCUboot swaps the previous image
+back. While MCUboot still needs slot 1 for that revert, the update service
+refuses a new upload and an abort with `busy`.
+
+The boot budget is the second path, in builds with
+`CONFIG_KFSW_BOOT_BUDGET` (the MCUboot update profile). Every reset that was
+not a commanded reboot spends one attempt before `main()` runs. When none is left, the early
+boot service copies the Golden partition into slot 1 and requests a trial
+swap, exactly as an upload would. If a revert is still pending it reboots
+first and lets MCUboot revert, so Golden is only installed over an image that
+has had its chance. Golden confirms itself once it has started, because no
+operator is there to do it, and waits for the ground to upload a replacement.
+Installing an image through either update front end refills the budget.
+
+`fwu abort` from `Staged` erases slot 1, which also removes the previous
+image kept there, and the node goes on running what it ran before, Golden
+included. After the next upload the previous image is gone anyway.
+
+## An update from the ground
+
+FWU lite is the path a ground station uses when the node has no room or no
+need for a file first. The ground node sends, the flight node writes straight
+into slot 1, and the operator drives each step:
+
+```mermaid
+sequenceDiagram
+    participant OP as Operator console
+    participant GND as Ground node
+    participant NODE as Flight node
+    participant MCU as MCUboot
+
+    OP->>GND: fwu_lite send 2 image
+    GND->>NODE: BEGIN with size and SHA-256
+    NODE->>NODE: erase slot 1
+    loop every block
+        GND->>NODE: BLOCK offset, bytes, CRC32
+        NODE-->>GND: accepted
+    end
+    OP->>GND: fwu_lite validate 2
+    GND->>NODE: VERIFY
+    NODE->>NODE: read slot 1 back, check CRC32 and SHA-256
+    OP->>GND: fwu_lite flash 2
+    GND->>NODE: START_FLASHING
+    NODE->>NODE: request a trial swap, refill the boot budget
+    OP->>NODE: csp reboot 2 pin
+    NODE->>MCU: reset
+    MCU->>MCU: check the signature, swap the slots
+    OP->>NODE: check health, then set boot_confirmed
+```
+
+Each step answers one question. `send` says the bytes arrived; a lost contact
+is resumed by sending again. `validate` says the bytes in flash are the bytes
+that were sent. `flash` says MCUboot accepted the request, which shows as
+`fwu_swap_scheduled` in table 30. None of them resets the node; the operator
+does that with `csp reboot`. Only MCUboot checks the signature, at the swap.
+After the reset, `boot_image` in table 32 says which image is running.
+
+FTP upload to `/firmware.bin` takes the same writer and ends in the same
+`Staged` state, with a CRC32 check instead of the SHA-256.
+
 ## Selecting the update paths
 
 `CONFIG_KFSW_FWU` is the shared flash writer, transfer ownership and bootloader
@@ -125,11 +216,18 @@ mcuboot
 
 Check the running version over the link with `csp ident 2`. A completed upload
 does not prove that the candidate booted. Check node health and read back the
-previous image before accepting the candidate:
+previous image before accepting the candidate. From a ground node, confirm it
+through the boot table:
 
 ```text
-mcuboot confirm
+param set 2 boot_confirmed 1
+param get 2 boot_attempts
 ```
+
+`boot_attempts` drops to 0 once the confirmation is written. A value above 0
+means the image is still on trial and the next reset reverts it.
+
+On the board's own console, `mcuboot confirm` does the same.
 
 To revert, reset without confirming. Upload and abort requests return `busy`
 while MCUboot needs the secondary image for trial rollback.
