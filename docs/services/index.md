@@ -1354,7 +1354,8 @@ From the shell: `limits status`, `limits list`, `limits load [file]` and
 ## Watchdogs
 
 Three watchdogs answer three different questions. Each resets the node when
-its answer is no.
+its answer is no. @ref fault_recovery shows how they fit with the other fault
+mechanisms.
 
 | Watchdog | Proves | Fed by | Timeout | Enabled in |
 | --- | --- | --- | --- | --- |
@@ -1366,9 +1367,10 @@ its answer is no.
 
 The MCU's independent watchdog, IWDG on the STM32L4, runs from its own
 low-speed oscillator and cannot be stopped once started. Zephyr drives it
-through its watchdog driver; `kfsw-platform` arms it after the services have
-started, so a slow boot is not reset before the shell is up. native_sim has no
-hardware watchdog. The [NUCLEO target](../targets/index.md#watchdog) explains
+through its watchdog driver. `main()` arms it first, before storage and the
+services, so a hang anywhere in startup still ends in a reset; a keep-alive on
+the system workqueue feeds it until health takes over at the end of startup.
+native_sim has no hardware watchdog. The [NUCLEO target](../targets/index.md#watchdog) explains
 why it is the independent watchdog and not `watchdog0`.
 
 ### Health
