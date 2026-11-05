@@ -6,7 +6,21 @@
  * for a recovery image.
  *
  * Every boundary is a multiple of the 2 KB erase block.
+ *
+ * MCUboot arms watchdog0, which the board points at the window watchdog. The
+ * window watchdog cannot reach the bootloader's timeout, so here it names the
+ * independent one, the same device the application arms through kfsw,watchdog.
  */
+
+/ {
+	aliases {
+		watchdog0 = &iwdg;
+	};
+};
+
+&iwdg {
+	status = "okay";
+};
 
 &flash0 {
 	partitions {

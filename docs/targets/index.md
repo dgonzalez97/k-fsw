@@ -190,8 +190,14 @@ and has a much shorter timeout.
 The independent watchdog runs from the low-speed oscillator, goes up to about
 32 s and keeps running in most low-power states.
 
-The watchdog is armed after all services have started, so a slow boot isn't
-reset before the shell is up.
+The application arms it at the top of `main()`, before the flash and
+filesystem work. In the MCUboot profile the bootloader has already started the
+same watchdog with a 20 s timeout (`app/sysbuild/mcuboot.conf`), so a hang in
+driver initialisation, or an image that never reaches `main()`, still resets
+the board and an unconfirmed trial is reverted. `nucleo-mcuboot-flash.overlay`
+points the bootloader's `watchdog0` at the independent watchdog for this.
+Every application booted by this bootloader must arm and feed the watchdog
+within 20 s.
 
 ### Build, flash and console
 
