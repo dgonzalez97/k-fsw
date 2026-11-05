@@ -360,7 +360,8 @@ Two things can ask for that:
   An operator who already knows the image is bad does not have to wait.
 - The early boot service, when `boot_attempts_left` reaches zero. The count
   and `boot_attempts_max` live in a dedicated flash record, independent of the
-  parameter snapshot. See [boot budget and MCUboot](../fwu/README.md#boot-budget-and-mcuboot).
+  parameter snapshot. The boot budget section of @ref firmware_update has the
+  details.
 
 The swap is a trial, not a permanent one: if the recovery image cannot boot
 either, the bootloader still has somewhere to go back to. The recovery image

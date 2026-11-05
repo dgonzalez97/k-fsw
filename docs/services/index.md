@@ -829,8 +829,8 @@ property. The NUCLEO-L496ZG uses the last 64 KiB of its 1 MiB flash:
 `CONFIG_USE_DT_CODE_PARTITION=y` keeps the application out of the storage
 region. native_sim uses a 256 KiB partition backed by a host file,
 `build/linux/kfsw-storage.bin` when started with the runner. The FRDM-K64F profile keeps
-storage disabled. Pico W uses its own persistent and scratch layout; see the
-[target guide](@ref targets).
+storage disabled. Pico W uses its own persistent and scratch layout; see
+@ref targets.
 
 ### Mount and format
 
