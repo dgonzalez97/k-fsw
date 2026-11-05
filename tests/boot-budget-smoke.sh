@@ -46,5 +46,11 @@ run("golden", "test_hosted_golden",
     "BOOT BUDGET: Golden up; no budget consumed; self-install refused")
 run("golden", "test_hosted_golden",
     "BOOT BUDGET: Golden up; no budget consumed; self-install refused")
+# The install that brings recovery in refills the budget, but that write may
+# fail without failing the install. Leave the record empty and restart: the
+# next recovery startup has to put the count back on its own.
+run("golden", "test_hosted_drain", "BOOT BUDGET: drained left=0")
+run("golden", "test_hosted_golden_refills_at_startup",
+    "BOOT BUDGET: Golden refilled at startup left=3")
 print("BOOT BUDGET RESULT: PASS (hosted bootloader model)")
 PYTEST

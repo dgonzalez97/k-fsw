@@ -298,6 +298,39 @@ ZTEST(boot_budget, test_hosted_golden)
 	printk("BOOT BUDGET: Golden up; no budget consumed; self-install refused\n");
 }
 
+/* Leave the record empty for the next run of this image. The install that
+ * brings recovery in refills it, but that write is allowed to fail, and this
+ * is the state recovery would then start from.
+ */
+ZTEST(boot_budget, test_hosted_drain)
+{
+	uint8_t left;
+	uint8_t maximum;
+	if (!hosted) {
+		ztest_test_skip();
+	}
+	zassert_ok(kfsw_boot_store_open());
+	zassert_ok(kfsw_boot_store_read(&left, &maximum));
+	zassert_ok(kfsw_boot_store_write(0U, maximum));
+	zassert_ok(kfsw_boot_store_read(&left, &maximum));
+	zassert_equal(left, 0U);
+	printk("BOOT BUDGET: drained left=%u\n", left);
+}
+
+ZTEST(boot_budget, test_hosted_golden_refills_at_startup)
+{
+	uint8_t left;
+	uint8_t maximum;
+	if (!hosted) {
+		ztest_test_skip();
+	}
+	zassert_true(IS_ENABLED(CONFIG_KFSW_GOLDEN_IMAGE));
+	zassert_ok(kfsw_boot_store_open());
+	zassert_ok(kfsw_boot_store_read(&left, &maximum));
+	zassert_equal(left, maximum, "recovery must start the count again");
+	printk("BOOT BUDGET: Golden refilled at startup left=%u\n", left);
+}
+
 ZTEST(boot_budget, test_read_failure_leaves_budget_unavailable)
 {
 	fail_read = true;
