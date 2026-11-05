@@ -490,6 +490,11 @@ is defined by that service and carries its ID in its own header.
 | 9 to 11 | `journal_stats`, `journal_tail`, `journal_time` | `k-fsw` composition |
 | 12 to 15 | free | |
 | 16 | `ground_wtd` | `kfsw-services`, `gndwdt.h` |
+| 17 to 19 | free | |
+| 20 to 23 | `fbo_run`, `fbo_sched_add`, `fbo_sched_cancel`, `fbo_sched_clear` | `kfsw-services`, `fbo.h` |
+| 24 | `golden_install` | `k-fsw` composition |
+| 40 to 43 | `gpredict_select`, `gpredict_enable`, `gpredict_park`, `gpredict_clear` | `kfsw-modules`, `gpredict.h` |
+| 64 | `temp_clear` | `kfsw-modules`, `temperature_sensor_example.h` |
 
 **CSP ports.** 0 is management (CMP) and 1 ping, both from libcsp. K-FSW
 serves 8 remote shell execution, 9 file transfer, 10 parameter values, 11

@@ -346,6 +346,9 @@ int main(void)
 #if CONFIG_KFSW_GNDWDT
 		&kfsw_gndwdt_command_definitions,
 #endif
+#if CONFIG_KFSW_TEMPERATURE_SENSOR_EXAMPLE
+		&kfsw_temp_example_command_definitions,
+#endif
 	};
 
 	result = kfsw_command_init(command_sets, ARRAY_SIZE(command_sets));
