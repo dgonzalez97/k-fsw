@@ -293,7 +293,7 @@ static int cmd_log_remote(const struct shell *sh, size_t argc, char **argv)
 static int cmd_log_level(const struct shell *sh, size_t argc, char **argv)
 {
 	unsigned long level;
-	char *end;
+	int parse_error = 0;
 
 	if (argc == 1U) {
 		for (unsigned int module = 0U; module < KFSW_LOG_MODULE_COUNT; module++) {
@@ -313,8 +313,8 @@ static int cmd_log_level(const struct shell *sh, size_t argc, char **argv)
 				    kfsw_log_get_module_level((enum kfsw_log_module)module));
 			return 0;
 		}
-		level = strtoul(argv[2], &end, 10);
-		if ((*end != '\0') || (level > 4U)) {
+		level = shell_strtoul(argv[2], 10, &parse_error);
+		if ((parse_error != 0) || (level > 4U)) {
 			shell_error(sh, "level is 0 debug, 1 info, 2 warning, 3 error, 4 off");
 			return -EINVAL;
 		}

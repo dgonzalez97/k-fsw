@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include <zephyr/shell/shell.h>
+#include <zephyr/shell/shell_string_conv.h>
 
 #include <kfsw/services/gndwdt.h>
 
@@ -104,13 +105,13 @@ static int cmd_gndwdt_arm(const struct shell *sh, size_t argc, char **argv)
 static int cmd_gndwdt_timeout(const struct shell *sh, size_t argc, char **argv)
 {
 	unsigned long seconds;
-	char *end;
+	int parse_error = 0;
 	int result;
 
 	ARG_UNUSED(argc);
 
-	seconds = strtoul(argv[1], &end, 0);
-	if ((end == argv[1]) || (*end != '\0') || (seconds > UINT32_MAX)) {
+	seconds = shell_strtoul(argv[1], 0, &parse_error);
+	if ((parse_error != 0) || (seconds > UINT32_MAX)) {
 		shell_error(sh, "Invalid timeout: %s", argv[1]);
 		return -EINVAL;
 	}

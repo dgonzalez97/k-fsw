@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include <zephyr/shell/shell.h>
+#include <zephyr/shell/shell_string_conv.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/util.h>
 
@@ -32,10 +33,10 @@ static int setting_result(const struct shell *sh, int result)
 
 static int parse_u32(const struct shell *sh, const char *text, uint32_t *out, const char *what)
 {
-	char *end;
-	unsigned long parsed = strtoul(text, &end, 0);
+	int parse_error = 0;
+	unsigned long parsed = shell_strtoul(text, 0, &parse_error);
 
-	if ((end == text) || (*end != '\0') || (parsed > UINT32_MAX)) {
+	if ((parse_error != 0) || (parsed > UINT32_MAX)) {
 		shell_error(sh, "Invalid %s: %s", what, text);
 		return -EINVAL;
 	}

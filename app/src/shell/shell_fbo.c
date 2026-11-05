@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include <zephyr/shell/shell.h>
+#include <zephyr/shell/shell_string_conv.h>
 #include <zephyr/sys/util.h>
 
 #include <kfsw/services/command.h>
@@ -52,12 +53,12 @@ static int cmd_fbo_sched_add(const struct shell *sh, size_t argc, char **argv)
 {
 	struct kfsw_command_arg args[3];
 	unsigned long node;
-	char *end;
+	int parse_error = 0;
 
 	ARG_UNUSED(argc);
 
-	node = strtoul(argv[2], &end, 10);
-	if ((*end != '\0') || (node > UINT16_MAX)) {
+	node = shell_strtoul(argv[2], 10, &parse_error);
+	if ((parse_error != 0) || (node > UINT16_MAX)) {
 		shell_error(sh, "node must be a number, 0 for this one");
 		return -EINVAL;
 	}
@@ -74,12 +75,12 @@ static int cmd_fbo_sched_cancel(const struct shell *sh, size_t argc, char **argv
 {
 	struct kfsw_command_arg args[1];
 	unsigned long index;
-	char *end;
+	int parse_error = 0;
 
 	ARG_UNUSED(argc);
 
-	index = strtoul(argv[1], &end, 10);
-	if ((*end != '\0') || (index > UINT16_MAX)) {
+	index = shell_strtoul(argv[1], 10, &parse_error);
+	if ((parse_error != 0) || (index > UINT16_MAX)) {
 		shell_error(sh, "index must be a number");
 		return -EINVAL;
 	}

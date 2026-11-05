@@ -270,7 +270,7 @@ static int cmd_csp_ident(const struct shell *sh, size_t argc, char **argv)
 	struct kfsw_csp_clock clock = {0};
 	struct kfsw_csp_info info;
 	unsigned long node;
-	char *end = NULL;
+	int parse_error = 0;
 	int result;
 
 	/* This node's identity is answered locally, without the network. */
@@ -285,8 +285,8 @@ static int cmd_csp_ident(const struct shell *sh, size_t argc, char **argv)
 		return 0;
 	}
 
-	node = strtoul(argv[1], &end, 0);
-	if ((end == argv[1]) || (*end != '\0') || (node > KFSW_CSP_BROADCAST_ADDRESS)) {
+	node = shell_strtoul(argv[1], 0, &parse_error);
+	if ((parse_error != 0) || (node > KFSW_CSP_BROADCAST_ADDRESS)) {
 		shell_error(sh, "Invalid node: %s", argv[1]);
 		return -EINVAL;
 	}
@@ -334,6 +334,7 @@ static int cmd_csp_clock(const struct shell *sh, size_t argc, char **argv)
 	struct kfsw_csp_clock clock = {0};
 	unsigned long node;
 	char *end;
+	int parse_error = 0;
 	int result;
 
 	if (argc < 2U) {
@@ -369,8 +370,8 @@ static int cmd_csp_clock(const struct shell *sh, size_t argc, char **argv)
 		return 0;
 	}
 
-	node = strtoul(argv[1], &end, 0);
-	if ((end == argv[1]) || (*end != '\0') || (node > KFSW_CSP_BROADCAST_ADDRESS)) {
+	node = shell_strtoul(argv[1], 0, &parse_error);
+	if ((parse_error != 0) || (node > KFSW_CSP_BROADCAST_ADDRESS)) {
 		shell_error(sh, "Invalid node: %s", argv[1]);
 		return -EINVAL;
 	}
