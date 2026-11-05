@@ -46,16 +46,23 @@ git config user.name
 git config user.email
 ```
 
-Use a short imperative subject with uppercase area tags:
+The subject is uppercase area tags and then the thing that changed, as a noun
+phrase, not an instruction:
 
 ```text
-[SERVICES][PARAM] Reject invalid table offsets
-[TEST][HIL] Add CAN parameter checks
-[DOCS][GUIDE] Simplify wiki navigation
+[PARAM] Remote table list descriptor changes
+[SHELL] Help line width fix
+[DOCS] Golden partition contents
 ```
 
-One commit per responsibility. Add a body only when the reason is not clear
-from the subject.
+The first tag is the layer or kind of change (`SERVICES`, `COMMS`, `DOCS`,
+`TEST`, `BOOT`, ...), the optional second one the feature. Keep it under about
+72 characters, with no trailing period.
+
+The subject is the whole message. The reason for a change goes in the code, a
+comment or the documentation, where the next reader of that code finds it.
+Make one commit per coherent change; related fixes in the same area go in the
+same commit.
 
 ## Pull requests
 
