@@ -1,4 +1,6 @@
+#include <ctype.h>
 #include <errno.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -18,23 +20,27 @@ int kfsw_app_hk_parse_entry(const char *text, struct kfsw_hk_entry *entry)
 		return -EINVAL;
 	}
 
-	while ((count < ARRAY_SIZE(parts)) && (*cursor != '\0')) {
+	for (;;) {
 		char *end;
 
+		if ((count == ARRAY_SIZE(parts)) || !isdigit((unsigned char)*cursor)) {
+			return -EINVAL;
+		}
+		errno = 0;
 		parts[count] = strtoul(cursor, &end, 0);
-		if (end == cursor) {
-			break;
+		if ((errno == ERANGE) || (parts[count] > UINT16_MAX)) {
+			return -EINVAL;
 		}
 		count++;
 		cursor = end;
-		if (*cursor == ':') {
-			cursor++;
-		} else {
+		if (*cursor != ':') {
 			break;
 		}
+		cursor++;
 	}
 
-	if ((*cursor != '\0') || (count < 2U)) {
+	if ((*cursor != '\0') || (count < 2U) || (parts[count - 2U] > UINT8_MAX) ||
+	    (parts[count - 1U] > KFSW_PARAM_OFFSET_MAX)) {
 		return -EINVAL;
 	}
 

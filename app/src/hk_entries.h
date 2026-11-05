@@ -13,11 +13,14 @@ int kfsw_app_hk_parse_class(const char **text, uint8_t *retrieval_class);
 /**
  * @brief Parse one housekeeping entry written as [node:]table:offset.
  *
- * Numbers can use any base strtoul accepts. Nothing is printed on failure.
+ * Numbers can use any base strtoul accepts, without a sign. Nothing is printed
+ * on failure.
  *
  * @param text Entry text.
  * @param entry Destination.
- * @return 0 on success, or -EINVAL when the text is not an entry.
+ * @return 0 on success, or -EINVAL when the text is not an entry or a field
+ *         does not fit: node above 65535, table above 255, offset above
+ *         KFSW_PARAM_OFFSET_MAX.
  */
 int kfsw_app_hk_parse_entry(const char *text, struct kfsw_hk_entry *entry);
 
