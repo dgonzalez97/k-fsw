@@ -12,6 +12,8 @@
 
 #define TARGET DT_CHOSEN(kfsw_fwu_partition)
 #define GOLDEN DT_CHOSEN(kfsw_golden_partition)
+/* Where golden.c starts parsing the TLV area of an untouched image. */
+#define HASHED (DT_REG_SIZE(GOLDEN) - GOLDEN_IMAGE_TLV_SIZE)
 static uint8_t image[DT_REG_SIZE(GOLDEN)];
 static int erase_error;
 static unsigned int fail_erase_at;
@@ -41,6 +43,49 @@ static int write_byte(const struct device *device, off_t offset, uint8_t value)
 }
 
 static const struct flash_simulator_cb callbacks = {.write_byte = write_byte};
+
+/* Put the image buffer, however it has been edited, in the recovery partition.
+ * The erase here is on the recovery slot, not the secondary one the tests watch.
+ */
+static void store_golden(void)
+{
+	const struct flash_area *area;
+
+	zassert_ok(flash_area_open(DT_FIXED_PARTITION_ID(GOLDEN), &area));
+	zassert_ok(flash_area_flatten(area, 0, area->fa_size));
+	zassert_ok(flash_area_write(area, 0, image, sizeof(image)));
+	flash_area_close(area);
+	erase_calls = 0U;
+}
+
+/* Rewrite the three header fields the installer reads before it trusts the
+ * image, leaving the magic alone so the image still counts as present.
+ */
+static void store_header(uint16_t header_size, uint16_t protected_size, uint32_t body_size)
+{
+	struct image_header header;
+
+	memcpy(&header, image, sizeof(header));
+	header.ih_hdr_size = sys_cpu_to_le16(header_size);
+	header.ih_protect_tlv_size = sys_cpu_to_le16(protected_size);
+	header.ih_img_size = sys_cpu_to_le32(body_size);
+	memcpy(image, &header, sizeof(header));
+	store_golden();
+}
+
+/* An image the installer must refuse without erasing the secondary slot, which
+ * is the whole point of checking it here instead of leaving it to MCUboot.
+ */
+static void refused(int expected)
+{
+	struct kfsw_fwu_status status;
+
+	zassert_true(kfsw_golden_present());
+	zassert_equal(kfsw_golden_install(), expected);
+	zassert_equal(erase_calls, 0U, "the secondary slot must stay untouched");
+	zassert_ok(kfsw_fwu_get_status(&status));
+	zassert_equal(status.state, KFSW_FWU_IDLE);
+}
 
 static void before(void *fixture)
 {
@@ -124,19 +169,113 @@ ZTEST(golden, test_cached_cleanup_cannot_adopt_successor)
 
 ZTEST(golden, test_damaged_image_refused_before_the_slot_erase)
 {
-	const struct flash_area *area;
+	image[IMAGE_HEADER_SIZE] ^= 0x01U;
+	store_golden();
+	refused(-EBADMSG);
+}
+
+/* A partition that holds no image at all is not a damaged one: there is
+ * nothing to install and nothing to report as corrupt.
+ */
+ZTEST(golden, test_image_without_the_magic_is_absent)
+{
 	struct kfsw_fwu_status status;
 
-	image[IMAGE_HEADER_SIZE] ^= 0x01U;
-	zassert_ok(flash_area_open(DT_FIXED_PARTITION_ID(GOLDEN), &area));
-	zassert_ok(flash_area_flatten(area, 0, area->fa_size));
-	zassert_ok(flash_area_write(area, 0, image, sizeof(image)));
-	flash_area_close(area);
-	zassert_true(kfsw_golden_present());
-	zassert_equal(kfsw_golden_install(), -EBADMSG);
+	image[0] ^= 0xFFU;
+	store_golden();
+	zassert_false(kfsw_golden_present());
+	zassert_equal(kfsw_golden_install(), -ENOENT);
 	zassert_equal(erase_calls, 0U, "the secondary slot must stay untouched");
 	zassert_ok(kfsw_fwu_get_status(&status));
 	zassert_equal(status.state, KFSW_FWU_IDLE);
+}
+
+/* Header sizes are read before anything is hashed, so a header that claims
+ * more than the partition holds must be refused on its own arithmetic.
+ */
+ZTEST(golden, test_header_larger_than_the_partition_refused)
+{
+	store_header(UINT16_MAX, 0U, 0U);
+	refused(-EBADMSG);
+}
+
+ZTEST(golden, test_body_larger_than_the_partition_refused)
+{
+	store_header(IMAGE_HEADER_SIZE, 0U, sizeof(image));
+	refused(-EBADMSG);
+}
+
+/* The TLV area needs its own header. A body that ends two bytes from the end
+ * of the partition leaves no room for one.
+ */
+ZTEST(golden, test_body_leaving_no_room_for_the_tlv_header_refused)
+{
+	store_header(IMAGE_HEADER_SIZE, 0U, sizeof(image) - IMAGE_HEADER_SIZE - 2U);
+	refused(-EBADMSG);
+}
+
+ZTEST(golden, test_tlv_area_without_its_magic_refused)
+{
+	struct image_tlv_info info;
+
+	memcpy(&info, &image[HASHED], sizeof(info));
+	info.it_magic = sys_cpu_to_le16(0U);
+	memcpy(&image[HASHED], &info, sizeof(info));
+	store_golden();
+	refused(-EBADMSG);
+}
+
+ZTEST(golden, test_tlv_area_longer_than_the_partition_refused)
+{
+	struct image_tlv_info info;
+
+	memcpy(&info, &image[HASHED], sizeof(info));
+	info.it_tlv_tot = sys_cpu_to_le16(UINT16_MAX);
+	memcpy(&image[HASHED], &info, sizeof(info));
+	store_golden();
+	refused(-EBADMSG);
+}
+
+/* A single entry that claims more bytes than the area it sits in would walk
+ * the parser past the end of the TLV area.
+ */
+ZTEST(golden, test_tlv_entry_overrunning_the_area_refused)
+{
+	struct image_tlv tlv;
+
+	memcpy(&tlv, &image[HASHED + sizeof(struct image_tlv_info)], sizeof(tlv));
+	tlv.it_len = sys_cpu_to_le16(GOLDEN_IMAGE_SHA256_SIZE + 1U);
+	memcpy(&image[HASHED + sizeof(struct image_tlv_info)], &tlv, sizeof(tlv));
+	store_golden();
+	refused(-EBADMSG);
+}
+
+/* A well-formed TLV area with no SHA-256 entry gives nothing to compare the
+ * image against, which is refused rather than taken on trust.
+ */
+ZTEST(golden, test_tlv_area_without_a_digest_refused)
+{
+	struct image_tlv tlv;
+
+	memcpy(&tlv, &image[HASHED + sizeof(struct image_tlv_info)], sizeof(tlv));
+	tlv.it_type = sys_cpu_to_le16(IMAGE_TLV_SHA512);
+	memcpy(&image[HASHED + sizeof(struct image_tlv_info)], &tlv, sizeof(tlv));
+	store_golden();
+	refused(-EBADMSG);
+}
+
+/* A SHA-256 entry of the wrong length is not a digest this installer can use,
+ * so the walk goes past it and finds nothing.
+ */
+ZTEST(golden, test_digest_of_the_wrong_length_refused)
+{
+	struct image_tlv tlv;
+
+	memcpy(&tlv, &image[HASHED + sizeof(struct image_tlv_info)], sizeof(tlv));
+	tlv.it_len = sys_cpu_to_le16(GOLDEN_IMAGE_SHA256_SIZE - 1U);
+	memcpy(&image[HASHED + sizeof(struct image_tlv_info)], &tlv, sizeof(tlv));
+	store_golden();
+	refused(-EBADMSG);
 }
 
 ZTEST_SUITE(golden, NULL, NULL, before, NULL, NULL);

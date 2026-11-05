@@ -1,0 +1,5 @@
+tests:
+  kfsw.platform.boot_store:
+    tags: [unit, platform, boot]
+    platform_allow: [native_sim/native/64]
+    integration_platforms: [native_sim/native/64]
