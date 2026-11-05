@@ -230,6 +230,12 @@ doesn't change monotonic deadlines.
 
 ## Further reading
 
+- @ref data_flow follows a value, a command, an event and a log line to the
+  ground.
+- @ref fault_recovery puts the watchdogs, monitors and recovery paths on one
+  page.
+- @ref persistence shows what is kept in flash and who owns it.
+- @ref cfs_concept_map maps K-FSW to cFS.
 - @ref services covers the services, storage and parameter formats.
 - @ref communications covers packet flow, interfaces and routes.
 - @ref development covers changing a dependency and its manifest pin.

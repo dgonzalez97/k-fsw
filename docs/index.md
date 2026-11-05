@@ -62,6 +62,7 @@ See @ref getting_started for workspace setup.
 ## Development
 
 - @ref architecture covers repositories, startup and configuration.
+- @ref cfs_concept_map maps K-FSW to cFS for readers who know it.
 - @ref development covers branches, dependency changes and pull requests.
 - @ref testing covers software checks and hardware tests.
 - @ref project_status lists bench results and known limits.
