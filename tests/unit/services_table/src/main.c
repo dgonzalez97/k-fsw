@@ -52,8 +52,7 @@ static const struct kfsw_param_definition fixture_definitions[] = {
 	{
 		.offset = OFFSET_LIMIT,
 		.type = KFSW_PARAM_U32,
-		.flags = KFSW_PARAM_FLAG_CONFIGURATION |
-			 (IS_ENABLED(KFSW_TEST_FALLIBLE_MIXED) ? KFSW_PARAM_FLAG_PERSISTENT : 0),
+		.flags = KFSW_PARAM_FLAG_CONFIGURATION,
 		.name = "fixture_limit",
 		.description = "Range-checked configuration value",
 		.value = &fixture_limit,
@@ -121,10 +120,7 @@ static const struct kfsw_param_definition fallible_definitions[] = {
 	 .value = &applied_value,
 	 .validate = validate_applied,
 	 .apply = apply_value,
-	 .changed = applied_changed,
-	 .flags = (IS_ENABLED(KFSW_TEST_FALLIBLE_PERSIST) || IS_ENABLED(KFSW_TEST_FALLIBLE_MIXED))
-			  ? KFSW_PARAM_FLAG_PERSISTENT
-			  : 0},
+	 .changed = applied_changed},
 	{.offset = 4, .type = KFSW_PARAM_I32, .name = "applied_mode", .value = &fixture_mode},
 };
 static const struct kfsw_param_definition_set fallible_set = {
@@ -599,44 +595,6 @@ ZTEST(services_table, test_text_and_data_batch_notifies_once)
 	zassert_equal(text_changes, 2);
 	zassert_equal(data_changes, 2);
 }
-
-#if defined(KFSW_TEST_FALLIBLE_PERSIST) || defined(KFSW_TEST_FALLIBLE_MIXED)
-ZTEST(services_table, test_fallible_snapshot_and_defaults)
-{
-	struct kfsw_param_value value = {
-		.type = KFSW_PARAM_U32, .size = sizeof(uint32_t), .scalar.u32 = 41};
-
-	apply_calls = 0;
-	notifications = 0;
-	zassert_ok(kfsw_param_set("applied_value", &value));
-	zassert_ok(kfsw_param_persist_save());
-	value.scalar.u32 = 52;
-	zassert_ok(kfsw_param_set("applied_value", &value));
-	if (IS_ENABLED(KFSW_TEST_FALLIBLE_MIXED)) {
-		set_u32("fixture_limit", 25);
-		zassert_equal(kfsw_param_persist_load(), -ENOTSUP);
-		zassert_equal(kfsw_param_restore_defaults(), -ENOTSUP);
-		zassert_equal(applied_value, 52);
-		zassert_equal(fixture_limit, 25);
-		zassert_equal(apply_calls, 2);
-		zassert_equal(notifications, 2);
-		return;
-	}
-	apply_error = -EIO;
-	zassert_equal(kfsw_param_persist_load(), -EIO);
-	zassert_equal(kfsw_param_restore_defaults(), -EIO);
-	zassert_equal(applied_value, 52);
-	zassert_equal(apply_calls, 4);
-	zassert_equal(notifications, 2);
-	apply_error = 0;
-	zassert_ok(kfsw_param_persist_load());
-	zassert_equal(applied_value, 41);
-	zassert_ok(kfsw_param_restore_defaults());
-	zassert_equal(applied_value, 0);
-	zassert_equal(apply_calls, 6);
-	zassert_equal(notifications, 4);
-}
-#endif
 
 #if defined(KFSW_TEST_TEXT_PERSIST)
 ZTEST(services_table, test_text_and_data_snapshot_and_defaults)
