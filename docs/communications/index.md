@@ -49,11 +49,12 @@ node 2.
 | 12 | libparam descriptors | `KFSW_PARAM_LIST_PORT` |
 | 13 | FWU lite uploads | `KFSW_FWU_LITE_CSP_PORT` |
 | 14 | Housekeeping | `KFSW_HK_CSP_PORT` |
+| 15 | Housekeeping beacons are sent to it; nothing on a node binds it | `KFSW_HK_BEACON_PORT` |
 | 16 | Remote log (log history and journal) | `KFSW_LOG_REMOTE_PORT` |
 
 Every node serves ports 0 and 1; libcsp's ports 2 to 6 are not served. Both
 ends of a link must use the same port numbers. `CSP_PORT_MAX_BIND` is 16 and
-raising it costs connection slots, so 7 and 8 are the room left for a new
+raising it costs connection slots, so port 7 is the room left for a new
 service rather than 17 and up.
 
 **Packet.** A CSP header (addresses, ports and flags such as CRC32 or RDP) and
@@ -113,6 +114,68 @@ after a reset. A replayed handshake can interrupt a session but can't restore
 an old key; `comms uhf connect` starts a new handshake. With the default 256-byte
 buffer and CRC32, an encrypted packet carries up to 220 bytes of data. Other
 interfaces are not encrypted.
+
+## Routing and interfaces
+
+Every packet a node sends or receives goes through one router thread. The
+services never touch a link: they bind a port, and the router decides which
+interface carries the packet.
+
+```mermaid
+flowchart LR
+    SERVICES["Services on their ports"]
+    ROUTER["Router thread: csp_route_work"]
+    TABLE["Route table: KFSW_CSP_ROUTE_TABLE"]
+    LOOP["LOOP: the node's own address"]
+    CODEC["Radio codec, optional"]
+    KISS["KISS interface, one per UART"]
+    CAN["CAN interface, CFP"]
+    UART["UART: USART3, or a PTY on Linux"]
+    CANHW["CAN controller, or SocketCAN on Linux"]
+    PEERS["Other nodes"]
+
+    SERVICES <--> ROUTER
+    ROUTER -- "longest prefix" --> TABLE
+    ROUTER <--> LOOP
+    ROUTER <-.-> CODEC
+    CODEC <-.-> KISS
+    ROUTER <--> KISS
+    ROUTER <--> CAN
+    KISS <--> UART
+    CAN <--> CANHW
+    UART <--> PEERS
+    CANHW <--> PEERS
+```
+
+`kfsw_csp_init()` (`kfsw-comms/src/csp.c`) builds this once. It opens every
+UART under a `kfsw,csp-kiss-uarts` devicetree node, or the single UART chosen
+as `kfsw,csp-uart`, as a KISS interface (`src/uart.c`), opens the controller chosen by `kfsw,csp-can`
+as a CAN interface (`src/can.c`), gives the loopback interface the node's
+address, then checks and loads the route table. The router thread
+(`kfsw_csp_router_thread`) starts in `kfsw_csp_start()`, which `main()` calls
+after the PARAM server binds and before the other servers start.
+
+A packet for the node's own address goes to `LOOP` and comes back in as if it
+had arrived. Any other destination is looked up in the route table, and the
+longest matching prefix names the interface. The table is fixed once the
+router starts: there is no route discovery and no failover. A node with no
+table gets `0/0 LOOP` and reaches only itself.
+
+The radio codec is only there with `CONFIG_KFSW_RADIO_UHF_CRYPTO`. It sits
+between the router and one named KISS interface: received packets go through
+its own thread to be decrypted before the router sees them
+(`kfsw-comms/src/uart_codec.c`), and outgoing ones are encrypted before KISS
+frames them.
+
+Addresses belong to nodes, not to interfaces, with one exception. When a node
+forwards between two interfaces, each interface needs its own subnet, because
+libcsp does not forward a packet back into the subnet it came from. The
+multi-interface test below shows the layout.
+
+On Linux the same code runs against host devices. A KISS UART is a native_sim
+pseudo-terminal, and a CAN interface is a SocketCAN device named at run time
+with `--can-if`, `vcan0` for tests or `can0` for an adapter. K-FSW has no ZMQ
+interface; two Linux nodes talk through a PTY pair or a virtual CAN bus.
 
 ## Packet path
 
@@ -461,9 +524,12 @@ remote parameter and checks the KISS counters.
 
 ## Security
 
-Only the encrypted radio link is authenticated. libcsp HMAC is not enabled,
-CRC32 only detects accidental corruption, and commands have no per-node
-authorization.
+Only the encrypted radio link is authenticated by default. libcsp HMAC is
+available as `CONFIG_KFSW_CSP_HMAC`: it signs what the node sends, and
+`CONFIG_KFSW_CSP_HMAC_REQUIRE` then refuses unsigned packets on the ports that
+change state. `config/profiles/radio-crypto.conf` enables signing; the
+reference compositions leave it off. CRC32 only detects accidental corruption,
+and commands have no per-node authorization.
 
 The optional host binaries can be fetched and built with `tools/host-tools.sh`
 (Rust required). `KFSW_HOST_TOOLS=1 tools/ci/robot.sh` opts into building them;
