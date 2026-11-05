@@ -102,6 +102,12 @@ explain therefore ends with the Golden recovery image installed, after the
 bootloader has had the chance to revert an unconfirmed update. A run that
 stays healthy for `CONFIG_KFSW_BOOT_BUDGET_STABLE_S` refills the count, so
 only startups that never became stable add up.
+
+Neither of those mechanisms exists in the recovery image: `KFSW_BOOT_BUDGET`
+depends on `!KFSW_GOLDEN_IMAGE`, so Golden compiles neither the spend at
+startup nor the stable-run refill. Golden spends no attempts and refills the
+record once at its own startup, which is the retry for an install-time refill
+that failed.
 @ref firmware_update has the sequence.
 
 The persistent journal (`KFSW_JOURNAL`) keeps boot reports and important

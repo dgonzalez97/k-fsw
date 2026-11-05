@@ -87,6 +87,26 @@ For a focused native suite:
 ./k-fsw/tools/ci/unit.sh -s kfsw.services.fwu
 ```
 
+### Both native widths
+
+Twister runs `native_sim/native/64` and the 32-bit `native_sim/native`. A suite
+that builds on both is worth more than one that builds on either: the two
+differ in pointer width, type alignment and structure padding, which is where
+a vendored library's assumptions show up.
+
+`kfsw.services.param_replies` links the vendored libparam, whose `param_list.c`
+derives the record stride from `__alignof__(param_t)` and asserts it is 8.
+`param_t` leads with a `uint64_t`, 8-aligned on x86-64 and 4-aligned under
+`-m32`, so the suite failed to compile on the 32-bit target until the fork
+pinned in `west.yml` set `_Alignas(8)` on that member. Anything else linking
+libparam on a 32-bit target depended on the same fix.
+
+Run one suite on one width with `-p`:
+
+```bash
+./k-fsw/tools/ci/unit.sh -s kfsw.services.param_replies -p native_sim/native
+```
+
 ## Analysis
 
 These stages are not part of `all.sh`; run them before a release or after a

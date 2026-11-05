@@ -761,6 +761,29 @@ A save writes and syncs the temporary file and then renames it over the active
 file. If a step fails, the temporary file is removed and the previous snapshot
 stays. The CRC catches corruption; it is not authentication.
 
+### What may be persistent
+
+A snapshot is restored as a whole, so a restored value that calls back into its
+owner can fail in the middle of the restore. Registration therefore refuses a
+parameter that is persistent and has an `.apply` callback, with `-EINVAL`
+naming the parameter. One such entry would otherwise make every other
+persistent value in the snapshot unrestorable.
+
+`KFSW_PARAM_FLAG_OWNER_STORE` is the exemption. It marks a parameter whose
+owner keeps the value somewhere else, and the restore skips it, so the owner
+may be both persistent and fallible. `boot_attempts_left` and
+`boot_attempts_max` in table 32 are the canonical pair: persistent, with an
+`.apply` that can fail, and held in the platform boot store rather than the
+snapshot.
+
+Read-only and persistent is a legitimate combination and needs no exemption:
+`boot_count` is saved in the snapshot and refused to a writer.
+
+The rule is the same in both directions. There is no case in which a single
+persistent parameter with an `.apply` is accepted; `kfsw_param_init()` rejects
+the set at registration rather than at restore time, so a composition that
+breaks the rule fails on the bench and not in orbit.
+
 ## Parameter tables as files
 
 A snapshot is written by the node, covers every persistent value across all

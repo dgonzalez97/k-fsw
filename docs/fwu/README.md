@@ -53,6 +53,15 @@ has had its chance. Golden confirms itself once it has started, because no
 operator is there to do it, and waits for the ground to upload a replacement.
 Installing an image through either update front end refills the budget.
 
+The install that brings Golden in refills the record, but that write is allowed
+to fail without failing the install, and no later path retries it. Golden
+therefore refills again from a `SYS_INIT` at its own startup
+(`kfsw-services/src/boot_budget.c`, `POST_KERNEL` 52, compiled only when
+`CONFIG_KFSW_GOLDEN_IMAGE`). A failure there is logged and startup continues:
+Golden spends no attempts itself, so an unwritable record costs it nothing, and
+the next successful write restores the count for whatever it installs.
+`tests/boot-budget-smoke.sh` drains the record and restarts Golden to prove it.
+
 `fwu abort` from `Staged` erases slot 1, which also removes the previous
 image kept there, and the node goes on running what it ran before, Golden
 included. After the next upload the previous image is gone anyway.
@@ -360,8 +369,9 @@ The NUCLEO swap composition uses two recovery mechanisms in this order:
    application's zero budget then installs Golden. A missing Golden image or
    an installation error is reported once at startup and normal startup proceeds.
 4. Golden has no budget and cannot install itself. It confirms its trial image
-   at startup and remains reachable for an operator to install a replacement.
-   Its ground watchdog restarts it into itself after a day without a feed.
+   at startup, refills the record, and remains reachable for an operator to
+   install a replacement. Its ground watchdog restarts it into itself after a
+   day without a feed.
 5. Either front end refills the budget, because both reach it through the same
    activation. Golden runs the lite front end, so the image it installs starts
    with a full budget.
