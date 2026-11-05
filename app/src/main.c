@@ -59,6 +59,8 @@
 #endif
 #if CONFIG_KFSW_RESMON
 #include <kfsw/services/resmon.h>
+#endif
+#if CONFIG_KFSW_SCRUB
 #include <kfsw/services/scrub.h>
 #endif
 #if CONFIG_KFSW_LIMITS
