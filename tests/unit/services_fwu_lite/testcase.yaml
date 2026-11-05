@@ -5,12 +5,14 @@ tests:
       - services
       - fwu
     platform_allow:
+      - native_sim/native
       - native_sim/native/64
     integration_platforms:
+      - native_sim/native
       - native_sim/native/64
   kfsw.services.fwu_lite.recovery:
     tags: [unit, services, fwu]
-    platform_allow: [native_sim/native/64]
+    platform_allow: [native_sim/native, native_sim/native/64]
     extra_args:
       - DTC_OVERLAY_FILE="app.overlay;recovery.overlay"
     extra_configs:
