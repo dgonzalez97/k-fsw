@@ -88,6 +88,7 @@ for target in linux rpi_pico_w; do
 	expect_error 2 '--semihost is unsupported' "$target" --semihost
 done
 KFSW_PRISTINE=invalid expect_error 1 'KFSW_PRISTINE must be' nucleo_l496zg
+KFSW_SYSBUILD=1 expect_error 1 'KFSW_SYSBUILD needs KFSW_MCUBOOT_KEY' nucleo_l496zg
 status=0
 BUILD_OPTIONS_WEST_STATUS=7 run_build nucleo_l496zg --semihost || status=$?
 [[ "$status" == 7 ]]

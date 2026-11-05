@@ -173,8 +173,10 @@ so installing it means copying it into the secondary slot and swapping, which
 
 The signing key is private and kept outside the repository. With
 `KFSW_MCUBOOT_KEY` the build puts its public key in the bootloader and signs
-the application. Without it MCUboot uses the development key from its own
-repository, which anyone can sign with; the rollback test checks for this.
+the application. `tools/build.sh` refuses a sysbuild build without it. The
+development key from MCUboot's own repository, which anyone can sign with, is
+used only when `KFSW_MCUBOOT_KEY` names it, as CI does; the rollback test checks
+that a board built with the real key rejects an image signed with it.
 
 Bootloader settings go in `app/sysbuild.conf` as `SB_CONFIG_*` symbols.
 Sysbuild overrides settings placed in a fragment on the bootloader image.

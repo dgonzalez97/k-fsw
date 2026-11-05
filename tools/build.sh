@@ -120,7 +120,12 @@ if [[ -n "${KFSW_CMAKE_ARGS:-}" ]]; then
 fi
 
 # The bootloader is configured in app/sysbuild.conf. Only the signing key is
-# passed here; without it MCUboot uses its public development key.
+# passed here. Without one, sysbuild falls back to MCUboot's development key,
+# whose private half is public, so that key must be named to be used.
+if [[ -n "${KFSW_SYSBUILD:-}" && -z "${KFSW_MCUBOOT_KEY:-}" ]]; then
+	echo "ERROR: KFSW_SYSBUILD needs KFSW_MCUBOOT_KEY; name bootloader/mcuboot/root-ec-p256.pem to sign with the public development key"
+	exit 1
+fi
 if [[ -n "${KFSW_MCUBOOT_KEY:-}" ]]; then
 	if [[ ! -r "$KFSW_MCUBOOT_KEY" ]]; then
 		echo "ERROR: KFSW_MCUBOOT_KEY is set but not readable: $KFSW_MCUBOOT_KEY"
