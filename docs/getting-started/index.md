@@ -343,6 +343,83 @@ Serve the HTML from the workspace:
 
 The HTML includes the C API; the PDF only has the manual.
 
+## Add a module
+
+A module is the code for one device or subsystem. Start from the temperature
+example in `kfsw-modules/temperature-sensor-example/`: it is small, it runs on
+KFSW-Linux without hardware, and it has one of everything a module usually
+needs. Its `README.md` lists the files and what each one shows.
+
+### Run the example first
+
+The example is off in the default Linux build. Its profile turns it on:
+
+```bash
+KFSW_PRISTINE=always \
+  KFSW_EXTRA_CONF_FILE="$PWD/k-fsw/config/profiles/linux-temperature.conf" \
+  ./k-fsw/tools/build.sh linux
+./k-fsw/tools/kfsw-linux run
+```
+
+After `@READY`:
+
+```text
+kfsw:~$ temp status
+kfsw:~$ param table 51
+kfsw:~$ cmd list
+```
+
+native_sim has no temperature sensor, so the reading is the reserved invalid
+value and `temp_valid` is 0. Everything else, the table, the counters, the
+alarm setting, the command and the events, behaves as on a board. Build
+again with `KFSW_PRISTINE=always` and without the profile to turn it off.
+
+### Copy it
+
+1. Copy the directory to `kfsw-modules/<your-module>/` and rename the files,
+   the `kfsw_temp_example_` prefix and the `KFSW_TEMP_EXAMPLE_` Kconfig
+   symbols to your module's name. The places that need your hardware are
+   marked `TODO(template)`.
+2. Add the module to `kfsw-modules/Kconfig` (one `source` line) and
+   `kfsw-modules/CMakeLists.txt` (one `add_subdirectory_ifdef`).
+3. Pick a free parameter table between 50 and 99. Table numbers and parameter
+   names must be unique on a node, and a duplicate stops every table from
+   registering at startup. Prefix every parameter name with the module's short
+   name.
+4. Put the hardware behind the backend file, the `_sensor.c` of the example.
+   The rest of the module must build and run without it, so the unit tests
+   can run on native_sim. Bind the device in devicetree, never by board name.
+5. In `k-fsw`, link the module in `app/CMakeLists.txt`, add its parameter set
+   to `parameter_sets[]` and its command set to `command_sets[]` in
+   `app/src/main.c`, and call its `init()` in the module stage of `main()`.
+   @ref architecture lists the stages.
+6. Copy the example's tests in `kfsw-modules/tests/temperature_sensor_example/`
+   and run them:
+
+   ```bash
+   west twister -p native_sim/native/64 -T kfsw-modules/tests/<your-module>
+   ```
+
+7. Add a profile under `config/profiles/` that turns the module on, as
+   `linux-temperature.conf` does, so it can be built and checked without
+   changing the reference compositions.
+
+A module calls the services and the platform, never the other way round
+(@ref architecture). If two modules need the same mechanism, it belongs in a
+service. @ref data_flow shows how the module's
+values and commands reach the ground once it is registered.
+
+### Check it
+
+```bash
+./k-fsw/tools/ci/quality.sh
+./k-fsw/tools/ci/unit.sh
+```
+
+Then build the board you are targeting. A module that talks to hardware needs
+a bench test as well; @ref testing says how the existing fixtures are laid
+out.
+
 ## Common problems
 
 ### west is not available
@@ -400,4 +477,4 @@ simulator's flash erase options.
 
 Read @ref architecture and @ref zephyr_integration before adding a service or
 target, @ref development before changing a dependency, and @ref commands for
-the shell.
+the shell. @ref cfs_concept_map maps K-FSW to cFS for readers who know it.
