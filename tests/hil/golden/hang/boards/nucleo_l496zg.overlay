@@ -1,0 +1,9 @@
+/* Layered after config/profiles/nucleo-mcuboot-flash.overlay. */
+/ {
+	chosen {
+		zephyr,code-partition = &slot0_partition;
+		kfsw,fwu-partition = &slot1_partition;
+		kfsw,golden-partition = &kfsw_golden_partition;
+		kfsw,boot-budget-partition = &kfsw_boot_budget_partition;
+	};
+};
