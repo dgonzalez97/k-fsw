@@ -77,6 +77,9 @@ node. Only a feed command from the ground restarts its countdown, 24 hours by
 default. At zero it reboots the node, on the assumption that a node nobody
 has reached for a day has lost its way and should start again from a known
 state.
+The Golden recovery image runs it too, with the same timeout: its only
+other supervision is a keep-alive that feeds the hardware watchdog while the
+scheduler runs, which a wedged link does not stop.
 
 A fatal error writes the faulting address into the last words note
 (`app/src/fatal.c`) and halts the CPU, and the hardware watchdog resets it.

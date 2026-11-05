@@ -361,6 +361,7 @@ The NUCLEO swap composition uses two recovery mechanisms in this order:
    an installation error is reported once at startup and normal startup proceeds.
 4. Golden has no budget and cannot install itself. It confirms its trial image
    at startup and remains reachable for an operator to install a replacement.
+   Its ground watchdog restarts it into itself after a day without a feed.
 5. Either front end refills the budget, because both reach it through the same
    activation. Golden runs the lite front end, so the image it installs starts
    with a full budget.
