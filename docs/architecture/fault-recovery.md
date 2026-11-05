@@ -96,7 +96,9 @@ power loss or a reset nothing explained.
 With `CONFIG_KFSW_BOOT_BUDGET`, every reset that is not a commanded reboot
 spends one boot attempt before `main()`. A run of resets the node cannot
 explain therefore ends with the Golden recovery image installed, after the
-bootloader has had the chance to revert an unconfirmed update.
+bootloader has had the chance to revert an unconfirmed update. A run that
+stays healthy for `CONFIG_KFSW_BOOT_BUDGET_STABLE_S` refills the count, so
+only startups that never became stable add up.
 @ref firmware_update has the sequence.
 
 The persistent journal (`KFSW_JOURNAL`) keeps boot reports and important

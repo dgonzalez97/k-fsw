@@ -350,7 +350,11 @@ The NUCLEO swap composition uses two recovery mechanisms in this order:
    image on the following reset. The application cannot override that decision.
 2. After flash and reset-cause drivers initialize, before `main()` and any
    filesystem mount, K-FSW reads the early flash record and consumes one attempt
-   for an unexplained reset. Confirmation and reversion never refill it.
+   for an unexplained reset. Confirmation and reversion never refill it. A
+   stable run does: after `CONFIG_KFSW_BOOT_BUDGET_STABLE_S` (600 s by
+   default) with health supervision running, where the image has it, and no
+   deadline fault in that window, the count goes back to the live maximum. An
+   image that keeps resetting before then still runs out.
 3. At zero, K-FSW calls `kfsw_golden_install()`. A pending revert returns
    `-EBUSY`: K-FSW resets immediately and lets MCUboot revert first. The reverted
    application's zero budget then installs Golden. A missing Golden image or
@@ -365,8 +369,9 @@ The NUCLEO swap composition uses two recovery mechanisms in this order:
 (offset `0x3c`) are readable and writable u8 parameters. The compiled maximum
 is `CONFIG_KFSW_BOOT_ATTEMPTS_MAX=3`; accepted maxima are 3, 5 and 10. Raising
 it does not refill the count. Lowering it clamps the count. Remaining attempts
-must be between zero and the live maximum. No healthy boot or watchdog feed
-refills anything. FWU activation refills the record to the live maximum after
+must be between zero and the live maximum. A watchdog feed refills nothing;
+a stable run refills the count as described above, and writes only when an
+attempt was spent. FWU activation refills the record to the live maximum after
 installing an image; a store failure is reported without invalidating the image.
 
 `golden attempts` reads the count and `golden attempts 3` writes it, in the

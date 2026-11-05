@@ -349,4 +349,23 @@ ZTEST(boot_budget, test_maximum_changes_never_refill)
 	zassert_equal(kfsw_boot_budget_set_max(7U), -EINVAL);
 }
 
+ZTEST(boot_budget, test_stable_run_refills_a_spent_budget)
+{
+	zassert_ok(kfsw_boot_budget_start(false));
+	zassert_ok(kfsw_boot_budget_start(false));
+	zassert_equal(remaining(), 1U);
+	zassert_ok(kfsw_boot_budget_mark_stable());
+	zassert_equal(remaining(), 3U);
+	fail_write = true;
+	zassert_ok(kfsw_boot_budget_mark_stable(), "a full budget is not written again");
+	fail_write = false;
+	zassert_ok(kfsw_boot_budget_set_max(10U));
+	fail_write = true;
+	zassert_equal(kfsw_boot_budget_mark_stable(), -EIO);
+	zassert_equal(remaining(), 3U);
+	fail_write = false;
+	zassert_ok(kfsw_boot_budget_mark_stable());
+	zassert_equal(remaining(), 10U);
+}
+
 ZTEST_SUITE(boot_budget, NULL, NULL, before, NULL, NULL);
