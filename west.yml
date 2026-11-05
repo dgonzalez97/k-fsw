@@ -63,7 +63,7 @@ manifest:
     - name: libparam
       remote: kfsw
       repo-path: kfsw-libparam
-      revision: c8a7c10485a7eb3ef329241a66090141787a117c
+      revision: 83624cbd246f0fd8cb88492441e441418114f44c
       path: kfsw-services/third_party/libparam
 
   self:

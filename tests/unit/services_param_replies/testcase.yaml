@@ -1,10 +1,5 @@
 tests:
   kfsw.services.param_replies:
     tags: [unit, services, param]
-    # 64-bit only, and not a preference: this suite links the vendored libparam,
-    # whose param_list.c asserts __alignof__(param_t) == 8. param_t leads with a
-    # uint64_t, which is 8-aligned on x86-64 and 4-aligned under -m32, so the
-    # assertion fails before anything is compiled. Adding native_sim/native here
-    # needs the vendored layout changed first.
-    platform_allow: [native_sim/native/64]
+    platform_allow: [native_sim/native, native_sim/native/64]
     integration_platforms: [native_sim/native/64]
