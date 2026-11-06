@@ -568,7 +568,8 @@ other interfaces need their own access policy.
 ### Running another node's shell commands: `remexec`
 
 `remexec` reads which shell commands a node offers and runs one of them, on
-CSP port 8. It needs `CONFIG_KFSW_REMEXEC`, which the Linux image sets.
+CSP port 8. It needs `CONFIG_KFSW_REMEXEC`, which the Linux and NUCLEO L496
+images set.
 
 | Command | Meaning |
 | --- | --- |

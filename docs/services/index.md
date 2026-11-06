@@ -1132,9 +1132,9 @@ lifetimes.
 
 `CONFIG_KFSW_REMEXEC` lets an operator read which shell commands a node offers
 and run one of them, on CSP port 8, with its output coming back to the node
-that asked. The Linux image enables it. It is not composed into the NUCLEO
-image yet: capturing output costs a shell instance, and that footprint has not
-been measured on the board.
+that asked. The Linux image and the NUCLEO L496 image enable it. Capturing
+output costs a second shell instance, measured on the L496 at 6924 bytes of
+flash and 8832 of RAM.
 
 **Allowlist.** A command is unreachable until the composition marks it in the
 list handed to `kfsw_remexec_init()`. The listing reads the same array the
