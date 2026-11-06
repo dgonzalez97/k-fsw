@@ -138,6 +138,23 @@ def literal(text):
     return joined.replace('\\"', '"').replace("\\n", " ").replace("\\t", " ").strip()
 
 
+def cell(text):
+    """Make text safe for a Markdown table that Doxygen also parses.
+
+    A pipe would start a new column, and Doxygen reads `<name>` in a usage
+    string as an HTML tag and refuses the page.
+    """
+    return (
+        (text or "")
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("|", "\\|")
+        # Doxygen reads @word as one of its own commands.
+        .replace("@", "&#64;")
+    )
+
+
 def set_name(text):
     text = (text or "").strip()
     if text in ("NULL", "", "0"):
@@ -271,7 +288,8 @@ def render(rows):
     for full, args_text, help_text, origin, cond in rows:
         gate = f"`{cond}`" if cond else "always"
         out.append(
-            f"| `{full}` | {args_text or '-'} | {help_text or '-'} | {gate} | `{origin}` |"
+            f"| `{full}` | {args_text or '-'} | {cell(help_text) or '-'} "
+            f"| {gate} | `{origin}` |"
         )
     out.append("")
     return "\n".join(out)
@@ -513,7 +531,7 @@ def render_parameters(sets, arrays):
         count = len(arrays.get(item["array"], []))
         gate = f"`{item['guard']}`" if item["guard"] else "always"
         out.append(
-            f"| {item['table']} | `{item['name']}` | {count} | {item['holds'] or '-'} "
+            f"| {item['table']} | `{item['name']}` | {count} | {cell(item['holds']) or '-'} "
             f"| {gate} | `{item['file']}` |"
         )
     out.append("")
@@ -530,8 +548,8 @@ def render_parameters(sets, arrays):
             out.append(
                 f"| `{item['name']}` | {offset} | `{literal(entry.get('name',''))}` "
                 f"| {kind} | {flags_text(entry.get('flags'))} "
-                f"| {literal(entry.get('unit','')) or '-'} "
-                f"| {literal(entry.get('description','')) or '-'} |"
+                f"| {cell(literal(entry.get('unit',''))) or '-'} "
+                f"| {cell(literal(entry.get('description',''))) or '-'} |"
             )
     out.append("")
     return "\n".join(out), total
@@ -633,7 +651,7 @@ def render_commands(rows):
         gate = f"`{row['guard']}`" if row["guard"] else "always"
         out.append(
             f"| {row['id']} | `{row['name']}` | {row['args']} "
-            f"| {'yes' if row['mutating'] else '-'} | {row['help'] or '-'} "
+            f"| {'yes' if row['mutating'] else '-'} | {cell(row['help']) or '-'} "
             f"| {gate} | `{row['file']}` |"
         )
     out.append("")

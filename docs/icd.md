@@ -15,11 +15,11 @@ Read from the `SHELL_*` macros in the sources, so a command a particular image s
 | `cmd` | - | Read the command registry; each command runs from its own group. | always | `k-fsw/app/src/shell/shell_registry.c` |
 | `cmd list` | 0 | Every command this node carries | always | `k-fsw/app/src/shell/shell_registry.c` |
 | `cmd describe` | 0 | Every command with its arguments and its help | always | `k-fsw/app/src/shell/shell_registry.c` |
-| `cmd show` | 1 | One command with its arguments: show <name> | always | `k-fsw/app/src/shell/shell_registry.c` |
+| `cmd show` | 1 | One command with its arguments: show &lt;name&gt; | always | `k-fsw/app/src/shell/shell_registry.c` |
 | `comms` | - | Links: UART, CAN and radio. | always | `k-fsw/app/src/shell/shell_comms.c` |
 | `comms can` | 0 | CSP over CAN. | always | `k-fsw/app/src/shell/shell_can.c` |
 | `comms can info` | 0 | Show the CSP CAN interface | always | `k-fsw/app/src/shell/shell_can.c` |
-| `comms can test` | 1 | Ping a node through CAN: test <node> | always | `k-fsw/app/src/shell/shell_can.c` |
+| `comms can test` | 1 | Ping a node through CAN: test &lt;node&gt; | always | `k-fsw/app/src/shell/shell_can.c` |
 | `comms uart` | 0 | CSP over UART, KISS framed. | always | `k-fsw/app/src/shell/shell_uart.c` |
 | `comms uart info` | 0 | Show each dedicated CSP UART status | always | `k-fsw/app/src/shell/shell_uart.c` |
 | `comms uart test` | 0-1 | Ping configured or explicit peer: test [node] | always | `k-fsw/app/src/shell/shell_uart.c` |
@@ -27,123 +27,123 @@ Read from the `SHELL_*` macros in the sources, so a command a particular image s
 | `comms uhf connect` | 0 | Establish radio sessions with the configured peer. | `CONFIG_KFSW_RADIO_UHF_CRYPTO` | `kfsw-modules/radio-uhf/src/radio_uhf.c` |
 | `comms uhf status` | 0 | Show configured UHF radio identity and status. | `CONFIG_KFSW_RADIO_UHF_SHELL` | `kfsw-modules/radio-uhf/src/radio_uhf.c` |
 | `csp` | - | CSP commands. | always | `k-fsw/app/src/shell/shell_csp.c` |
-| `csp ifstat` | 2 | Read remote counters: ifstat <node> <interface> | always | `k-fsw/app/src/shell/shell_csp.c` |
-| `csp clock` | 0-2 | Time: clock [set <utc>|<node> [sync]] | always | `k-fsw/app/src/shell/shell_csp.c` |
+| `csp ifstat` | 2 | Read remote counters: ifstat &lt;node&gt; &lt;interface&gt; | always | `k-fsw/app/src/shell/shell_csp.c` |
+| `csp clock` | 0-2 | Time: clock [set &lt;utc&gt;\|&lt;node&gt; [sync]] | always | `k-fsw/app/src/shell/shell_csp.c` |
 | `csp counters` | 0-1 | Show libcsp error counters: counters [clear] | always | `k-fsw/app/src/shell/shell_csp.c` |
-| `csp debug` | 0-1 | Trace packets in and out: debug [on|off] | always | `k-fsw/app/src/shell/shell_csp.c` |
+| `csp debug` | 0-1 | Trace packets in and out: debug [on\|off] | always | `k-fsw/app/src/shell/shell_csp.c` |
 | `csp ident` | 0-1 | Identify a node, or this one when no node is given: ident [node] | always | `k-fsw/app/src/shell/shell_csp.c` |
 | `csp info` | 0 | Show local CSP identity and router state | always | `k-fsw/app/src/shell/shell_csp.c` |
 | `csp interfaces` | 0 | Show registered CSP interfaces | always | `k-fsw/app/src/shell/shell_csp.c` |
 | `csp ping` | 0-1 | Ping a node, or this one when no node is given: ping [node] | always | `k-fsw/app/src/shell/shell_csp.c` |
-| `csp reboot` | 2-3 | Restart a node: reboot <node> <pin> [--retry] | `CONFIG_KFSW_COMMAND && CONFIG_REBOOT` | `k-fsw/app/src/shell/shell_csp.c` |
+| `csp reboot` | 2-3 | Restart a node: reboot &lt;node&gt; &lt;pin&gt; [--retry] | `CONFIG_KFSW_COMMAND && CONFIG_REBOOT` | `k-fsw/app/src/shell/shell_csp.c` |
 | `csp rdp` | 0-1 | Reliable transport detail: rdp [0..2] | always | `k-fsw/app/src/shell/shell_csp.c` |
 | `csp routes` | 0 | Show the CSP static routing table | always | `k-fsw/app/src/shell/shell_csp.c` |
 | `event` | - | Event record. | always | `k-fsw/app/src/shell/shell_event.c` |
 | `event clear` | 0 | Discard held records; counters are kept | always | `k-fsw/app/src/shell/shell_event.c` |
 | `event list` | 0 | Show held records, oldest first | always | `k-fsw/app/src/shell/shell_event.c` |
 | `event stats` | 0-1 | Show record counters, here or on a node: stats [node] | `CONFIG_KFSW_COMMAND_CSP` | `k-fsw/app/src/shell/shell_event.c` |
-| `event tail` | 1-2 | One record by age, newest 0: tail [node] <age> | `CONFIG_KFSW_COMMAND_CSP` | `k-fsw/app/src/shell/shell_event.c` |
+| `event tail` | 1-2 | One record by age, newest 0: tail [node] &lt;age&gt; | `CONFIG_KFSW_COMMAND_CSP` | `k-fsw/app/src/shell/shell_event.c` |
 | `fbo` | - | File based operations: run a sequence from a file. | always | `k-fsw/app/src/shell/shell_fbo.c` |
 | `fbo sched` | - | Time-tagged queue: release a command later. | always | `k-fsw/app/src/shell/shell_fbo.c` |
-| `fbo sched add` | 3 | Release a command later: add <+s|@utc> <node> "<command>" | always | `k-fsw/app/src/shell/shell_fbo.c` |
-| `fbo sched cancel` | 1 | Cancel a scheduled entry: cancel <index> | always | `k-fsw/app/src/shell/shell_fbo.c` |
+| `fbo sched add` | 3 | Release a command later: add &lt;+s\|&#64;utc&gt; &lt;node&gt; "&lt;command&gt;" | always | `k-fsw/app/src/shell/shell_fbo.c` |
+| `fbo sched cancel` | 1 | Cancel a scheduled entry: cancel &lt;index&gt; | always | `k-fsw/app/src/shell/shell_fbo.c` |
 | `fbo sched clear` | 0 | Empty the queue; a release in flight finishes | always | `k-fsw/app/src/shell/shell_fbo.c` |
 | `fbo sched list` | 0 | Show every queued entry | always | `k-fsw/app/src/shell/shell_fbo.c` |
 | `fbo sched status` | 0 | Show the queue counters | always | `k-fsw/app/src/shell/shell_fbo.c` |
-| `fbo run` | 1 | Carry out a procedure: run <name> | always | `k-fsw/app/src/shell/shell_fbo.c` |
+| `fbo run` | 1 | Carry out a procedure: run &lt;name&gt; | always | `k-fsw/app/src/shell/shell_fbo.c` |
 | `fbo stop` | 0 | Ask the running procedure to stop | always | `k-fsw/app/src/shell/shell_fbo.c` |
 | `fbo status` | 0 | Show what a procedure has done | always | `k-fsw/app/src/shell/shell_fbo.c` |
 | `ftp` | - | File transfer. Without a node, this node. | always | `k-fsw/app/src/shell/shell_ftp.c` |
-| `ftp generate` | 2 | Create deterministic local data: generate <path> <bytes 0..32768> | always | `k-fsw/app/src/shell/shell_ftp.c` |
-| `ftp get` | 3 | Download from a remote node: get <node> <remote> <local> | always | `k-fsw/app/src/shell/shell_ftp.c` |
+| `ftp generate` | 2 | Create deterministic local data: generate &lt;path&gt; &lt;bytes 0..32768&gt; | always | `k-fsw/app/src/shell/shell_ftp.c` |
+| `ftp get` | 3 | Download from a remote node: get &lt;node&gt; &lt;remote&gt; &lt;local&gt; | always | `k-fsw/app/src/shell/shell_ftp.c` |
 | `ftp ls` | 0-2 | List a directory: ls [node] [path] | always | `k-fsw/app/src/shell/shell_ftp.c` |
-| `ftp mkdir` | 1-2 | Create a directory: mkdir [node] <path> | always | `k-fsw/app/src/shell/shell_ftp.c` |
-| `ftp put` | 3 | Upload to a remote node: put <node> <local> <remote> | always | `k-fsw/app/src/shell/shell_ftp.c` |
-| `ftp stat` | 1-2 | Show metadata: stat [node] <path> | always | `k-fsw/app/src/shell/shell_ftp.c` |
-| `ftp verify` | 2 | Compare two local files: verify <first> <second> | always | `k-fsw/app/src/shell/shell_ftp.c` |
+| `ftp mkdir` | 1-2 | Create a directory: mkdir [node] &lt;path&gt; | always | `k-fsw/app/src/shell/shell_ftp.c` |
+| `ftp put` | 3 | Upload to a remote node: put &lt;node&gt; &lt;local&gt; &lt;remote&gt; | always | `k-fsw/app/src/shell/shell_ftp.c` |
+| `ftp stat` | 1-2 | Show metadata: stat [node] &lt;path&gt; | always | `k-fsw/app/src/shell/shell_ftp.c` |
+| `ftp verify` | 2 | Compare two local files: verify &lt;first&gt; &lt;second&gt; | always | `k-fsw/app/src/shell/shell_ftp.c` |
 | `fwu` | - | Firmware update. | always | `k-fsw/app/src/shell/shell_fwu.c` |
 | `fwu abort` | 0 | Abandon a transfer and erase the slot | always | `k-fsw/app/src/shell/shell_fwu.c` |
-| `fwu begin` | 2 | Start a transfer: begin <size> <crc32> | always | `k-fsw/app/src/shell/shell_fwu.c` |
+| `fwu begin` | 2 | Start a transfer: begin &lt;size&gt; &lt;crc32&gt; | always | `k-fsw/app/src/shell/shell_fwu.c` |
 | `fwu finish` | 0 | Verify the image and offer it to the bootloader | always | `k-fsw/app/src/shell/shell_fwu.c` |
 | `fwu status` | 0 | Show update state and slot geometry | always | `k-fsw/app/src/shell/shell_fwu.c` |
 | `fwu_lite` | - | Resumable firmware upload. | always | `k-fsw/app/src/shell/shell_fwu_lite.c` |
-| `fwu_lite abort` | 1 | Erase this sender's transfer: abort <node> | always | `k-fsw/app/src/shell/shell_fwu_lite.c` |
-| `fwu_lite flash` | 1 | Activate a validated image: flash <node> | always | `k-fsw/app/src/shell/shell_fwu_lite.c` |
-| `fwu_lite send` | 2 | Upload or resume: send <node> <path> | always | `k-fsw/app/src/shell/shell_fwu_lite.c` |
+| `fwu_lite abort` | 1 | Erase this sender's transfer: abort &lt;node&gt; | always | `k-fsw/app/src/shell/shell_fwu_lite.c` |
+| `fwu_lite flash` | 1 | Activate a validated image: flash &lt;node&gt; | always | `k-fsw/app/src/shell/shell_fwu_lite.c` |
+| `fwu_lite send` | 2 | Upload or resume: send &lt;node&gt; &lt;path&gt; | always | `k-fsw/app/src/shell/shell_fwu_lite.c` |
 | `fwu_lite status` | 0-1 | Show local or owned remote progress: status [node] | always | `k-fsw/app/src/shell/shell_fwu_lite.c` |
-| `fwu_lite validate` | 1 | Validate stored bytes: validate <node> | always | `k-fsw/app/src/shell/shell_fwu_lite.c` |
+| `fwu_lite validate` | 1 | Validate stored bytes: validate &lt;node&gt; | always | `k-fsw/app/src/shell/shell_fwu_lite.c` |
 | `gndwdt` | - | Ground watchdog. | always | `k-fsw/app/src/shell/shell_gndwdt.c` |
-| `gndwdt feed` | 1 | Feed another node's ground watchdog: feed <node> | `CONFIG_KFSW_COMMAND_CSP` | `k-fsw/app/src/shell/shell_gndwdt.c` |
+| `gndwdt feed` | 1 | Feed another node's ground watchdog: feed &lt;node&gt; | `CONFIG_KFSW_COMMAND_CSP` | `k-fsw/app/src/shell/shell_gndwdt.c` |
 | `gndwdt off` | 0 | Disarm this node's countdown | always | `k-fsw/app/src/shell/shell_gndwdt.c` |
 | `gndwdt on` | 0 | Arm this node's countdown | always | `k-fsw/app/src/shell/shell_gndwdt.c` |
 | `gndwdt show` | 0-1 | Show the countdown, here or on another node: show [node] | `CONFIG_KFSW_COMMAND_CSP` | `k-fsw/app/src/shell/shell_gndwdt.c` |
-| `gndwdt timeout` | 1 | Set the silence allowed: timeout <seconds> | always | `k-fsw/app/src/shell/shell_gndwdt.c` |
+| `gndwdt timeout` | 1 | Set the silence allowed: timeout &lt;seconds&gt; | always | `k-fsw/app/src/shell/shell_gndwdt.c` |
 | `golden` | - | Recovery image and the startups left before it. | always | `k-fsw/app/src/shell/shell_golden.c` |
 | `golden status` | 0 | Whether the golden partition holds an image | `CONFIG_KFSW_GOLDEN` | `k-fsw/app/src/shell/shell_golden.c` |
-| `golden install` | 1-2 | Install it and restart: install [node] <pin> | `CONFIG_KFSW_GOLDEN && CONFIG_KFSW_COMMAND` | `k-fsw/app/src/shell/shell_golden.c` |
+| `golden install` | 1-2 | Install it and restart: install [node] &lt;pin&gt; | `CONFIG_KFSW_GOLDEN && CONFIG_KFSW_COMMAND` | `k-fsw/app/src/shell/shell_golden.c` |
 | `golden attempts` | 0-1 | Startups left before recovery: attempts [count] | `CONFIG_KFSW_BOOT_STORE && CONFIG_KFSW_PARAM` | `k-fsw/app/src/shell/shell_golden.c` |
 | `health` | - | Health monitoring. | always | `k-fsw/app/src/shell/shell_health.c` |
 | `health list` | 0 | Show each watched component and its deadline | always | `k-fsw/app/src/shell/shell_health.c` |
-| `health report` | 1 | Report a component alive: report <handle> | always | `k-fsw/app/src/shell/shell_health.c` |
+| `health report` | 1 | Report a component alive: report &lt;handle&gt; | always | `k-fsw/app/src/shell/shell_health.c` |
 | `health status` | 0 | Show whether the watchdog is being fed, and why | always | `k-fsw/app/src/shell/shell_health.c` |
-| `health watch` | 0-3 | Watch a component nothing reports: watch <name> <ms> confirm | always | `k-fsw/app/src/shell/shell_health.c` |
+| `health watch` | 0-3 | Watch a component nothing reports: watch &lt;name&gt; &lt;ms&gt; confirm | always | `k-fsw/app/src/shell/shell_health.c` |
 | `hk` | - | Housekeeping: collect a set of values in one pass. | always | `k-fsw/app/src/shell/shell_hk.c` |
 | `hk save` | 0 | Save settings; replace a rejected snapshot | `CONFIG_KFSW_HK_PERSISTENCE` | `k-fsw/app/src/shell/shell_hk.c` |
-| `hk define` | 2-5 | Name a report: define [node] <report> [class=N] <[node:]table:offset> ... [--retry] | `CONFIG_KFSW_COMMAND_CSP` | `k-fsw/app/src/shell/shell_hk.c` |
-| `hk clear` | 1-3 | Forget a report: clear [node] <report> [--retry] | `CONFIG_KFSW_COMMAND_CSP` | `k-fsw/app/src/shell/shell_hk.c` |
+| `hk define` | 2-5 | Name a report: define [node] &lt;report&gt; [class=N] &lt;[node:]table:offset&gt; ... [--retry] | `CONFIG_KFSW_COMMAND_CSP` | `k-fsw/app/src/shell/shell_hk.c` |
+| `hk clear` | 1-3 | Forget a report: clear [node] &lt;report&gt; [--retry] | `CONFIG_KFSW_COMMAND_CSP` | `k-fsw/app/src/shell/shell_hk.c` |
 | `hk show` | 0 | Show the reports and the counters | always | `k-fsw/app/src/shell/shell_hk.c` |
-| `hk collect` | 1 | Collect now: collect <report> | always | `k-fsw/app/src/shell/shell_hk.c` |
-| `hk get` | 1-2 | Read samples back: get <report> [count] | always | `k-fsw/app/src/shell/shell_hk.c` |
-| `hk period` | 2-4 | Collect repeatedly; 0 to stop: period [node] <report> <ms> [--retry] | `CONFIG_KFSW_COMMAND_CSP` | `k-fsw/app/src/shell/shell_hk.c` |
-| `hk store` | 2 | Keep samples in a file; 0 to stop: store <report> <ms> | `CONFIG_KFSW_HK_STORE` | `k-fsw/app/src/shell/shell_hk.c` |
-| `hk store_clear` | 1 | Stop storing and delete the file: store_clear <report> | `CONFIG_KFSW_HK_STORE` | `k-fsw/app/src/shell/shell_hk.c` |
-| `hk stored` | - | Read stored samples: stored <report> [from=<sequence>] [to=<sequence>] [since=<seconds>] [until=<seconds>] [skip=<flags>] | `CONFIG_KFSW_HK_STORE` | `k-fsw/app/src/shell/shell_hk.c` |
-| `hk extract` | - | Stored samples to a file: extract <report> <path> [from=<sequence>] [to=<sequence>] [since=<seconds>] [until=<seconds>] [skip=<flags>] | `CONFIG_KFSW_HK_STORE` | `k-fsw/app/src/shell/shell_hk.c` |
-| `hk beacon` | 3 | Send unprompted; 0 to stop,  at least: beacon <report> <node> <ms> | `CONFIG_KFSW_HK_BEACON` | `k-fsw/app/src/shell/shell_hk.c` |
+| `hk collect` | 1 | Collect now: collect &lt;report&gt; | always | `k-fsw/app/src/shell/shell_hk.c` |
+| `hk get` | 1-2 | Read samples back: get &lt;report&gt; [count] | always | `k-fsw/app/src/shell/shell_hk.c` |
+| `hk period` | 2-4 | Collect repeatedly; 0 to stop: period [node] &lt;report&gt; &lt;ms&gt; [--retry] | `CONFIG_KFSW_COMMAND_CSP` | `k-fsw/app/src/shell/shell_hk.c` |
+| `hk store` | 2 | Keep samples in a file; 0 to stop: store &lt;report&gt; &lt;ms&gt; | `CONFIG_KFSW_HK_STORE` | `k-fsw/app/src/shell/shell_hk.c` |
+| `hk store_clear` | 1 | Stop storing and delete the file: store_clear &lt;report&gt; | `CONFIG_KFSW_HK_STORE` | `k-fsw/app/src/shell/shell_hk.c` |
+| `hk stored` | - | Read stored samples: stored &lt;report&gt; [from=&lt;sequence&gt;] [to=&lt;sequence&gt;] [since=&lt;seconds&gt;] [until=&lt;seconds&gt;] [skip=&lt;flags&gt;] | `CONFIG_KFSW_HK_STORE` | `k-fsw/app/src/shell/shell_hk.c` |
+| `hk extract` | - | Stored samples to a file: extract &lt;report&gt; &lt;path&gt; [from=&lt;sequence&gt;] [to=&lt;sequence&gt;] [since=&lt;seconds&gt;] [until=&lt;seconds&gt;] [skip=&lt;flags&gt;] | `CONFIG_KFSW_HK_STORE` | `k-fsw/app/src/shell/shell_hk.c` |
+| `hk beacon` | 3 | Send unprompted; 0 to stop,  at least: beacon &lt;report&gt; &lt;node&gt; &lt;ms&gt; | `CONFIG_KFSW_HK_BEACON` | `k-fsw/app/src/shell/shell_hk.c` |
 | `journal` | - | Persistent event journal. | always | `k-fsw/app/src/shell/shell_journal.c` |
-| `journal remote` | 1-2 | Download another node's newest records: remote <node> [count] | `CONFIG_KFSW_LOG_REMOTE` | `k-fsw/app/src/shell/shell_journal.c` |
+| `journal remote` | 1-2 | Download another node's newest records: remote &lt;node&gt; [count] | `CONFIG_KFSW_LOG_REMOTE` | `k-fsw/app/src/shell/shell_journal.c` |
 | `journal stats` | - | Journal state, here or on a node: stats | always | `k-fsw/app/src/shell/shell_journal.c` |
-| `journal tail` | - | One saved event by age, newest 0: tail <age> | always | `k-fsw/app/src/shell/shell_journal.c` |
-| `journal time` | - | When a saved event happened: time <age> | always | `k-fsw/app/src/shell/shell_journal.c` |
+| `journal tail` | - | One saved event by age, newest 0: tail &lt;age&gt; | always | `k-fsw/app/src/shell/shell_journal.c` |
+| `journal time` | - | When a saved event happened: time &lt;age&gt; | always | `k-fsw/app/src/shell/shell_journal.c` |
 | `limits` | - | Parameter limits. | always | `k-fsw/app/src/shell/shell_limits.c` |
 | `limits list` | 0 | List the rules in force | always | `k-fsw/app/src/shell/shell_limits.c` |
 | `limits load` | 0-1 | Load a rule file: load [file] | always | `k-fsw/app/src/shell/shell_limits.c` |
 | `limits status` | 0 | Show counters and the last load result | always | `k-fsw/app/src/shell/shell_limits.c` |
 | `limits sweep` | 0 | Evaluate the rules now | always | `k-fsw/app/src/shell/shell_limits.c` |
 | `log` | - | Logging commands. | always | `k-fsw/app/src/shell/shell_system.c` |
-| `log level` | 0-2 | Levels by service: level [<module> [0..4]] | always | `k-fsw/app/src/shell/shell_system.c` |
+| `log level` | 0-2 | Levels by service: level [&lt;module&gt; [0..4]] | always | `k-fsw/app/src/shell/shell_system.c` |
 | `log history` | 0 | Read recent log messages | `CONFIG_KFSW_LOG_HISTORY` | `k-fsw/app/src/shell/shell_system.c` |
-| `log remote` | 1-3 | Another node's recent messages: remote <node> [count] [level] | `CONFIG_KFSW_LOG_REMOTE` | `k-fsw/app/src/shell/shell_system.c` |
+| `log remote` | 1-3 | Another node's recent messages: remote &lt;node&gt; [count] [level] | `CONFIG_KFSW_LOG_REMOTE` | `k-fsw/app/src/shell/shell_system.c` |
 | `log test` | 0 | Exercise all log levels | always | `k-fsw/app/src/shell/shell_system.c` |
 | `param` | - | Parameter commands. | always | `k-fsw/app/src/shell/shell_param.c` |
 | `param clear` | 0 | Delete the saved snapshot; RAM is unchanged | `CONFIG_KFSW_PARAM_PERSISTENCE` | `k-fsw/app/src/shell/shell_param.c` |
 | `param defaults` | 0 | Restore compiled defaults in RAM only | `CONFIG_KFSW_PARAM_PERSISTENCE` | `k-fsw/app/src/shell/shell_param.c` |
-| `param get` | 1-2 | Get local or remote value: get [node] <name> | always | `k-fsw/app/src/shell/shell_param.c` |
-| `reboot` | 1 | Restart this node; csp reboot for another: reboot <pin> | `CONFIG_KFSW_COMMAND && CONFIG_REBOOT` | `k-fsw/app/src/shell/shell_system.c` |
-| `remexec` | - | What another node offers: remexec <node> get [command] | <node> run "<command>" | always | `k-fsw/app/src/shell/shell_remexec.c` |
+| `param get` | 1-2 | Get local or remote value: get [node] &lt;name&gt; | always | `k-fsw/app/src/shell/shell_param.c` |
+| `reboot` | 1 | Restart this node; csp reboot for another: reboot &lt;pin&gt; | `CONFIG_KFSW_COMMAND && CONFIG_REBOOT` | `k-fsw/app/src/shell/shell_system.c` |
+| `remexec` | - | What another node offers: remexec &lt;node&gt; get [command] \| &lt;node&gt; run "&lt;command&gt;" | always | `k-fsw/app/src/shell/shell_remexec.c` |
 | `resmon` | - | Resource monitor. | always | `k-fsw/app/src/shell/shell_resmon.c` |
-| `resmon alert` | 1 | Set the stack use that raises an event: alert <percent> | always | `k-fsw/app/src/shell/shell_resmon.c` |
+| `resmon alert` | 1 | Set the stack use that raises an event: alert &lt;percent&gt; | always | `k-fsw/app/src/shell/shell_resmon.c` |
 | `resmon sample` | 0 | Sweep the threads now | always | `k-fsw/app/src/shell/shell_resmon.c` |
 | `resmon show` | 0 | Show what the last sweep found | always | `k-fsw/app/src/shell/shell_resmon.c` |
 | `scrub` | - | Resident image checksums. | always | `k-fsw/app/src/shell/shell_scrub.c` |
 | `scrub status` | 0 | Counters and what each region last reported | always | `k-fsw/app/src/shell/shell_scrub.c` |
-| `scrub sweep` | 0-1 | Re-read every region, or one: sweep [slot0|slot1|golden] | always | `k-fsw/app/src/shell/shell_scrub.c` |
-| `scrub learn` | 1 | Take what is on flash now as the reference: learn <region> | always | `k-fsw/app/src/shell/shell_scrub.c` |
+| `scrub sweep` | 0-1 | Re-read every region, or one: sweep [slot0\|slot1\|golden] | always | `k-fsw/app/src/shell/shell_scrub.c` |
+| `scrub learn` | 1 | Take what is on flash now as the reference: learn &lt;region&gt; | always | `k-fsw/app/src/shell/shell_scrub.c` |
 | `status` | 0 | Show basic runtime status: status | always | `k-fsw/app/src/shell/shell_system.c` |
 | `status` | 0-1 | Show status, here or on a node: status [node] | `CONFIG_KFSW_COMMAND_CSP` | `k-fsw/app/src/shell/shell_system.c` |
 | `storage` | - | Filesystem storage commands. | always | `k-fsw/app/src/shell/shell_storage.c` |
 | `storage info` | 0 | Show filesystem storage status | always | `k-fsw/app/src/shell/shell_storage.c` |
-| `storage test` | 0-2 | Run storage test: test [write|read <value>] | always | `k-fsw/app/src/shell/shell_storage.c` |
+| `storage test` | 0-2 | Run storage test: test [write\|read &lt;value&gt;] | always | `k-fsw/app/src/shell/shell_storage.c` |
 | `table` | - | Parameter tables uploaded as files. | always | `k-fsw/app/src/shell/shell_table.c` |
-| `table check` | 1 | Check a table file without applying it: check <path> | always | `k-fsw/app/src/shell/shell_table.c` |
-| `table dump` | 2 | Write a table out as a file: dump <table> <path> | always | `k-fsw/app/src/shell/shell_table.c` |
-| `table load` | 1 | Adopt a table file, all of it or none: load <path> | always | `k-fsw/app/src/shell/shell_table.c` |
+| `table check` | 1 | Check a table file without applying it: check &lt;path&gt; | always | `k-fsw/app/src/shell/shell_table.c` |
+| `table dump` | 2 | Write a table out as a file: dump &lt;table&gt; &lt;path&gt; | always | `k-fsw/app/src/shell/shell_table.c` |
+| `table load` | 1 | Adopt a table file, all of it or none: load &lt;path&gt; | always | `k-fsw/app/src/shell/shell_table.c` |
 | `table revert` | 0 | Put back the values the last load replaced | always | `k-fsw/app/src/shell/shell_table.c` |
 | `table show` | 0 | Show what is loaded and the counters | always | `k-fsw/app/src/shell/shell_table.c` |
 | `temp` | - | Temperature example: the MCU die reading. | always | `kfsw-modules/temperature-sensor-example/src/temperature_sensor_example_shell.c` |
 | `temp status` | 0 | Show the cached die temperature. | always | `kfsw-modules/temperature-sensor-example/src/temperature_sensor_example_shell.c` |
 | `test` | - | Developer hardware-test commands. | always | `kfsw-modules/button-test/src/button_test_shell.c` |
-| `test led` | 2 | Control LED: led <green|blue|red> <on|off>. | always | `kfsw-modules/button-test/src/button_test_shell.c` |
+| `test led` | 2 | Control LED: led &lt;green\|blue\|red&gt; &lt;on\|off&gt;. | always | `kfsw-modules/button-test/src/button_test_shell.c` |
 | `time` | 0 | Show monotonic time: time | always | `k-fsw/app/src/shell/shell_system.c` |
 | `version` | 0 | Show build information: version | always | `k-fsw/app/src/shell/shell_system.c` |
 | `watchdog` | - | Hardware watchdog. | always | `k-fsw/app/src/shell/shell_watchdog.c` |
@@ -159,23 +159,23 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `noop` | 0 | - | Round trip with no effect. | always | `k-fsw/app/src/commands/command_definitions.c` |
 | 2 | `info` | 0 | - | Report uptime and storage state. | always | `k-fsw/app/src/commands/command_definitions.c` |
-| 3 | `reboot` | 1 | yes | Reset this node after a short delay: reboot <pin>. | `CONFIG_REBOOT` | `k-fsw/app/src/commands/command_definitions.c` |
+| 3 | `reboot` | 1 | yes | Reset this node after a short delay: reboot &lt;pin&gt;. | `CONFIG_REBOOT` | `k-fsw/app/src/commands/command_definitions.c` |
 | 4 | `event_stats` | 0 | - | Report event record counters. | `CONFIG_KFSW_EVENT` | `k-fsw/app/src/commands/command_definitions.c` |
 | 5 | `event_tail` | 1 | - | Read one recorded event by age, newest is 0. | `CONFIG_KFSW_EVENT` | `k-fsw/app/src/commands/command_definitions.c` |
-| 6 | `hk_define` | 2 | - | Name what a report collects: <report> "[class=N] [node:]table:offset ...". | `CONFIG_KFSW_HK` | `k-fsw/app/src/commands/command_definitions.c` |
-| 7 | `hk_period` | 2 | - | Collect repeatedly: hk_period <report> <ms>, 0 to stop. | `CONFIG_KFSW_HK` | `k-fsw/app/src/commands/command_definitions.c` |
-| 8 | `hk_clear` | 1 | - | Forget a report: hk_clear <report>. | `CONFIG_KFSW_HK` | `k-fsw/app/src/commands/command_definitions.c` |
+| 6 | `hk_define` | 2 | - | Name what a report collects: &lt;report&gt; "[class=N] [node:]table:offset ...". | `CONFIG_KFSW_HK` | `k-fsw/app/src/commands/command_definitions.c` |
+| 7 | `hk_period` | 2 | - | Collect repeatedly: hk_period &lt;report&gt; &lt;ms&gt;, 0 to stop. | `CONFIG_KFSW_HK` | `k-fsw/app/src/commands/command_definitions.c` |
+| 8 | `hk_clear` | 1 | - | Forget a report: hk_clear &lt;report&gt;. | `CONFIG_KFSW_HK` | `k-fsw/app/src/commands/command_definitions.c` |
 | 9 | `journal_stats` | 0 | - | Read persistent journal status. | `CONFIG_KFSW_JOURNAL` | `k-fsw/app/src/commands/command_definitions.c` |
 | 10 | `journal_tail` | 1 | - | Read a journal event by age, newest is 0. | `CONFIG_KFSW_JOURNAL` | `k-fsw/app/src/commands/command_definitions.c` |
 | 11 | `journal_time` | 1 | - | Read a journal event's sequence and time by age. | `CONFIG_KFSW_JOURNAL` | `k-fsw/app/src/commands/command_definitions.c` |
 | 16 | `ground_wtd` | 1 | yes | Ground watchdog: get, or KFSWWSFK to feed over CSP. | always | `kfsw-services/src/gndwdt/gndwdt.c` |
-| 20 | `fbo_run` | 1 | yes | Carry out a procedure: fbo_run <name>. | always | `kfsw-services/src/fbo/fbo_commands.c` |
-| 21 | `fbo_sched_add` | 3 | yes | Release a command later: fbo_sched_add <+s|@utc> <node> "<command>". | always | `kfsw-services/src/fbo/fbo_commands.c` |
-| 22 | `fbo_sched_cancel` | 1 | yes | Cancel a scheduled entry: fbo_sched_cancel <index>. | always | `kfsw-services/src/fbo/fbo_commands.c` |
+| 20 | `fbo_run` | 1 | yes | Carry out a procedure: fbo_run &lt;name&gt;. | always | `kfsw-services/src/fbo/fbo_commands.c` |
+| 21 | `fbo_sched_add` | 3 | yes | Release a command later: fbo_sched_add &lt;+s\|&#64;utc&gt; &lt;node&gt; "&lt;command&gt;". | always | `kfsw-services/src/fbo/fbo_commands.c` |
+| 22 | `fbo_sched_cancel` | 1 | yes | Cancel a scheduled entry: fbo_sched_cancel &lt;index&gt;. | always | `kfsw-services/src/fbo/fbo_commands.c` |
 | 23 | `fbo_sched_clear` | 0 | yes | Empty the queue; a release in flight finishes. | always | `kfsw-services/src/fbo/fbo_commands.c` |
-| 24 | `golden_install` | 1 | yes | Install the recovery image and restart: golden_install <pin>. | `CONFIG_KFSW_GOLDEN` | `k-fsw/app/src/commands/command_definitions.c` |
-| 40 | `gpredict_select` | 1 | yes | Judge the next bearing by a profile: gpredict_select <index>. | always | `kfsw-modules/gpredict/src/gpredict_commands.c` |
-| 41 | `gpredict_enable` | 2 | yes | Allow or forbid selecting a profile: gpredict_enable <index> <1|0>. | always | `kfsw-modules/gpredict/src/gpredict_commands.c` |
+| 24 | `golden_install` | 1 | yes | Install the recovery image and restart: golden_install &lt;pin&gt;. | `CONFIG_KFSW_GOLDEN` | `k-fsw/app/src/commands/command_definitions.c` |
+| 40 | `gpredict_select` | 1 | yes | Judge the next bearing by a profile: gpredict_select &lt;index&gt;. | always | `kfsw-modules/gpredict/src/gpredict_commands.c` |
+| 41 | `gpredict_enable` | 2 | yes | Allow or forbid selecting a profile: gpredict_enable &lt;index&gt; &lt;1\|0&gt;. | always | `kfsw-modules/gpredict/src/gpredict_commands.c` |
 | 42 | `gpredict_park` | 0 | yes | Send the antenna to its park position now. | always | `kfsw-modules/gpredict/src/gpredict_commands.c` |
 | 43 | `gpredict_clear` | 0 | yes | Clear a tracker fault and park. | always | `kfsw-modules/gpredict/src/gpredict_commands.c` |
 | 64 | `temp_clear` | 0 | yes | Zero the temperature read, failure and alarm counters. | always | `kfsw-modules/temperature-sensor-example/src/temperature_sensor_example_commands.c` |
