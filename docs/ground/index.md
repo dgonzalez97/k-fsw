@@ -32,7 +32,8 @@ These are the reference settings. Each node file sets two addresses:
   configuration file and build directory, with a `-csp1` suffix.
 - `KFSW_CSP_PEER` is the node at the other end of the serial link, the one
   `comms uart test` pings when given no node. It is not a route: where packets go is
-  the route table, `KFSW_CSP_ROUTES`.
+  the route table, `KFSW_CSP_ROUTES`. On the firmware side the same number is
+  `CONFIG_KFSW_CSP_UART_PEER_ADDRESS`, which both ends have to agree on.
 
 A bench usually needs its own variant of a role, for example the UHF gateway
 routed to flight node 2. Copy the role to a file ending in `-bench.env`, such
