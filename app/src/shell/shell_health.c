@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include <zephyr/shell/shell.h>
+#include <zephyr/shell/shell_string_conv.h>
 #include <zephyr/sys/util.h>
 
 #include <kfsw/services/health.h>
@@ -63,7 +64,7 @@ static int cmd_health_watch(const struct shell *sh, size_t argc, char **argv)
 {
 	uint8_t handle = 0U;
 	unsigned long deadline;
-	char *end = NULL;
+	int parse_error = 0;
 	int result;
 
 	/* Watching a component that never reports resets the board, so ask for confirm. */
@@ -74,8 +75,8 @@ static int cmd_health_watch(const struct shell *sh, size_t argc, char **argv)
 		return -EINVAL;
 	}
 
-	deadline = strtoul(argv[2], &end, 0);
-	if ((end == argv[2]) || (*end != '\0') || (deadline == 0UL) || (deadline > UINT32_MAX)) {
+	deadline = shell_strtoul(argv[2], 0, &parse_error);
+	if ((parse_error != 0) || (deadline == 0UL) || (deadline > UINT32_MAX)) {
 		shell_error(sh, "Invalid deadline: %s", argv[2]);
 		return -EINVAL;
 	}
@@ -95,13 +96,13 @@ static int cmd_health_watch(const struct shell *sh, size_t argc, char **argv)
 static int cmd_health_report(const struct shell *sh, size_t argc, char **argv)
 {
 	unsigned long handle;
-	char *end = NULL;
+	int parse_error = 0;
 	int result;
 
 	ARG_UNUSED(argc);
 
-	handle = strtoul(argv[1], &end, 0);
-	if ((end == argv[1]) || (*end != '\0') || (handle > UINT8_MAX)) {
+	handle = shell_strtoul(argv[1], 0, &parse_error);
+	if ((parse_error != 0) || (handle > UINT8_MAX)) {
 		shell_error(sh, "Invalid handle: %s", argv[1]);
 		return -EINVAL;
 	}
@@ -118,14 +119,14 @@ static int cmd_health_report(const struct shell *sh, size_t argc, char **argv)
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	health_commands,
-	SHELL_CMD_ARG(list, NULL, "Show each watched component and its deadline.",
+	SHELL_CMD_ARG(list, NULL, "Show each watched component and its deadline",
 		      cmd_health_list, 1, 0),
-	SHELL_CMD_ARG(report, NULL, "Report a component alive: report <handle>.",
+	SHELL_CMD_ARG(report, NULL, "Report a component alive: report <handle>",
 		      cmd_health_report, 2, 0),
-	SHELL_CMD_ARG(status, NULL, "Show whether the watchdog is being fed, and why.",
+	SHELL_CMD_ARG(status, NULL, "Show whether the watchdog is being fed, and why",
 		      cmd_health_status, 1, 0),
 	SHELL_CMD_ARG(watch, NULL,
-		      "Watch a component nothing reports: watch <name> <ms> confirm.",
+		      "Watch a component nothing reports: watch <name> <ms> confirm",
 		      cmd_health_watch, 1, 3),
 	SHELL_SUBCMD_SET_END);
 

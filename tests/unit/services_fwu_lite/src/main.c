@@ -1,412 +1,419 @@
 #include <errno.h>
 #include <string.h>
-
+#include <psa/crypto.h>
+#include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/crc.h>
 #include <zephyr/storage/flash_map.h>
+#include <zephyr/storage/stream_flash.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/ztest.h>
-
-#include <kfsw/services/fwu.h>
 #include <kfsw/services/fwu_lite.h>
 
-/* The protocol is tested without a transport: requests go straight to the
- * handler. Every bad request must get a reply, and a damaged block can be sent
- * again.
- */
-
 #define BLOCK KFSW_FWU_LITE_MAX_BLOCK_SIZE
-#define IMAGE_BLOCKS 5U
-#define IMAGE_TAIL 40U
-#define IMAGE_SIZE ((BLOCK * IMAGE_BLOCKS) + IMAGE_TAIL)
-
+#define IMAGE_SIZE (2U * BLOCK + 17U)
 static uint8_t image[IMAGE_SIZE];
+static uint8_t descriptor[KFSW_FWU_LITE_DESCRIPTOR_SIZE];
+static uint8_t receipt[KFSW_FWU_LITE_RECEIPT_SIZE];
+static struct kfsw_fwu_lite_message request;
+static struct kfsw_fwu_lite_message reply;
+static struct kfsw_fwu_status status;
+static unsigned int stream_writes;
 static int erase_error;
+static uint32_t transfer;
 
+int __real_stream_flash_buffered_write(struct stream_flash_ctx *ctx, const uint8_t *data,
+				       size_t size, bool flush);
+int __wrap_stream_flash_buffered_write(struct stream_flash_ctx *ctx, const uint8_t *data,
+				       size_t size, bool flush)
+{
+	stream_writes++;
+	return __real_stream_flash_buffered_write(ctx, data, size, flush);
+}
 int __real_flash_area_flatten(const struct flash_area *area, off_t offset, size_t size);
-
 int __wrap_flash_area_flatten(const struct flash_area *area, off_t offset, size_t size)
 {
 	return erase_error != 0 ? erase_error : __real_flash_area_flatten(area, offset, size);
 }
 
-static void *lite_setup(void)
+static void before(void *fixture)
 {
-	for (size_t index = 0U; index < sizeof(image); index++) {
-		image[index] = (uint8_t)((index * 23U) + 5U);
-	}
-	return NULL;
-}
-
-static void lite_before(void *fixture)
-{
+	struct kfsw_fwu_image description = {
+		.size = sizeof(image), .block_size = BLOCK, .digest_present = true};
+	size_t hash_size;
 	ARG_UNUSED(fixture);
 	erase_error = 0;
-	(void)kfsw_fwu_abort();
-}
-
-static uint8_t ask(struct kfsw_fwu_lite_message *reply, uint8_t opcode, uint16_t block_index,
-		   uint32_t argument, uint32_t extra, const uint8_t *data, uint16_t data_size)
-{
-	struct kfsw_fwu_lite_message request = {
-		.opcode = opcode,
-		.block_index = block_index,
-		.argument = argument,
-		.extra = extra,
-		.data = data,
-		.data_size = data_size,
-	};
-
-	zassert_ok(kfsw_fwu_lite_handle(&request, reply));
-	return reply->status;
-}
-
-static uint8_t send_block(struct kfsw_fwu_lite_message *reply, uint16_t index)
-{
-	uint32_t offset = (uint32_t)index * BLOCK;
-	uint16_t size = (uint16_t)MIN((size_t)BLOCK, sizeof(image) - offset);
-
-	return ask(reply, KFSW_FWU_LITE_OP_BLOCK, index, crc32_ieee(&image[offset], size), 0U,
-		   &image[offset], size);
-}
-
-static void begin_transfer(struct kfsw_fwu_lite_message *reply)
-{
-	zassert_equal(ask(reply, KFSW_FWU_LITE_OP_BEGIN, 0U, IMAGE_SIZE,
-			  crc32_ieee(image, IMAGE_SIZE), NULL, 0U),
-		      KFSW_FWU_LITE_STATUS_OK);
-}
-
-/* ---------------------------------------------------------------- the codec */
-
-ZTEST(services_fwu_lite, test_header_is_twelve_bytes_and_big_endian)
-{
-	/* Check the layout byte by byte; a round trip would pass even if both halves were wrong. */
-	struct kfsw_fwu_lite_message message = {
-		.opcode = KFSW_FWU_LITE_OP_BLOCK,
-		.status = 0x11,
-		.block_index = 0x2233,
-		.argument = 0x44556677,
-		.extra = 0x8899AABB,
-	};
-	uint8_t buffer[32];
-	size_t encoded = 0U;
-
-	zassert_ok(kfsw_fwu_lite_encode(&message, buffer, sizeof(buffer), &encoded));
-	zassert_equal(encoded, KFSW_FWU_LITE_HEADER_SIZE);
-
-	zassert_equal(buffer[0], KFSW_FWU_LITE_OP_BLOCK);
-	zassert_equal(buffer[1], 0x11);
-	zassert_equal(buffer[2], 0x22);
-	zassert_equal(buffer[3], 0x33);
-	zassert_equal(buffer[4], 0x44);
-	zassert_equal(buffer[7], 0x77);
-	zassert_equal(buffer[8], 0x88);
-	zassert_equal(buffer[11], 0xBB);
-}
-
-ZTEST(services_fwu_lite, test_encode_decode_round_trip_carries_a_payload)
-{
-	struct kfsw_fwu_lite_message message = {
-		.opcode = KFSW_FWU_LITE_OP_BLOCK,
-		.block_index = 7U,
-		.argument = 0xDEADBEEF,
-		.extra = 12345U,
-		.data = image,
-		.data_size = 64U,
-	};
-	struct kfsw_fwu_lite_message decoded;
-	uint8_t buffer[KFSW_FWU_LITE_HEADER_SIZE + BLOCK];
-	size_t encoded = 0U;
-
-	zassert_ok(kfsw_fwu_lite_encode(&message, buffer, sizeof(buffer), &encoded));
-	zassert_equal(encoded, KFSW_FWU_LITE_HEADER_SIZE + 64U);
-	zassert_ok(kfsw_fwu_lite_decode(buffer, encoded, &decoded));
-
-	zassert_equal(decoded.opcode, message.opcode);
-	zassert_equal(decoded.block_index, message.block_index);
-	zassert_equal(decoded.argument, message.argument);
-	zassert_equal(decoded.extra, message.extra);
-	zassert_equal(decoded.data_size, 64U);
-	zassert_mem_equal(decoded.data, image, 64U);
-}
-
-ZTEST(services_fwu_lite, test_encode_rejects_bad_arguments)
-{
-	struct kfsw_fwu_lite_message message = {.opcode = KFSW_FWU_LITE_OP_STATUS};
-	uint8_t buffer[KFSW_FWU_LITE_HEADER_SIZE];
-	size_t encoded = 0U;
-
-	zassert_equal(kfsw_fwu_lite_encode(NULL, buffer, sizeof(buffer), &encoded), -EINVAL);
-	zassert_equal(kfsw_fwu_lite_encode(&message, NULL, sizeof(buffer), &encoded), -EINVAL);
-	zassert_equal(kfsw_fwu_lite_encode(&message, buffer, sizeof(buffer), NULL), -EINVAL);
-
-	/* A payload size with no payload would encode whatever follows in memory. */
-	message.data_size = 4U;
-	message.data = NULL;
-	zassert_equal(kfsw_fwu_lite_encode(&message, buffer, sizeof(buffer), &encoded), -EINVAL);
-
-	message.data = image;
-	message.data_size = BLOCK + 1U;
-	zassert_equal(kfsw_fwu_lite_encode(&message, buffer, sizeof(buffer), &encoded), -EMSGSIZE);
-
-	message.data_size = 8U;
-	zassert_equal(kfsw_fwu_lite_encode(&message, buffer, KFSW_FWU_LITE_HEADER_SIZE, &encoded),
-		      -EMSGSIZE);
-}
-
-ZTEST(services_fwu_lite, test_decode_rejects_bad_input)
-{
-	uint8_t buffer[KFSW_FWU_LITE_HEADER_SIZE + 8U] = {0};
-	struct kfsw_fwu_lite_message decoded;
-
-	zassert_equal(kfsw_fwu_lite_decode(NULL, sizeof(buffer), &decoded), -EINVAL);
-	zassert_equal(kfsw_fwu_lite_decode(buffer, sizeof(buffer), NULL), -EINVAL);
-
-	/* Anything shorter than a header cannot be interpreted at all. */
-	zassert_equal(kfsw_fwu_lite_decode(buffer, KFSW_FWU_LITE_HEADER_SIZE - 1U, &decoded),
-		      -EBADMSG);
-
-	buffer[0] = KFSW_FWU_LITE_OP_BEGIN;
-	zassert_ok(kfsw_fwu_lite_decode(buffer, KFSW_FWU_LITE_HEADER_SIZE, &decoded));
-
-	buffer[0] = 0xEE;
-	zassert_equal(kfsw_fwu_lite_decode(buffer, sizeof(buffer), &decoded), -EBADMSG,
-		      "an unknown opcode must not be interpreted as a known one");
-}
-
-/* --------------------------------------------------------------- the handler */
-
-ZTEST(services_fwu_lite, test_an_unknown_request_is_answered_not_ignored)
-{
-	/* Even a request that makes no sense gets a reply. */
-	struct kfsw_fwu_lite_message request = {.opcode = 0x7F};
-	struct kfsw_fwu_lite_message reply;
-
-	zassert_ok(kfsw_fwu_lite_handle(&request, &reply));
-	zassert_equal(reply.status, KFSW_FWU_LITE_STATUS_INVALID);
-	zassert_equal(reply.opcode, 0x7F, "a reply must say which request it answers");
-}
-
-ZTEST(services_fwu_lite, test_handle_rejects_null)
-{
-	struct kfsw_fwu_lite_message message = {.opcode = KFSW_FWU_LITE_OP_STATUS};
-
-	zassert_equal(kfsw_fwu_lite_handle(NULL, &message), -EINVAL);
-	zassert_equal(kfsw_fwu_lite_handle(&message, NULL), -EINVAL);
-}
-
-ZTEST(services_fwu_lite, test_begin_rejects_an_image_that_does_not_fit)
-{
-	struct kfsw_fwu_lite_message reply;
-
-	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_BEGIN, 0U, kfsw_fwu_max_image_size() + 1U, 0U,
-			  NULL, 0U),
-		      KFSW_FWU_LITE_STATUS_TOO_LARGE);
-}
-
-ZTEST(services_fwu_lite, test_a_block_before_begin_is_rejected)
-{
-	struct kfsw_fwu_lite_message reply;
-
-	zassert_equal(send_block(&reply, 0U), KFSW_FWU_LITE_STATUS_INVALID);
-}
-
-ZTEST(services_fwu_lite, test_a_block_out_of_order_is_named_not_written)
-{
-	struct kfsw_fwu_lite_message reply;
-
-	begin_transfer(&reply);
-	zassert_equal(send_block(&reply, 0U), KFSW_FWU_LITE_STATUS_OK);
-
-	zassert_equal(send_block(&reply, 3U), KFSW_FWU_LITE_STATUS_OUT_OF_ORDER);
-	zassert_equal(reply.block_index, 1U, "the reply must say which block is actually wanted");
-	zassert_equal(reply.extra, BLOCK, "a rejected block must not advance the transfer");
-}
-
-ZTEST(services_fwu_lite, test_a_corrupt_block_can_simply_be_sent_again)
-{
-	/* A bad block costs one block, not the whole upload. */
-	struct kfsw_fwu_lite_message reply;
-	uint8_t corrupted[BLOCK];
-
-	begin_transfer(&reply);
-	zassert_equal(send_block(&reply, 0U), KFSW_FWU_LITE_STATUS_OK);
-
-	memcpy(corrupted, &image[BLOCK], sizeof(corrupted));
-	corrupted[10] ^= 0xFFU;
-
-	/* The checksum is for the good block, so the node sees the damage. */
-	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_BLOCK, 1U, crc32_ieee(&image[BLOCK], BLOCK), 0U,
-			  corrupted, BLOCK),
-		      KFSW_FWU_LITE_STATUS_BAD_BLOCK);
-	zassert_equal(reply.extra, BLOCK, "a bad block must not be written");
-	zassert_equal(reply.block_index, 1U, "the same block must still be wanted");
-
-	zassert_equal(send_block(&reply, 1U), KFSW_FWU_LITE_STATUS_OK,
-		      "resending the block must simply work");
-	zassert_equal(reply.extra, 2U * BLOCK);
-}
-
-ZTEST(services_fwu_lite, test_a_short_block_in_the_middle_is_rejected)
-{
-	/* Only the last block may be short. */
-	struct kfsw_fwu_lite_message reply;
-
-	begin_transfer(&reply);
-	zassert_equal(
-		ask(&reply, KFSW_FWU_LITE_OP_BLOCK, 0U, crc32_ieee(image, 100U), 0U, image, 100U),
-		KFSW_FWU_LITE_STATUS_INVALID);
-}
-
-ZTEST(services_fwu_lite, test_a_short_last_block_is_accepted)
-{
-	struct kfsw_fwu_lite_message reply;
-
-	begin_transfer(&reply);
-	for (uint16_t index = 0U; index < IMAGE_BLOCKS; index++) {
-		zassert_equal(send_block(&reply, index), KFSW_FWU_LITE_STATUS_OK);
-	}
-	zassert_equal(send_block(&reply, IMAGE_BLOCKS), KFSW_FWU_LITE_STATUS_OK,
-		      "the final partial block must be accepted");
-	zassert_equal(reply.extra, IMAGE_SIZE);
-}
-
-ZTEST(services_fwu_lite, test_verify_before_the_image_is_complete_is_rejected)
-{
-	struct kfsw_fwu_lite_message reply;
-
-	begin_transfer(&reply);
-	zassert_equal(send_block(&reply, 0U), KFSW_FWU_LITE_STATUS_OK);
-	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_VERIFY, 0U, 0U, 0U, NULL, 0U),
-		      KFSW_FWU_LITE_STATUS_INVALID);
-}
-
-ZTEST(services_fwu_lite, test_verify_reports_a_wrong_whole_image_checksum)
-{
-	struct kfsw_fwu_lite_message reply;
-
-	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_BEGIN, 0U, IMAGE_SIZE,
-			  crc32_ieee(image, IMAGE_SIZE) ^ 0xFFFFFFFFU, NULL, 0U),
-		      KFSW_FWU_LITE_STATUS_OK);
-	for (uint16_t index = 0U; index <= IMAGE_BLOCKS; index++) {
-		zassert_equal(send_block(&reply, index), KFSW_FWU_LITE_STATUS_OK);
-	}
-
-	/* Every block passed its own check, so only the whole-image checksum
-	 * can catch a sender that declared the wrong image. */
-	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_VERIFY, 0U, 0U, 0U, NULL, 0U),
-		      KFSW_FWU_LITE_STATUS_BAD_IMAGE);
-}
-
-ZTEST(services_fwu_lite, test_a_whole_image_arrives_and_verifies)
-{
-	struct kfsw_fwu_lite_message reply;
-	struct kfsw_fwu_status status;
-	const struct flash_area *area;
-	uint8_t tail[IMAGE_TAIL];
-
-	begin_transfer(&reply);
-	for (uint16_t index = 0U; index <= IMAGE_BLOCKS; index++) {
-		zassert_equal(send_block(&reply, index), KFSW_FWU_LITE_STATUS_OK,
-			      "block %u was rejected", index);
-	}
-
-	zassert_equal(reply.extra, IMAGE_SIZE);
-	zassert_equal(reply.argument, crc32_ieee(image, IMAGE_SIZE));
-	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_VERIFY, 0U, 0U, 0U, NULL, 0U),
-		      KFSW_FWU_LITE_STATUS_OK);
 	zassert_ok(kfsw_fwu_get_status(&status));
+	if (status.handle.generation != 0U) {
+		zassert_ok(kfsw_fwu_session_abort(&status.handle, &status));
+	}
+	for (size_t i = 0; i < sizeof(image); i++) {
+		image[i] = (uint8_t)(i * 23U + 5U);
+	}
+	description.crc32 = crc32_ieee(image, sizeof(image));
+	zassert_equal(psa_hash_compute(PSA_ALG_SHA_256, image, sizeof(image), description.sha256,
+				       sizeof(description.sha256), &hash_size),
+		      PSA_SUCCESS);
+	kfsw_fwu_lite_pack_image(&description, descriptor);
+	request = (struct kfsw_fwu_lite_message){.version = KFSW_FWU_LITE_VERSION,
+						 .opcode = KFSW_FWU_LITE_OP_BEGIN,
+						 .request_id = 123U,
+						 .transfer_id = ++transfer,
+						 .data = descriptor,
+						 .data_size = sizeof(descriptor)};
+	stream_writes = 0U;
+}
+
+static uint8_t ask(uint16_t peer)
+{
+	zassert_ok(kfsw_fwu_lite_handle_peer(peer, &request, &reply, receipt));
+	zassert_ok(kfsw_fwu_lite_receipt(&reply, &status));
+	return reply.status;
+}
+
+static void begin(void)
+{
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
+	request.generation = reply.generation;
+	request.data = NULL;
+	request.data_size = 0U;
+	zassert_not_equal(request.generation, 0U);
+}
+
+static void block(uint32_t offset, size_t size)
+{
+	request.opcode = KFSW_FWU_LITE_OP_BLOCK;
+	request.offset = offset;
+	request.data = image + offset;
+	request.data_size = size;
+	request.crc32 = crc32_ieee(request.data, size);
+	request.request_id++;
+}
+
+static void control(uint8_t opcode)
+{
+	request.opcode = opcode;
+	request.offset = 0U;
+	request.crc32 = 0U;
+	request.data = NULL;
+	request.data_size = 0U;
+	request.request_id++;
+}
+
+static void complete(void)
+{
+	begin();
+	for (size_t offset = 0; offset < sizeof(image); offset += BLOCK) {
+		block(offset, MIN(BLOCK, sizeof(image) - offset));
+		zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
+	}
+}
+
+ZTEST(services_fwu_lite, test_wire_layout)
+{
+	uint8_t wire[KFSW_FWU_LITE_WIRE_SIZE];
+	size_t size;
+	request.request_id = 0x11223344;
+	request.transfer_id = 0x55667788;
+	zassert_ok(kfsw_fwu_lite_encode(&request, wire, sizeof(wire), &size));
+	zassert_equal(size, 70U);
+	zassert_equal(wire[0], 1U);
+	zassert_equal(wire[1], 0U);
+	zassert_equal(wire[2], KFSW_FWU_LITE_OP_BEGIN);
+	zassert_equal(sys_get_be32(wire + 4), 0x11223344);
+	zassert_equal(sys_get_be32(wire + 8), 0x55667788);
+	zassert_equal(sys_get_be16(wire + 24), 42U);
+	zassert_mem_equal(wire + 28, descriptor, sizeof(descriptor));
+	zassert_ok(kfsw_fwu_lite_decode(wire, size, &reply));
+	zassert_equal(reply.request_id, request.request_id);
+	zassert_mem_equal(reply.data, descriptor, sizeof(descriptor));
+}
+
+ZTEST(services_fwu_lite, test_codec_rejects_trailing_and_truncation)
+{
+	uint8_t wire[KFSW_FWU_LITE_WIRE_SIZE];
+	size_t size;
+	zassert_ok(kfsw_fwu_lite_encode(&request, wire, sizeof(wire), &size));
+	zassert_equal(kfsw_fwu_lite_decode(wire, size + 1, &reply), -EBADMSG);
+	zassert_equal(kfsw_fwu_lite_decode(wire, size - 1, &reply), -EBADMSG);
+	zassert_equal(kfsw_fwu_lite_decode(wire, 27U, &reply), -EBADMSG);
+	wire[26] = 1U;
+	zassert_equal(kfsw_fwu_lite_decode(wire, size, &reply), -EBADMSG);
+}
+
+ZTEST(services_fwu_lite, test_oversize_before_narrowing)
+{
+	static uint8_t malicious[65548U];
+	zassert_equal(kfsw_fwu_lite_decode(malicious, sizeof(malicious), &reply), -EMSGSIZE);
+	request.data_size = 65536U;
+	size_t size;
+	zassert_equal(kfsw_fwu_lite_encode(&request, malicious, sizeof(malicious), &size),
+		      -EMSGSIZE);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_INVALID);
+}
+
+ZTEST(services_fwu_lite, test_unsupported_version)
+{
+	request.version++;
+	zassert_ok(kfsw_fwu_lite_handle_peer(16U, &request, &reply, receipt));
+	zassert_equal(reply.status, KFSW_FWU_LITE_STATUS_INVALID);
+	zassert_ok(kfsw_fwu_get_status(&status));
+	zassert_equal(status.state, KFSW_FWU_IDLE);
+}
+
+ZTEST(services_fwu_lite, test_reply_as_request)
+{
+	request.direction = KFSW_FWU_LITE_REPLY;
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_INVALID);
+}
+
+ZTEST(services_fwu_lite, test_illegal_begin_fields)
+{
+	request.generation = 1U;
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_INVALID);
+	request.generation = 0U;
+	request.offset = 1U;
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_INVALID);
+	request.offset = 0U;
+	request.request_id = 0U;
+	zassert_ok(kfsw_fwu_lite_handle_peer(16U, &request, &reply, receipt));
+	zassert_equal(reply.status, KFSW_FWU_LITE_STATUS_INVALID);
+}
+
+ZTEST(services_fwu_lite, test_fixed_block_descriptor)
+{
+	descriptor[9] ^= 1U;
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_INVALID);
+	zassert_ok(kfsw_fwu_get_status(&status));
+	zassert_equal(status.state, KFSW_FWU_IDLE);
+}
+
+ZTEST(services_fwu_lite, test_lost_begin_reply)
+{
+	struct kfsw_fwu_lite_message original = request;
+	begin();
+	struct kfsw_fwu_handle handle = status.handle;
+	uint32_t started = status.started;
+	request = original;
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
+	zassert_equal(status.handle.generation, handle.generation);
+	zassert_equal(status.started, started);
+}
+
+ZTEST(services_fwu_lite, test_full_duplicate_no_write)
+{
+	begin();
+	block(0U, BLOCK);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
+	unsigned int writes = stream_writes;
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
+	zassert_equal(status.received, BLOCK);
+	zassert_equal(stream_writes, writes);
+}
+
+ZTEST(services_fwu_lite, test_short_tail_duplicate_no_write)
+{
+	complete();
+	unsigned int writes = stream_writes;
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
+	zassert_equal(status.received, sizeof(image));
+	zassert_equal(stream_writes, writes);
+}
+
+ZTEST(services_fwu_lite, test_changed_duplicate)
+{
+	begin();
+	block(0U, BLOCK);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
+	image[0] ^= 1U;
+	request.crc32 = crc32_ieee(image, BLOCK);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_BAD_IMAGE);
+	zassert_equal(status.received, BLOCK);
+}
+
+ZTEST(services_fwu_lite, test_older_block_never_accepted)
+{
+	begin();
+	block(0U, BLOCK);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
+	block(BLOCK, BLOCK);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
+	block(0U, BLOCK);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OUT_OF_ORDER);
+	zassert_equal(status.received, 2U * BLOCK);
+}
+
+ZTEST(services_fwu_lite, test_bad_block_crc)
+{
+	begin();
+	block(0U, BLOCK);
+	request.crc32++;
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_BAD_BLOCK);
+	zassert_equal(stream_writes, 0U);
+}
+
+ZTEST(services_fwu_lite, test_short_nonfinal_rejected)
+{
+	begin();
+	block(0U, 17U);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_INVALID);
+	zassert_equal(stream_writes, 0U);
+}
+
+ZTEST(services_fwu_lite, test_owner_is_transport_peer)
+{
+	begin();
+	block(0U, BLOCK);
+	zassert_equal(ask(17U), KFSW_FWU_LITE_STATUS_OWNER);
+	zassert_equal(stream_writes, 0U);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
+}
+
+ZTEST(services_fwu_lite, test_old_generation)
+{
+	begin();
+	request.generation++;
+	block(0U, BLOCK);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_STALE);
+	zassert_equal(stream_writes, 0U);
+}
+
+ZTEST(services_fwu_lite, test_status_discovers_exact_owned_handle)
+{
+	begin();
+	struct kfsw_fwu_handle handle = status.handle;
+	control(KFSW_FWU_LITE_OP_STATUS);
+	request.transfer_id = 0U;
+	request.generation = 0U;
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
+	zassert_equal(status.handle.generation, handle.generation);
+	zassert_equal(status.handle.transfer_id, handle.transfer_id);
+	zassert_equal(ask(17U), KFSW_FWU_LITE_STATUS_OWNER);
+}
+
+ZTEST(services_fwu_lite, test_different_descriptor_busy)
+{
+	struct kfsw_fwu_lite_message original = request;
+	begin();
+	request = original;
+	descriptor[10] ^= 1U;
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_BUSY);
+}
+
+ZTEST(services_fwu_lite, test_local_and_ftp_conflicts)
+{
+	begin();
+	zassert_equal(kfsw_fwu_begin(sizeof(image), 0U), -EBUSY);
+	zassert_equal(kfsw_fwu_abort(), -EACCES);
+	struct kfsw_fwu_owner owner = {.kind = KFSW_FWU_OWNER_FTP, .peer = 16U};
+	struct kfsw_fwu_image other = {.size = sizeof(image)};
+	struct kfsw_fwu_handle handle = {0};
+	zassert_equal(kfsw_fwu_session_begin(&owner, &other, 0U, &handle, &status), -EBUSY);
+	zassert_equal(handle.generation, 0U);
+}
+
+ZTEST(services_fwu_lite, test_verify_requires_complete)
+{
+	begin();
+	control(KFSW_FWU_LITE_OP_VERIFY);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_INVALID);
+	zassert_equal(status.state, KFSW_FWU_RECEIVING);
+}
+
+ZTEST(services_fwu_lite, test_explicit_verify_then_start_replay)
+{
+	complete();
+	zassert_equal(status.state, KFSW_FWU_RECEIVING);
+	control(KFSW_FWU_LITE_OP_START_FLASHING);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_INVALID);
+	control(KFSW_FWU_LITE_OP_VERIFY);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
 	zassert_equal(status.state, KFSW_FWU_VERIFIED);
-	zassert_false(status.swap_scheduled);
-	zassert_ok(flash_area_open(DT_FIXED_PARTITION_ID(DT_CHOSEN(kfsw_fwu_partition)), &area));
-	zassert_ok(flash_area_read(area, kfsw_fwu_slot_write_offset() + IMAGE_SIZE - IMAGE_TAIL,
-				   tail, sizeof(tail)));
-	flash_area_close(area);
-	zassert_mem_equal(tail, &image[IMAGE_SIZE - IMAGE_TAIL], sizeof(tail));
-	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_VERIFY, 0U, 0U, 0U, NULL, 0U),
-		      KFSW_FWU_LITE_STATUS_OK);
-	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_START_FLASHING, 0U, 0U, 0U, NULL, 0U),
-		      KFSW_FWU_LITE_STATUS_OK);
+	zassert_equal(status.committed, sizeof(image));
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
+	control(KFSW_FWU_LITE_OP_START_FLASHING);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
+	zassert_equal(status.state, KFSW_FWU_READY);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
 }
 
-ZTEST(services_fwu_lite, test_idle_verify_is_rejected)
+ZTEST(services_fwu_lite, test_abort_tombstone_and_successor)
 {
-	struct kfsw_fwu_lite_message reply;
-
-	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_VERIFY, 0U, 0U, 0U, NULL, 0U),
-		      KFSW_FWU_LITE_STATUS_INVALID);
+	begin();
+	struct kfsw_fwu_lite_message old = request;
+	control(KFSW_FWU_LITE_OP_ABORT);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
+	struct kfsw_fwu_lite_message abort = request;
+	request = old;
+	request.generation = 0U;
+	request.opcode = KFSW_FWU_LITE_OP_BEGIN;
+	request.transfer_id = ++transfer;
+	request.data = descriptor;
+	request.data_size = sizeof(descriptor);
+	begin();
+	block(0U, BLOCK);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
+	request = abort;
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_STALE);
+	zassert_ok(kfsw_fwu_get_status(&status));
+	zassert_equal(status.received, BLOCK);
 }
 
-ZTEST(services_fwu_lite, test_abort_reports_erase_failure)
+ZTEST(services_fwu_lite, test_begin_erase_failure_retains_owner)
 {
-	struct kfsw_fwu_lite_message reply;
-
-	begin_transfer(&reply);
-	zassert_equal(send_block(&reply, 0U), KFSW_FWU_LITE_STATUS_OK);
 	erase_error = -EIO;
-	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_ABORT, 0U, 0U, 0U, NULL, 0U),
-		      KFSW_FWU_LITE_STATUS_FAILED);
-	zassert_equal(reply.extra, BLOCK);
-	erase_error = 0;
-	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_ABORT, 0U, 0U, 0U, NULL, 0U),
-		      KFSW_FWU_LITE_STATUS_OK);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_FAILED);
+	zassert_ok(kfsw_fwu_get_status(&status));
+	zassert_equal(status.state, KFSW_FWU_FAILED);
+	zassert_equal(status.handle.owner.peer, 16U);
 }
 
-ZTEST(services_fwu_lite, test_status_reports_progress_without_changing_it)
+ZTEST(services_fwu_lite, test_aborted_duplicate_never_claims_acceptance)
 {
-	struct kfsw_fwu_lite_message reply;
-
-	begin_transfer(&reply);
-	zassert_equal(send_block(&reply, 0U), KFSW_FWU_LITE_STATUS_OK);
-
-	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_STATUS, 0U, 0U, 0U, NULL, 0U),
-		      KFSW_FWU_LITE_STATUS_OK);
-	zassert_equal(reply.extra, BLOCK);
-	zassert_equal(reply.block_index, 1U);
-
-	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_STATUS, 0U, 0U, 0U, NULL, 0U),
-		      KFSW_FWU_LITE_STATUS_OK);
-	zassert_equal(reply.extra, BLOCK, "asking must not advance anything");
+	begin();
+	block(0U, BLOCK);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
+	struct kfsw_fwu_lite_message accepted = request;
+	control(KFSW_FWU_LITE_OP_ABORT);
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_OK);
+	request = accepted;
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_INVALID);
+	zassert_equal(status.received, 0U);
 }
 
-ZTEST(services_fwu_lite, test_abort_returns_to_idle_and_a_new_transfer_can_start)
+ZTEST(services_fwu_lite, test_mutation_rejects_trailing_fields)
 {
-	struct kfsw_fwu_lite_message reply;
-
-	begin_transfer(&reply);
-	zassert_equal(send_block(&reply, 0U), KFSW_FWU_LITE_STATUS_OK);
-
-	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_ABORT, 0U, 0U, 0U, NULL, 0U),
-		      KFSW_FWU_LITE_STATUS_OK);
-	zassert_equal(reply.extra, 0U);
-
-	begin_transfer(&reply);
-	zassert_equal(send_block(&reply, 0U), KFSW_FWU_LITE_STATUS_OK);
+	begin();
+	control(KFSW_FWU_LITE_OP_ABORT);
+	request.offset = 1U;
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_INVALID);
+	zassert_ok(kfsw_fwu_get_status(&status));
+	zassert_equal(status.state, KFSW_FWU_RECEIVING);
+	request.offset = 0U;
+	request.data = image;
+	request.data_size = 1U;
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_INVALID);
 }
 
-ZTEST(services_fwu_lite, test_a_second_begin_while_receiving_is_refused)
+ZTEST(services_fwu_lite, test_ftp_owner_blocks_lite)
 {
-	/* A second sender is told the node is busy. */
-	struct kfsw_fwu_lite_message reply;
-
-	begin_transfer(&reply);
-	zassert_equal(send_block(&reply, 0U), KFSW_FWU_LITE_STATUS_OK);
-
-	zassert_equal(ask(&reply, KFSW_FWU_LITE_OP_BEGIN, 0U, IMAGE_SIZE,
-			  crc32_ieee(image, IMAGE_SIZE), NULL, 0U),
-		      KFSW_FWU_LITE_STATUS_BUSY);
-	zassert_equal(reply.extra, BLOCK, "the running transfer must be untouched");
+	struct kfsw_fwu_owner owner = {.kind = KFSW_FWU_OWNER_FTP, .peer = 16U};
+	struct kfsw_fwu_image other = {.size = sizeof(image)};
+	struct kfsw_fwu_handle handle = {0};
+	zassert_ok(kfsw_fwu_session_begin(&owner, &other, 0U, &handle, &status));
+	zassert_equal(ask(16U), KFSW_FWU_LITE_STATUS_BUSY);
+	zassert_ok(kfsw_fwu_get_status(&status));
+	zassert_equal(status.handle.owner.kind, KFSW_FWU_OWNER_FTP);
 }
 
-ZTEST(services_fwu_lite, test_status_names_are_reported)
+ZTEST(services_fwu_lite, test_null_arguments)
 {
-	zassert_str_equal(kfsw_fwu_lite_status_name(KFSW_FWU_LITE_STATUS_OK), "ok");
-	zassert_str_equal(kfsw_fwu_lite_status_name(KFSW_FWU_LITE_STATUS_BAD_BLOCK), "bad-block");
-	zassert_str_equal(kfsw_fwu_lite_status_name(KFSW_FWU_LITE_STATUS_BAD_IMAGE), "bad-image");
-	zassert_str_equal(kfsw_fwu_lite_status_name(KFSW_FWU_LITE_STATUS_OUT_OF_ORDER),
-			  "out-of-order");
-	zassert_str_equal(kfsw_fwu_lite_status_name(KFSW_FWU_LITE_STATUS_BUSY), "busy");
-	zassert_str_equal(kfsw_fwu_lite_status_name(200U), "unknown");
+	size_t size;
+	uint8_t wire[KFSW_FWU_LITE_WIRE_SIZE];
+	zassert_equal(kfsw_fwu_lite_encode(NULL, wire, sizeof(wire), &size), -EINVAL);
+	zassert_equal(kfsw_fwu_lite_decode(NULL, 0U, &reply), -EINVAL);
+	zassert_equal(kfsw_fwu_lite_handle_peer(16U, NULL, &reply, receipt), -EINVAL);
+	zassert_equal(kfsw_fwu_session_lookup(NULL, &status), -EINVAL);
 }
 
-ZTEST_SUITE(services_fwu_lite, NULL, lite_setup, lite_before, NULL, NULL);
+ZTEST_SUITE(services_fwu_lite, NULL, NULL, before, NULL, NULL);

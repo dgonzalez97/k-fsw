@@ -421,6 +421,67 @@ milliseconds, module, severity and up to 191 text bytes. Log filters apply
 before retention. Zephyr logs, driver output and shell responses are not
 captured.
 
+### Debugger text mirror
+
+`config/profiles/log-semihost.conf` opts into full-text K-FSW mirroring.
+It preserves the USB/UART text console and copies the already-rendered bounded
+message, severity, colour escapes and final newline to a platform-owned sink.
+Markers are included without a severity prefix, as on the local console.
+The sink does not capture arbitrary Zephyr logs, driver output, or shell replies.
+It does not use `CONFIG_LOG_BACKEND_SEMIHOST` or change remote dictionary export.
+
+From the workspace root, build the reference NUCLEO-L496ZG image:
+
+```bash
+./k-fsw/tools/build.sh nucleo_l496zg --semihost
+./k-fsw/tools/debug.sh nucleo_l496zg
+```
+
+The option appends the profile to any existing `KFSW_EXTRA_CONF_FILE` list.
+It is off by default; `./k-fsw/tools/build.sh --help` describes the option.
+The option supports `nucleo_l496zg`, `nucleo_f746zg` and `frdm_k64f`;
+other targets are rejected before building.
+
+Use the NUCLEO's ST-Link through the OpenOCD runner. Before letting the image
+execute, issue these commands in GDB:
+
+```text
+monitor reset halt
+monitor arm semihosting enable
+monitor arm semihosting_fileio disable
+continue
+```
+
+OpenOCD handles terminal writes on its own output. Keep that output available
+for capture. The sink uses Zephyr's `semihost_write` with stdout handle 1, as
+the pinned Zephyr semihost log backend does. Zero unwritten bytes means success;
+partial writes, negative errors and invalid results are rejected without retry
+or recursive logging. Concurrent mirror attempts are skipped without waiting.
+
+The guard checks CMSIS DHCSR C_DEBUGEN on supported mainline Cortex-M targets.
+It skips calls when detached, in a handler, with interrupts masked, or in
+unprivileged thread mode. Cortex-M0/M0+, TrustZone configurations and non-Cortex-M
+targets return unsupported. History locks are released before mirroring.
+A probe attachment does **not** prove a semihost handler is active: enabling the
+handler before execution is mandatory. Detachment can race the guard and BKPT;
+keep the debugger connected for the whole opt-in session. A build option cannot
+make asynchronous debugger removal safe at every instruction boundary.
+
+Overhead is **unmeasured**. Each accepted mirror copies one bounded line and
+halts the core for a host write; host latency has no firmware bound. Measure
+log-call latency and missed deadlines on the intended debugger/board before
+using this in timing-sensitive debugging. The normal build disables both
+options, compiling out the sink and mirror, with no extra formatting or
+semihost calls. Do not enable this profile in flight builds.
+
+For HIL, record the exact ELF, probe, OpenOCD version and capture. Compare a
+warning, a long/truncated message and a boot marker against the UART console;
+confirm a detached boot skips the sink, and ISR/IRQ-masked logging never enters
+BKPT. Test handler-disabled execution only under controlled debugger recovery.
+Native tests cover sink policy, text preservation and failed/partial write
+results through linker wrappers; CMSIS register behavior and detach timing
+remain HIL-only. No physical acceptance or timing measurement is claimed here.
+
 ### Remote log
 
 `CONFIG_KFSW_LOG_REMOTE` serves the history, and the journal when
@@ -437,7 +498,21 @@ Reads are bounded (1 to 32 records), do not remove anything, and do not need
 UTC. A node that does not answer within `CONFIG_KFSW_LOG_REMOTE_TIMEOUT_MS`
 (3 s) is logged as a warning.
 
-The serving node's `log_remote_format` parameter picks how messages travel:
+The serving node's `log_remote_format` parameter picks how messages travel.
+Text remains the compiled default. To start in dictionary mode, add this to an
+extra configuration alongside `config/profiles/log-remote.conf`:
+
+```text
+CONFIG_KFSW_LOG_REMOTE_DEFAULT_DICTIONARY=y
+```
+
+`CONFIG_KFSW_LOG_REMOTE_DEFAULT_TEXT=y` selects text instead. This choice sets
+both the initial value and the parameter reset default. A restored persistent
+`log_remote_format` value still takes precedence, and runtime writes still
+select 0 or 1 immediately. Neither choice changes local formatted text,
+cbprintf packaging, text fallback, CRCs, or the remote wire representation.
+
+The formats are:
 
 | Value | Format | On the requesting shell |
 | --- | --- | --- |
@@ -488,9 +563,11 @@ application passes the enabled tables to `kfsw_param_init()`, which checks
 them and builds a sorted index. Persistence and the CSP adapter use the same
 index.
 
-Local writes call `validate` before updating storage, then call `changed`.
-A rejected local write keeps the previous value. Change callbacks run after
-the write and cannot reject it.
+Validators check values without changing hardware or owner state. A scalar
+`apply` callback performs work that can fail before storage is committed; its
+errno reaches the local caller. `changed` runs after a successful write and
+cannot reject it. Registry initialization copies defaults without calling
+`apply`, so it does not drive GPIO before the module initializes.
 
 ```text
 KFSW_PARAM              local tables and API
@@ -505,7 +582,7 @@ local-only composition.
 ### Tables
 
 A parameter is addressed by table and offset. Table numbers are split by the
-layer that defines the table, which `param tables` shows in its `layer`
+layer that defines the table, which `param whichtables` shows in its `layer`
 column:
 
 | Numbers | Used by |
@@ -522,7 +599,7 @@ are unique inside a table. Names are unique on the node and up to
 registration.
 
 A definition set can carry a `description`, one short line saying what the
-table holds; `param tables` prints it in its `holds` column. Every table in
+table holds; `param whichtables` prints it in its `holds` column. Every table in
 the five repositories has one, and a new table should too.
 
 | ID | Layer | Name | Source |
@@ -550,7 +627,7 @@ the five repositories has one, and a new table should too.
 | 40 | service | `limits` | `kfsw-services/src/limits-parameters/` |
 | 50 | module | `radio_uhf` | `kfsw-modules/radio-uhf/parameters/` |
 | 51 | module | `temp_example` | `kfsw-modules/temperature-sensor-example/parameters/` |
-| 67 | module | `hw_test` | `kfsw-modules/boton-test/` |
+| 67 | module | `hw_test` | `kfsw-modules/button-test/` |
 
 A table is only registered when its service or module is enabled. The `fwu`
 table is read-only. `health_interval_ms` is checked against the watchdog
@@ -559,7 +636,7 @@ platform and comms layers can't depend on the parameter service.
 
 ### Write modes
 
-The `mode` column of `param list` comes from each definition:
+The `mode` column of `param listall` comes from each definition:
 
 | Letter | Meaning |
 | --- | --- |
@@ -613,7 +690,7 @@ caches the descriptors of one remote node.
 ```text
 kfsw:~$ param get 2 log_level
 kfsw:~$ param set 2 log_level 2
-kfsw:~$ param list 2
+kfsw:~$ param listall 2
 ```
 
 A named read asks the node for that one descriptor and then the value. A node
@@ -628,15 +705,34 @@ The cache holds `CONFIG_KFSW_PARAM_REMOTE_POOL_SIZE` descriptors. Value requests
 are handled by a worker thread; when its queue is full the request is dropped
 and `param_requests_dropped` increases.
 
-Each node validates remote writes with its own validators. An invalid remote
-value is rejected and the parameter goes back to its compiled default.
+Remote reads retry only `-ETIMEDOUT`, with at most three total read attempts
+inside the caller's original deadline, including mutex waits. The default
+budget is `CONFIG_KFSW_PARAM_LIST_TIMEOUT_MS + CONFIG_KFSW_PARAM_TIMEOUT_MS`.
+Earlier successful batches may be requested again; the values are not a snapshot.
+Other errors return immediately. Remote writes remain single-shot.
+
+On the requesting node, read-only `param_read_resends` (table 26, offset `0x20`,
+wire ID `0x1a20`) counts extra request packets sent during read retries,
+including descriptor requests. It starts at boot, saturates at `4294967295`,
+and survives service restarts. Read it locally with `param get param_read_resends`,
+or from another node with `param get <requesting-node> param_read_resends`.
+It indicates timeout recovery traffic, without distinguishing request loss,
+reply loss, congestion or server drops. FWU's `resent` count is separate.
+
+Each node validates the complete remote write before applying it. A request
+containing a fallible scalar must contain exactly one value, including repeated
+writes to the same parameter. Software-only batches remain supported. Rejected
+writes keep the previous value; failed application receives no success ACK.
+Cached peer values never invoke local appliers.
 
 ### Defaults, save and load
 
 At boot every value starts from its compiled default, then the snapshot is
 restored. `param set` changes RAM and runs the change callback. With
 `param_autosave` on (the default), an accepted change to a persistent value
-also writes the snapshot.
+also writes the snapshot. Snapshot loads and persistent default resets refuse
+multi-value operations containing a fallible scalar before changing any value.
+Singleton operations return the applier's error if application fails.
 
 | Command | RAM | Saved snapshot |
 | --- | --- | --- |
@@ -664,6 +760,29 @@ defaults stay, and startup continues. The filesystem is not reformatted.
 A save writes and syncs the temporary file and then renames it over the active
 file. If a step fails, the temporary file is removed and the previous snapshot
 stays. The CRC catches corruption; it is not authentication.
+
+### What may be persistent
+
+A snapshot is restored as a whole, so a restored value that calls back into its
+owner can fail in the middle of the restore. Registration therefore refuses a
+parameter that is persistent and has an `.apply` callback, with `-EINVAL`
+naming the parameter. One such entry would otherwise make every other
+persistent value in the snapshot unrestorable.
+
+`KFSW_PARAM_FLAG_OWNER_STORE` is the exemption. It marks a parameter whose
+owner keeps the value somewhere else, and the restore skips it, so the owner
+may be both persistent and fallible. `boot_attempts_left` and
+`boot_attempts_max` in table 32 are the canonical pair: persistent, with an
+`.apply` that can fail, and held in the platform boot store rather than the
+snapshot.
+
+Read-only and persistent is a legitimate combination and needs no exemption:
+`boot_count` is saved in the snapshot and refused to a writer.
+
+The rule is the same in both directions. There is no case in which a single
+persistent parameter with an `.apply` is accepted; `kfsw_param_init()` rejects
+the set at registration rather than at restore time, so a composition that
+breaks the rule fails on the bench and not in orbit.
 
 ## Parameter tables as files
 
@@ -699,6 +818,11 @@ back. Only the most recent load can be undone, and only once; there is no stack
 of loads. The held values do not survive a reset, so a load that needs to outlive
 one is followed by `param save`.
 
+A file containing a fallible scalar must contain only that value. The same rule
+applies to undo. File validation performs no application. A failed load returns
+the application errno and preserves the previous undo state. A failed undo can
+be retried. No physical rollback is attempted.
+
 `table dump <table> <path>` writes what is running as a file, so the usual way
 to change a table is to fetch that, edit one value on the ground and upload it
 back rather than composing a file from the manual. Read-only parameters and
@@ -727,8 +851,9 @@ property. The NUCLEO-L496ZG uses the last 64 KiB of its 1 MiB flash:
 
 `CONFIG_USE_DT_CODE_PARTITION=y` keeps the application out of the storage
 region. native_sim uses a 256 KiB partition backed by a host file,
-`build/linux/kfsw-storage.bin` when started with the runner. The FRDM-K64F and
-Pico W profiles have no storage.
+`build/linux/kfsw-storage.bin` when started with the runner. The FRDM-K64F profile keeps
+storage disabled. Pico W uses its own persistent and scratch layout; see
+@ref targets.
 
 ### Mount and format
 
@@ -737,6 +862,66 @@ partition as corrupt (`EFAULT`), the whole partition is scanned. A fully erased
 partition is formatted and mounted; anything else is reported as an error and
 left as it is. Services that need storage report their own errors when it is
 not mounted.
+
+### One filesystem, two block layers
+
+LittleFS is the only filesystem K-FSW mounts, on every target. What changes
+between boards is what lies underneath it, and only because the flash does.
+LittleFS keeps directory metadata in a pair of erase blocks, so a partition
+needs more than two of them to hold a directory tree at all: measured on the
+hosted image, two and three 256 KiB blocks both fail on the first directory
+with `-28`, the F746's four 32 KiB sectors fail on the second, and 4 KiB blocks
+work. The STM32F746 has 256 KiB sectors, so LittleFS cannot sit on its internal
+flash directly.
+
+The ZMS disk below closes that gap: Zephyr's own ZMS subsystem presented as an
+ordinary `disk_access` device, with fine logical sectors over the coarse
+physical ones. Above it nothing changes. The mount path, the platform storage
+API and every service that reads or writes a file are identical on both boards,
+so a new MCU with coarse sectors is a profile and a sector count, not a port.
+That is why the L496, whose 2 KiB pages suit LittleFS, stays on flash directly:
+the uniformity that matters is the filesystem and the API, and both are already
+uniform.
+
+### Optional ZMS block translation
+
+`config/profiles/f746-zms-storage.conf` and
+`config/profiles/f746-zms-storage.overlay` opt into the platform ZMS disk.
+Use them with the shared `f746-recovery-flash.overlay` map, after the
+minimal A profile. Existing target defaults do not enable this backend.
+The selected partition must contain two erase-aligned physical sectors;
+the F746 map reserves `[0x80000, 0x100000)`, two 256 KiB sectors.
+
+The disk exposes 48 sectors of 4096 bytes (192 KiB before LittleFS overhead).
+Logical sector N uses ZMS ID N+1. ZMS owns append, recovery and compaction;
+the adapter serializes access and checks complete records with data CRC.
+The mandatory `tools/zephyr-patch.sh` correction propagates close-ATE write
+errors before ZMS advances to another physical sector.
+Writes are synchronous. A multi-sector request validates its complete range
+before writing, but it is not atomic: earlier sectors can persist when a
+later sector fails. After a write error, unmount and reinitialize before
+using the disk again.
+
+Before ZMS mount, the adapter scans the partition and recognizes the pinned
+Zephyr 4.4.0 version 1, 32-bit-ID empty-sector headers. Blank media may be
+initialized. Unknown nonblank media, unsupported valid headers, and media
+with all headers destroyed are refused without writes. This guard is tied
+to the pinned on-media format and must be checked when updating Zephyr.
+LittleFS formatting remains allowed only when every logical sector is erased.
+
+The native suite is `tests/unit/platform_storage_zms`. Physical erase stalls,
+wear, watchdog margins, UART/CAN behavior and reset/power-loss acceptance
+require separate F746 measurements. No firmware update or recovery writer
+uses this disk.
+
+The opt-in `f746-zms-storage.conf` profile also enables persistent parameters
+and FTP in the running A image. Apply it after `f746-minimal.conf`, with the
+shared recovery flash map and `f746-zms-storage.overlay`. Keep this profile out
+of Golden: Golden uses the separate recovery uploader and never mounts the
+file region. Check software fit for each build using the linker memory report and the
+`zephyr.signed.bin` size against the 256 KiB A partition. Physical storage and
+interruption acceptance remain outstanding.
+
 
 ## File transfer
 
@@ -947,9 +1132,9 @@ lifetimes.
 
 `CONFIG_KFSW_REMEXEC` lets an operator read which shell commands a node offers
 and run one of them, on CSP port 8, with its output coming back to the node
-that asked. The Linux image enables it. It is not composed into the NUCLEO
-image yet: capturing output costs a shell instance, and that footprint has not
-been measured on the board.
+that asked. The Linux image and the NUCLEO L496 image enable it. Capturing
+output costs a second shell instance, measured on the L496 at 6924 bytes of
+flash and 8832 of RAM.
 
 **Allowlist.** A command is unreachable until the composition marks it in the
 list handed to `kfsw_remexec_init()`. The listing reads the same array the
@@ -1192,7 +1377,8 @@ From the shell: `limits status`, `limits list`, `limits load [file]` and
 ## Watchdogs
 
 Three watchdogs answer three different questions. Each resets the node when
-its answer is no.
+its answer is no. @ref fault_recovery shows how they fit with the other fault
+mechanisms.
 
 | Watchdog | Proves | Fed by | Timeout | Enabled in |
 | --- | --- | --- | --- | --- |
@@ -1204,9 +1390,10 @@ its answer is no.
 
 The MCU's independent watchdog, IWDG on the STM32L4, runs from its own
 low-speed oscillator and cannot be stopped once started. Zephyr drives it
-through its watchdog driver; `kfsw-platform` arms it after the services have
-started, so a slow boot is not reset before the shell is up. native_sim has no
-hardware watchdog. The [NUCLEO target](../targets/index.md#watchdog) explains
+through its watchdog driver. `main()` arms it first, before storage and the
+services, so a hang anywhere in startup still ends in a reset; a keep-alive on
+the system workqueue feeds it until health takes over at the end of startup.
+native_sim has no hardware watchdog. The [NUCLEO target](../targets/index.md#watchdog) explains
 why it is the independent watchdog and not `watchdog0`.
 
 ### Health
@@ -1312,7 +1499,7 @@ these services. Each module has its own parameter table, numbered 50 to 99.
 | --- | --- | --- |
 | `radio-uhf` | 50 | Holybro SiK UHF radio: identity, status and optional link encryption |
 | `temperature-sensor-example` | 51 | The MCU's die temperature, sampled on a work queue; the module to copy |
-| `boton-test` | 67 | A board button and three LEDs, for bench tests |
+| `button-test` | 67 | A board button and three LEDs, for bench tests |
 
 The [kfsw-modules README](https://github.com/dgonzalez97/kfsw-modules#readme)
 says how a module is laid out and how to add one.

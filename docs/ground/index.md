@@ -11,8 +11,15 @@ build options.
 | Role | CSP address | Use |
 | --- | --- | --- |
 | `kfsw-gnd-uhf` | 16 | Opens the UHF radio for the ground network |
-| `kfsw-gnd-can` | 16 | Reaches a flight node over a SocketCAN interface |
+| `kfsw-gnd-can` | 17 | Reaches a flight node over a SocketCAN interface |
+| `kfsw-beacon` | 18 | Receives beacons from a flight node |
 | `kfsw-ops` | 19 | Operator shell; doesn't open the radio |
+| `kfsw-rotctl` | 20 | Antenna rotator control |
+
+The address says which link the ground node is on: 16 is reached over KISS and
+17 over CAN. A flight profile that carries both links can then name one route
+per link and never has to guess which one a ground address belongs to, which is
+what `nucleo-can.conf` does with `"3 CAN,17 CAN,16 KISS,0/0 KISS"`.
 
 These are the reference settings. Each node file sets two addresses:
 
@@ -86,11 +93,16 @@ Keep USB device paths out of the node files and put them in the bench file.
 ground-station/
 |-- README.md
 |-- station.env
-|-- reports/
+|-- satellites.json           Gpredict proxy profiles
+|-- reports/                  HK report definitions
+|-- tle/tracked.txt           TLEs of the profiled spacecraft
+|-- yamcs/                    Yamcs configuration (submodule)
 `-- nodes/
+    |-- kfsw-beacon.env
     |-- kfsw-gnd-can.env
     |-- kfsw-gnd-uhf.env
-    `-- kfsw-ops.env
+    |-- kfsw-ops.env
+    `-- kfsw-rotctl.env
 ```
 
 A node file is a shell environment file; see
@@ -300,6 +312,11 @@ nowhere, which is how to watch Gpredict without a rotator attached. Add
 drive the real daemons, and run the proxy on different ports so it can sit in
 front of them.
 
+`ground-station/tle/tracked.txt` holds the TLEs of the spacecraft in the
+profiles below. Gpredict imports them through its TLE update from local
+files; refresh the file before a pass, because a TLE a few weeks old puts the
+antenna off the spacecraft.
+
 ### Pointing Gpredict at it
 
 In Gpredict, `Edit > Preferences > Interfaces > Rotators` and `> Radios`, add
@@ -420,7 +437,7 @@ report=k-fsw/ground-station/reports/nucleo-temperature.yaml
     -o k-fsw/ground-station/yamcs/src/main/yamcs/mdb/kfsw-hk.xml
 ```
 
-`hk-report.py check` compares the file with a node's `param list`, which
+`hk-report.py check` compares the file with a node's `param listall`, which
 catches a parameter that moved.
 
 ### Bridge datagrams
@@ -465,6 +482,54 @@ writable because the module doesn't use SiK command mode.
   ping in both directions and the counters.
 
 Radio settings and commands are in `tests/hil/radio-uhf/holybro/README.md`.
+
+## Day to day
+
+Three set-ups cover most work. Each opens a serial device or a pseudo-terminal
+exclusively, so run one reader per device at a time.
+
+### A KFSW-Linux node from the host
+
+`./k-fsw/tools/kfsw-linux run` starts a node with its shell on the terminal
+and prints the pseudo-terminal of its CSP UART (`uart_1`). Host tools talk CSP
+over KISS on that device without a ground node:
+
+```bash
+./k-fsw/tools/ground/hk-bridge.py --device /dev/pts/7 --node 1 --report 0
+./k-fsw/tools/kfsw-linux csp --device /dev/pts/7 discover --nodes 1
+```
+
+The first pulls report 0 into Yamcs, the second asks node 1 for its identity.
+Define the report on the node's own shell first, for example
+`hk define 0 3:0x00 3:0x0c`. The CSP tools are an optional project in
+`west.yml`; fetch and build them once with
+`west update kfsw-csp-tools && ./k-fsw/tools/kfsw-linux csp build`, which
+needs Rust.
+
+### Ground nodes on one host
+
+`k-ground run kfsw-gnd-uhf` and `k-ground run kfsw-ops` in two terminals, as
+under Running above, give a gateway and an operator shell joined by a local
+link. Everything an operator does to a flight node is typed in the `kfsw-ops`
+shell with the node number first: `param get 2 boot_image`, `event tail 2 0`,
+`hk define 2 0 ...`, `ftp put 2 ...`, `csp reboot 2 <pin>`.
+
+### A pass
+
+For a flight node over the radio, add the radio bridge to the gateway (see
+Radio below), start Yamcs and the bridge, and let the Gpredict proxy drive
+the antenna:
+
+```bash
+./k-fsw/tools/ground/gpredict-proxy.py --profile "LUR-1" \
+    --rotator-upstream 127.0.0.1:4533 --radio-upstream 127.0.0.1:4532
+./k-fsw/tools/ground/hk-bridge.py --device "$KGROUND_HOLYBRO_DEVICE" \
+    --baud 57600 --node 2 --report 0
+```
+
+During the pass, feed the ground watchdog (`gndwdt feed 2`), read what
+happened since the last pass (`journal remote 2`, `event stats 2`), then pull
+stored housekeeping and files.
 
 ## Saving and replaying HK
 

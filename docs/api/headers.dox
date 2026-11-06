@@ -71,7 +71,7 @@
  */
 
 /**
- * @file ../kfsw-modules/boton-test/include/kfsw/modules/boton_test.h
+ * @file ../kfsw-modules/button-test/include/kfsw/modules/button_test.h
  * @brief Debounced button state and typed status API.
- * @ingroup kfsw_modules_boton_test
+ * @ingroup kfsw_modules_button_test
  */

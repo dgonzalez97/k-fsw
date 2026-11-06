@@ -12,9 +12,9 @@ KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
 
 interface="${KFSW_CAN_INTERFACE:-vcan0}"
 node2_build_dir="${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/tests/linux-can"
-node16_build_dir="${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/k-ground/kfsw-gnd-can-node-16"
+node17_build_dir="${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/k-ground/kfsw-gnd-can-node-17"
 node2_executable="$node2_build_dir/zephyr/zephyr.exe"
-node16_executable="$node16_build_dir/zephyr/zephyr.exe"
+node17_executable="$node17_build_dir/zephyr/zephyr.exe"
 
 mode="smoke"
 if [[ "${1:-}" == "--terminal" ]]; then
@@ -28,14 +28,14 @@ fi
 
 work_dir="$(mktemp -d /tmp/kfsw-can-smoke.XXXXXX)"
 node2_pid=""
-node16_pid=""
+node17_pid=""
 relay_pid=""
 
 cleanup()
 {
 	[[ -n "$relay_pid" ]] && kill "$relay_pid" 2>/dev/null || true
 	[[ -n "$node2_pid" ]] && kill "$node2_pid" 2>/dev/null || true
-	[[ -n "$node16_pid" ]] && kill "$node16_pid" 2>/dev/null || true
+	[[ -n "$node17_pid" ]] && kill "$node17_pid" 2>/dev/null || true
 	wait 2>/dev/null || true
 	exec 3>&- 4>&-
 	rm -rf -- "$work_dir"
@@ -46,7 +46,7 @@ fail()
 	echo "CAN RESULT: FAIL"
 	echo "  $1"
 
-	for log_file in node2.log node16.log; do
+	for log_file in node2.log node17.log; do
 		if [[ -s "$work_dir/$log_file" ]]; then
 			echo "--- $log_file ---"
 			sed -n '1,200p' "$work_dir/$log_file"
@@ -86,34 +86,34 @@ if [[ ! -x "$node2_executable" ]]; then
 		"$KFSW_REPO_DIR/tools/build.sh" linux
 fi
 
-if [[ ! -x "$node16_executable" ]]; then
-	echo "CAN SMOKE: building node 16"
+if [[ ! -x "$node17_executable" ]]; then
+	echo "CAN SMOKE: building node 17"
 	"$KFSW_REPO_DIR/tools/k-ground" build kfsw-gnd-can
 fi
 
-mkfifo "$work_dir/node2.in" "$work_dir/node16.in"
+mkfifo "$work_dir/node2.in" "$work_dir/node17.in"
 exec 3<>"$work_dir/node2.in"
-exec 4<>"$work_dir/node16.in"
+exec 4<>"$work_dir/node17.in"
 
 "$node2_executable" --uart_stdinout --device_id=2 --no-color \
 	--can-if="$interface" -flash="$work_dir/node2-flash.bin" \
 	<&3 >"$work_dir/node2.log" 2>&1 &
 node2_pid=$!
 
-"$node16_executable" --uart_stdinout --device_id=16 --no-color \
-	--can-if="$interface" -flash="$work_dir/node16-flash.bin" \
-	<&4 >"$work_dir/node16.log" 2>&1 &
-node16_pid=$!
+"$node17_executable" --uart_stdinout --device_id=17 --no-color \
+	--can-if="$interface" -flash="$work_dir/node17-flash.bin" \
+	<&4 >"$work_dir/node17.log" 2>&1 &
+node17_pid=$!
 
 wait_for_output "$work_dir/node2.log" "@READY " "$node2_pid" || \
 	fail "node 2 did not report readiness"
-wait_for_output "$work_dir/node16.log" "@READY " "$node16_pid" || \
-	fail "node 16 did not report readiness"
+wait_for_output "$work_dir/node17.log" "@READY " "$node17_pid" || \
+	fail "node 17 did not report readiness"
 
 if [[ "$mode" == "terminal" ]]; then
-	tail -n 0 -F "$work_dir/node16.log" &
+	tail -n 0 -F "$work_dir/node17.log" &
 	relay_pid=$!
-	echo "KFSW CAN TERMINAL: READY (interactive node 16; node 2 is on $interface)"
+	echo "KFSW CAN TERMINAL: READY (interactive node 17; node 2 is on $interface)"
 	while IFS= read -r shell_command; do
 		printf '%s\n' "$shell_command" >&4
 	done
@@ -121,7 +121,7 @@ if [[ "$mode" == "terminal" ]]; then
 fi
 
 printf '%s\n' \
-	'csp ping 16' \
+	'csp ping 17' \
 	'csp interfaces' \
 	'csp counters' >&3
 
@@ -132,28 +132,28 @@ printf '%s\n' \
 	'param get 2 node_id' \
 	'comms can info' \
 	'comms can test 2' \
-	'comms can test 16' \
+	'comms can test 17' \
 	'csp interfaces' \
 	'csp counters' >&4
 
-wait_for_output "$work_dir/node16.log" "CSP ping 2: success" "$node16_pid" || \
-	fail "node 16 could not ping node 2 over $interface"
-wait_for_output "$work_dir/node2.log" "CSP ping 16: success" "$node2_pid" || \
-	fail "node 2 could not ping node 16 over $interface"
-wait_for_output "$work_dir/node16.log" "hostname: kfsw-can-2" "$node16_pid" || \
+wait_for_output "$work_dir/node17.log" "CSP ping 2: success" "$node17_pid" || \
+	fail "node 17 could not ping node 2 over $interface"
+wait_for_output "$work_dir/node2.log" "CSP ping 17: success" "$node2_pid" || \
+	fail "node 2 could not ping node 17 over $interface"
+wait_for_output "$work_dir/node17.log" "hostname: kfsw-can-2" "$node17_pid" || \
 	fail "the remote identity did not arrive over $interface"
-wait_for_output "$work_dir/node16.log" '2:uid = ' "$node16_pid" || \
+wait_for_output "$work_dir/node17.log" '2:uid = ' "$node17_pid" || \
 	fail "a remote string parameter was not readable over $interface"
-wait_for_output "$work_dir/node16.log" "2:node_id = 2" "$node16_pid" || \
+wait_for_output "$work_dir/node17.log" "2:node_id = 2" "$node17_pid" || \
 	fail "a remote scalar parameter was not readable over $interface"
-wait_for_output "$work_dir/node16.log" "CAN CSP test: PASS" "$node16_pid" || \
+wait_for_output "$work_dir/node17.log" "CAN CSP test: PASS" "$node17_pid" || \
 	fail "comms can test did not pass over $interface"
-grep -Fq "bitrate: " "$work_dir/node16.log" || fail "comms can info did not report the bitrate"
-grep -Fq "node 16 is not reached through CAN" "$work_dir/node16.log" ||
+grep -Fq "bitrate: " "$work_dir/node17.log" || fail "comms can info did not report the bitrate"
+grep -Fq "node 17 is not reached through CAN" "$work_dir/node17.log" ||
 	fail "comms can test accepted this node's own address"
 
 # The CAN interface has to show traffic in both directions on both nodes.
-for log_file in node2.log node16.log; do
+for log_file in node2.log node17.log; do
 	if ! grep -Eq '^CAN addr=[0-9]+/[0-9]+ default=(yes|no) tx=[1-9][0-9]* rx=[1-9][0-9]*' \
 		"$work_dir/$log_file"; then
 		fail "${log_file%.log} did not carry traffic on its CAN interface"
@@ -161,7 +161,7 @@ for log_file in node2.log node16.log; do
 done
 
 # libcsp's own counters, which is what a framing or buffer problem shows up in.
-for log_file in node2.log node16.log; do
+for log_file in node2.log node17.log; do
 	grep -Fq "last_can_error=0 (none)" "$work_dir/$log_file" || \
 		fail "${log_file%.log} reported a CAN framing error"
 	grep -Fq "buffer_out=0 conn_out=0 conn_ovf=0 conn_noroute=0 invalid_reply=0" \
@@ -170,5 +170,5 @@ for log_file in node2.log node16.log; do
 done
 
 cat "$work_dir/node2.log"
-cat "$work_dir/node16.log"
+cat "$work_dir/node17.log"
 echo "CAN RESULT: PASS"

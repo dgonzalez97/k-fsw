@@ -15,13 +15,13 @@ KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
 source "$KFSW_HIL_DIR/shapes.sh"
 
 # The ST-LINK's USB identity, from the target profile.
-STLINK_USB_ID="$(sed -n 's/^KFSW_STLINK_USB_ID=//p' \
-	"$KFSW_REPO_DIR/config/targets/nucleo_l496zg.env" 2>/dev/null || true)"
+STLINK_USB_ID="${KFSW_STLINK_USB_ID:-$(sed -n 's/^KFSW_STLINK_USB_ID=//p' \
+	"$KFSW_REPO_DIR/config/targets/nucleo_l496zg.env" 2>/dev/null || true)}"
 # The reference board's own ST-Link serial. More than one board can answer on
 # this bench, and they are not the same composition, so the board the suite is
 # written against is named rather than taken from enumeration order.
-STLINK_SERIAL="$(sed -n 's/^KFSW_STLINK_SERIAL=//p' \
-	"$KFSW_REPO_DIR/config/targets/nucleo_l496zg.env" 2>/dev/null || true)"
+STLINK_SERIAL="${KFSW_L496_STLINK:-${KFSW_STLINK_SERIAL:-$(sed -n 's/^KFSW_STLINK_SERIAL=//p' \
+	"$KFSW_REPO_DIR/config/targets/nucleo_l496zg.env" 2>/dev/null || true)}}"
 
 F746_STLINK_SERIAL="$(sed -n 's/^KFSW_STLINK_SERIAL=//p' \
 	"$KFSW_REPO_DIR/config/targets/nucleo_f746zg.env")"
@@ -37,6 +37,7 @@ can_down=""
 serial_without_driver=""
 have_robot=""
 have_terminal=""
+have_probe=""
 
 # USB identities that carry a serial bridge for the CSP UART or a radio. A board
 # running K-FSW also appears as a serial device, and taking one for the other
@@ -62,6 +63,23 @@ stable_path_of() {
 		fi
 	done
 	return 1
+}
+
+validate_override() {
+	local name="$1" device="${!1}"
+	if [[ ! -c "$device" ]]; then
+		echo "ERROR: $name=$device must resolve to a live character device; check the USB connection and device path." >&2
+		return 1
+	fi
+}
+
+discover_probe() {
+	local properties
+	properties="$(lsusb -v -d "$STLINK_USB_ID" 2>/dev/null || true)"
+	if [[ -n "$STLINK_SERIAL" ]] &&
+		awk -v serial="$STLINK_SERIAL" '$1 == "iSerial" && $3 == serial { found = 1 } END { exit !found }' <<<"$properties"; then
+		have_probe="yes"
+	fi
 }
 
 discover_serial() {
@@ -129,19 +147,32 @@ discover_serial() {
 
 	# An explicit setting always wins over discovery.
 	if [[ -n "${KFSW_DEBUG_SERIAL:-}" ]]; then
-		# Naming a console is a statement of intent, so it is taken as given.
-		found_debug="$KFSW_DEBUG_SERIAL"
-		debug_is_reference="yes"
+		found_debug=""
+		debug_is_reference=""
+		if validate_override KFSW_DEBUG_SERIAL; then
+			found_debug="$KFSW_DEBUG_SERIAL"
+			debug_is_reference="yes"
+		fi
 	fi
 	if [[ -n "${KFSW_FTDI_DEVICE:-}" ]]; then
-		found_second_serial="$KFSW_FTDI_DEVICE"
-		found_ftdi="$KFSW_FTDI_DEVICE"
+		found_second_serial=""
+		found_ftdi=""
+		if validate_override KFSW_FTDI_DEVICE; then
+			found_second_serial="$KFSW_FTDI_DEVICE"
+			found_ftdi="$KFSW_FTDI_DEVICE"
+		fi
 	fi
-	if [[ -n "${KFSW_F746_DEBUG_SERIAL:-}" && -e "$KFSW_F746_DEBUG_SERIAL" ]]; then
-		found_f746_debug="$KFSW_F746_DEBUG_SERIAL"
+	if [[ -n "${KFSW_F746_DEBUG_SERIAL:-}" ]]; then
+		found_f746_debug=""
+		if validate_override KFSW_F746_DEBUG_SERIAL; then
+			found_f746_debug="$KFSW_F746_DEBUG_SERIAL"
+		fi
 	fi
 	if [[ -n "${KFSW_RADIO_SERIAL:-}" ]]; then
-		found_radio="$KFSW_RADIO_SERIAL"
+		found_radio=""
+		if validate_override KFSW_RADIO_SERIAL; then
+			found_radio="$KFSW_RADIO_SERIAL"
+		fi
 	fi
 	return 0
 }
@@ -191,14 +222,17 @@ discover_host() {
 
 shape_is_possible() {
 	case "$1" in
+	board | board-uart | board-can | radio) [[ -n "$have_probe" ]] || return 1 ;;
+	esac
+	case "$1" in
 	software) [[ -n "$have_robot" ]] ;;
 	terminal) [[ -n "$have_robot" && -n "$have_terminal" ]] ;;
 	board) [[ -n "$have_robot" && -n "$found_debug" && -n "$debug_is_reference" ]] ;;
 	# The F746 scenario skips itself when that board is absent, so the shape
 	# only needs the adapter the link runs on.
-	board-uart) [[ -n "$have_robot" && -n "$found_debug" && -n "$debug_is_reference" && -n "$found_ftdi" ]] ;;
+	board-uart) [[ -n "$have_robot" && -n "$found_debug" && -n "$debug_is_reference" && -n "$found_ftdi" && ( -z "${KFSW_F746_DEBUG_SERIAL:-}" || -n "$found_f746_debug" ) ]] ;;
 	board-can) [[ -n "$have_robot" && -n "$found_debug" && -n "$debug_is_reference" && -n "$found_can" && "$found_can" != *virtual* ]] ;;
-	radio) [[ -n "$have_robot" && -n "$found_debug" && -n "$debug_is_reference" && -n "${found_radio:-$found_second_serial}" ]] ;;
+	radio) [[ -n "$have_robot" && -n "$found_debug" && -n "$debug_is_reference" && -n "$found_radio" ]] ;;
 	*) return 1 ;;
 	esac
 }
@@ -213,6 +247,7 @@ missing_for() {
 		[[ -z "$have_terminal" ]] && missing+=("tmux or the robot-terminal-runner submodule")
 		;;
 	board | board-uart | board-can | radio)
+		[[ -z "$have_probe" ]] && missing+=("ST-LINK USB $STLINK_USB_ID serial $STLINK_SERIAL (check USB or KFSW_STLINK_SERIAL)")
 		[[ -z "$found_debug" ]] && missing+=("the board's ST-LINK debug UART")
 		if [[ -n "$found_debug" && -z "$debug_is_reference" ]]; then
 			missing+=("KFSW_DEBUG_SERIAL, naming which of the attached boards to use")
@@ -222,6 +257,9 @@ missing_for() {
 	case "$shape" in
 	board-uart)
 		[[ -z "$found_ftdi" ]] && missing+=("an FTDI UART adapter")
+		if [[ -n "${KFSW_F746_DEBUG_SERIAL:-}" && -z "$found_f746_debug" ]]; then
+			missing+=("a live KFSW_F746_DEBUG_SERIAL character device")
+		fi
 		;;
 	board-can)
 		if [[ -n "$can_down" ]]; then
@@ -230,7 +268,7 @@ missing_for() {
 			missing+=("a CAN interface with a board on it")
 		fi
 		;;
-	radio) [[ -z "${found_radio:-$found_second_serial}" ]] && missing+=("a radio on a serial port") ;;
+	radio) [[ -z "$found_radio" ]] && missing+=("a live KFSW_RADIO_SERIAL character device assigned to a confirmed radio") ;;
 	esac
 
 	for item in ${missing[@]+"${missing[@]}"}; do
@@ -241,6 +279,7 @@ missing_for() {
 
 report() {
 	echo "PREFLIGHT: what this bench has"
+	echo "Device inventory only. Confirm wiring and firmware separately; no CSP link has been tested."
 	local host_tools="${CARGO_TARGET_DIR:-${KFSW_CSP_TOOLS_DIR:-$KFSW_WORKSPACE_ROOT/tools/kfsw-csp-tools}/target}/release"
 	for tool in csp-kiss csp-iperf; do
 		if [[ -x "$host_tools/$tool" ]]; then
@@ -262,7 +301,7 @@ report() {
 	printf '  %-22s %s\n' "FTDI UART" "${found_ftdi:-not found}"
 	# One cable, one board: the UART scenario for any other board says so and
 	# does not run.
-	printf '  %-22s %s\n' "FTDI wired to" "${KFSW_FTDI_BOARD:-nucleo_l496zg (set KFSW_FTDI_BOARD)}"
+	printf '  %-22s %s\n' "FTDI board setting" "${KFSW_FTDI_BOARD:-nucleo_l496zg (set KFSW_FTDI_BOARD)}"
 	printf '  %-22s %s\n' "second serial" "${found_second_serial:-not found}"
 	printf '  %-22s %s\n' "radio serial" "${found_radio:-not set; say which serial port it is}"
 	printf '  %-22s %s\n' "CAN interface" "${found_can:-${can_down:+$can_down (down)}}"
@@ -310,6 +349,7 @@ report() {
 signing_key="${KFSW_MCUBOOT_KEY:-$HOME/.config/kfsw/mcuboot-signing-key.pem}"
 
 discover_serial
+discover_probe
 discover_can
 discover_host
 

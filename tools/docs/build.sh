@@ -21,7 +21,7 @@ required_inputs=(
 	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw"
 	"$KFSW_WORKSPACE_ROOT/kfsw-comms/include/kfsw"
 	"$KFSW_WORKSPACE_ROOT/kfsw-modules/radio-uhf/include/kfsw"
-	"$KFSW_WORKSPACE_ROOT/kfsw-modules/boton-test/include/kfsw"
+	"$KFSW_WORKSPACE_ROOT/kfsw-modules/button-test/include/kfsw"
 )
 
 for input in "${required_inputs[@]}"; do
@@ -50,5 +50,17 @@ if [[ ! -s "$KFSW_DOCS_OUTPUT/html/index.html" ]]; then
 	echo "ERROR: Doxygen did not generate $KFSW_DOCS_OUTPUT/html/index.html"
 	exit 1
 fi
+
+# The reader's browser draws the diagrams. KFSW_MERMAID_JS names a local copy
+# of mermaid.min.js for a manual read offline; otherwise the pinned release is
+# fetched, and a reader without a network sees the diagram source instead.
+mermaid_script='<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" integrity="sha384-rbtjAdnIQE/aQJGEgXrVUlMibdfTSa4PQju4HDhN3sR2PmaKFzhEafuePsl9H/9I" crossorigin="anonymous"></script>'
+if [[ -n "${KFSW_MERMAID_JS:-}" ]]; then
+	cp -- "$KFSW_MERMAID_JS" "$KFSW_DOCS_OUTPUT/html/mermaid.min.js"
+	mermaid_script='<script src="mermaid.min.js"></script>'
+fi
+while IFS= read -r -d '' page; do
+	sed -i "s#</body>#$mermaid_script\n<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral' });</script>\n</body>#" "$page"
+done < <(grep -lZ 'class="mermaid"' "$KFSW_DOCS_OUTPUT"/html/*.html || true)
 
 echo "DOXYGEN RESULT: PASS"

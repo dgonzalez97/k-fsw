@@ -21,7 +21,7 @@ source "$KFSW_ROOT/k-fsw/tests/csp-version.sh"
 node1_executable="$KFSW_BUILD_DIR/zephyr/zephyr.exe"
 node2_build_dir="${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}/tests/linux-node2$csp_suffix"
 node2_executable="$node2_build_dir/zephyr/zephyr.exe"
-work_dir="$(mktemp -d /tmp/kfsw-csp-smoke.XXXXXX)"
+work_dir="$(mktemp -d "${TMPDIR:-/tmp}/kfsw-csp-smoke.XXXXXX")"
 node1_pid=""
 node2_pid=""
 bridge_pid=""
@@ -36,7 +36,7 @@ cleanup()
 
     wait 2>/dev/null || true
     exec 3>&- 4>&-
-    rm -rf "$work_dir"
+    [[ "${KFSW_KEEP_TEST_OUTPUT:-0}" == 1 ]] || rm -rf "$work_dir"
 }
 
 fail()
@@ -157,19 +157,24 @@ printf '%s\n' \
 	'csp ping 2' \
 	$'csp p\t 2' \
 	'csp ifstat 2 KISS' \
-	'param list 2' \
+	'param listall invalid' \
+	'param whichtables invalid' \
+	"param listall $((csp_broadcast + 1))" \
+	"param whichtables $((csp_broadcast + 1))" \
+	'param listall 2' \
 	'param get 2 test_u32' \
 	'param set 2 test_u32 1234' \
 	'param get 2 test_u32' \
 	$'pa\t g\t 2 test_u32' \
 	'param set 2 log_level 3' \
 	'param get 2 log_level' \
-	'param tables 2' \
+	'param whichtables 2' \
 	'param table 2 32' \
 	'param table 2 1' \
 	'param get 2 uid' \
 	'param get 2 csp_buf_free' \
 	'param get 2 log_level' \
+	'param get 2 node_id' \
 	'param set 2 log_level 5' \
 	'param get 2 log_level' \
 	'param get 2 missing' \
@@ -270,11 +275,20 @@ if grep -Fq "2:csp_buf_free = 0" "$work_dir/node1.log"; then
     fail "the remote buffer count read back as zero, so nothing sampled it"
 fi
 
-wait_for_output "$work_dir/node1.log" "2:log_level = 1" \
-	"$node1_pid" || fail "remote validation did not restore the compiled default"
+wait_for_output "$work_dir/node1.log" "param set: node 2 did not answer" \
+	"$node1_pid" || fail "invalid remote parameter write was not refused"
 wait_for_output "$work_dir/node1.log" \
     "get: parameter 'missing' not found" "$node1_pid" || \
     fail "invalid remote parameter was not rejected"
+# Readback must follow the rejection, rather than match an earlier valid value.
+if ! awk '
+    index($0, "2:node_id = 2") { checking = 1; next }
+    checking && index($0, "param set: node 2 did not answer") { rejected = 1 }
+    checking && rejected && index($0, "2:log_level = 3") { preserved = 1 }
+    END { exit !(checking && rejected && preserved) }
+' "$work_dir/node1.log"; then
+    fail "rejected remote write did not preserve the previous value"
+fi
 wait_for_output "$work_dir/node1.log" \
     "set: parameter 'node_id' is read-only" "$node1_pid" || \
     fail "remote read-only parameter write was not rejected"
@@ -289,6 +303,7 @@ wait_for_output "$work_dir/node1.log" \
 	"$node1_pid" || fail "FTP path traversal was not rejected"
 
 node1_expected=(
+    "CSP node must be in range 1..$csp_broadcast"
     "CSP ping 1: success"
     # Remote commands answer one field per line, after the node they came from.
     "node: 2"
@@ -316,8 +331,8 @@ node1_expected=(
     "1           0x00  node_id"
     "2:test_u32 = 42"
     "2:test_u32 = 1234"
-	"2:log_level = 5"
-	"2:log_level = 1"
+	"param set: node 2 did not answer"
+	"2:log_level = 3"
     '2:uid = "kfsw-2"'
     "get: parameter 'missing' not found"
     "set: parameter 'node_id' is read-only"

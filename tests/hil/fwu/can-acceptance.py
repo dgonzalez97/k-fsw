@@ -27,7 +27,7 @@ def soak(board, ground, seconds, output):
     board.run("hk period 0 1000", "every 1000 ms")
     board.run("hk period 1 1000", "every 1000 ms")
     board.run("hk beacon 0 16 5000")
-    ground.run("param list 2", "temp_valid")
+    ground.run("param listall 2", "temp_valid")
     ground.run("ftp generate /soak-source.bin 4096", ": PASS")
     board.run("hil start", "Timing started")
     deadline = time.monotonic() + seconds
@@ -74,16 +74,27 @@ def soak(board, ground, seconds, output):
         raise RuntimeError(str(errors))
 
 
+def boot_attempts_max(board):
+    """The limit a cut reset spends one of. Eight cuts outlast a budget of three."""
+    reply = board.run("golden attempts")
+    match = re.search(r"attempts left: \d+ of (\d+)", reply)
+    if match is None:
+        raise RuntimeError(f"No boot attempt budget on this image: {reply[:120]}")
+    return int(match[1])
+
+
 def interruptions(board, ground, image, output):
     revision = bench.remote_revision(ground)
     bench.read_slot(ground, 1, "/original.bin")
+    limit = boot_attempts_max(board)
     results = []
     for protocol in ("ftp", "lite"):
         for operation, count in (("erase", 1), ("erase", 80), ("write", 512), ("write", 65536)):
             board.run("mcuboot", "confirmed: 1")
+            board.run(f"golden attempts {limit}", f"attempts left: {limit} of {limit}")
             board.run(f"hil cut {operation} {count}", "Reset armed:")
             command = ("ftp put 2 /candidate.bin /firmware.bin" if protocol == "ftp"
-                       else f"fwu send 2 {image}")
+                       else f"fwu_lite send 2 {image}")
             reply = ground.run(command, timeout=600)
             board.wait_for("@HIL_CUT ", timeout=30)
             boot = board.wait_for("@READY ", timeout=60)
@@ -94,15 +105,18 @@ def interruptions(board, ground, image, output):
             board.run("mcuboot", "confirmed: 1")
             if bench.remote_revision(ground) != revision:
                 raise RuntimeError("Interrupted upload changed the running image")
+            spent = board.run("golden attempts")
+            if f"attempts left: {limit - 1} of {limit}" not in spent:
+                raise RuntimeError(f"Cut reset did not spend one attempt: {spent[:120]}")
             bench.read_slot(ground, 1, "/readback.bin")
             bench.compare(ground, "/original.bin", "/readback.bin")
             results.append({"protocol": protocol, "operation": operation, "after": count,
-                            "sender_recovered": ": PASS" in reply or "Image accepted and verified" in reply,
+                            "sender_recovered": ": PASS" in reply or "Upload complete" in reply,
                             "result": "PASS", "reset_marker": boot.splitlines()[0]})
             (output / "interruptions.json").write_text(json.dumps(results, indent=2))
             print(f"Reset test: {protocol} {operation} {count}: PASS", flush=True)
-    ground.run(f"fwu send 2 {image}", "Image accepted and verified", timeout=600)
-    board.run("fwu abort", timeout=60)
+    ground.run(f"fwu_lite send 2 {image}", "Upload complete", timeout=600)
+    ground.run("fwu_lite abort 2", "Owned transfer aborted", timeout=60)
     board.run("mcuboot", "confirmed: 1")
     bench.read_slot(ground, 1, "/readback.bin")
     bench.compare(ground, "/original.bin", "/readback.bin")

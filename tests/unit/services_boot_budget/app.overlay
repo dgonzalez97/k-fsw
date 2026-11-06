@@ -1,0 +1,24 @@
+/ {
+    chosen {
+        kfsw,storage-partition = &storage_partition;
+        kfsw,fwu-partition = &slot1_partition;
+        kfsw,golden-partition = &test_golden;
+        kfsw,boot-budget-partition = &test_budget;
+    };
+};
+&storage_partition {
+    reg = <0x000fc000 0x00040000>;
+};
+&flash0 {
+    write-block-size = <8>;
+    partitions {
+        test_golden: partition@180000 {
+            label = "test-golden";
+            reg = <0x00180000 0x1000>;
+        };
+        test_budget: partition@181000 {
+            label = "test-budget";
+            reg = <0x00181000 0x2000>;
+        };
+    };
+};

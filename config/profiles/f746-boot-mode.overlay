@@ -1,0 +1,43 @@
+/* Retention area the bootloader and the application share, so a node that has
+ * spent its boot attempts can ask MCUboot for permanent Golden on the next
+ * reset. MCUboot's firmware loader reads it through io_detect_boot_mode().
+ *
+ * The last 256 bytes of SRAM1 are taken out of sram0 rather than added beside
+ * it: a region the kernel still owns would be cleared on the way up, which is
+ * the one thing this area must survive.
+ */
+
+/ {
+	sram_retained: memory@2004ff00 {
+		compatible = "zephyr,memory-region", "mmio-sram";
+		reg = <0x2004ff00 0x100>;
+		ranges = <0x0 0x2004ff00 0x100>;
+		zephyr,memory-region = "RetainedMem";
+		status = "okay";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		retainedmem: retainedmem {
+			compatible = "zephyr,retained-ram";
+			status = "okay";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges;
+
+			boot_mode0: boot_mode@0 {
+				compatible = "zephyr,retention";
+				status = "okay";
+				reg = <0x0 0x1>;
+			};
+		};
+	};
+
+	chosen {
+		zephyr,boot-mode = &boot_mode0;
+	};
+};
+
+/* 256 KiB less the retained tail. */
+&sram0 {
+	reg = <0x20010000 0x3ff00>;
+};

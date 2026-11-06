@@ -25,3 +25,5 @@ zephyr_link_libraries(
     -Wl,--wrap=kfsw_ftp_link_receive
     -Wl,--wrap=kfsw_ftp_link_release
 )
+
+zephyr_link_libraries(-Wl,--wrap=flash_area_flatten)

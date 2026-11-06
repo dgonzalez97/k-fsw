@@ -19,7 +19,7 @@ import serial
 
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 FLIGHT = 2
-GROUND = 16
+GROUND = 17
 
 
 def require(text, expected):
@@ -181,11 +181,11 @@ def run_test(arguments, output):
         board = Console(port.fileno(), port.write, arguments.board_prompt, board_log)
         board.run("")
         board.run("fwu status", "target: bound")
-        board.run("csp routes", "16/14 -> CAN direct")
+        board.run("csp routes", f"{GROUND}/14 -> CAN direct")
         board.run("mcuboot", "confirmed: 1")
 
         process = subprocess.Popen([str(arguments.ground.resolve()),
-            "--uart_stdinout", "--device_id=16", "--no-color",
+            "--uart_stdinout", f"--device_id={GROUND}", "--no-color",
             f"--can-if={arguments.interface}", f"-flash={flash}",
         ], cwd=output, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, bufsize=0)
@@ -195,7 +195,7 @@ def run_test(arguments, output):
                          "kfsw-gnd-can# ", ground_log)
         ground.ready()
         ground.run("csp routes", "0/0 -> CAN direct")
-        ground.run("csp interfaces", "CAN addr=16/")
+        ground.run("csp interfaces", f"CAN addr={GROUND}/")
         board.run("csp interfaces", "CAN addr=2/")
         check_link(ground, board)
         original_revision = remote_revision(ground)
@@ -228,12 +228,13 @@ def run_test(arguments, output):
         compare(ground, "/before.bin", "/readback.bin")
 
         print("CAN FWU: FWU lite upload and readback", flush=True)
-        ground.run(f"fwu send {FLIGHT} {image}", "Image accepted and verified", timeout=600)
+        ground.run(f"fwu_lite send {FLIGHT} {image}", "Upload complete", timeout=600)
+        ground.run(f"fwu_lite validate {FLIGHT}", "Stored image verified", timeout=60)
         status = board.run("fwu status", "state: verified")
         require(status, "swap_scheduled: no")
         read_slot(ground, 2, "/readback.bin")
         compare(ground, "/candidate.bin", "/readback.bin")
-        ground.run(f"fwu flash {FLIGHT}", f"Node {FLIGHT} scheduled a swap")
+        ground.run(f"fwu_lite flash {FLIGHT}", f"Node {FLIGHT} image ready; swap scheduled: yes")
         board.reboot(arguments.reboot_pin)
         check_trial(ground, board, arguments.revision)
 
@@ -248,11 +249,11 @@ def run_test(arguments, output):
         compare(ground, "/before.bin", "/readback.bin")
         if arguments.stack_check:
             print("CAN FWU: PARAM read and stack margins", flush=True)
-            ground.run(f"param list {FLIGHT}", "param_requests_dropped", timeout=30)
+            ground.run(f"param listall {FLIGHT}", "param_requests_dropped", timeout=30)
             ground.run(f"param get {FLIGHT} param_requests_dropped", f"{FLIGHT}:param_requests_dropped = ")
             stacks = board.run("kernel thread stacks", "unused")
             (output / "stacks.txt").write_text(stacks)
-        ground.run("csp interfaces", "CAN addr=16/")
+        ground.run("csp interfaces", f"CAN addr={GROUND}/")
         board.run("csp interfaces", "CAN addr=2/")
 
     after = can_state(arguments.interface)

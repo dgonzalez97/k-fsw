@@ -6,6 +6,15 @@ KFSW_CI_DIR="$(dirname "$KFSW_ALL_TOOL")"
 KFSW_REPO_DIR="$(dirname "$(dirname "$KFSW_CI_DIR")")"
 KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
 
+suite=software
+if [[ $# -ne 0 ]]; then
+	if [[ $# -ne 2 || "$1" != --suite || ( "$2" != software && "$2" != board ) ]]; then
+		echo "Usage: $0 [--suite software|board]" >&2
+		exit 2
+	fi
+	suite="$2"
+fi
+
 cd "$KFSW_WORKSPACE_ROOT"
 
 # Only the environment, never a target: sourcing _common.sh here would export
@@ -15,16 +24,24 @@ if [[ -f "$KFSW_WORKSPACE_ROOT/.venv/bin/activate" ]]; then
 	source "$KFSW_WORKSPACE_ROOT/.venv/bin/activate"
 fi
 
+"$KFSW_REPO_DIR/tools/zephyr-patch.sh" --check
+"$KFSW_REPO_DIR/tests/zephyr-patch.sh"
 west manifest --validate
 "$KFSW_CI_DIR/build.sh"
 # Against the image build.sh just made, which carries no test fixtures. The
 # workflow checks this too; having it only there is how two releases went out
 # with a stale icd.md.
 "$KFSW_REPO_DIR/tools/docs/icd.py" --check
+python3 "$KFSW_CI_DIR/golden.py"
 "$KFSW_CI_DIR/quality.sh"
 "$KFSW_CI_DIR/unit.sh"
+"$KFSW_CI_DIR/coverage.sh"
 "$KFSW_CI_DIR/integration.sh"
 "$KFSW_CI_DIR/csp-v1.sh"
 "$KFSW_CI_DIR/valgrind.sh"
 "$KFSW_CI_DIR/robot.sh"
 "$KFSW_CI_DIR/docs.sh"
+
+if [[ "$suite" == board ]]; then
+	"$KFSW_CI_DIR/board.sh"
+fi

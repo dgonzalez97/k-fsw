@@ -115,6 +115,24 @@ static void apply_rdp_trace(const union kfsw_param_scalar *value)
 	(void)kfsw_csp_set_rdp_trace(value->u8);
 }
 
+/* The packet dump, under the same rule as the verbosity above. */
+static uint8_t csp_packet_trace;
+
+static void sample_packet_trace(void *value)
+{
+	*(uint8_t *)value = kfsw_csp_get_packet_trace() ? 1U : 0U;
+}
+
+static int validate_packet_trace(const union kfsw_param_scalar *value)
+{
+	return (value->u8 > 1U) ? -ERANGE : 0;
+}
+
+static void apply_packet_trace(const union kfsw_param_scalar *value)
+{
+	kfsw_csp_set_packet_trace(value->u8 != 0U);
+}
+
 /* libcsp's own error counters, sampled together. */
 static uint8_t csp_buffer_out;
 static uint8_t csp_conn_out;
@@ -330,6 +348,18 @@ static const struct kfsw_param_definition csp_param_definitions[] = {
 		.validate = validate_rdp_trace,
 		.changed = apply_rdp_trace,
 		.sample = sample_rdp_trace,
+	},
+	{
+		.offset = 0x1eU,
+		.type = KFSW_PARAM_U8,
+		.flags = KFSW_PARAM_FLAG_CONFIGURATION | KFSW_PARAM_FLAG_LIVE,
+		.name = "packet_trace",
+		.description = "Packet dump: 0 off, 1 on",
+		.value = &csp_packet_trace,
+		.default_value = {.u8 = 0U},
+		.validate = validate_packet_trace,
+		.changed = apply_packet_trace,
+		.sample = sample_packet_trace,
 	},
 	{
 		.offset = 0x20U,

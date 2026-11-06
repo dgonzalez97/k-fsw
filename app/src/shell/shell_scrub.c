@@ -119,11 +119,11 @@ static int cmd_scrub_learn(const struct shell *sh, size_t argc, char **argv)
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	scrub_commands,
-	SHELL_CMD_ARG(status, NULL, "Counters and what each region last reported.", cmd_scrub_status,
+	SHELL_CMD_ARG(status, NULL, "Counters and what each region last reported", cmd_scrub_status,
 		      1, 0),
-	SHELL_CMD_ARG(sweep, NULL, "Re-read every region, or one: sweep [slot0|slot1|golden].",
+	SHELL_CMD_ARG(sweep, NULL, "Re-read every region, or one: sweep [slot0|slot1|golden]",
 		      cmd_scrub_sweep, 1, 1),
-	SHELL_CMD_ARG(learn, NULL, "Take what is on flash now as the reference: learn <region>.",
+	SHELL_CMD_ARG(learn, NULL, "Take what is on flash now as the reference: learn <region>",
 		      cmd_scrub_learn, 2, 0),
 	SHELL_SUBCMD_SET_END);
 

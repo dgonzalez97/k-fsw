@@ -19,8 +19,8 @@
 #if CONFIG_KFSW_RADIO_UHF
 #include <kfsw/modules/radio_uhf.h>
 #endif
-#if CONFIG_KFSW_BOTON_TEST
-#include <kfsw/modules/boton_test.h>
+#if CONFIG_KFSW_BUTTON_TEST
+#include <kfsw/modules/button_test.h>
 #endif
 #if CONFIG_KFSW_TEMPERATURE_SENSOR_EXAMPLE
 #include <kfsw/modules/temperature_sensor_example.h>
@@ -59,6 +59,8 @@
 #endif
 #if CONFIG_KFSW_RESMON
 #include <kfsw/services/resmon.h>
+#endif
+#if CONFIG_KFSW_SCRUB
 #include <kfsw/services/scrub.h>
 #endif
 #if CONFIG_KFSW_LIMITS
@@ -107,9 +109,34 @@ int main(void)
 {
 	uint32_t startup_failures = 0;
 #if CONFIG_KFSW_STORAGE || CONFIG_KFSW_PARAM || CONFIG_KFSW_CSP || CONFIG_KFSW_RADIO_UHF ||        \
-	CONFIG_KFSW_BOTON_TEST || CONFIG_KFSW_COMMAND || CONFIG_KFSW_WATCHDOG ||                   \
+	CONFIG_KFSW_BUTTON_TEST || CONFIG_KFSW_COMMAND || CONFIG_KFSW_WATCHDOG ||                  \
 	CONFIG_KFSW_GNDWDT || CONFIG_KFSW_RESMON || CONFIG_BOOTLOADER_MCUBOOT
 	int result;
+#endif
+
+#if CONFIG_KFSW_WATCHDOG
+	/* Armed before the flash and filesystem work, where a fault would
+	 * otherwise stop the node for good: neither the boot budget nor the
+	 * ground watchdog can act on a core that has halted. The IWDG cannot be
+	 * retimed or stopped once started, so it is armed once, here, and the
+	 * keep-alive runs on the system workqueue above this thread and feeds
+	 * through a slow start-up on its own. */
+	result = kfsw_platform_watchdog_init();
+	if (result == -ENODEV) {
+		kfsw_log_info("No watchdog device bound; running unguarded");
+	} else if (result != 0) {
+		startup_failures++;
+		kfsw_log_error("Failed to initialize the watchdog: %d", result);
+	} else if (IS_ENABLED(CONFIG_KFSW_WATCHDOG_AUTO_START)) {
+		result = kfsw_platform_watchdog_start();
+		if (result != 0) {
+			startup_failures++;
+			kfsw_log_error("Failed to start the watchdog: %d", result);
+		} else {
+			kfsw_log_info("Watchdog armed with a %d ms timeout",
+				      CONFIG_KFSW_WATCHDOG_TIMEOUT_MS);
+		}
+	}
 #endif
 
 	kfsw_log_info("K-FSW application starting");
@@ -153,23 +180,6 @@ int main(void)
 	if (result != 0) {
 		startup_failures++;
 		kfsw_log_error("Could not confirm this image: %d", result);
-	}
-#endif
-
-#if CONFIG_KFSW_GOLDEN
-	/* Before anything else starts, because this image has already failed to
-	   stay up often enough. */
-	{
-		enum kfsw_golden_outcome recovery;
-
-		result = kfsw_golden_check(&recovery);
-		if (result != 0) {
-			startup_failures++;
-			kfsw_log_error("Recovery decision unavailable: %d", result);
-		} else if (recovery == KFSW_GOLDEN_INSTALLED) {
-			kfsw_log_warning("Restarting into the recovery image");
-			sys_reboot(SYS_REBOOT_COLD);
-		}
 	}
 #endif
 
@@ -242,8 +252,8 @@ int main(void)
 #if CONFIG_KFSW_RADIO_UHF
 		&kfsw_radio_uhf_param_definitions,
 #endif
-#if CONFIG_KFSW_BOTON_TEST
-		&kfsw_boton_test_param_definitions,
+#if CONFIG_KFSW_BUTTON_TEST
+		&kfsw_button_test_param_definitions,
 #endif
 #if CONFIG_KFSW_TEMPERATURE_SENSOR_EXAMPLE
 		&kfsw_temp_example_param_definitions,
@@ -299,13 +309,13 @@ int main(void)
 	}
 #endif
 
-#if CONFIG_KFSW_BOTON_TEST
-	result = kfsw_boton_test_init();
+#if CONFIG_KFSW_BUTTON_TEST
+	result = kfsw_button_test_init();
 	if (result != 0) {
 		startup_failures++;
-		kfsw_log_error("Failed to initialize boton_test: %d", result);
+		kfsw_log_error("Failed to initialize button_test: %d", result);
 	} else {
-		kfsw_log_info("boton_test initialized");
+		kfsw_log_info("button_test initialized");
 	}
 #endif
 
@@ -335,6 +345,9 @@ int main(void)
 #endif
 #if CONFIG_KFSW_GNDWDT
 		&kfsw_gndwdt_command_definitions,
+#endif
+#if CONFIG_KFSW_TEMPERATURE_SENSOR_EXAMPLE
+		&kfsw_temp_example_command_definitions,
 #endif
 	};
 
@@ -516,26 +529,6 @@ int main(void)
 			}
 		}
 #endif
-	}
-#endif
-
-#if CONFIG_KFSW_WATCHDOG
-	/* Armed last, so a slow start-up isn't reset before the shell is up. */
-	result = kfsw_platform_watchdog_init();
-	if (result == -ENODEV) {
-		kfsw_log_info("No watchdog device bound; running unguarded");
-	} else if (result != 0) {
-		startup_failures++;
-		kfsw_log_error("Failed to initialize the watchdog: %d", result);
-	} else if (IS_ENABLED(CONFIG_KFSW_WATCHDOG_AUTO_START)) {
-		result = kfsw_platform_watchdog_start();
-		if (result != 0) {
-			startup_failures++;
-			kfsw_log_error("Failed to start the watchdog: %d", result);
-		} else {
-			kfsw_log_info("Watchdog armed with a %d ms timeout",
-				      CONFIG_KFSW_WATCHDOG_TIMEOUT_MS);
-		}
 	}
 #endif
 

@@ -95,8 +95,8 @@ static int cmd_can_test(const struct shell *sh, size_t argc, char **argv)
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(can_commands,
-	SHELL_CMD_ARG(info, NULL, "Show the CSP CAN interface.", cmd_can_info, 1, 0),
-	SHELL_CMD_ARG(test, NULL, "Ping a node through CAN: test <node>.", cmd_can_test, 2, 0),
+	SHELL_CMD_ARG(info, NULL, "Show the CSP CAN interface", cmd_can_info, 1, 0),
+	SHELL_CMD_ARG(test, NULL, "Ping a node through CAN: test <node>", cmd_can_test, 2, 0),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_SUBCMD_ADD((comms), can, &can_commands, "CSP over CAN.", NULL, 1, 0);

@@ -15,6 +15,7 @@ Holybro CSP KISS Link Succeeds
     Skip If    not $HOLYBRO_RADIO    KGROUND_HOLYBRO_DEVICE is not configured
     ${result}=    Run Holybro CSP KISS Smoke
     HIL Command Should Pass    ${result}    HOLYBRO CSP/KISS RESULT: PASS
+    Should Contain    ${result.stdout}    HOLYBRO PARAM REFUSAL: PASS preserved=yes restored=yes
 
 Firmware Update Over The Radio Changes The Running Image
     [Documentation]    Uploads a second image over UHF and proves a different

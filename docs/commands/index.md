@@ -20,8 +20,13 @@ the wrong number of arguments prints its usage:
 ```text
 kfsw:~$ ftp generate
 generate: wrong parameter count
-generate - Create deterministic local data: generate <path> <bytes 0..32768>.
+generate - Create deterministic local data: generate <path> <bytes 0..32768>
 ```
+
+Required arguments use `<name>` and optional arguments use `[name]`. A
+subcommand that takes arguments ends its help with its usage; one that takes
+none says nothing further. For example, `ftp -h` includes
+`get <node> <remote> <local>` and `put <node> <local> <remote>`.
 
 ## Commands and build options
 
@@ -39,6 +44,7 @@ service:
 | `ftp` | `CONFIG_KFSW_FTP` |
 | `event` | `CONFIG_KFSW_EVENT` |
 | `journal` | `CONFIG_KFSW_JOURNAL` |
+| `cmd` | `CONFIG_KFSW_COMMAND` |
 | `reboot` | `CONFIG_KFSW_COMMAND` and `CONFIG_REBOOT` |
 | `hk` | `CONFIG_KFSW_HK` |
 | `fbo` | `CONFIG_KFSW_FBO` |
@@ -52,7 +58,51 @@ service:
 | `remexec` | `CONFIG_KFSW_REMEXEC` |
 | `comms uhf` | `CONFIG_KFSW_RADIO_UHF_SHELL` |
 | `temp` | `CONFIG_KFSW_TEMP_EXAMPLE_SHELL` |
-| `boton_test`, `test` | `CONFIG_KFSW_BOTON_TEST_SHELL` |
+| `button_test`, `test` | `CONFIG_KFSW_BUTTON_TEST_SHELL` |
+
+## Two registries
+
+`help` lists the shell. `cmd list` lists the command registry. They are
+different lists, and a name in one need not be in the other.
+
+A shell command is a Zephyr `SHELL_CMD_REGISTER` group: text in, text out,
+reachable from a terminal and from nowhere else. It exists only where
+`CONFIG_SHELL` is on, and the golden recovery profile builds without it,
+because the shell is a quarter of that image and an orbiting node cannot reach
+it anyway.
+
+A registered command is an entry in the command service: a name, a numeric ID,
+up to four typed arguments and a typed result. Its registry is a static array
+of `CONFIG_KFSW_COMMAND_MAX_COMMANDS` entries, fixed once startup ends, and a
+composition whose definition sets exceed that count fails startup with
+`-ENOSPC`.
+
+The registry is what everything other than a terminal calls:
+
+| Caller | Names the command |
+| --- | --- |
+| The ground, on CSP port 11 | by ID |
+| A shell group | by name, through `kfsw_shell_run_command()` |
+| File procedures and the time-tagged queue | by name, read from the file |
+| Limits, when a parameter crosses a bound | by name, from the limit |
+| The ground watchdog, on another node | by name |
+
+Each reaches the same definition and the same handler, and each invocation
+records a `COMMAND_INVOKED`, `COMMAND_UNKNOWN` or `COMMAND_REJECTED` event
+carrying the command ID and the source node. A shell group that calls a service
+API directly leaves none of that behind, so an action the ground or a procedure
+has to run belongs in the registry even when an operator reaches it by typing.
+
+`remexec` goes the other way round: it runs an allowlisted shell line on
+another node, on CSP port 8, and returns the text that line printed.
+
+`cmd` reads the registry and runs nothing:
+
+| Command | Prints |
+| --- | --- |
+| `cmd list` | Every command this node carries, with its ID and flags |
+| `cmd describe` | The same, with each argument type and the help |
+| `cmd show <name>` | One command |
 
 ## Identity and time
 
@@ -134,11 +184,11 @@ and `csp interfaces`.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `boton_test status` | none | Press count, last press and LED states |
+| `button_test status` | none | Press count, last press and LED states |
 | `test led` | `<green|blue|red> <on|off>` | Switch one LED |
 
 ```text
-kfsw:~$ boton_test status
+kfsw:~$ button_test status
 press_count: 0
 last_press_s: 0
 led_green: off
@@ -268,20 +318,22 @@ packets leave on USART3; don't connect the shell terminal to the CSP UART.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `param tables` | `[node]` | The tables a node carries, without values |
+| `param whichtables` | `[node]` | The tables a node carries, without values |
 | `param table` | `[node] <id>` | The parameters of one table, with values |
-| `param list` | `[node]` | Every parameter of a node, with values |
+| `param listall` | `[node]` | Every parameter of a node, with values |
 | `param get` | `[node] <name>` | Read a value |
 | `param set` | `[node] <name> <value>` | Write a value |
 
 Three views of the same parameters, from the widest to the most detailed:
-`tables` says which tables exist, `table` shows one, `list` shows them all. `layer` says which part of K-FSW defines the table, `kept` how many of its
-values are saved, and `holds` what is in it. Table names are not sent over the
-link, so for another node the names and descriptions come from this build,
-whose table numbers are the same.
+`whichtables` says which tables exist, `table` shows one, and `listall` shows
+every parameter. `layer` identifies the part of K-FSW that defines a table;
+`holds` describes its contents. Local output also includes `kept`, the number
+of persistent values. Remote table summaries carry their own names and
+descriptions. For older nodes without table-list support, names and descriptions
+come from this build by matching table IDs; an unknown table is named `-`.
 
 ```text
-kfsw:~$ param tables
+kfsw:~$ param whichtables
  id  layer    name          params  kept  holds
 ---  -------  ------------  ------  ----  -----
   1  core     board             11     0  Node identity and what the board carries
@@ -293,7 +345,7 @@ kfsw:~$ param tables
 ```
 
 ```text
-kfsw:~$ param list
+kfsw:~$ param listall
 table       addr  name                              type    mode  value
 ----------  ----  --------------------------------  ------  ----  -----
 board       0x00  node_id                           u16     r     1
@@ -309,7 +361,10 @@ Input is parsed with the parameter's type; overflow, negative unsigned values
 and bad numbers are rejected.
 
 `echo_enabled` makes the console repeat what it receives. It is off by
-default:
+default. On `native_sim`, run `param set echo_enabled 1` to enable interactive
+TAB completion and arrow-key command history. The same console behavior applies
+on boards. Zephyr ignores TAB and arrow-key escape sequences while echo is off;
+history and completion are already compiled in.
 
 ```text
 kfsw:~$ param set echo_enabled 1
@@ -480,6 +535,11 @@ is defined by that service and carries its ID in its own header.
 | 9 to 11 | `journal_stats`, `journal_tail`, `journal_time` | `k-fsw` composition |
 | 12 to 15 | free | |
 | 16 | `ground_wtd` | `kfsw-services`, `gndwdt.h` |
+| 17 to 19 | free | |
+| 20 to 23 | `fbo_run`, `fbo_sched_add`, `fbo_sched_cancel`, `fbo_sched_clear` | `kfsw-services`, `fbo.h` |
+| 24 | `golden_install` | `k-fsw` composition |
+| 40 to 43 | `gpredict_select`, `gpredict_enable`, `gpredict_park`, `gpredict_clear` | `kfsw-modules`, `gpredict.h` |
+| 64 | `temp_clear` | `kfsw-modules`, `temperature_sensor_example.h` |
 
 **CSP ports.** 0 is management (CMP) and 1 ping, both from libcsp. K-FSW
 serves 8 remote shell execution, 9 file transfer, 10 parameter values, 11
@@ -489,7 +549,7 @@ Kconfig option; see @ref communications.
 
 **Parameter tables.** 1 to 24 are core (1 `board`, 2 `system`, 3
 `telemetry`, 4 `csp`, 5 `storage`), 25 to 49 services (25 `log` through 38
-`remexec`, listed by `param tables`) and 50 to 99 modules (50 `radio-uhf`, 51
+`remexec`, listed by `param whichtables`) and 50 to 99 modules (50 `radio-uhf`, 51
 `temp_example`, 67 `hw_test`).
 
 **Node addresses.** Under CSP 2, the default, nodes are 1 to 16382 and 16383
@@ -508,7 +568,8 @@ other interfaces need their own access policy.
 ### Running another node's shell commands: `remexec`
 
 `remexec` reads which shell commands a node offers and runs one of them, on
-CSP port 8. It needs `CONFIG_KFSW_REMEXEC`, which the Linux image sets.
+CSP port 8. It needs `CONFIG_KFSW_REMEXEC`, which the Linux and NUCLEO L496
+images set.
 
 | Command | Meaning |
 | --- | --- |
@@ -601,16 +662,18 @@ data: 0002000001000ce9d363
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `hk define` | `[node] <report> [node:]table:offset ...` | Set what a report collects |
-| `hk clear` | `[node] <report>` | Delete a report |
+| `hk define` | `[node] <report> [class=N] <[node:]table:offset> ... [--retry]` | Set what a report collects |
+| `hk clear` | `[node] <report> [--retry]` | Delete a report |
 | `hk show` | none | Reports and counters |
 | `hk collect` | `<report>` | Collect now |
 | `hk get` | `<report> [count]` | Print collected samples |
-| `hk period` | `[node] <report> <ms>` | Collect periodically, 0 to stop |
+| `hk period` | `[node] <report> <ms> [--retry]` | Collect periodically, 0 to stop |
 | `hk store` | `<report> <ms>` | Also write samples to a file, 0 to stop |
 | `hk store_clear` | `<report>` | Stop storing and delete the file |
 | `hk beacon` | `<report> <node> <ms>` | Send the latest sample periodically, 0 to stop |
 | `hk save` | none | Save the report settings |
+
+`--retry` applies when a destination node is given.
 
 A leading node sets up that node's reports: `hk define 2 0 3:0 3:8` asks node 2
 to collect its own uptime and free storage as report 0. An entry always holds a

@@ -12,6 +12,7 @@ NUCLEO Reports Boot And Ready
     HIL Command Should Pass    ${result}    HIL RESULT: PASS
     Should Contain    ${result.stdout}    @BOOT
     Should Contain    ${result.stdout}    @READY
+    Should Contain    ${result.stdout}    watchdog armed before storage
 
 Hosted Image Reports Boot And Ready
     [Documentation]    Hosted LittleFS boot markers and table 32; no silicon reset evidence.

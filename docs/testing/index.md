@@ -8,7 +8,52 @@ Run the checks that cover the change. From the workspace root:
 ./k-fsw/tools/ci/integration.sh
 ```
 
-`tools/ci/all.sh` runs the software sequence. Individual entry points also cover
+Before a commit, run `./k-fsw/tools/ci/all.sh` from the workspace root.
+It defaults to `--suite software` and runs the software sequence, including
+FWU recovery guards and restart after Twister in `unit.sh`, and the synthetic
+F746 proof tests in `quality.sh`.
+
+Before a tag, prepare the bench and run:
+
+```bash
+./k-fsw/tools/ci/all.sh --suite board
+```
+
+This runs the software sequence first, then `tools/ci/board.sh`. The board
+stage can also run on its own. It selects Robot's `board`, `board-uart`,
+`board-can` and `radio` shapes with their existing tags and preflights, then
+runs the standalone watchdog, health, MCUboot rollback, Golden recovery,
+CAN limit and FRDM shell checks. Radio firmware update is already in Robot.
+These checks reflash boards, rewrite firmware slots or Golden, and reset
+nodes. Back up the bench first. Radio update takes tens of minutes; CAN
+acceptance adds a one-hour soak when enabled.
+
+Every unavailable case prints NOT RUN with its reason. The final board result
+names skipped shapes and individual Robot cases. Missing hardware and
+all-skipped shapes are never PASS. Missing hardware, case scripts or required
+tools do not fail the command; a case that executes and fails does. A zero exit with NOT RUN is incomplete
+bench coverage, and the tag notes must record it. Physical acceptance still
+needs human-observed evidence.
+
+CAN acceptance and encrypted radio run before the other cases overwrite their
+prepared baselines. For CAN acceptance, install and confirm the probes-enabled
+baseline described in `tests/hil/fwu/README.md`, set
+`KFSW_FWU_CAN_ACCEPTANCE_READY=1`, and supply `KFSW_FWU_CAN_GROUND`,
+`KFSW_FWU_CAN_IMAGE` and `KFSW_FWU_CAN_FLASH` (the ground flash containing
+`/candidate.bin`). The test resets interrupted secondary-slot erase/write.
+For encrypted radio, prepare the baseline in
+`tests/hil/radio-uhf/holybro/README.md`, set `KFSW_RADIO_CRYPTO_READY=1`, and
+supply `KFSW_RADIO_CRYPTO_GROUND` and `KFSW_RADIO_CRYPTO_KEY_FILE`.
+It leaves the encryption key configured. Both cases skip without those inputs.
+The usual preflight serial and CAN overrides still apply.
+
+The board stage also runs `tools/f746-proof.sh build` when the explicitly set
+`KFSW_MCUBOOT_KEY` names a readable file. Otherwise it prints NOT RUN. This is
+an offline build and artifact check, with no hardware IO. Button acceptance
+and the Pico shell smoke always print NOT RUN because they need a person;
+complete them separately in the bench gate in @ref development.
+
+Individual entry points also cover
 Robot, Valgrind, UBSan, coverage, @ref footprint, and Doxygen. Test output
 stays in the build directory.
 
@@ -40,6 +85,26 @@ For a focused native suite:
 
 ```bash
 ./k-fsw/tools/ci/unit.sh -s kfsw.services.fwu
+```
+
+### Both native widths
+
+Twister runs `native_sim/native/64` and the 32-bit `native_sim/native`. A suite
+that builds on both is worth more than one that builds on either: the two
+differ in pointer width, type alignment and structure padding, which is where
+a vendored library's assumptions show up.
+
+`kfsw.services.param_replies` links the vendored libparam, whose `param_list.c`
+derives the record stride from `__alignof__(param_t)` and asserts it is 8.
+`param_t` leads with a `uint64_t`, 8-aligned on x86-64 and 4-aligned under
+`-m32`, so the suite failed to compile on the 32-bit target until the fork
+pinned in `west.yml` set `_Alignas(8)` on that member. Anything else linking
+libparam on a 32-bit target depended on the same fix.
+
+Run one suite on one width with `-p`:
+
+```bash
+./k-fsw/tools/ci/unit.sh -s kfsw.services.param_replies -p native_sim/native
 ```
 
 ## Analysis

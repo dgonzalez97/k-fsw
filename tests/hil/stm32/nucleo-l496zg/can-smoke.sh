@@ -16,7 +16,7 @@ set -a; . "$here/can-bench.env"; set +a
 interface="${KFSW_CAN_INTERFACE:-can0}"
 bitrate="${KFSW_CAN_BITRATE:-500000}"
 flight="${KFSW_CAN_FLIGHT_NODE:-2}"
-ground="${KFSW_CAN_GROUND_NODE:-16}"
+ground="${KFSW_CAN_GROUND_NODE:-17}"
 
 fail() { echo "CAN SMOKE RESULT: FAIL - $*"; exit 1; }
 skip() { echo "CAN SMOKE RESULT: NOT RUN - $*"; exit 0; }

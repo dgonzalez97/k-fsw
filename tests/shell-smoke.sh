@@ -1,16 +1,22 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+source "$(dirname "$0")/csp-version.sh"
+build_dir_override="${KFSW_BUILD_DIR:-}"
 source "$(dirname "$0")/../tools/_common.sh" linux
 
+if [[ -z "$build_dir_override" && -n "$csp_suffix" ]]; then
+    KFSW_BUILD_DIR="${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}/linux$csp_suffix"
+fi
+
 executable="$KFSW_BUILD_DIR/zephyr/zephyr.exe"
-work_dir="$(mktemp -d /tmp/kfsw-shell-smoke.XXXXXX)"
+work_dir="$(mktemp -d "${TMPDIR:-/tmp}/kfsw-shell-smoke.XXXXXX")"
 capture_file="$work_dir/output.log"
 flash_image="$work_dir/flash.bin"
 
 cleanup()
 {
-	rm -rf -- "$work_dir"
+	[[ "${KFSW_KEEP_TEST_OUTPUT:-0}" == 1 ]] || rm -rf -- "$work_dir"
 }
 
 trap cleanup EXIT
@@ -28,21 +34,47 @@ fi
 	printf 'pa\t g\t test_u32\n'
 	# Two matches: Tab lists them one per line with their help.
 	printf 'st\t\n'
+	printf 'param \t\025\n'
+	printf 'param li\t -h\n'
+	printf 'param wh\t -h\n'
+	printf 'ftp \t\025\n'
 	printf '%s\n' \
 		'help' \
 		'status' \
+		$'\033[A' \
 		'time' \
 		'version' \
 		'resmon show' \
 		'comms uart info' \
-		'param tables' \
+		'param -h' \
+		'param save -h' \
+		'param whichtables' \
 		'param get uid' \
 		'param set route_table "9/9 KISS"' \
 		'csp routes' \
+		'csp rdp 2' \
+		'csp rdp 256' \
+		'csp rdp' \
+		'csp rdp 258' \
+		'csp rdp' \
+		'csp rdp 3' \
+		'csp rdp' \
+		'csp rdp -18446744073709551615' \
+		'csp rdp' \
+		'csp rdp 184467440737095516160' \
+		'csp rdp' \
+		'csp rdp bogus' \
+		'csp rdp' \
+		'csp rdp " -18446744073709551615"' \
+		'csp rdp' \
+		'csp rdp ""' \
+		'csp rdp' \
+		'csp rdp 1' \
+		'csp rdp 0' \
 		'csp ping' \
 		'param set route_table bad-table' \
 		'param get route_table' \
-		'param list' \
+		'param listall' \
 		'param get test_u32' \
 		'param set test_u32 1234' \
 		'param get test_u32' \
@@ -56,7 +88,9 @@ fi
 		'param clear' \
 		'storage info' \
 		'storage test' \
-		'ftp' \
+		'ftp -h' \
+		'csp -h' \
+		'hk -h' \
 		'ftp generate' \
 		'ftp mkdir /selfnode' \
 		'ftp ls /' \
@@ -72,7 +106,12 @@ fi
 cat "$capture_file"
 
 expected_output=(
-	"  status   : Show status, here or on a node: status [node]."
+	'Every parameter of a node, with its value: listall [node]'
+	'The tables a node carries, without values: whichtables [node]'
+	'Save persistent parameters to storage'
+	'param listall  -h'
+	'param whichtables  -h'
+	"  status   : Show status, here or on a node: status [node]"
 	"  storage  : Filesystem storage commands."
     '@BOOT '
     '@READY '
@@ -84,9 +123,9 @@ expected_output=(
 	'csp      : CSP commands.'
 	'ftp      : File transfer. Without a node, this node.'
 	'param    : Parameter commands.'
-	'status   : Show status, here or on a node: status [node].'
+	'status   : Show status, here or on a node: status [node]'
 	'storage  : Filesystem storage commands.'
-	'version  : Show build information.'
+	'version  : Show build information: version'
     'K-FSW status'
     'revisions:'
     '  kfsw-libcsp: '
@@ -138,7 +177,7 @@ expected_output=(
     "set: parameter 'route_table' is read-only"
     'route_table = "0/0 KISS"'
     '0/0 -> KISS direct'
-    '1/14 -> LOOP direct'
+    "1/$csp_host_bits -> LOOP direct"
     'CSP ping 1: success'
     'rtt_ms: '
 	'Parameter snapshot save: PASS'
@@ -152,9 +191,14 @@ expected_output=(
 	'ready: yes'
 	'total_bytes: '
 	'Storage test: PASS'
-	'  mkdir     : Create a directory: mkdir [node] <path>.'
+	'  mkdir     : Create a directory'
+	'Download from a remote node: get <node> <remote> <local>'
+	'Upload to a remote node: put <node> <local> <remote>'
+	'Identify a node, or this one when no node is given: ident [node]'
+	'Ping a node, or this one when no node is given: ping [node]'
+	'Forget a report: clear [node] <report> [--retry]'
+	'generate - Create deterministic local data: generate <path> <bytes 0..32768>'
 	'generate: wrong parameter count'
-	'generate - Create deterministic local data: generate <path> <bytes 0..32768>.'
 	'FTP mkdir 1 /selfnode: PASS'
 	# The firmware slots and the RAM volume show in a listing of the root.
 	'dir           0 boot'
@@ -171,6 +215,16 @@ expected_output=(
     '[INFO] K-FSW shell log test: info'
 )
 
+if [[ $(grep -Fc 'CSP RDP trace: 2' "$capture_file") -ne 9 ||
+      $(grep -Fc 'level is 0 off, 1 errors, 2 with the protocol' "$capture_file") -ne 8 ]]; then
+    echo "SHELL RESULT: FAIL"
+    echo "  rejected RDP level changed the trace or was accepted"
+    exit 1
+fi
+for level in 0 1; do
+    grep -Fq "CSP RDP trace: $level" "$capture_file" || exit 1
+done
+
 for expected in "${expected_output[@]}"; do
     if ! grep -Fq "$expected" "$capture_file"; then
         echo "SHELL RESULT: FAIL"
@@ -178,6 +232,19 @@ for expected in "${expected_output[@]}"; do
         exit 1
     fi
 done
+
+if [[ $(grep -Fc 'K-FSW status' "$capture_file") -ne 2 ]]; then
+    echo "SHELL RESULT: FAIL"
+    echo "  arrow-up did not recall status exactly once"
+    exit 1
+fi
+
+# Both Tab and -h must show the transfer argument order.
+if [[ $(grep -Fc 'Download from a remote node: get <node> <remote> <local>' "$capture_file") -lt 2 ]]; then
+    echo "SHELL RESULT: FAIL"
+    echo "  FTP argument hints missing from Tab or help"
+    exit 1
+fi
 
 # The version comes from the build, so only check that one is printed.
 if ! grep -Eq '^K-FSW: .+' "$capture_file"; then
@@ -191,5 +258,35 @@ if grep -Eq '^  kfsw +:' "$capture_file"; then
 	echo "  kfsw must be a prompt, not a root command"
 	exit 1
 fi
+
+# Run rejected commands separately so valid listings cannot mask a dispatch error.
+negative_commands=(
+    'param list'
+    'param tables'
+    'param listall 1 extra'
+    'param whichtables 1 extra'
+    'param listall invalid'
+    'param whichtables invalid'
+    'param listall 16384'
+    'param whichtables 16384'
+)
+for index in "${!negative_commands[@]}"; do
+    command="${negative_commands[$index]}"
+    negative_capture="$work_dir/negative-$index.log"
+    printf '%s\n' "$command" |
+        "$executable" --uart_stdinout --stop_at=1.0 --no-color \
+            -flash="$work_dir/negative-flash.bin" >"$negative_capture" 2>&1
+    case "$index" in
+        0|1) expected='Parameter commands.' ;;
+        2|3) expected='wrong parameter count' ;;
+        *) expected="CSP node must be in range 1..$csp_broadcast" ;;
+    esac
+    if ! grep -Fq "$expected" "$negative_capture" ||
+        grep -Eq '0x00  node_id|core +board|parameter list failed|did not answer' "$negative_capture"; then
+        echo "SHELL RESULT: FAIL: unexpected response to $command"
+        cat "$negative_capture"
+        exit 1
+    fi
+done
 
 echo "SHELL RESULT: PASS"

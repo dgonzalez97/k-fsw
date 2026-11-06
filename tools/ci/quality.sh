@@ -8,6 +8,16 @@ KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
 
 clang_format=""
 
+bash "$KFSW_REPO_DIR/tests/build-options-test.sh"
+python3 "$KFSW_REPO_DIR/tests/ci-suite-test.py"
+
+quality_python="$KFSW_WORKSPACE_ROOT/.venv/bin/python"
+[[ -x "$quality_python" ]] || quality_python=python3
+echo "QUALITY: F746 offline proof tests"
+started=$SECONDS
+"$quality_python" "$KFSW_REPO_DIR/tests/f746-proof-test.py"
+echo "QUALITY: F746 offline proof tests added $((SECONDS - started))s"
+
 if [[ -x "$KFSW_WORKSPACE_ROOT/.venv/bin/clang-format" ]]; then
 	clang_format="$KFSW_WORKSPACE_ROOT/.venv/bin/clang-format"
 elif command -v clang-format >/dev/null 2>&1; then
@@ -27,66 +37,15 @@ format_roots+=("$KFSW_REPO_DIR/tests/hil/fwu")
 	format_roots+=("$KFSW_REPO_DIR/tests/hil/radio-uhf/holybro/raw-peer/src")
 [[ -d "$KFSW_WORKSPACE_ROOT/kfsw-modules" ]] && \
 	format_roots+=("$KFSW_WORKSPACE_ROOT/kfsw-modules")
+for library in kfsw-platform kfsw-services kfsw-comms; do
+	format_roots+=("$KFSW_WORKSPACE_ROOT/$library/include" "$KFSW_WORKSPACE_ROOT/$library/src")
+done
 
 mapfile -d '' format_sources < <(
 	find "${format_roots[@]}" \
 		-type f \( -name '*.c' -o -name '*.h' \) \
 		! -path '*/third_party/*' \
 		-print0 | sort -z
-)
-
-format_sources+=(
-	"$KFSW_WORKSPACE_ROOT/kfsw-platform/include/kfsw/platform/storage.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-platform/src/storage.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-platform/include/kfsw/platform/watchdog.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-platform/src/watchdog.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/health.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/health/health.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/log.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/parameter.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/ftp.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command/command.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command/command_csp.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command/command_internal.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command/command_protocol.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command/command_retry.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/command/command_retry.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/fbo/fbo.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/fbo/fbo_clock.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/fbo/fbo_internal.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/journal.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/journal/journal.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/journal/journal_store.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/journal/journal_store.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/command.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/event.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/event/event.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp/ftp_client.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp/ftp_internal.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp/ftp_link.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp/ftp_link_csp.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp/ftp_protocol.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp/ftp_server.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp/ftp_store.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/ftp/ftp_transfer.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/log.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/log_history.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/log_remote.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/log_remote.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/log_history_internal.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/log_history.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/libparam_print.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/libparam_print.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/parameter.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/parameter_csp.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/parameter_internal.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/parameter/parameter_persistence.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/scrub.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/scrub/scrub.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/scrub-parameters/scrub_table.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/include/kfsw/services/limits.h"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/limits/limits.c"
-	"$KFSW_WORKSPACE_ROOT/kfsw-services/src/limits-parameters/limits_table.c"
 )
 
 echo "QUALITY: clang-format (${#format_sources[@]} files)"
@@ -173,10 +132,10 @@ cppcheck \
 	-DCONFIG_KFSW_PARAM=1 \
 	-DCONFIG_KFSW_PARAM_CSP=1 \
 	-DCONFIG_KFSW_PARAM_PERSISTENCE=1 \
-	-DCONFIG_KFSW_BOTON_TEST=1 \
-	-DCONFIG_KFSW_BOTON_TEST_GPIO=1 \
-	-DCONFIG_KFSW_BOTON_TEST_DEBOUNCE_MS=30 \
-	-DCONFIG_KFSW_BOTON_TEST_SHELL=1 \
+	-DCONFIG_KFSW_BUTTON_TEST=1 \
+	-DCONFIG_KFSW_BUTTON_TEST_GPIO=1 \
+	-DCONFIG_KFSW_BUTTON_TEST_DEBOUNCE_MS=30 \
+	-DCONFIG_KFSW_BUTTON_TEST_SHELL=1 \
 	-DCONFIG_KFSW_GPREDICT=1 \
 	-DCONFIG_KFSW_GPREDICT_GRACE_MS=5000 \
 	-DCONFIG_KFSW_GPREDICT_PARK_AZIMUTH_DEG=0 \

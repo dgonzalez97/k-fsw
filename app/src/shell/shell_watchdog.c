@@ -98,10 +98,10 @@ static int cmd_watchdog_starve(const struct shell *sh, size_t argc, char **argv)
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	watchdog_commands,
-	SHELL_CMD_ARG(feed, NULL, "Feed the watchdog once.", cmd_watchdog_feed, 1, 0),
-	SHELL_CMD_ARG(starve, NULL, "Stop feeding so the board resets: starve confirm.",
+	SHELL_CMD_ARG(feed, NULL, "Feed the watchdog once", cmd_watchdog_feed, 1, 0),
+	SHELL_CMD_ARG(starve, NULL, "Stop feeding so the board resets: starve confirm",
 		      cmd_watchdog_starve, 1, 1),
-	SHELL_CMD_ARG(status, NULL, "Show watchdog configuration and activity.",
+	SHELL_CMD_ARG(status, NULL, "Show watchdog configuration and activity",
 		      cmd_watchdog_status, 1, 0),
 	SHELL_SUBCMD_SET_END);
 

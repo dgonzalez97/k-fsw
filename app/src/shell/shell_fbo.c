@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include <zephyr/shell/shell.h>
+#include <zephyr/shell/shell_string_conv.h>
 #include <zephyr/sys/util.h>
 
 #include <kfsw/services/command.h>
@@ -52,12 +53,12 @@ static int cmd_fbo_sched_add(const struct shell *sh, size_t argc, char **argv)
 {
 	struct kfsw_command_arg args[3];
 	unsigned long node;
-	char *end;
+	int parse_error = 0;
 
 	ARG_UNUSED(argc);
 
-	node = strtoul(argv[2], &end, 10);
-	if ((*end != '\0') || (node > UINT16_MAX)) {
+	node = shell_strtoul(argv[2], 10, &parse_error);
+	if ((parse_error != 0) || (node > UINT16_MAX)) {
 		shell_error(sh, "node must be a number, 0 for this one");
 		return -EINVAL;
 	}
@@ -74,12 +75,12 @@ static int cmd_fbo_sched_cancel(const struct shell *sh, size_t argc, char **argv
 {
 	struct kfsw_command_arg args[1];
 	unsigned long index;
-	char *end;
+	int parse_error = 0;
 
 	ARG_UNUSED(argc);
 
-	index = strtoul(argv[1], &end, 10);
-	if ((*end != '\0') || (index > UINT16_MAX)) {
+	index = shell_strtoul(argv[1], 10, &parse_error);
+	if ((parse_error != 0) || (index > UINT16_MAX)) {
 		shell_error(sh, "index must be a number");
 		return -EINVAL;
 	}
@@ -218,23 +219,23 @@ static int cmd_fbo_status(const struct shell *sh, size_t argc, char **argv)
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	fbo_sched_commands,
-	SHELL_CMD_ARG(add, NULL, "Release a command later: add <+s|@utc> <node> \"<command>\".",
+	SHELL_CMD_ARG(add, NULL, "Release a command later: add <+s|@utc> <node> \"<command>\"",
 		      cmd_fbo_sched_add, 4, 0),
-	SHELL_CMD_ARG(cancel, NULL, "Cancel a scheduled entry: cancel <index>.",
+	SHELL_CMD_ARG(cancel, NULL, "Cancel a scheduled entry: cancel <index>",
 		      cmd_fbo_sched_cancel, 2, 0),
-	SHELL_CMD_ARG(clear, NULL, "Empty the queue; a release in flight finishes.",
+	SHELL_CMD_ARG(clear, NULL, "Empty the queue; a release in flight finishes",
 		      cmd_fbo_sched_clear, 1, 0),
-	SHELL_CMD_ARG(list, NULL, "Show every queued entry.", cmd_fbo_sched_list, 1, 0),
-	SHELL_CMD_ARG(status, NULL, "Show the queue counters.", cmd_fbo_sched_status, 1, 0),
+	SHELL_CMD_ARG(list, NULL, "Show every queued entry", cmd_fbo_sched_list, 1, 0),
+	SHELL_CMD_ARG(status, NULL, "Show the queue counters", cmd_fbo_sched_status, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	fbo_commands,
 	SHELL_CMD(sched, &fbo_sched_commands, "Time-tagged queue: release a command later.",
 		  NULL),
-	SHELL_CMD_ARG(run, NULL, "Carry out a procedure: run <name>.", cmd_fbo_run, 2, 0),
-	SHELL_CMD_ARG(stop, NULL, "Ask the running procedure to stop.", cmd_fbo_stop, 1, 0),
-	SHELL_CMD_ARG(status, NULL, "Show what a procedure has done.", cmd_fbo_status, 1, 0),
+	SHELL_CMD_ARG(run, NULL, "Carry out a procedure: run <name>", cmd_fbo_run, 2, 0),
+	SHELL_CMD_ARG(stop, NULL, "Ask the running procedure to stop", cmd_fbo_stop, 1, 0),
+	SHELL_CMD_ARG(status, NULL, "Show what a procedure has done", cmd_fbo_status, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(fbo, &fbo_commands, "File based operations: run a sequence from a file.", NULL);

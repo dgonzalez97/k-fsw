@@ -114,7 +114,7 @@ def tests(ground, flight, bridge, key, reboot):
     for repeat in range(3):
         ground.run("csp ping 2", "CSP ping 2: success")
         flight.run("csp ping 17", "CSP ping 17: success")
-    ground.run("param list 2", "uhf_replays", timeout=60)
+    ground.run("param listall 2", "uhf_replays", timeout=60)
     ground.run("param get 2 uhf_key_hex", 'uhf_key_hex = ""')
     result = ground.run("param set 2 uhf_encrypt_enable 0", timeout=30)
     if "failed" not in result.lower() and "error" not in result.lower():

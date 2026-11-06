@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+KFSW_BUTTON_TEST_TOOL="$(readlink -f "${BASH_SOURCE[0]}")"
+KFSW_TESTS_DIR="$(dirname "$KFSW_BUTTON_TEST_TOOL")"
+KFSW_REPO_DIR="$(dirname "$KFSW_TESTS_DIR")"
+KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
+disabled_build_dir="${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/tests/button-test-disabled"
+enabled_build_dir="${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/tests/button-test-enabled"
+work_dir="$(mktemp -d /tmp/kfsw-button-test.XXXXXX)"
+disabled_log="$work_dir/disabled.log"
+enabled_log="$work_dir/enabled.log"
+
+cleanup()
+{
+	rm -rf -- "$work_dir"
+}
+
+fail()
+{
+	echo "BUTTON TEST RESULT: FAIL"
+	echo "  $1"
+
+	for log_file in "$disabled_log" "$enabled_log"; do
+		if [[ -s "$log_file" ]]; then
+			echo "--- $(basename "$log_file") ---"
+			cat "$log_file"
+		fi
+	done
+	exit 1
+}
+
+expect()
+{
+	local log_file="$1"
+	local expected="$2"
+	local message="$3"
+
+	grep -Fq "$expected" "$log_file" || fail "$message"
+}
+
+run_image()
+{
+	local executable="$1"
+	local flash_image="$2"
+	local output_log="$3"
+
+	printf '%s\n' \
+		'param whichtables' \
+		'param listall' \
+		'param get press_count' \
+		'param get last_press_s' \
+		'param get led_green' \
+		'param get led_blue' \
+		'param get led_red' \
+		'param set press_count 100' \
+		'param set last_press_s 100' \
+		'test led green on' \
+		'param get led_green' \
+		'test led green off' \
+		'param get led_green' \
+		'test led blue on' \
+		'param get led_blue' \
+		'test led blue off' \
+		'param get led_blue' \
+		'test led red on' \
+		'param get led_red' \
+		'test led red off' \
+		'param get led_red' \
+		'test led purple on' \
+		'test led red blink' \
+		'param set led_green 1' \
+		'param get led_green' \
+		'param set led_green 2' \
+		'param get led_green' \
+		'param set led_green 0' \
+		'param get press_count' \
+		'param get last_press_s' \
+		'param get led_green' |
+		"$executable" --uart_stdinout --stop_at=2.0 --no-color \
+			-flash="$flash_image" -flash_erase -flash_rm \
+			>"$output_log" 2>&1
+}
+
+trap cleanup EXIT
+
+KFSW_BUILD_DIR="$disabled_build_dir" \
+	KFSW_PRISTINE=always \
+	"$KFSW_REPO_DIR/tools/build.sh" linux
+
+if grep -q '^CONFIG_KFSW_BUTTON_TEST=' "$disabled_build_dir/zephyr/.config"; then
+	fail "the default Linux composition enabled button_test"
+fi
+
+run_image "$disabled_build_dir/zephyr/zephyr.exe" \
+	"$work_dir/disabled-flash.bin" "$disabled_log"
+
+expect "$disabled_log" \
+	"get: parameter 'press_count' not found" \
+	"the disabled composition unexpectedly exposed press_count"
+expect "$disabled_log" \
+	"get: parameter 'last_press_s' not found" \
+	"the disabled composition unexpectedly exposed last_press_s"
+# One row per parameter: table, offset, name. Without the module there is no
+# table.
+if grep -Eq '^hw_test +0x[0-9a-f]{2} ' "$disabled_log"; then
+	fail "the disabled parameter list contains the hw_test table"
+fi
+# Match the row in the module's table; the names have no prefix.
+if grep -Eq '^hw_test +0x[0-9a-f]{2} +(press_count|last_press_s|led_)' "$disabled_log"; then
+	fail "the disabled parameter list contains module definitions"
+fi
+if grep -Eq '^ *67 +module' "$disabled_log"; then
+	fail "the disabled composition registered table 67"
+fi
+
+KFSW_BUILD_DIR="$enabled_build_dir" \
+	KFSW_EXTRA_CONF_FILE="$KFSW_TESTS_DIR/config/button-test-linux.conf" \
+	KFSW_PRISTINE=always \
+	"$KFSW_REPO_DIR/tools/build.sh" linux
+
+grep -qx 'CONFIG_KFSW_BUTTON_TEST=y' "$enabled_build_dir/zephyr/.config" || \
+	fail "the test composition did not enable button_test"
+if grep -q '^CONFIG_KFSW_BUTTON_TEST_GPIO=' "$enabled_build_dir/zephyr/.config"; then
+	fail "the software composition enabled physical GPIO handling"
+fi
+if grep -q '^CONFIG_KFSW_BUTTON_TEST_LED_GPIO=' "$enabled_build_dir/zephyr/.config"; then
+	fail "the software composition enabled physical LED handling"
+fi
+
+run_image "$enabled_build_dir/zephyr/zephyr.exe" \
+	"$work_dir/enabled-flash.bin" "$enabled_log"
+
+expect "$enabled_log" 'button_test initialized' \
+	"the enabled module did not initialize"
+# Table, offset, name, type and mode, so a wrong write mode shows up here.
+if ! grep -Eq '^hw_test +0x00 +press_count +u32 +r ' "$enabled_log"; then
+	fail "the enabled parameter list omitted read-only press_count at table 67 offset 0"
+fi
+if ! grep -Eq '^hw_test +0x04 +last_press_s +u32 +r ' "$enabled_log"; then
+	fail "the enabled parameter list omitted read-only last_press_s at table 67 offset 4"
+fi
+for led in green blue red; do
+	if ! grep -Eq "^hw_test +0x0[89a] +led_${led} +u8 +w " "$enabled_log"; then
+		fail "the enabled parameter list omitted writable ${led} LED state"
+	fi
+done
+# The module table is in the module band.
+if ! grep -Eq '^ *67 +module +hw_test +' "$enabled_log"; then
+	fail "hw_test was not registered as table 67 in the module band"
+fi
+expect "$enabled_log" 'press_count = 0' \
+	"the live press_count did not start at zero"
+expect "$enabled_log" 'last_press_s = 0' \
+	"the live last_press_s did not start at zero"
+expect "$enabled_log" 'led_green = 0' \
+	"the green LED state did not start off"
+expect "$enabled_log" 'led_blue = 0' \
+	"the blue LED state did not start off"
+expect "$enabled_log" 'led_red = 0' \
+	"the red LED state did not start off"
+expect "$enabled_log" \
+	"set: parameter 'press_count' is read-only or service is not ready" \
+	"press_count was not read-only"
+expect "$enabled_log" \
+	"set: parameter 'last_press_s' is read-only or service is not ready" \
+	"last_press_s was not read-only"
+for led in green blue red; do
+	expect "$enabled_log" "${led}: on" "the ${led} shell command did not turn on"
+	expect "$enabled_log" "${led}: off" "the ${led} shell command did not turn off"
+	expect "$enabled_log" "led_${led} = 1" \
+		"the ${led} shell command did not update PARAM state"
+done
+expect "$enabled_log" 'unknown LED colour: purple' \
+	"an invalid LED colour was not rejected"
+expect "$enabled_log" 'LED state must be on or off' \
+	"an invalid LED operation was not rejected"
+expect "$enabled_log" "set: parameter 'led_green' failed (-34)" \
+	"an invalid LED boolean was not rejected"
+
+if [[ "$(grep -Fc 'press_count = 0' "$enabled_log")" -lt 2 ]]; then
+	fail "the rejected press_count write changed the module state"
+fi
+if [[ "$(grep -Fc 'last_press_s = 0' "$enabled_log")" -lt 2 ]]; then
+	fail "the rejected last_press_s write changed the module state"
+fi
+if [[ "$(grep -Fc 'led_green = 1' "$enabled_log")" -lt 3 ]]; then
+	fail "the invalid green LED write changed the module state"
+fi
+
+cat "$disabled_log"
+cat "$enabled_log"
+echo "BUTTON TEST RESULT: PASS"

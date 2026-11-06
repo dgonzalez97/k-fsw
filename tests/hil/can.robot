@@ -37,7 +37,7 @@ CSP Reaches A Node Over A Virtual CAN Bus
     Should Be Equal As Integers    ${result.rc}    0    msg=${result.stdout}
     Should Contain    ${result.stdout}    CAN RESULT: PASS
     Response Should Contain    ${result.stdout}    CSP ping 2: success
-    Response Should Contain    ${result.stdout}    CSP ping 16: success
+    Response Should Contain    ${result.stdout}    CSP ping 17: success
     Response Should Contain    ${result.stdout}    2:node_id = 2
     Response Should Contain    ${result.stdout}    last_can_error=0 (none)
 

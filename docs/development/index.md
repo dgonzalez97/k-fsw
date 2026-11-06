@@ -16,6 +16,7 @@ git -C k-fsw pull --ff-only
 . .venv/bin/activate
 west manifest --validate
 west update
+./k-fsw/tools/zephyr-patch.sh
 ```
 
 Dependencies normally end up detached at their manifest SHA. Create a branch
@@ -45,16 +46,23 @@ git config user.name
 git config user.email
 ```
 
-Use a short imperative subject with uppercase area tags:
+The subject is uppercase area tags and then the thing that changed, as a noun
+phrase, not an instruction:
 
 ```text
-[SERVICES][PARAM] Reject invalid table offsets
-[TEST][HIL] Add CAN parameter checks
-[DOCS][GUIDE] Simplify wiki navigation
+[PARAM] Remote table list descriptor changes
+[SHELL] Help line width fix
+[DOCS] Golden partition contents
 ```
 
-One commit per responsibility. Add a body only when the reason is not clear
-from the subject.
+The first tag is the layer or kind of change (`SERVICES`, `COMMS`, `DOCS`,
+`TEST`, `BOOT`, ...), the optional second one the feature. Keep it under about
+72 characters, with no trailing period.
+
+The subject is the whole message. The reason for a change goes in the code, a
+comment or the documentation, where the next reader of that code finds it.
+Make one commit per coherent change; related fixes in the same area go in the
+same commit.
 
 ## Pull requests
 
@@ -179,6 +187,12 @@ Use short descriptions of what the code does. For procedures, give the command,
 expected result and relevant limits. Link to upstream references for RTOS and
 protocol background.
 
+Draw diagrams as fenced code blocks marked `mermaid`. GitHub draws them in
+place, and `tools/docs/build.sh` passes them through `tools/docs/mermaid-filter.py`
+so the HTML manual draws the same source with a pinned Mermaid release. To read
+the manual offline, point `KFSW_MERMAID_JS` at a local `mermaid.min.js` before
+building. The PDF shows the diagram source.
+
 From the workspace root:
 
 ```bash
@@ -197,18 +211,22 @@ Software CI says the code builds and behaves in simulation. It cannot say the
 board keeps a log across a reset, answers over CAN, or comes back from an
 interrupted update. A tag claims all of it, so the bench runs first.
 
-Run it in this order. Each step is cheap compared to the one below it, and a
-failure early usually explains the ones after.
+Run `tools/ci/all.sh` before a commit. Before a tag, prepare and back up the
+bench, then run the board suite. See @ref testing for optional baseline inputs.
 
 | Step | Command | Needs |
 | --- | --- | --- |
-| 1 | `tools/ci/all.sh` | nothing; this is what CI runs |
-| 2 | `tests/hil/preflight.sh` | nothing; says what the bench can serve |
-| 3 | `tests/hil/run.sh board` | the board on its ST-LINK |
-| 4 | `tests/hil/run.sh board-uart` | a serial bridge on the CSP UART |
-| 5 | `tests/hil/run.sh board-can` | a CAN transceiver and a host adapter |
-| 6 | `tests/hil/run.sh radio` | the radio pair |
-| 7 | firmware update over CAN, below | a backup, and MCUboot on the board |
+| 1 | `tests/hil/preflight.sh` | device inventory; confirm wiring separately |
+| 2 | `tools/ci/all.sh --suite board` | software first, then every available automatic board check; reflashes and resets boards |
+| 3 | `tests/hil/shell-smoke.sh rpi_pico_w` | a person to copy the UF2 and reconnect the console |
+| 4 | `tests/hil/button-test/button-acceptance.sh` | a person to press the button and judge its behaviour |
+
+The suite reports the last two checks as NOT RUN. CAN acceptance needs a
+confirmed probes-enabled baseline; encrypted radio needs its prepared flight
+image. Supply their inputs as described in @ref testing. Run them separately
+if another fixture has replaced those baselines. `tools/f746-proof.sh build`
+is included only with an explicitly set readable `KFSW_MCUBOOT_KEY`; it is
+an offline artifact check, not physical evidence.
 
 Record which steps ran, which were skipped for want of hardware, and the exact
 output of each. A step nobody ran is not a step that passed, and the tag notes
@@ -231,9 +249,9 @@ Every one of these has cost a bench session at least once.
   `sudo tests/hil/stm32/nucleo-l496zg/can-up.sh 500000 normal`
 - **One ground profile per build directory.** `tools/k-ground` includes the
   profile and node number in each build directory, so `kfsw-gnd-can`,
-  `kfsw-gnd-uhf` and a local `-bench.env` variant can share node 16 without
-  overwriting each other's configuration. For example, CAN uses
-  `build/k-ground/kfsw-gnd-can-node-16`; CSP v1 adds the `-csp1` suffix.
+  `kfsw-gnd-uhf` and a local `-bench.env` variant never overwrite each other's
+  configuration. For example, CAN uses `build/k-ground/kfsw-gnd-can-node-17`;
+  CSP v1 adds the `-csp1` suffix.
 - **A serial bridge needs its driver.** On a kernel that builds `ftdi_sio` as a
   module it has to be loaded, and a module whose BTF does not validate has to have
   that section stripped before it will load.
@@ -321,9 +339,9 @@ tree by `tools/golden.sh` and recorded in `release.json` as `recovery_image`.
 It is the composition in `config/profiles/nucleo-golden.conf`: CSP over the
 UART and CAN links, remote parameters, the command server and both update
 routes, and nothing else. No console, no filesystem, no housekeeping. It exists
-to be reachable and to take a new image, and it is around 143 KB against the
-192 KB the golden partition holds, where the flight image is 247 KB. A target
-without that partition has no recovery image and `recovery_image` is null.
+to be reachable and to take a new image, and `tools/golden.sh` checks that it
+fits the 188 KiB golden partition. A target without that partition has no
+recovery image and `recovery_image` is null.
 
 Flash it once per board, at `0x080C0000`, with `tools/golden.sh flash`. It is
 not flashed by the release and it does not change when the flight image does,
@@ -340,10 +358,10 @@ Two things can ask for that:
 
 - `golden_install <pin>`, a command like `reboot`, over CSP or from the shell.
   An operator who already knows the image is bad does not have to wait.
-- The boot service, once an image has booted unconfirmed more times than
-  `boot_retries` allows. That parameter is persistent and between one and ten;
-  without the parameter snapshot it restarts at its compiled default every
-  boot, so the build warns and so does the log at startup.
+- The early boot service, when `boot_attempts_left` reaches zero. The count
+  and `boot_attempts_max` live in a dedicated flash record, independent of the
+  parameter snapshot. The boot budget section of @ref firmware_update has the
+  details.
 
 The swap is a trial, not a permanent one: if the recovery image cannot boot
 either, the bootloader still has somewhere to go back to. The recovery image
@@ -352,12 +370,9 @@ confirm it for a node that is already in trouble. That is
 `CONFIG_KFSW_BOOT_CONFIRM_AT_START`, and an image an operator confirms should
 leave it off.
 
-The automatic path is the one to be careful about. The retry budget is only
-spent by repeated unconfirmed boots, and MCUboot's own revert rescues a node
-before that happens: it puts the previous image back after a single failed
-trial. So the budget is reached only by a node whose revert is not rescuing it,
-which is the case recovery exists for and which a bench with a working
-bootloader cannot reproduce. What is verified on hardware is the mechanism
-underneath: `tests/hil/golden-recovery-smoke.sh` installs the image on command
-and checks from the ground node over CAN that the node comes back carrying the
-recovery parameter set.
+The early budget survives both confirmation and MCUboot revert. A node with
+no ground contact can exhaust it even when MCUboot restores the previous image.
+`tests/boot-budget-smoke.sh` exercises that budget and installation through a
+hosted bootloader model, and `tests/hil/golden-recovery-smoke.sh` installs the
+image on command and checks the recovery parameter set over CAN. Automatic
+expiry and real power cuts are bench work.

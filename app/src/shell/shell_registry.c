@@ -118,10 +118,10 @@ static int cmd_registry_show(const struct shell *sh, size_t argc, char **argv)
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	registry_commands,
-	SHELL_CMD_ARG(list, NULL, "Every command this node carries.", cmd_registry_list, 1, 0),
-	SHELL_CMD_ARG(describe, NULL, "Every command with its arguments and its help.",
+	SHELL_CMD_ARG(list, NULL, "Every command this node carries", cmd_registry_list, 1, 0),
+	SHELL_CMD_ARG(describe, NULL, "Every command with its arguments and its help",
 		      cmd_registry_describe, 1, 0),
-	SHELL_CMD_ARG(show, NULL, "One command with its arguments: show <name>.",
+	SHELL_CMD_ARG(show, NULL, "One command with its arguments: show <name>",
 		      cmd_registry_show, 2, 0),
 	SHELL_SUBCMD_SET_END);
 

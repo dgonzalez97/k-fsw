@@ -1,0 +1,12 @@
+/* Space for a signed candidate and filesystem readbacks in hosted tests. */
+&flashcontroller0 {
+	reg = <0x00000000 0x00400000>;
+};
+
+&flash0 {
+	reg = <0x00000000 0x00400000>;
+};
+
+&storage_partition {
+	reg = <0x000fc000 0x00200000>;
+};

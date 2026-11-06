@@ -94,7 +94,7 @@ Operator Commands The Flight Node From The Ground Shell
     KFSW Terminal Output Should Contain    kfsw-libparam:
     Execute KFSW Command    csp ping 1    CSP ping 1: success
     Execute KFSW Command    event tail 1 999    event_tail: failed, no record at age 999
-    Execute KFSW Command    param tables 1    Uploaded table files, adoptions and reverts
+    Execute KFSW Command    param whichtables 1    Uploaded table files, adoptions and reverts
     Execute KFSW Command    csp reboot 1 1234    denied
 
 KFSW Linux Releases A Scheduled Command When Its Deadline Passes

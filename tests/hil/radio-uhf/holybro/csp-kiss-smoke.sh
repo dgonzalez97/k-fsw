@@ -7,6 +7,8 @@ KFSW_REPO_DIR="$(dirname "$(dirname "$(dirname "$(dirname "$HOLYBRO_DIR")")")")"
 
 source "$KFSW_REPO_DIR/tools/_common.sh" nucleo_l496zg
 
+source "$KFSW_REPO_DIR/tests/support/csp-debug-checks.sh"
+
 radio_device="${KGROUND_HOLYBRO_DEVICE:-}"
 debug_serial="${KFSW_DEBUG_SERIAL:-$KFSW_SERIAL}"
 radio_baud="${KGROUND_HOLYBRO_BAUD:-57600}"
@@ -20,6 +22,7 @@ bridge_pid=""
 debug_stty=""
 radio_stty=""
 compiled_log_level_default=""
+original_log_level=""
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -42,8 +45,17 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
+send_ground()
+{
+	printf '%s\n' "$@" >&3
+}
+
 cleanup()
 {
+	if [[ -n "$original_log_level" ]]; then
+		timeout 2s bash -c 'printf "%s\r\n" "$1" >"$0"' \
+			"$debug_serial" "param set log_level $original_log_level" || true
+	fi
 	[[ -n "$bridge_pid" ]] && kill "$bridge_pid" 2>/dev/null || true
 	[[ -n "$ground_pid" ]] && kill "$ground_pid" 2>/dev/null || true
 	[[ -n "$debug_capture_pid" ]] && kill "$debug_capture_pid" 2>/dev/null || true
@@ -271,7 +283,7 @@ wait_for_output "$work_dir/nucleo.log" "CSP ping 16: success" \
 	"$debug_capture_pid" || \
 	fail "NUCLEO node 2 could not ping k-ground node 16 over Holybro"
 
-printf '%s\n' 'param list 2' 'param get 2 log_level' >&3
+printf '%s\n' 'param listall 2' 'param get 2 log_level' >&3
 # Remote listings show table numbers: node_id is offset 0 of the board table and
 # log_level offset 0 of the log table.
 wait_for_output "$work_dir/ground.log" "1           0x00  node_id" "$ground_pid" || \
@@ -329,31 +341,25 @@ wait_for_output_count "$work_dir/nucleo.log" "K-FSW status" \
 validate_log_callback "$alternate_log_level" || \
 	fail "the change callback did not apply the remote log_level"
 
-default_count_before="$(grep -Fc \
-	"2:log_level = $compiled_log_level_default" "$work_dir/ground.log" || true)"
-ground_status_count_before="$(grep -Fc 'K-FSW status' "$work_dir/ground.log" || true)"
-negative_start_line="$(($(wc -l <"$work_dir/ground.log") + 1))"
-printf '%s\n' 'param set 2 log_level 5' 'param get 2 log_level' \
-	'param get 2 missing' 'csp ping 3' 'status' >&3
-wait_for_output "$work_dir/ground.log" "2:log_level = 5" "$ground_pid" || \
-	fail "the invalid remote log_level request was not transmitted"
-wait_for_output_count "$work_dir/ground.log" \
-	"2:log_level = $compiled_log_level_default" \
-	"$((default_count_before + 1))" "$ground_pid" || \
-	fail "invalid remote log_level did not restore the compiled default"
-wait_for_output "$work_dir/ground.log" "get: parameter 'missing' not found" \
-	"$ground_pid" || fail "missing remote parameter was not rejected"
-wait_for_output "$work_dir/ground.log" "csp ping: node 3 did not answer" "$ground_pid" || \
+csp_refusal_check "$work_dir/ground.log" "$ground_pid" send_ground \
+	'param set 2 log_level 5' 'param get 2 log_level' \
+	'param set: node 2 did not answer' '2:log_level = 5' \
+	"2:log_level = $alternate_log_level" || \
+	fail "invalid remote log_level was acknowledged or changed the prior value"
+csp_exchange "$work_dir/ground.log" "$ground_pid" send_ground \
+	"param set 2 log_level $original_log_level" && \
+	csp_reply_has "2:log_level = $original_log_level" || fail "log_level restoration failed"
+csp_exchange "$work_dir/ground.log" "$ground_pid" send_ground \
+	'param get 2 log_level' && csp_reply_has "2:log_level = $original_log_level" || \
+	fail "restored log_level did not read back"
+original_log_level=""
+echo 'HOLYBRO PARAM REFUSAL: PASS preserved=yes restored=yes'
+csp_exchange "$work_dir/ground.log" "$ground_pid" send_ground \
+	'param get 2 missing' && csp_reply_has "get: parameter 'missing' not found" || \
+	fail "missing remote parameter was not rejected"
+csp_exchange "$work_dir/ground.log" "$ground_pid" send_ground \
+	'csp ping 3' && csp_reply_has 'csp ping: node 3 did not answer' || \
 	fail "a nonexistent CSP node did not fail cleanly"
-wait_for_output_count "$work_dir/ground.log" "K-FSW status" \
-	"$((ground_status_count_before + 1))" "$ground_pid" || \
-	fail "the ground shell was not responsive after negative tests"
-negative_output="$(tail -n +"$negative_start_line" "$work_dir/ground.log")"
-grep -Fq "2:log_level = $compiled_log_level_default" \
-	<<<"$negative_output" || fail "the negative-test window lacks default readback"
-if grep -Fq "2:log_level = $alternate_log_level" <<<"$negative_output"; then
-	fail "invalid remote log_level retained the prior non-default value"
-fi
 
 # Commanding and the event record across the radio, and a node reaching itself.
 printf '%s\n' \

@@ -118,15 +118,15 @@ static int cmd_table_dump(const struct shell *sh, size_t argc, char **argv)
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	table_commands,
-	SHELL_CMD_ARG(check, NULL, "Check a table file without applying it: check <path>.",
+	SHELL_CMD_ARG(check, NULL, "Check a table file without applying it: check <path>",
 		      cmd_table_check, 2, 0),
-	SHELL_CMD_ARG(dump, NULL, "Write a table out as a file: dump <table> <path>.",
+	SHELL_CMD_ARG(dump, NULL, "Write a table out as a file: dump <table> <path>",
 		      cmd_table_dump, 3, 0),
-	SHELL_CMD_ARG(load, NULL, "Adopt a table file, all of it or none: load <path>.",
+	SHELL_CMD_ARG(load, NULL, "Adopt a table file, all of it or none: load <path>",
 		      cmd_table_load, 2, 0),
-	SHELL_CMD_ARG(revert, NULL, "Put back the values the last load replaced.", cmd_table_revert,
+	SHELL_CMD_ARG(revert, NULL, "Put back the values the last load replaced", cmd_table_revert,
 		      1, 0),
-	SHELL_CMD_ARG(show, NULL, "Show what is loaded and the counters.", cmd_table_show, 1, 0),
+	SHELL_CMD_ARG(show, NULL, "Show what is loaded and the counters", cmd_table_show, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(table, &table_commands, "Parameter tables uploaded as files.", NULL);

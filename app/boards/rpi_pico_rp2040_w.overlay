@@ -2,11 +2,43 @@
 	chosen {
 		zephyr,console = &cdc_acm_uart0;
 		zephyr,shell-uart = &cdc_acm_uart0;
+		kfsw,csp-uart = &uart0;
+		kfsw,storage-partition = &kfsw_storage_partition;
+		kfsw,tmp-disk = &tmp_disk;
+		kfsw,rtc = &rtc;
+		kfsw,watchdog = &wdt0;
+	};
+
+	tmp_disk: tmp-disk {
+		compatible = "zephyr,ram-disk";
+		disk-name = "TMP";
+		sector-size = <512>;
+		sector-count = <32>;
 	};
 };
 
 &zephyr_udc0 {
 	cdc_acm_uart0: cdc_acm_uart0 {
 		compatible = "zephyr,cdc-acm-uart";
+	};
+};
+
+&uart0 {
+	current-speed = <115200>;
+	parity = "none";
+	stop-bits = "1";
+	data-bits = <8>;
+};
+
+&code_partition {
+	reg = <0x00000100 0x001bff00>;
+};
+
+&flash0 {
+	partitions {
+		kfsw_storage_partition: partition@1c0000 {
+			label = "kfsw-storage";
+			reg = <0x001c0000 0x00040000>;
+		};
 	};
 };

@@ -46,6 +46,12 @@ See the [device model](https://docs.zephyrproject.org/4.4.0/kernel/drivers/index
 
 ## Kconfig
 
+Every service, every adapter and every limit is a Kconfig symbol, so a target is
+composed rather than written: the golden recovery image drops the shell and the
+file services by configuration alone, and the same tree still builds the full
+flight composition. Nothing is hidden in a script or a header, and the chooser
+below shows all of it as one tree.
+
 Configuration is combined at build time:
 
 ```text
@@ -67,6 +73,103 @@ rg '^CONFIG_KFSW_' build/linux/zephyr/.config
 
 Change the source `.conf` or Kconfig file and rebuild.
 See the [Kconfig guide](https://docs.zephyrproject.org/4.4.0/build/kconfig/index.html).
+
+### Browsing the options
+
+Zephyr ships the same terminal chooser the Linux kernel uses. It needs a build
+directory that has already been configured, so build the target first:
+
+```bash
+source .venv/bin/activate
+west build -t menuconfig -d build/nucleo_l496zg
+```
+
+![The chooser on a configured build directory](media/menuconfig-root.png)
+
+Arrow keys move, space toggles, `/` searches the whole tree and `?` shows where
+a symbol is defined and what depends on it. `west build -t guiconfig` opens the
+same thing as a window instead, which needs an X display.
+
+It lists every option the build knows, not only K-FSW's: `CONFIG_SHELL_STACK_SIZE`
+and `CONFIG_CSP_BUFFER_COUNT` sit under their own subsystems. The K-FSW options
+are five menus, one per repository:
+
+```text
+  K-FSW platform             kfsw-platform
+  K-FSW communications       kfsw-comms
+  K-FSW services             kfsw-services
+  K-FSW reusable modules     kfsw-modules, one submenu per module
+  K-FSW application          k-fsw/app
+```
+
+`K-FSW application` is the first entry at the top; the other four are under
+`Modules`, next to the HALs and the Zephyr modules, each one named after the
+repository it comes from and the path it was resolved to.
+
+![The K-FSW repositories under the Modules menu](media/menuconfig-modules.png)
+
+Inside a menu the options are nested the way they depend on each other, so
+turning off a service takes its ports, stacks and limits with it. `C` adds the
+symbol name to each line, which is what a `.conf` file wants:
+
+![The services menu with symbol names shown](media/menuconfig-services.png)
+
+`?` on any line answers where the value came from, down to the file and line
+that defines it and the menu path that reaches it:
+
+![Symbol information for a single option](media/menuconfig-symbol.png)
+
+### Keeping what you chose
+
+The chooser writes `build/<target>/zephyr/.config`, which is a build artefact. It
+survives an incremental `west build` and reaches `autoconf.h`, so a change can be
+tried straight away, but a pristine build regenerates it from the `.conf` files
+and the choice is gone. `tools/build.sh` builds with `west build -p auto`, and
+`tools/golden.sh` and CI use `always`.
+
+So copy the file first, then compare afterwards. `diffconfig -m` prints the
+difference in `.conf` format:
+
+```bash
+cp build/nucleo_l496zg/zephyr/.config /tmp/before
+west build -t menuconfig -d build/nucleo_l496zg
+python3 zephyr/scripts/kconfig/diffconfig -m \
+  /tmp/before build/nucleo_l496zg/zephyr/.config
+```
+
+```text
+CONFIG_KFSW_REMEXEC=y
+CONFIG_KFSW_REMEXEC_CSP_PORT=8
+CONFIG_KFSW_REMEXEC_MAX_ENTRIES=16
+CONFIG_KFSW_REMEXEC_OUTPUT_MAX=200
+CONFIG_KFSW_REMEXEC_SERVER_PRIORITY=3
+CONFIG_KFSW_REMEXEC_SERVER_STACK_SIZE=3072
+CONFIG_KFSW_REMEXEC_TIMEOUT_MS=5000
+```
+
+Turning one option on brings its defaults with it. Paste only the lines that are
+a decision; the six defaults above belong in Kconfig, where they already are.
+
+Then put the kept lines where that target or variant is composed: a board file
+such as `app/boards/nucleo_l496zg.conf` for everything that target always has,
+or a profile in `config/profiles/` for a variant. To find which file sets an
+option today, read `build/<target>/zephyr/.config-trace.json`, where every
+symbol carries its value and the file and line it came from.
+
+### A composition with profiles
+
+The chooser knows nothing about layering: it shows one resolved configuration.
+To work on a layered one, build it with its profiles and then open that build
+directory:
+
+```bash
+KFSW_EXTRA_CONF_FILE="$PWD/k-fsw/config/profiles/nucleo-can.conf;$PWD/k-fsw/config/profiles/nucleo-button-test.conf" \
+  ./k-fsw/tools/build.sh nucleo_l496zg
+west build -t menuconfig -d build/nucleo_l496zg
+```
+
+The comparison then shows what the layers already decided as well as what you
+changed, so check each line against the profiles before copying it anywhere.
 
 ## Devicetree
 
@@ -115,6 +218,7 @@ From the workspace root:
 . .venv/bin/activate
 west manifest --validate
 west update
+./k-fsw/tools/zephyr-patch.sh
 ```
 
 Preserve local dependency changes before updating. Detached HEAD at a

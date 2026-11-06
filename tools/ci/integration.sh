@@ -35,11 +35,19 @@ gndwdt_output="$(mktemp -d /tmp/kfsw-gndwdt.XXXXXX)"
 	--executable "${KFSW_OUTPUT_ROOT:-$KFSW_REPO_DIR/../build}/linux/zephyr/zephyr.exe" \
 	--output "$gndwdt_output/run"
 rm -rf -- "$gndwdt_output"
+echo "INTEGRATION: ground watchdog expiry and reboot (accelerated native_sim)"
+"$KFSW_REPO_DIR/tests/gndwdt-expiry-smoke.sh"
+echo "INTEGRATION: early boot budget and Golden recovery"
+"$KFSW_REPO_DIR/tests/boot-budget-smoke.sh"
+
+echo "INTEGRATION: ground operator requests over PTY KISS"
+"$kfsw_python" "$KFSW_REPO_DIR/tests/ground-services-smoke.py"
+
 echo "INTEGRATION: shell and local PARAM"
 "$KFSW_REPO_DIR/tests/shell-smoke.sh"
 
-echo "INTEGRATION: boton_test parameters"
-"$KFSW_REPO_DIR/tests/boton-test-smoke.sh"
+echo "INTEGRATION: button_test parameters"
+"$KFSW_REPO_DIR/tests/button-test-smoke.sh"
 
 echo "INTEGRATION: storage"
 "$KFSW_REPO_DIR/tests/storage-smoke.sh"
@@ -68,5 +76,20 @@ echo "INTEGRATION: a parameter limit crossed, released and re-armed"
 echo "INTEGRATION: multi-interface CSP/KISS routing and transit"
 "$KFSW_REPO_DIR/tests/build-multi-kiss.sh"
 "$KFSW_REPO_DIR/tests/multi-kiss-smoke.sh"
+
+echo "INTEGRATION: independent firmware update front ends"
+"$kfsw_python" "$KFSW_REPO_DIR/tests/fwu-composition-smoke.py"
+
+echo "INTEGRATION: firmware update over FWU lite and FTP"
+for route in lite ftp; do
+	for variant in clean lossy; do
+		options=()
+		if [[ "$variant" == lossy ]]; then
+			options+=(--lossy)
+			[[ "$route" != lite ]] || options+=(--contacts)
+		fi
+		KFSW_CSP_VERSION=2 "$KFSW_REPO_DIR/tests/k-ground-fwu-$route-smoke.sh" "${options[@]}"
+	done
+done
 
 echo "INTEGRATION RESULT: PASS"

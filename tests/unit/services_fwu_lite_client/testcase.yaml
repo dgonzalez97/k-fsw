@@ -1,0 +1,15 @@
+tests:
+  kfsw.services.fwu_lite_client:
+    tags: [unit, services, fwu]
+    platform_allow: [native_sim/native/64]
+    integration_platforms: [native_sim/native/64]
+  kfsw.services.fwu_lite_client.small_buffer:
+    tags: [unit, services, fwu]
+    platform_allow: [native_sim/native/64]
+    extra_configs:
+      - CONFIG_KFSW_FWU_STREAM_BUFFER_SIZE=64
+  kfsw.services.fwu_lite_client.rdp:
+    tags: [unit, services, fwu]
+    platform_allow: [native_sim/native/64]
+    extra_configs:
+      - CONFIG_KFSW_FWU_LITE_RDP=y

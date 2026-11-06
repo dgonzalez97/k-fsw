@@ -33,7 +33,7 @@ done
 set -a; . "$here/stm32/nucleo-l496zg/can-bench.env"; set +a
 interface="${KFSW_CAN_INTERFACE:-can0}"
 bitrate="${KFSW_CAN_BITRATE:-500000}"
-ground="${KFSW_CAN_GROUND_NODE:-16}"
+ground="${KFSW_CAN_GROUND_NODE:-17}"
 flight="${KFSW_CAN_FLIGHT_NODE:-2}"
 second="${KFSW_CAN_SECOND_NODE:-3}"
 

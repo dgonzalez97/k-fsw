@@ -5,7 +5,7 @@ Library           Process
 *** Test Cases ***
 Limits Release On Both Links And Rearm
     [Tags]    physical    can    nucleo    limits    needs-can    needs-uart
-    ${result}=    Run Process    ${CURDIR}/limits/released-on-two-links.sh
+    ${result}=    Run Process    ${CURDIR}/limits/released-on-two-links.sh    --board    nucleo_l496zg
     ...    stdout=${OUTPUT DIR}/limits-links.out    stderr=STDOUT    timeout=1800s
     Log    ${result.stdout}
     Skip If    "LIMITS LINKS RESULT: NOT RUN" in $result.stdout    ${result.stdout}

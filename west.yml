@@ -36,22 +36,22 @@ manifest:
 
     - name: kfsw-platform
       remote: kfsw
-      revision: 7e25c0ec11ea39b4b241c93e180255633f3f3aaa
+      revision: 6d0f5ae2fd5ea57e7bbb50d69f4c6b35dfbee162
       path: kfsw-platform
 
     - name: kfsw-services
       remote: kfsw
-      revision: c26e920ea6a9483ffc04f5099c7fc817b3fc6067
+      revision: 98ff5b87d04f7147128c1cd19d9bf72a7cd390f3
       path: kfsw-services
 
     - name: kfsw-comms
       remote: kfsw
-      revision: eb25914f7cc803bc5149192501039b0e0a05c934
+      revision: b50dfb8d9dd67e645bbb765941c4aec79afa581d
       path: kfsw-comms
 
     - name: kfsw-modules
       remote: kfsw
-      revision: cd3b84f1da83ef0440e341e6ca3ef8a046d230d0
+      revision: 68601831ac54f382cf8c79da07611bb0a3b1204b
       path: kfsw-modules
 
     - name: libcsp
@@ -63,7 +63,7 @@ manifest:
     - name: libparam
       remote: kfsw
       repo-path: kfsw-libparam
-      revision: c8a7c10485a7eb3ef329241a66090141787a117c
+      revision: 83624cbd246f0fd8cb88492441e441418114f44c
       path: kfsw-services/third_party/libparam
 
   self:

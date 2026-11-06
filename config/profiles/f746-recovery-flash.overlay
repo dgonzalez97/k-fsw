@@ -1,0 +1,30 @@
+/* Shared F746 map. image-1 is permanent Golden, never a B update slot. */
+&flash0 {
+	/delete-node/ partitions;
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		boot_partition: partition@0 {
+			label = "mcuboot";
+			reg = <0x00000 0x10000>;
+		};
+		slot1_partition: partition@10000 {
+			label = "image-1";
+			reg = <0x10000 0x30000>;
+		};
+		slot0_partition: partition@40000 {
+			label = "image-0";
+			reg = <0x40000 0x40000>;
+		};
+		storage_partition: partition@80000 {
+			label = "storage";
+			reg = <0x80000 0x80000>;
+		};
+	};
+};
+/ {
+	aliases {
+		mcuboot-button0 = &user_button;
+	};
+};

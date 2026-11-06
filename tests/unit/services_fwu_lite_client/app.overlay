@@ -1,0 +1,11 @@
+/* The update service writes to slot1 on the simulated flash, with 4 KB erase blocks. */
+/ {
+	chosen {
+		kfsw,fwu-partition = &slot1_partition;
+	};
+};
+
+/* Write in 8-byte blocks like the real part, so alignment errors show up. */
+&flash0 {
+	write-block-size = <8>;
+};

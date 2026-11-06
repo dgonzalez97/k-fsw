@@ -14,6 +14,8 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 zephyr_link_libraries(
     -Wl,--wrap=kfsw_time_monotonic_ms
     -Wl,--wrap=sys_reboot
+    -Wl,--wrap=nvs_write
+    -Wl,--wrap=k_work_reschedule
 )
 project(kfsw_services_gndwdt_tests LANGUAGES C)
 

@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include <zephyr/shell/shell.h>
+#include <zephyr/shell/shell_string_conv.h>
 
 #include <kfsw/services/gndwdt.h>
 
@@ -31,6 +32,7 @@ static int show_local(const struct shell *sh)
 	shell_print(sh, "since_contact_s: %u", status.since_contact_s);
 	shell_print(sh, "contacts: %u last_node: %u", status.contacts, status.last_node);
 	shell_print(sh, "expiries: %u", status.expiries);
+	shell_print(sh, "reschedule failures: %u", status.reschedule_failures);
 	return 0;
 }
 
@@ -103,13 +105,13 @@ static int cmd_gndwdt_arm(const struct shell *sh, size_t argc, char **argv)
 static int cmd_gndwdt_timeout(const struct shell *sh, size_t argc, char **argv)
 {
 	unsigned long seconds;
-	char *end;
+	int parse_error = 0;
 	int result;
 
 	ARG_UNUSED(argc);
 
-	seconds = strtoul(argv[1], &end, 0);
-	if ((end == argv[1]) || (*end != '\0') || (seconds > UINT32_MAX)) {
+	seconds = shell_strtoul(argv[1], 0, &parse_error);
+	if ((parse_error != 0) || (seconds > UINT32_MAX)) {
 		shell_error(sh, "Invalid timeout: %s", argv[1]);
 		return -EINVAL;
 	}
@@ -126,18 +128,18 @@ static int cmd_gndwdt_timeout(const struct shell *sh, size_t argc, char **argv)
 
 SHELL_STATIC_SUBCMD_SET_CREATE(gndwdt_commands,
 #if CONFIG_KFSW_COMMAND_CSP
-	SHELL_CMD_ARG(feed, NULL, "Feed another node's ground watchdog: feed <node>.",
+	SHELL_CMD_ARG(feed, NULL, "Feed another node's ground watchdog: feed <node>",
 		      cmd_gndwdt_feed, 2, 0),
 #endif
-	SHELL_CMD_ARG(off, NULL, "Disarm this node's countdown.", cmd_gndwdt_arm, 1, 0),
-	SHELL_CMD_ARG(on, NULL, "Arm this node's countdown.", cmd_gndwdt_arm, 1, 0),
+	SHELL_CMD_ARG(off, NULL, "Disarm this node's countdown", cmd_gndwdt_arm, 1, 0),
+	SHELL_CMD_ARG(on, NULL, "Arm this node's countdown", cmd_gndwdt_arm, 1, 0),
 #if CONFIG_KFSW_COMMAND_CSP
-	SHELL_CMD_ARG(show, NULL, "Show the countdown, here or on another node: show [node].",
+	SHELL_CMD_ARG(show, NULL, "Show the countdown, here or on another node: show [node]",
 		      cmd_gndwdt_show, 1, 1),
 #else
-	SHELL_CMD_ARG(show, NULL, "Show the countdown and its counters.", cmd_gndwdt_show, 1, 0),
+	SHELL_CMD_ARG(show, NULL, "Show the countdown and its counters", cmd_gndwdt_show, 1, 0),
 #endif
-	SHELL_CMD_ARG(timeout, NULL, "Set the silence allowed: timeout <seconds>.",
+	SHELL_CMD_ARG(timeout, NULL, "Set the silence allowed: timeout <seconds>",
 		      cmd_gndwdt_timeout, 2, 0),
 	SHELL_SUBCMD_SET_END);
 

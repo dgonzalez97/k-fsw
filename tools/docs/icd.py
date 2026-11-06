@@ -198,7 +198,7 @@ def main():
 
     with tempfile.TemporaryDirectory() as scratch:
         flash = pathlib.Path(scratch) / "icd-flash.bin"
-        tables = parse_tables(ask(image, flash, "param tables", arguments.seconds))
+        tables = parse_tables(ask(image, flash, "param whichtables", arguments.seconds))
         parameters = parse_parameters(ask(image, flash, "param describe", arguments.seconds))
         commands = parse_commands(ask(image, flash, "cmd describe", arguments.seconds))
 

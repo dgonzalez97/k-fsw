@@ -14,6 +14,10 @@
     </tab>
     <tab type="usergroup" visible="yes" url="development.html" title="Development">
       <tab type="user" visible="yes" url="architecture.html" title="Architecture"/>
+      <tab type="user" visible="yes" url="data_flow.html" title="Data flow"/>
+      <tab type="user" visible="yes" url="fault_recovery.html" title="Fault recovery"/>
+      <tab type="user" visible="yes" url="persistence.html" title="Persistence"/>
+      <tab type="user" visible="yes" url="cfs_concept_map.html" title="K-FSW for cFS users"/>
       <tab type="user" visible="yes" url="zephyr_integration.html" title="Zephyr"/>
       <tab type="user" visible="yes" url="development.html" title="Contributing"/>
       <tab type="user" visible="yes" url="testing.html" title="Testing"/>

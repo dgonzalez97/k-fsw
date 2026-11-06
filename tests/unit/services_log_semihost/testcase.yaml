@@ -1,0 +1,9 @@
+common:
+  tags: [unit, services, log, platform]
+  platform_allow: [native_sim/native/64]
+  integration_platforms: [native_sim/native/64]
+tests:
+  kfsw.services.log_semihost: {}
+  kfsw.services.log_semihost.color:
+    extra_configs:
+      - CONFIG_KFSW_LOG_COLOR=y

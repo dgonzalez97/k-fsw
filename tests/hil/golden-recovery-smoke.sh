@@ -21,7 +21,7 @@ trap '[[ "$keep" == 1 ]] && echo "GOLDEN RECOVERY: logs in $work" || rm -rf "$wo
 set -a; . "$here/stm32/nucleo-l496zg/can-bench.env"; set +a
 interface="${KFSW_CAN_INTERFACE:-can0}"
 flight="${KFSW_CAN_FLIGHT_NODE:-2}"
-ground="${KFSW_CAN_GROUND_NODE:-16}"
+ground="${KFSW_CAN_GROUND_NODE:-17}"
 pin="${KFSW_REBOOT_PIN:-0000}"
 
 fail() { keep=1; echo "GOLDEN RECOVERY RESULT: FAIL - $*"; exit 1; }
@@ -81,7 +81,7 @@ PYTHON
 }
 
 count_parameters() {
-	printf '%s\n' "csp ping $flight" "param list $flight" |
+	printf '%s\n' "csp ping $flight" "param listall $flight" |
 		timeout 150 "$ground_exe" --uart_stdinout "--can-if=$interface" \
 			--stop_at=70.0 --no-color >"$1" 2>&1 || true
 	grep -c "^ *[0-9]\+  " "$1" || true

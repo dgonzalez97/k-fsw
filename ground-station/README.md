@@ -6,8 +6,10 @@ role, its CSP address and its peer. There are no drivers or services here.
 | Role | CSP node | Use |
 | --- | --- | --- |
 | `kfsw-gnd-uhf` | 16 | UHF gateway; bridge its KISS PTY to the Holybro radio |
-| `kfsw-gnd-can` | 16 | Reaches a flight node over CAN |
+| `kfsw-gnd-can` | 17 | Reaches a flight node over CAN |
+| `kfsw-beacon` | 18 | Receives beacons from a flight node |
 | `kfsw-ops` | 19 | Operator shell |
+| `kfsw-rotctl` | 20 | Antenna rotator control |
 
 `KFSW_CSP_NODE` is the node's address and `KFSW_CSP_PEER` the node `uart test`
 pings; routes come from `KFSW_CSP_ROUTES`. A bench variant goes in a file

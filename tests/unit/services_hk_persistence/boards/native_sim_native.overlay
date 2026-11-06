@@ -1,0 +1,10 @@
+/ {
+	chosen {
+		kfsw,storage-partition = &storage_partition;
+	};
+};
+
+&storage_partition {
+	label = "kfsw-storage-test";
+	reg = <0x000fc000 0x00010000>;
+};

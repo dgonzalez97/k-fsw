@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include <zephyr/shell/shell.h>
+#include <zephyr/shell/shell_string_conv.h>
 
 #include <kfsw/services/resmon.h>
 
@@ -54,13 +55,13 @@ static int cmd_resmon_sample(const struct shell *sh, size_t argc, char **argv)
 static int cmd_resmon_alert(const struct shell *sh, size_t argc, char **argv)
 {
 	unsigned long percent;
-	char *end;
+	int parse_error = 0;
 	int result;
 
 	ARG_UNUSED(argc);
 
-	percent = strtoul(argv[1], &end, 0);
-	if ((end == argv[1]) || (*end != '\0') || (percent > UINT32_MAX)) {
+	percent = shell_strtoul(argv[1], 0, &parse_error);
+	if ((parse_error != 0) || (percent > UINT32_MAX)) {
 		shell_error(sh, "Invalid percentage: %s", argv[1]);
 		return -EINVAL;
 	}
@@ -76,10 +77,10 @@ static int cmd_resmon_alert(const struct shell *sh, size_t argc, char **argv)
 }
 
 SHELL_STATIC_SUBCMD_SET_CREATE(resmon_commands,
-	SHELL_CMD_ARG(alert, NULL, "Set the stack use that raises an event: alert <percent>.",
+	SHELL_CMD_ARG(alert, NULL, "Set the stack use that raises an event: alert <percent>",
 		      cmd_resmon_alert, 2, 0),
-	SHELL_CMD_ARG(sample, NULL, "Sweep the threads now.", cmd_resmon_sample, 1, 0),
-	SHELL_CMD_ARG(show, NULL, "Show what the last sweep found.", cmd_resmon_show, 1, 0),
+	SHELL_CMD_ARG(sample, NULL, "Sweep the threads now", cmd_resmon_sample, 1, 0),
+	SHELL_CMD_ARG(show, NULL, "Show what the last sweep found", cmd_resmon_show, 1, 0),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(resmon, &resmon_commands, "Resource monitor.", NULL);

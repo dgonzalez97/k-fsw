@@ -4,6 +4,9 @@ common:
   integration_platforms: [native_sim/native/64]
 tests:
   kfsw.services.log_history: {}
+  kfsw.services.log_history.dictionary:
+    extra_configs:
+      - CONFIG_KFSW_LOG_REMOTE_DEFAULT_DICTIONARY=y
   kfsw.services.log_history.local:
     extra_configs:
       - CONFIG_KFSW_LOG_REMOTE=n

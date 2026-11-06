@@ -52,13 +52,14 @@ INPUT                  = docs \
                          ../kfsw-modules/gpredict/include/kfsw \
                          ../kfsw-modules/radio-uhf/include/kfsw \
                          ../kfsw-modules/temperature-sensor-example/include/kfsw \
-                         ../kfsw-modules/boton-test/include/kfsw
+                         ../kfsw-modules/button-test/include/kfsw
 INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = *.h *.md *.dox
 RECURSIVE              = YES
 EXCLUDE                = docs/theme
 EXCLUDE_PATTERNS       = */third_party/* */build/* */bootloader/*
 EXAMPLE_PATH           = docs
+FILTER_PATTERNS        = *.md=tools/docs/mermaid-filter.py
 IMAGE_PATH             = docs/media
 
 REFERENCES_RELATION    = NO
