@@ -414,6 +414,12 @@ again with `KFSW_PRISTINE=always` and without the profile to turn it off.
 7. Add a profile under `config/profiles/` that turns the module on, as
    `linux-temperature.conf` does, so it can be built and checked without
    changing the reference compositions.
+8. If the module registers shell commands, keep that file out of the module's
+   own archive and give it a Zephyr library of its own, as the example's
+   `CMakeLists.txt` does. A shell group is reached only through a linker
+   section, so an archive member that holds nothing else is never pulled in and
+   the commands are missing from `help` with no error anywhere. Zephyr links
+   its own libraries whole, which is what keeps the registration.
 
 A module calls the services and the platform, never the other way round
 (@ref architecture). If two modules need the same mechanism, it belongs in a
