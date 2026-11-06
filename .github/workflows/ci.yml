@@ -41,12 +41,12 @@ jobs:
         if: matrix.target == 'linux'
         run: ./k-fsw/tests/build-linux-minimal.sh
 
-      # The document is generated from the image, so a parameter or command
-      # added without regenerating it is a failure here rather than a page
-      # that quietly stopped being true.
-      - name: Check the interface control document against the image
+      # The document is generated from the sources, so an interface added
+      # without regenerating it is a failure here rather than a page that
+      # quietly stopped being true. It reads no image, so it needs no target.
+      - name: Check the interface control document against the sources
         if: matrix.target == 'linux'
-        run: ./k-fsw/tools/docs/icd.py --check
+        run: ./k-fsw/tools/docs/icd-source.py --check
 
       - name: Check the golden recovery composition and partition fit
         if: matrix.target == 'nucleo_l496zg'
