@@ -223,9 +223,14 @@ build directory that has already been built:
 west build -t menuconfig -d build/linux
 ```
 
-It covers every option the build knows, K-FSW's and Zephyr's alike. What it
-writes is a build artefact; @ref zephyr_integration says how to keep a choice
-in a `.conf`.
+![The chooser on a configured build directory](media/menuconfig-root.png)
+
+It covers every option the build knows, K-FSW's and Zephyr's alike: this
+application is the first entry, and the four other K-FSW repositories are under
+`Modules`. A target is composed out of those options rather than written, which
+is how the same tree builds both the full image and the golden recovery one.
+What the chooser writes is a build artefact; @ref zephyr_integration says how to
+keep a choice in a `.conf`.
 
 Other useful files:
 

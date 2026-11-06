@@ -46,6 +46,12 @@ See the [device model](https://docs.zephyrproject.org/4.4.0/kernel/drivers/index
 
 ## Kconfig
 
+Every service, every adapter and every limit is a Kconfig symbol, so a target is
+composed rather than written: the golden recovery image drops the shell and the
+file services by configuration alone, and the same tree still builds the full
+flight composition. Nothing is hidden in a script or a header, and the chooser
+below shows all of it as one tree.
+
 Configuration is combined at build time:
 
 ```text
@@ -78,6 +84,8 @@ source .venv/bin/activate
 west build -t menuconfig -d build/nucleo_l496zg
 ```
 
+![The chooser on a configured build directory](media/menuconfig-root.png)
+
 Arrow keys move, space toggles, `/` searches the whole tree and `?` shows where
 a symbol is defined and what depends on it. `west build -t guiconfig` opens the
 same thing as a window instead, which needs an X display.
@@ -93,6 +101,23 @@ are five menus, one per repository:
   K-FSW reusable modules     kfsw-modules, one submenu per module
   K-FSW application          k-fsw/app
 ```
+
+`K-FSW application` is the first entry at the top; the other four are under
+`Modules`, next to the HALs and the Zephyr modules, each one named after the
+repository it comes from and the path it was resolved to.
+
+![The K-FSW repositories under the Modules menu](media/menuconfig-modules.png)
+
+Inside a menu the options are nested the way they depend on each other, so
+turning off a service takes its ports, stacks and limits with it. `C` adds the
+symbol name to each line, which is what a `.conf` file wants:
+
+![The services menu with symbol names shown](media/menuconfig-services.png)
+
+`?` on any line answers where the value came from, down to the file and line
+that defines it and the menu path that reaches it:
+
+![Symbol information for a single option](media/menuconfig-symbol.png)
 
 ### Keeping what you chose
 
