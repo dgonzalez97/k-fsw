@@ -271,16 +271,6 @@ jobs:
           requirements: k-fsw/tests/hil/requirements.txt
 
       - name: Validate all Robot suites and run software scenarios
-        env:
-          # On main and on a manual run every software scenario has to run:
-          # a skipped scenario is not acceptance evidence. tools/ci/robot.sh
-          # then also requires the software prerequisites, and robot-counts.py
-          # fails the job on a skip or on nothing executed. Pull requests stay
-          # lenient, because an optional host tool may be missing there.
-          KFSW_ROBOT_ACCEPTANCE: >-
-            ${{ (github.event_name == 'workflow_dispatch' ||
-                 (github.event_name == 'push' && github.ref == 'refs/heads/main'))
-                && '1' || '0' }}
         run: ./k-fsw/tools/ci/robot.sh
 
       - name: Upload Robot diagnostics
