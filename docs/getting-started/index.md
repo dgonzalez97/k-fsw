@@ -216,6 +216,17 @@ grep '^CONFIG_KFSW_' build/linux/zephyr/.config
 grep '^CONFIG_BOARD' build/linux/zephyr/.config
 ```
 
+To browse the options instead of the result, open the terminal chooser on a
+build directory that has already been built:
+
+```bash
+west build -t menuconfig -d build/linux
+```
+
+It covers every option the build knows, K-FSW's and Zephyr's alike. What it
+writes is a build artefact; @ref zephyr_integration says how to keep a choice
+in a `.conf`.
+
 Other useful files:
 
 ```text
