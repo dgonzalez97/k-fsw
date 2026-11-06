@@ -44,6 +44,7 @@ service:
 | `ftp` | `CONFIG_KFSW_FTP` |
 | `event` | `CONFIG_KFSW_EVENT` |
 | `journal` | `CONFIG_KFSW_JOURNAL` |
+| `cmd` | `CONFIG_KFSW_COMMAND` |
 | `reboot` | `CONFIG_KFSW_COMMAND` and `CONFIG_REBOOT` |
 | `hk` | `CONFIG_KFSW_HK` |
 | `fbo` | `CONFIG_KFSW_FBO` |
@@ -58,6 +59,50 @@ service:
 | `comms uhf` | `CONFIG_KFSW_RADIO_UHF_SHELL` |
 | `temp` | `CONFIG_KFSW_TEMP_EXAMPLE_SHELL` |
 | `boton_test`, `test` | `CONFIG_KFSW_BOTON_TEST_SHELL` |
+
+## Two registries
+
+`help` lists the shell. `cmd list` lists the command registry. They are
+different lists, and a name in one need not be in the other.
+
+A shell command is a Zephyr `SHELL_CMD_REGISTER` group: text in, text out,
+reachable from a terminal and from nowhere else. It exists only where
+`CONFIG_SHELL` is on, and the golden recovery profile builds without it,
+because the shell is a quarter of that image and an orbiting node cannot reach
+it anyway.
+
+A registered command is an entry in the command service: a name, a numeric ID,
+up to four typed arguments and a typed result. Its registry is a static array
+of `CONFIG_KFSW_COMMAND_MAX_COMMANDS` entries, fixed once startup ends, and a
+composition whose definition sets exceed that count fails startup with
+`-ENOSPC`.
+
+The registry is what everything other than a terminal calls:
+
+| Caller | Names the command |
+| --- | --- |
+| The ground, on CSP port 11 | by ID |
+| A shell group | by name, through `kfsw_shell_run_command()` |
+| File procedures and the time-tagged queue | by name, read from the file |
+| Limits, when a parameter crosses a bound | by name, from the limit |
+| The ground watchdog, on another node | by name |
+
+Each reaches the same definition and the same handler, and each invocation
+records a `COMMAND_INVOKED`, `COMMAND_UNKNOWN` or `COMMAND_REJECTED` event
+carrying the command ID and the source node. A shell group that calls a service
+API directly leaves none of that behind, so an action the ground or a procedure
+has to run belongs in the registry even when an operator reaches it by typing.
+
+`remexec` goes the other way round: it runs an allowlisted shell line on
+another node, on CSP port 8, and returns the text that line printed.
+
+`cmd` reads the registry and runs nothing:
+
+| Command | Prints |
+| --- | --- |
+| `cmd list` | Every command this node carries, with its ID and flags |
+| `cmd describe` | The same, with each argument type and the help |
+| `cmd show <name>` | One command |
 
 ## Identity and time
 
