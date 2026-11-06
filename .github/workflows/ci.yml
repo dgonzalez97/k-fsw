@@ -24,7 +24,7 @@ jobs:
 
     steps:
       - name: Check out K-FSW
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: k-fsw
 
@@ -60,7 +60,7 @@ jobs:
 
     steps:
       - name: Check out K-FSW
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: k-fsw
 
@@ -81,7 +81,7 @@ jobs:
 
     steps:
       - name: Check out K-FSW
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: k-fsw
 
@@ -93,7 +93,7 @@ jobs:
 
       - name: Upload Twister diagnostics
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: twister-diagnostics
           path: |
@@ -109,7 +109,7 @@ jobs:
 
     steps:
       - name: Check out K-FSW
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: k-fsw
 
@@ -135,7 +135,7 @@ jobs:
 
     steps:
       - name: Check out K-FSW
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: k-fsw
 
@@ -159,7 +159,7 @@ jobs:
 
     steps:
       - name: Check out K-FSW
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: k-fsw
 
@@ -176,7 +176,7 @@ jobs:
 
       - name: Upload the analysis report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: codechecker-report
           path: |
@@ -196,7 +196,7 @@ jobs:
 
     steps:
       - name: Check out K-FSW
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: k-fsw
 
@@ -210,7 +210,7 @@ jobs:
 
       - name: Upload Valgrind diagnostics
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: valgrind-diagnostics
           path: build/valgrind/*.log
@@ -227,7 +227,7 @@ jobs:
 
     steps:
       - name: Check out K-FSW
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: k-fsw
 
@@ -239,7 +239,7 @@ jobs:
 
       - name: Upload UBSan diagnostics
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ubsan-diagnostics
           path: |
@@ -258,7 +258,7 @@ jobs:
 
     steps:
       - name: Check out K-FSW
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: k-fsw
           submodules: recursive
@@ -274,7 +274,7 @@ jobs:
 
       - name: Upload Robot diagnostics
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: robot-diagnostics
           path: build/robot/
@@ -286,7 +286,7 @@ jobs:
 
     steps:
       - name: Check out K-FSW
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: k-fsw
 

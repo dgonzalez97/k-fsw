@@ -5,6 +5,7 @@ name: Documentation Pages
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -22,7 +23,7 @@ jobs:
 
     steps:
       - name: Check out K-FSW
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: k-fsw
           # The site carries one directory per version, built from refs in
@@ -30,7 +31,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -72,7 +73,7 @@ jobs:
       # nothing in the job log but the path of a log the runner then discards.
       - name: Keep the coverage log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-diagnostics
           path: |
@@ -103,6 +104,7 @@ jobs:
   deploy:
     name: Deploy documentation to GitHub Pages
     needs: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     environment:
       name: github-pages
