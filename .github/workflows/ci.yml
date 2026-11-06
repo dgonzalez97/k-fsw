@@ -55,7 +55,7 @@ jobs:
         run: python3 ./k-fsw/tools/ci/golden.py
 
   quality:
-    name: QUALITY / clang-format + cppcheck
+    name: QUALITY / clang-format + cppcheck + ruff
     runs-on: ubuntu-24.04
 
     steps:
@@ -68,6 +68,7 @@ jobs:
         uses: ./k-fsw/.github/actions/workspace
         with:
           packages: cppcheck
+          requirements: k-fsw/tools/ci/requirements.txt
 
       - name: Check source quality
         run: ./k-fsw/tools/ci/quality.sh

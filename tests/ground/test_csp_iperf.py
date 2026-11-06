@@ -95,7 +95,7 @@ class IperfTest(unittest.TestCase):
     def test_silence_and_tail_loss(self):
         for silent in [True, False]:
             with self.subTest(silent=silent):
-                def respond(header, data):
+                def respond(header, data, silent=silent):
                     return [kiss_reply(header, data)] if not silent and int.from_bytes(data[8:16], 'big') == 0 else []
                 result, row = self.exchange(respond)
                 self.assertEqual(result.returncode, 2, result.stderr)
@@ -137,7 +137,7 @@ class IperfTest(unittest.TestCase):
                 endpoints = ['--zmq-tx-socket', f'tcp://127.0.0.1:{tx_port}',
                              '--zmq-rx-socket', f'tcp://127.0.0.1:{rx_port}']
                 stop = threading.Event()
-                def relay():
+                def relay(upstream=upstream, downstream=downstream, stop=stop):
                     poller = zmq.Poller()
                     poller.register(upstream, zmq.POLLIN)
                     poller.register(downstream, zmq.POLLIN)

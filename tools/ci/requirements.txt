@@ -1,0 +1,3 @@
+# Python checkers tools/ci/quality.sh runs. Pinned, so a new release of a
+# linter cannot fail a push that did not change any Python.
+ruff==0.14.2

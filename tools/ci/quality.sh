@@ -18,6 +18,30 @@ started=$SECONDS
 "$quality_python" "$KFSW_REPO_DIR/tests/f746-proof-test.py"
 echo "QUALITY: F746 offline proof tests added $((SECONDS - started))s"
 
+# The Python under tools/ and tests/ drives the bench, the release and the
+# ground station, and nothing was checking it. F and E9 are real errors, B is
+# bugbear: the rules that catch a mistake rather than a preference.
+ruff=""
+if [[ -x "$KFSW_WORKSPACE_ROOT/.venv/bin/ruff" ]]; then
+	ruff="$KFSW_WORKSPACE_ROOT/.venv/bin/ruff"
+elif command -v ruff >/dev/null 2>&1; then
+	ruff="$(command -v ruff)"
+else
+	echo "ERROR: ruff is required"
+	echo "Install it in the workspace venv: .venv/bin/pip install ruff"
+	exit 1
+fi
+
+mapfile -d '' python_sources < <(
+	find "$KFSW_REPO_DIR/tools" "$KFSW_REPO_DIR/tests" \
+		-type f -name '*.py' \
+		! -path '*/third_party/*' \
+		-print0 | sort -z
+)
+
+echo "QUALITY: ruff (${#python_sources[@]} files)"
+"$ruff" check --no-cache --select F,E9,B "${python_sources[@]}"
+
 if [[ -x "$KFSW_WORKSPACE_ROOT/.venv/bin/clang-format" ]]; then
 	clang_format="$KFSW_WORKSPACE_ROOT/.venv/bin/clang-format"
 elif command -v clang-format >/dev/null 2>&1; then

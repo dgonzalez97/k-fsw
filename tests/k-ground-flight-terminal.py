@@ -4,7 +4,6 @@ import tempfile
 from pathlib import Path
 import sys
 import threading
-import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / 'hil/resources'))
 from Ground import Ground
