@@ -68,6 +68,21 @@ jobs:
       - name: Measure coverage
         run: ./k-fsw/tools/ci/coverage.sh
 
+      # coverage.sh redirects Twister into a file, so a failure in it leaves
+      # nothing in the job log but the path of a log the runner then discards.
+      - name: Keep the coverage log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-diagnostics
+          path: |
+            build/coverage/twister.log
+            build/coverage/twister/twister.json
+            build/coverage/twister/**/build.log
+            build/coverage/twister/**/handler.log
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Add coverage to the documentation
         run: cp -r build/coverage/html build/docs/site/${{ steps.docs.outputs.default }}/coverage
 
