@@ -74,7 +74,7 @@ class Suites(unittest.TestCase):
             self.script(self.ci / f'{stage}.sh', f'echo {stage} >> "$TRACE"')
         self.script(self.ci / 'golden.py', 'exit 0')
         (self.ci / 'golden.py').write_text('pass\n')
-        for name in ('tools/zephyr-patch.sh', 'tests/zephyr-patch.sh', 'tools/docs/icd.py'):
+        for name in ('tools/zephyr-patch.sh', 'tests/zephyr-patch.sh', 'tools/docs/icd-source.py'):
             self.script(self.repo / name, 'exit 0')
         binary = self.root / 'bin'
         self.script(binary / 'west', 'exit 0')
