@@ -6,7 +6,7 @@ The reference covers the K-FSW public headers in:
 - `kfsw-services/include/kfsw/`
 - `kfsw-comms/include/kfsw/`
 - `kfsw-modules/radio-uhf/include/kfsw/`
-- `kfsw-modules/boton-test/include/kfsw/`
+- `kfsw-modules/button-test/include/kfsw/`
 - `kfsw-modules/temperature-sensor-example/include/kfsw/`
 
 Under **API Reference**, use **API Groups** to browse by component or
@@ -45,7 +45,7 @@ Under **API Reference**, use **API Groups** to browse by component or
 
 - `kfsw/modules/radio_uhf.h`: radio identity, expected serial settings, link
   status and encryption
-- @ref kfsw_modules_boton_test for the button, LEDs and parameters
+- @ref kfsw_modules_button_test for the button, LEDs and parameters
 - @ref kfsw_modules_temp_example for the temperature example
 
 ## Scope

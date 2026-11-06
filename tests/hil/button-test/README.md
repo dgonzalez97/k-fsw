@@ -1,7 +1,7 @@
-# `boton_test` hardware test
+# `button_test` hardware test
 
-The `boton_test` module reads the NUCLEO USER button and drives three LEDs.
-The unit tests and `tests/boton-test-smoke.sh` cover the logic. This script
+The `button_test` module reads the NUCLEO USER button and drives three LEDs.
+The unit tests and `tests/button-test-smoke.sh` cover the logic. This script
 checks the parts that need the board:
 
 - pressing the button increases the counter, and nothing counts while the
@@ -16,7 +16,7 @@ From the workspace root, with the NUCLEO connected:
 ```bash
 source .venv/bin/activate
 export KFSW_DEBUG_SERIAL=/dev/serial/by-id/usb-STMicroelectronics_STM32_STLink_<serial>-if02
-./k-fsw/tests/hil/boton-test/button-acceptance.sh
+./k-fsw/tests/hil/button-test/button-acceptance.sh
 ```
 
 Use `--no-flash` to test the image already on the board.
@@ -26,7 +26,7 @@ Use `--no-flash` to test the image already on the board.
 The script first waits with the board untouched, then prints one line for
 each press with the host time, the counter and the module's `last_press_s`.
 After that it switches the LEDs through both paths, reads them back with
-`boton_test status` and compares the button parameters with the module status.
+`button_test status` and compares the button parameters with the module status.
 
 ## Reading the timeline
 

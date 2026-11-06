@@ -46,8 +46,8 @@ echo "INTEGRATION: ground operator requests over PTY KISS"
 echo "INTEGRATION: shell and local PARAM"
 "$KFSW_REPO_DIR/tests/shell-smoke.sh"
 
-echo "INTEGRATION: boton_test parameters"
-"$KFSW_REPO_DIR/tests/boton-test-smoke.sh"
+echo "INTEGRATION: button_test parameters"
+"$KFSW_REPO_DIR/tests/button-test-smoke.sh"
 
 echo "INTEGRATION: storage"
 "$KFSW_REPO_DIR/tests/storage-smoke.sh"

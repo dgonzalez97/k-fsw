@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Manual hardware test for the boton_test module. Flashes the NUCLEO profile,
+# Manual hardware test for the button_test module. Flashes the NUCLEO profile,
 # prints one line per button press with the device timestamp, and drives the
 # LEDs through the shell and the parameter table. It records the results but
 # doesn't decide pass or fail.
@@ -13,7 +13,7 @@ KFSW_TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../tools" && pwd)"
 source "$KFSW_TOOLS_DIR/_common.sh" nucleo_l496zg
 
 debug_serial="${KFSW_DEBUG_SERIAL:-${KFSW_SERIAL:-}}"
-build_dir="$KFSW_ROOT/build/hil/boton/nucleo_l496zg"
+build_dir="$KFSW_ROOT/build/hil/button/nucleo_l496zg"
 work_dir="$(mktemp -d)"
 debug_stty=""
 capture_pid=""
@@ -67,7 +67,7 @@ trap cleanup EXIT
 
 fail()
 {
-	printf 'BOTON ACCEPTANCE: ABORTED %s\n' "$1" >&2
+	printf 'BUTTON ACCEPTANCE: ABORTED %s\n' "$1" >&2
 	exit 1
 }
 
@@ -100,14 +100,14 @@ fi
 if [[ "$do_flash" -eq 1 ]]; then
 	banner "Build"
 	KFSW_BUILD_DIR="$build_dir" \
-		KFSW_EXTRA_CONF_FILE="$KFSW_REPO_DIR/config/profiles/nucleo-boton-test.conf" \
-		KFSW_EXTRA_DTC_OVERLAY_FILE="$KFSW_REPO_DIR/config/profiles/nucleo-boton-test.overlay" \
+		KFSW_EXTRA_CONF_FILE="$KFSW_REPO_DIR/config/profiles/nucleo-button-test.conf" \
+		KFSW_EXTRA_DTC_OVERLAY_FILE="$KFSW_REPO_DIR/config/profiles/nucleo-button-test.overlay" \
 		"$KFSW_TOOLS_DIR/build.sh" nucleo_l496zg >"$work_dir/build.log" 2>&1 || \
-		fail "the boton_test profile did not build"
+		fail "the button_test profile did not build"
 fi
 
 build_sha="$(git -C "$KFSW_REPO_DIR" rev-parse --short HEAD)"
-debounce_ms="$(sed -n 's/^CONFIG_KFSW_BOTON_TEST_DEBOUNCE_MS=\(.*\)$/\1/p' \
+debounce_ms="$(sed -n 's/^CONFIG_KFSW_BUTTON_TEST_DEBOUNCE_MS=\(.*\)$/\1/p' \
 	"$build_dir/zephyr/.config")"
 printf 'build: %s  debounce: %s ms  recording: %s s\n' \
 	"$build_sha" "$debounce_ms" "$record_s"
@@ -132,16 +132,16 @@ if [[ "$do_flash" -eq 1 ]]; then
 fi
 
 send ""
-send "boton_test status"
+send "button_test status"
 sleep 1
 grep -aq "press_count:" "$work_dir/nucleo.log" || \
-	fail "boton_test is not present in the running image"
+	fail "button_test is not present in the running image"
 
 banner "Baseline"
 printf 'Leave the board untouched for %s s.\n' "$BASELINE_S"
 baseline_before="$(latest_field press_count)"
 sleep "$BASELINE_S"
-send "boton_test status"
+send "button_test status"
 sleep 0.8
 baseline_after="$(latest_field press_count)"
 if [[ "$baseline_before" == "$baseline_after" ]]; then
@@ -172,7 +172,7 @@ while true; do
 	elapsed="$(awk -v a="$now" -v b="$start" 'BEGIN{printf "%.1f", a-b}')"
 	awk -v e="$elapsed" -v r="$record_s" 'BEGIN{exit !(e>=r)}' && break
 
-	printf 'boton_test status\r' >"$debug_serial"
+	printf 'button_test status\r' >"$debug_serial"
 	sleep "$POLL_S"
 	count="$(latest_field press_count)"
 	[[ -z "$count" ]] && continue
@@ -184,7 +184,7 @@ while true; do
 	fi
 done
 
-send "boton_test status"
+send "button_test status"
 sleep 0.8
 final_count="$(latest_field press_count)"
 printf '\ntotal presses recorded: %s (expected 8)\n' \
@@ -195,7 +195,7 @@ for led in green blue red; do
 	printf 'shell: %s on for 3 s\n' "$led"
 	send "test led $led on"
 	sleep 3
-	send "boton_test status"
+	send "button_test status"
 	sleep 0.6
 	printf '  green=%s blue=%s red=%s\n' "$(latest_field led_green)" \
 		"$(latest_field led_blue)" "$(latest_field led_red)"
@@ -209,7 +209,7 @@ for led in green blue red; do
 	printf 'param: hw_test_led_%s = 1 for 3 s\n' "$led"
 	send "param set hw_test_led_$led 1"
 	sleep 3
-	send "boton_test status"
+	send "button_test status"
 	sleep 0.6
 	printf '  green=%s blue=%s red=%s\n' "$(latest_field led_green)" \
 		"$(latest_field led_blue)" "$(latest_field led_red)"
@@ -225,11 +225,11 @@ grep -a "press_count = \|last_press_s = " \
 	"$work_dir/nucleo.log" | tail -2
 printf 'module status press_count: %s\n' "$final_count"
 
-transcript="$KFSW_ROOT/build/hil/boton/acceptance.log"
+transcript="$KFSW_ROOT/build/hil/button/acceptance.log"
 mkdir -p "$(dirname "$transcript")"
 cp "$work_dir/nucleo.log" "$transcript"
 
-printf '\nBOTON ACCEPTANCE: RECORDED build=%s debounce=%sms presses=%s\n' \
+printf '\nBUTTON ACCEPTANCE: RECORDED build=%s debounce=%sms presses=%s\n' \
 	"$build_sha" "$debounce_ms" $(( final_count - baseline_after ))
 printf 'transcript: %s\n' "$transcript"
 printf 'The press timeline and the LED observation are judged by the operator.\n'

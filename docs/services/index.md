@@ -627,7 +627,7 @@ the five repositories has one, and a new table should too.
 | 40 | service | `limits` | `kfsw-services/src/limits-parameters/` |
 | 50 | module | `radio_uhf` | `kfsw-modules/radio-uhf/parameters/` |
 | 51 | module | `temp_example` | `kfsw-modules/temperature-sensor-example/parameters/` |
-| 67 | module | `hw_test` | `kfsw-modules/boton-test/` |
+| 67 | module | `hw_test` | `kfsw-modules/button-test/` |
 
 A table is only registered when its service or module is enabled. The `fwu`
 table is read-only. `health_interval_ms` is checked against the watchdog
@@ -1499,7 +1499,7 @@ these services. Each module has its own parameter table, numbered 50 to 99.
 | --- | --- | --- |
 | `radio-uhf` | 50 | Holybro SiK UHF radio: identity, status and optional link encryption |
 | `temperature-sensor-example` | 51 | The MCU's die temperature, sampled on a work queue; the module to copy |
-| `boton-test` | 67 | A board button and three LEDs, for bench tests |
+| `button-test` | 67 | A board button and three LEDs, for bench tests |
 
 The [kfsw-modules README](https://github.com/dgonzalez97/kfsw-modules#readme)
 says how a module is laid out and how to add one.

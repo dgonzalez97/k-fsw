@@ -235,12 +235,12 @@ if(CONFIG_KFSW_RADIO_UHF)
     target_link_libraries(app PRIVATE kfsw::radio_uhf)
 endif()
 
-if(CONFIG_KFSW_BOTON_TEST)
-    if(NOT TARGET kfsw_boton_test)
+if(CONFIG_KFSW_BUTTON_TEST)
+    if(NOT TARGET kfsw_button_test)
         message(FATAL_ERROR
-            "boton_test was enabled but kfsw-modules did not provide its target")
+            "button_test was enabled but kfsw-modules did not provide its target")
     endif()
-    target_link_libraries(app PRIVATE kfsw::boton_test)
+    target_link_libraries(app PRIVATE kfsw::button_test)
 endif()
 
 if(CONFIG_KFSW_TEMPERATURE_SENSOR_EXAMPLE)

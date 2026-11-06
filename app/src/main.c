@@ -19,8 +19,8 @@
 #if CONFIG_KFSW_RADIO_UHF
 #include <kfsw/modules/radio_uhf.h>
 #endif
-#if CONFIG_KFSW_BOTON_TEST
-#include <kfsw/modules/boton_test.h>
+#if CONFIG_KFSW_BUTTON_TEST
+#include <kfsw/modules/button_test.h>
 #endif
 #if CONFIG_KFSW_TEMPERATURE_SENSOR_EXAMPLE
 #include <kfsw/modules/temperature_sensor_example.h>
@@ -109,7 +109,7 @@ int main(void)
 {
 	uint32_t startup_failures = 0;
 #if CONFIG_KFSW_STORAGE || CONFIG_KFSW_PARAM || CONFIG_KFSW_CSP || CONFIG_KFSW_RADIO_UHF ||        \
-	CONFIG_KFSW_BOTON_TEST || CONFIG_KFSW_COMMAND || CONFIG_KFSW_WATCHDOG ||                   \
+	CONFIG_KFSW_BUTTON_TEST || CONFIG_KFSW_COMMAND || CONFIG_KFSW_WATCHDOG ||                  \
 	CONFIG_KFSW_GNDWDT || CONFIG_KFSW_RESMON || CONFIG_BOOTLOADER_MCUBOOT
 	int result;
 #endif
@@ -252,8 +252,8 @@ int main(void)
 #if CONFIG_KFSW_RADIO_UHF
 		&kfsw_radio_uhf_param_definitions,
 #endif
-#if CONFIG_KFSW_BOTON_TEST
-		&kfsw_boton_test_param_definitions,
+#if CONFIG_KFSW_BUTTON_TEST
+		&kfsw_button_test_param_definitions,
 #endif
 #if CONFIG_KFSW_TEMPERATURE_SENSOR_EXAMPLE
 		&kfsw_temp_example_param_definitions,
@@ -309,13 +309,13 @@ int main(void)
 	}
 #endif
 
-#if CONFIG_KFSW_BOTON_TEST
-	result = kfsw_boton_test_init();
+#if CONFIG_KFSW_BUTTON_TEST
+	result = kfsw_button_test_init();
 	if (result != 0) {
 		startup_failures++;
-		kfsw_log_error("Failed to initialize boton_test: %d", result);
+		kfsw_log_error("Failed to initialize button_test: %d", result);
 	} else {
-		kfsw_log_info("boton_test initialized");
+		kfsw_log_info("button_test initialized");
 	}
 #endif
 

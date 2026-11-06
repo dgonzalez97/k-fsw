@@ -219,7 +219,7 @@ bench, then run the board suite. See @ref testing for optional baseline inputs.
 | 1 | `tests/hil/preflight.sh` | device inventory; confirm wiring separately |
 | 2 | `tools/ci/all.sh --suite board` | software first, then every available automatic board check; reflashes and resets boards |
 | 3 | `tests/hil/shell-smoke.sh rpi_pico_w` | a person to copy the UF2 and reconnect the console |
-| 4 | `tests/hil/boton-test/button-acceptance.sh` | a person to press the button and judge its behaviour |
+| 4 | `tests/hil/button-test/button-acceptance.sh` | a person to press the button and judge its behaviour |
 
 The suite reports the last two checks as NOT RUN. CAN acceptance needs a
 confirmed probes-enabled baseline; encrypted radio needs its prepared flight

@@ -14,8 +14,8 @@
 #include <kfsw/comms/csp.h>
 #include <kfsw/services/parameter.h>
 #include "parameter_internal.h"
-#if CONFIG_KFSW_BOTON_TEST
-#include <kfsw/modules/boton_test.h>
+#if CONFIG_KFSW_BUTTON_TEST
+#include <kfsw/modules/button_test.h>
 #include <zephyr/drivers/gpio/gpio_emul.h>
 #endif
 
@@ -321,16 +321,16 @@ static void check_v1_apply(void)
 }
 #endif
 
-#if CONFIG_KFSW_BOTON_TEST
+#if CONFIG_KFSW_BUTTON_TEST
 static atomic_t gpio_calls;
 static int gpio_error;
 
-int __real_kfsw_boton_test_led_gpio_set(enum kfsw_boton_test_led led, bool on);
+int __real_kfsw_button_test_led_gpio_set(enum kfsw_button_test_led led, bool on);
 
-int __wrap_kfsw_boton_test_led_gpio_set(enum kfsw_boton_test_led led, bool on)
+int __wrap_kfsw_button_test_led_gpio_set(enum kfsw_button_test_led led, bool on)
 {
 	atomic_inc(&gpio_calls);
-	return gpio_error != 0 ? gpio_error : __real_kfsw_boton_test_led_gpio_set(led, on);
+	return gpio_error != 0 ? gpio_error : __real_kfsw_button_test_led_gpio_set(led, on);
 }
 
 int serial_get(void)
@@ -417,9 +417,9 @@ static void check_leds(void)
 	const uint8_t requests[] = {PARAM_PUSH_REQUEST_V2, PARAM_PUSH_REQUEST_V2_HWID};
 	struct kfsw_param_value value = {.type = KFSW_PARAM_U8, .size = 1, .scalar.u8 = 1};
 	const struct kfsw_param_entry *entry = kfsw_param_find_name("led_green");
-	struct kfsw_boton_test_status status;
+	struct kfsw_button_test_status status;
 
-	zassert_ok(kfsw_boton_test_init());
+	zassert_ok(kfsw_button_test_init());
 	atomic_clear(&gpio_calls);
 	/* First assertion must expose GPIO mutation on the parent sources. */
 	check_led_push(PARAM_PUSH_REQUEST_V2, 0, 1, false);
@@ -434,7 +434,7 @@ static void check_leds(void)
 			}
 			check_led_push(requests[i], 0, tail, false);
 			zassert_equal(atomic_get(&gpio_calls), 0);
-			zassert_ok(kfsw_boton_test_get_status(&status));
+			zassert_ok(kfsw_button_test_get_status(&status));
 			zassert_false(status.led_green);
 			zassert_false(status.led_blue);
 		}
@@ -455,7 +455,7 @@ static void check_leds(void)
 		zassert_equal(atomic_get(&gpio_calls), 4);
 		zassert_ok(kfsw_param_read_stored_entry(entry, &value));
 		zassert_equal(value.scalar.u8, 0);
-		zassert_ok(kfsw_boton_test_get_status(&status));
+		zassert_ok(kfsw_button_test_get_status(&status));
 		zassert_false(status.led_green);
 		gpio_error = 0;
 		atomic_clear(&gpio_calls);
@@ -715,15 +715,15 @@ ZTEST(services_param_worker, test_blocked_sampling_keeps_router_running_and_queu
 	const struct kfsw_param_definition_set *sets[] = {
 		&set,
 		&write_set,
-#if CONFIG_KFSW_BOTON_TEST
-		&kfsw_boton_test_param_definitions,
+#if CONFIG_KFSW_BUTTON_TEST
+		&kfsw_button_test_param_definitions,
 #endif
 	};
 	struct kfsw_param_stats stats;
 	int free_before;
 
 	zassert_ok(kfsw_param_init(sets, ARRAY_SIZE(sets)));
-#if CONFIG_KFSW_BOTON_TEST
+#if CONFIG_KFSW_BUTTON_TEST
 	zassert_equal(atomic_get(&gpio_calls), 0, "initialization drove GPIO");
 #endif
 	zassert_ok(kfsw_csp_init());
@@ -804,7 +804,7 @@ ZTEST(services_param_worker, test_blocked_sampling_keeps_router_running_and_queu
 	zassert_ok(k_sem_take(&list_reply, K_SECONDS(1)));
 	zassert_equal(listed_status, 0);
 	zassert_equal(listed_total,
-		      (IS_ENABLED(CONFIG_KFSW_BOTON_TEST) ? 12 : 7) + IS_ENABLED(KFSW_TEST_APPLY));
+		      (IS_ENABLED(CONFIG_KFSW_BUTTON_TEST) ? 12 : 7) + IS_ENABLED(KFSW_TEST_APPLY));
 	zassert_equal(listed_id, KFSW_PARAM_ID(1, 0));
 	uint32_t fingerprint = listed_crc;
 
@@ -813,12 +813,12 @@ ZTEST(services_param_worker, test_blocked_sampling_keeps_router_running_and_queu
 	zassert_equal(listed_status, 0);
 	zassert_equal(listed_id, KFSW_PARAM_ID(20, 0));
 	inject_list(true,
-		    (IS_ENABLED(CONFIG_KFSW_BOTON_TEST) ? 12 : 7) + IS_ENABLED(KFSW_TEST_APPLY),
+		    (IS_ENABLED(CONFIG_KFSW_BUTTON_TEST) ? 12 : 7) + IS_ENABLED(KFSW_TEST_APPLY),
 		    fingerprint);
 	zassert_ok(k_sem_take(&list_reply, K_SECONDS(1)));
 	zassert_equal(listed_status, 1);
 	zassert_equal(listed_total,
-		      (IS_ENABLED(CONFIG_KFSW_BOTON_TEST) ? 12 : 7) + IS_ENABLED(KFSW_TEST_APPLY));
+		      (IS_ENABLED(CONFIG_KFSW_BUTTON_TEST) ? 12 : 7) + IS_ENABLED(KFSW_TEST_APPLY));
 	zassert_equal(listed_crc, fingerprint);
 	push_timeout(8000, true);
 	zassert_equal(writable, 8000);
@@ -843,7 +843,7 @@ ZTEST(services_param_worker, test_blocked_sampling_keeps_router_running_and_queu
 	check_v1_apply();
 #endif
 	check_cached_response();
-#if CONFIG_KFSW_BOTON_TEST
+#if CONFIG_KFSW_BUTTON_TEST
 	check_leds();
 #endif
 	zassert_equal(real, 1.5f);

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-KFSW_BOTON_TEST_TOOL="$(readlink -f "${BASH_SOURCE[0]}")"
-KFSW_TESTS_DIR="$(dirname "$KFSW_BOTON_TEST_TOOL")"
+KFSW_BUTTON_TEST_TOOL="$(readlink -f "${BASH_SOURCE[0]}")"
+KFSW_TESTS_DIR="$(dirname "$KFSW_BUTTON_TEST_TOOL")"
 KFSW_REPO_DIR="$(dirname "$KFSW_TESTS_DIR")"
 KFSW_WORKSPACE_ROOT="$(dirname "$KFSW_REPO_DIR")"
-disabled_build_dir="${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/tests/boton-test-disabled"
-enabled_build_dir="${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/tests/boton-test-enabled"
-work_dir="$(mktemp -d /tmp/kfsw-boton-test.XXXXXX)"
+disabled_build_dir="${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/tests/button-test-disabled"
+enabled_build_dir="${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/tests/button-test-enabled"
+work_dir="$(mktemp -d /tmp/kfsw-button-test.XXXXXX)"
 disabled_log="$work_dir/disabled.log"
 enabled_log="$work_dir/enabled.log"
 
@@ -18,7 +18,7 @@ cleanup()
 
 fail()
 {
-	echo "BOTON TEST RESULT: FAIL"
+	echo "BUTTON TEST RESULT: FAIL"
 	echo "  $1"
 
 	for log_file in "$disabled_log" "$enabled_log"; do
@@ -88,8 +88,8 @@ KFSW_BUILD_DIR="$disabled_build_dir" \
 	KFSW_PRISTINE=always \
 	"$KFSW_REPO_DIR/tools/build.sh" linux
 
-if grep -q '^CONFIG_KFSW_BOTON_TEST=' "$disabled_build_dir/zephyr/.config"; then
-	fail "the default Linux composition enabled boton_test"
+if grep -q '^CONFIG_KFSW_BUTTON_TEST=' "$disabled_build_dir/zephyr/.config"; then
+	fail "the default Linux composition enabled button_test"
 fi
 
 run_image "$disabled_build_dir/zephyr/zephyr.exe" \
@@ -115,23 +115,23 @@ if grep -Eq '^ *67 +module' "$disabled_log"; then
 fi
 
 KFSW_BUILD_DIR="$enabled_build_dir" \
-	KFSW_EXTRA_CONF_FILE="$KFSW_TESTS_DIR/config/boton-test-linux.conf" \
+	KFSW_EXTRA_CONF_FILE="$KFSW_TESTS_DIR/config/button-test-linux.conf" \
 	KFSW_PRISTINE=always \
 	"$KFSW_REPO_DIR/tools/build.sh" linux
 
-grep -qx 'CONFIG_KFSW_BOTON_TEST=y' "$enabled_build_dir/zephyr/.config" || \
-	fail "the test composition did not enable boton_test"
-if grep -q '^CONFIG_KFSW_BOTON_TEST_GPIO=' "$enabled_build_dir/zephyr/.config"; then
+grep -qx 'CONFIG_KFSW_BUTTON_TEST=y' "$enabled_build_dir/zephyr/.config" || \
+	fail "the test composition did not enable button_test"
+if grep -q '^CONFIG_KFSW_BUTTON_TEST_GPIO=' "$enabled_build_dir/zephyr/.config"; then
 	fail "the software composition enabled physical GPIO handling"
 fi
-if grep -q '^CONFIG_KFSW_BOTON_TEST_LED_GPIO=' "$enabled_build_dir/zephyr/.config"; then
+if grep -q '^CONFIG_KFSW_BUTTON_TEST_LED_GPIO=' "$enabled_build_dir/zephyr/.config"; then
 	fail "the software composition enabled physical LED handling"
 fi
 
 run_image "$enabled_build_dir/zephyr/zephyr.exe" \
 	"$work_dir/enabled-flash.bin" "$enabled_log"
 
-expect "$enabled_log" 'boton_test initialized' \
+expect "$enabled_log" 'button_test initialized' \
 	"the enabled module did not initialize"
 # Table, offset, name, type and mode, so a wrong write mode shows up here.
 if ! grep -Eq '^hw_test +0x00 +press_count +u32 +r ' "$enabled_log"; then
@@ -190,4 +190,4 @@ fi
 
 cat "$disabled_log"
 cat "$enabled_log"
-echo "BOTON TEST RESULT: PASS"
+echo "BUTTON TEST RESULT: PASS"

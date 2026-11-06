@@ -94,18 +94,18 @@ every other node to the KISS interface.
 
 ### Button and LED example
 
-`boton_test` is not in the default image. Build it with:
+`button_test` is not in the default image. Build it with:
 
 ```bash
-KFSW_EXTRA_CONF_FILE="$PWD/k-fsw/config/profiles/nucleo-boton-test.conf" \
-KFSW_EXTRA_DTC_OVERLAY_FILE="$PWD/k-fsw/config/profiles/nucleo-boton-test.overlay" \
+KFSW_EXTRA_CONF_FILE="$PWD/k-fsw/config/profiles/nucleo-button-test.conf" \
+KFSW_EXTRA_DTC_OVERLAY_FILE="$PWD/k-fsw/config/profiles/nucleo-button-test.overlay" \
   ./k-fsw/tools/build.sh nucleo_l496zg
 ```
 
 The overlay maps the USER button and the green, blue and red LEDs (LD1 to LD3)
 to the module's chosen properties, so the pins stay in devicetree. The button
 is debounced for 30 ms on the system workqueue, and its values are in table 67.
-The manual test is in `tests/hil/boton-test/`.
+The manual test is in `tests/hil/button-test/`.
 
 ### Wall clock
 

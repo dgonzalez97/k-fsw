@@ -15,9 +15,9 @@ tests:
     extra_configs:
       - CONFIG_GPIO=y
       - CONFIG_GPIO_EMUL=y
-      - CONFIG_KFSW_BOTON_TEST=y
-      - CONFIG_KFSW_BOTON_TEST_LED_GPIO=y
-      - CONFIG_KFSW_BOTON_TEST_SHELL=n
+      - CONFIG_KFSW_BUTTON_TEST=y
+      - CONFIG_KFSW_BUTTON_TEST_LED_GPIO=y
+      - CONFIG_KFSW_BUTTON_TEST_SHELL=n
   kfsw.services.param_worker.apply:
     tags: [unit, services, param, csp]
     platform_allow: [native_sim/native/64]

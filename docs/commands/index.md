@@ -58,7 +58,7 @@ service:
 | `remexec` | `CONFIG_KFSW_REMEXEC` |
 | `comms uhf` | `CONFIG_KFSW_RADIO_UHF_SHELL` |
 | `temp` | `CONFIG_KFSW_TEMP_EXAMPLE_SHELL` |
-| `boton_test`, `test` | `CONFIG_KFSW_BOTON_TEST_SHELL` |
+| `button_test`, `test` | `CONFIG_KFSW_BUTTON_TEST_SHELL` |
 
 ## Two registries
 
@@ -184,11 +184,11 @@ and `csp interfaces`.
 
 | Command | Arguments | Meaning |
 | --- | --- | --- |
-| `boton_test status` | none | Press count, last press and LED states |
+| `button_test status` | none | Press count, last press and LED states |
 | `test led` | `<green|blue|red> <on|off>` | Switch one LED |
 
 ```text
-kfsw:~$ boton_test status
+kfsw:~$ button_test status
 press_count: 0
 last_press_s: 0
 led_green: off

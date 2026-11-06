@@ -29,7 +29,7 @@ target_link_libraries(app PRIVATE kfsw::services kfsw::comms kfsw_libparam)
 
 zephyr_link_libraries(-Wl,--wrap=csp_buffer_get)
 
-if(CONFIG_KFSW_BOTON_TEST)
-    target_link_libraries(app PRIVATE kfsw::boton_test)
-    zephyr_link_libraries(-Wl,--wrap=kfsw_boton_test_led_gpio_set)
+if(CONFIG_KFSW_BUTTON_TEST)
+    target_link_libraries(app PRIVATE kfsw::button_test)
+    zephyr_link_libraries(-Wl,--wrap=kfsw_button_test_led_gpio_set)
 endif()

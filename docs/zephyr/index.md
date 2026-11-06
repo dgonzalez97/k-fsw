@@ -138,7 +138,7 @@ To work on a layered one, build it with its profiles and then open that build
 directory:
 
 ```bash
-KFSW_EXTRA_CONF_FILE="$PWD/k-fsw/config/profiles/nucleo-can.conf;$PWD/k-fsw/config/profiles/nucleo-boton-test.conf" \
+KFSW_EXTRA_CONF_FILE="$PWD/k-fsw/config/profiles/nucleo-can.conf;$PWD/k-fsw/config/profiles/nucleo-button-test.conf" \
   ./k-fsw/tools/build.sh nucleo_l496zg
 west build -t menuconfig -d build/nucleo_l496zg
 ```

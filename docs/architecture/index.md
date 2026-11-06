@@ -32,7 +32,7 @@ only when the option on the label is enabled.
 ```mermaid
 flowchart TB
     APP["k-fsw app: main.c, tables, shell adapters"]
-    MOD["kfsw-modules: radio-uhf, temperature, gpredict, boton-test"]
+    MOD["kfsw-modules: radio-uhf, temperature, gpredict, button-test"]
     SVC["kfsw-services: boot, log, PARAM, commands, HK, FWU, health"]
     COMMS["kfsw-comms: CSP setup, router, KISS, CAN"]
     PLAT["kfsw-platform: time, storage, reset cause, watchdog"]
@@ -105,9 +105,9 @@ The application selects it and passes its definition set to PARAM.
 
 - `radio-uhf` reports the selected Holybro SiK identity and expected serial
   configuration. The UART/KISS data path is in `kfsw-comms`.
-- `boton_test` handles debouncing, the press count, the last press time and
+- `button_test` handles debouncing, the press count, the last press time and
   the LED state.
-  Table 67 exposes its values. Use `kfsw_boton_test_get_status()` for a
+  Table 67 exposes its values. Use `kfsw_button_test_get_status()` for a
   consistent snapshot of all five fields.
 - `temperature-sensor-example` reads a configured sensor and publishes
   samples and status in table 51.
