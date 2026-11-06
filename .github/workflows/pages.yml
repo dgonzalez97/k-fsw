@@ -30,19 +30,15 @@ jobs:
           # this clone, so a shallow checkout would publish only main.
           fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      # The same setup every Software CI job uses. Standing up the workspace
+      # here instead is how this job came to build an unpatched Zephyr: the
+      # composite action is what runs tools/zephyr-patch.sh, and without it the
+      # ZMS sector-close fix was missing and the coverage suites failed here and
+      # nowhere else.
+      - name: Set up the workspace
+        uses: ./k-fsw/.github/actions/workspace
         with:
-          python-version: "3.12"
-
-      - name: Set up the west workspace
-        uses: zephyrproject-rtos/action-zephyr-setup@v1
-        with:
-          app-path: k-fsw
-          toolchains: arm-zephyr-eabi
-
-      - name: Install Doxygen
-        run: sudo apt-get install --yes doxygen
+          packages: doxygen
 
       - name: Install gcovr and plotly
         run: pip install gcovr plotly
