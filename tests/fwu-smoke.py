@@ -113,7 +113,7 @@ def remote_parameter(node, field, value):
 
 def lite_transfer(source, target, path, size, contacts):
     progress = []
-    for attempt in range(16):
+    for _ in range(16):
         result = source.command(f'fwu_lite send 16 {path}',
                                 r'Upload (?:complete|stopped)[^\r\n]*', timeout=90)[0]
         state = target.command('fwu_lite status',

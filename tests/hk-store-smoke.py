@@ -31,7 +31,7 @@ def main():
             # scheduler before querying so the window cannot move.
             time.sleep(11)
             flight('hk period 0 0', 'report 0 every 0 ms')
-            stored = flight('hk stored 0', 'held: seq')
+            flight('hk stored 0', 'held: seq')
             print('  [ok]   the stored window can be read back')
             flight('hk extract 0 /kfsw/hk/dataset.bin from=0 to=9', 'Extracted 10 records')
             flight('hk stored 0 from=1 to=1', 'selected: 1')

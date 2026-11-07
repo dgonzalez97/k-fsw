@@ -37,7 +37,7 @@ def main():
                     version, report, sequence, seconds, entries, flags, unsigned, signed = struct.unpack('>BBHIBBIi', data)
                     assert (version, report, entries, flags, unsigned, signed) == (1, 0, 2, 0, 42, -7)
                     sequences.append(sequence)
-                assert all(right > left for left, right in zip(sequences, sequences[1:])), sequences
+                assert all(right > left for left, right in zip(sequences, sequences[1:], strict=False)), sequences
                 print("  [ok]   the beacon is header plus the report's values: 42 and -7")
                 print('  [ok]   beacons keep coming with advancing sequences')
                 match = node.command('hk show', r'beacons sent: (\d+)')

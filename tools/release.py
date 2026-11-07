@@ -111,7 +111,7 @@ def check_inputs():
     version = required("KFSW_IMAGE_VERSION")
     match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)\+(\d+)", version)
     if not match or any(int(v) > limit for v, limit in zip(
-        match.groups(), (255, 255, 65535, 4294967295)
+        match.groups(), (255, 255, 65535, 4294967295), strict=True
     )):
         raise ValueError("KFSW_IMAGE_VERSION must fit MCUboot major.minor.patch+build")
     epoch = required("SOURCE_DATE_EPOCH")

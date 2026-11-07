@@ -110,7 +110,7 @@ class CspToolsTest(unittest.TestCase):
     def test_logs_missing_duplicate_and_truncated_replies_fail(self):
         for fault in ['missing', 'duplicate', 'truncated', 'no_end']:
             with self.subTest(fault=fault):
-                def respond(_header, payload):
+                def respond(_header, payload, fault=fault):
                     start, record, end = self.log_replies(payload)
                     return {'missing': [start, end], 'duplicate': [start, record, record, end],
                             'truncated': [start, record[:-1], end], 'no_end': [start, record]}[fault]

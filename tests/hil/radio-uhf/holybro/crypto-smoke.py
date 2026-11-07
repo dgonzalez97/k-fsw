@@ -93,7 +93,7 @@ def native(stack, executable, output, label, prompt):
 
 
 def sessions(ground, flight):
-    for attempt in range(6):
+    for _ in range(6):
         ground.run("comms uhf connect")
         time.sleep(0.7)
         gs = ground.run("comms uhf status")
@@ -111,7 +111,7 @@ def tests(ground, flight, bridge, key, reboot):
         console.run("param get uhf_key_hex", 'uhf_key_hex = ""')
         console.run("param get uhf_crypto_error", "uhf_crypto_error = 0")
     sessions(ground, flight)
-    for repeat in range(3):
+    for _ in range(3):
         ground.run("csp ping 2", "CSP ping 2: success")
         flight.run("csp ping 17", "CSP ping 17: success")
     ground.run("param listall 2", "uhf_replays", timeout=60)
@@ -168,7 +168,7 @@ def tests(ground, flight, bridge, key, reboot):
         sessions(ground, flight)
         ground.run("csp ping 2", "CSP ping 2: success")
         print("Saved key and replay rejection after flight reset: PASS", flush=True)
-    for label, console in (("flight", flight), ("ground", ground)):
+    for _label, console in (("flight", flight), ("ground", ground)):
         console.run("csp interfaces")
         console.run("kernel thread stacks")
         console.run("comms uhf status")

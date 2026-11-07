@@ -13,6 +13,7 @@ import tempfile
 import unittest
 from types import SimpleNamespace
 
+from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
@@ -172,7 +173,10 @@ class ProofTests(unittest.TestCase):
                 damaged = bytearray(original)
                 damaged[position] ^= 1
                 path.write_bytes(damaged)
-                with self.assertRaises(Exception):
+                # A flipped bit in the header or the TLVs is refused by a
+                # structural check; one in the payload only fails the
+                # signature, so both are the proof that the byte mattered.
+                with self.assertRaises((ValueError, InvalidSignature)):
                     self.check()
         path.write_bytes(original + bytes(0x40000))
         with self.assertRaisesRegex(ValueError, "budget"):

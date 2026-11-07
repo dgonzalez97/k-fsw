@@ -5,6 +5,7 @@ name: Documentation Pages
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -22,26 +23,22 @@ jobs:
 
     steps:
       - name: Check out K-FSW
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: k-fsw
           # The site carries one directory per version, built from refs in
           # this clone, so a shallow checkout would publish only main.
           fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      # The same setup every Software CI job uses. Standing up the workspace
+      # here instead is how this job came to build an unpatched Zephyr: the
+      # composite action is what runs tools/zephyr-patch.sh, and without it the
+      # ZMS sector-close fix was missing and the coverage suites failed here and
+      # nowhere else.
+      - name: Set up the workspace
+        uses: ./k-fsw/.github/actions/workspace
         with:
-          python-version: "3.12"
-
-      - name: Set up the west workspace
-        uses: zephyrproject-rtos/action-zephyr-setup@v1
-        with:
-          app-path: k-fsw
-          toolchains: arm-zephyr-eabi
-
-      - name: Install Doxygen
-        run: sudo apt-get install --yes doxygen
+          packages: doxygen
 
       - name: Install gcovr and plotly
         run: pip install gcovr plotly
@@ -72,7 +69,7 @@ jobs:
       # nothing in the job log but the path of a log the runner then discards.
       - name: Keep the coverage log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-diagnostics
           path: |
@@ -103,6 +100,7 @@ jobs:
   deploy:
     name: Deploy documentation to GitHub Pages
     needs: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     environment:
       name: github-pages

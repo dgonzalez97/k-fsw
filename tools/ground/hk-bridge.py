@@ -57,7 +57,10 @@ def csp_max_node():
     return 31 if csp_version == 1 else 16383
 CSP_FCRC32 = 0x01
 
-HK_PORT = 14
+# The node's CONFIG_KFSW_HK_CSP_PORT. Changed by --port, like --csp-version,
+# because a node built with another port cannot be read on this one.
+HK_PORT_DEFAULT = 14
+HK_PORT = HK_PORT_DEFAULT
 HK_PROTOCOL_VERSION = 1
 HK_HEADER_BYTES = 10
 HK_FLAG_INCOMPLETE = 0x01
@@ -364,9 +367,13 @@ def main():
                         help="host:port of the UDP link, or 'none'")
     parser.add_argument("--csp-version", type=int, choices=(1, 2), default=2,
                         help="CSP header of the link, as the nodes are built")
+    parser.add_argument("--port", type=int, default=HK_PORT_DEFAULT,
+                        help="housekeeping CSP port, as the node is built "
+                             f"(CONFIG_KFSW_HK_CSP_PORT, default {HK_PORT_DEFAULT})")
     args = parser.parse_args()
-    global csp_version
+    global csp_version, HK_PORT
     csp_version = args.csp_version
+    HK_PORT = args.port
     if args.definitions and not args.store:
         parser.error("--definitions needs --store: it is kept beside the samples")
     if args.replay and (args.capture or args.listen or args.node is not None):
@@ -376,6 +383,8 @@ def main():
     if not (0 <= args.source <= csp_max_node() and 16 <= args.sport <= 63
             and 0 <= args.report < 16 and 1 <= args.count <= 255 and args.baud > 0):
         parser.error("invalid address, port, report, count or baud rate")
+    if not 0 <= args.port <= 63:
+        parser.error("housekeeping port must be 0..63")
     if args.class_mask is not None and not 0 <= args.class_mask <= 255:
         parser.error("class mask must be 0..255")
     if (not math.isfinite(args.timeout) or not 0 < args.timeout <= 3600
