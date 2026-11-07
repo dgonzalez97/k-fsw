@@ -448,8 +448,124 @@ def resolve(token, defines):
     return defines.get(token, token)
 
 
+STRING_LITERAL = re.compile(r'"(?:[^"\\]|\\.)*"')
+NUMBER = r"(?:0x[0-9a-fA-F]+|\d+)"
+
+
+def function_macros(text):
+    """The function-like #defines of a source, as {name: (parameters, body)}."""
+    found = {}
+    for match in re.finditer(
+        r"^[ \t]*#[ \t]*define[ \t]+(\w+)\(([^)]*)\)[ \t]*(.*)$",
+        text.replace("\\\n", " "),
+        re.MULTILINE,
+    ):
+        parameters = [name.strip() for name in match.group(2).split(",") if name.strip()]
+        found[match.group(1)] = (parameters, match.group(3))
+    return found
+
+
+def number_defines(text):
+    """The object-like #defines of a source whose value is one number."""
+    return dict(
+        re.findall(
+            rf"^[ \t]*#[ \t]*define[ \t]+(\w+)[ \t]+({NUMBER}[uU]?)[ \t]*$", text, re.MULTILINE
+        )
+    )
+
+
+def collect_lists(workspace):
+    """Lists a composition header names, `#define LIST(ITEM) ITEM(a, 0) ITEM(b, 1)`."""
+    lists = {}
+    for root in HEADER_ROOTS:
+        base = workspace / root
+        if not base.is_dir():
+            continue
+        for path in base.rglob("*.h"):
+            try:
+                text = strip_comments(path.read_text(errors="replace"))
+            except OSError:
+                continue
+            for name, (parameters, body) in function_macros(text).items():
+                if len(parameters) != 1:
+                    continue
+                items = re.findall(rf"\b{parameters[0]}\s*\(([^()]*)\)", body)
+                if items:
+                    lists[name] = [split_args(item) for item in items]
+    return lists
+
+
+def substitute(body, parameters, arguments):
+    """One macro expansion: `#p` becomes a string, `p` its argument, `##` joins.
+
+    String literals already in the body are left as written.
+    """
+    literals = STRING_LITERAL.findall(body)
+    out = []
+    for index, piece in enumerate(STRING_LITERAL.split(body)):
+        for parameter, argument in zip(parameters, arguments, strict=True):
+            piece = re.sub(rf"(?<!#)#\s*{parameter}\b", f'"{argument}"', piece)
+            piece = re.sub(rf"\b{parameter}\b", argument, piece)
+        out.append(re.sub(r"\s*##\s*", "", piece))
+        if index < len(literals):
+            out.append(literals[index])
+    return "".join(out)
+
+
+def expand(text, macros, depth=0):
+    """Expand calls to the file's own function-like macros, nested ones included."""
+    if not macros or depth > 8:
+        return text
+    out, last = [], 0
+    for name, arguments, start in macro_calls(text, macros):
+        if start < last:
+            continue
+        parameters, body = macros[name]
+        end = text.index("(", start) + 1 + len(arguments) + 1
+        out.append(text[last:start])
+        out.append(substitute(body, parameters, split_args(arguments)))
+        last = end
+    out.append(text[last:])
+    expanded = "".join(out)
+    return expanded if expanded == text else expand(expanded, macros, depth + 1)
+
+
+def expand_lists(body, macros, lists):
+    """Replace `LIST(TEMPLATE)` in a definitions array by one TEMPLATE per item."""
+    if not lists:
+        return body
+    out, last = [], 0
+    for name, argument, start in macro_calls(body, lists):
+        template = argument.strip()
+        if template not in macros:
+            continue
+        parameters, template_body = macros[template]
+        out.append(body[last:start])
+        for arguments in lists[name]:
+            out.append(expand(substitute(template_body, parameters, arguments), macros))
+        last = body.index("(", start) + 1 + len(argument) + 1
+    out.append(body[last:])
+    return "".join(out)
+
+
+def offset_text(raw, numbers):
+    """An offset as the table prints it, computed when the source writes an expression."""
+    raw = (raw or "").strip()
+    if re.fullmatch(rf"{NUMBER}[uU]?", raw):
+        return raw
+    expression = re.sub(r"\b\w+\b", lambda word: numbers.get(word.group(0), word.group(0)), raw)
+    expression = re.sub(rf"\b({NUMBER})[uU]\b", r"\1", expression)
+    if not re.fullmatch(r"[0-9a-fA-Fx+*() \t]+", expression):
+        return raw
+    try:
+        return f"0x{eval(expression, {'__builtins__': {}}):02x}"
+    except (NameError, SyntaxError, TypeError, ValueError):
+        return raw
+
+
 def collect_parameters(workspace):
     defines = collect_defines(workspace)
+    lists = collect_lists(workspace)
     arrays, sets = {}, []
     for root in ROOTS:
         base = workspace / root
@@ -463,11 +579,14 @@ def collect_parameters(workspace):
             if "kfsw_param_definition" not in text:
                 continue
             where = str(path.relative_to(workspace))
+            macros = function_macros(text)
+            numbers = number_defines(text)
 
             for match in re.finditer(
                 r"struct\s+kfsw_param_definition\s+(\w+)\s*\[\s*\]\s*=", text
             ):
                 body, _ = balanced(text, match.end())
+                body = expand_lists(body, macros, lists)
                 entries = []
                 position = 0
                 while True:
@@ -477,6 +596,7 @@ def collect_parameters(workspace):
                         break
                     fields = designators(inner)
                     if "name" in fields:
+                        fields["offset"] = offset_text(fields.get("offset"), numbers)
                         entries.append(fields)
                 arrays[match.group(1)] = entries
 
