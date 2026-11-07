@@ -8,3 +8,13 @@ tests:
       - native_sim/native/64
     integration_platforms:
       - native_sim/native/64
+  kfsw.services.health.parameters:
+    tags: [unit, services, health]
+    extra_configs:
+      - CONFIG_KFSW_PARAM=y
+      - CONFIG_KFSW_HEALTH_SLOTS=y
+      - CONFIG_KFSW_HEALTH_SLOTS_HEADER="health_test_slots.h"
+    platform_allow:
+      - native_sim/native/64
+    integration_platforms:
+      - native_sim/native/64

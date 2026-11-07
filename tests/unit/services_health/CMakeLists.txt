@@ -14,5 +14,7 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(kfsw_services_health_tests LANGUAGES C)
 
 target_sources(app PRIVATE src/main.c)
+# The slot list the parameters variant names; kfsw-services includes it.
+zephyr_include_directories(include)
 target_link_libraries(app PRIVATE kfsw::services)
 zephyr_link_libraries(-Wl,--wrap=kfsw_platform_watchdog_configured_timeout_ms)

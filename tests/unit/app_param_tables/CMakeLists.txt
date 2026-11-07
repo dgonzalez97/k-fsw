@@ -33,4 +33,5 @@ target_sources(app PRIVATE
 target_include_directories(app PRIVATE
     ../../../app/src
 )
+zephyr_include_directories(../../../app/include)
 target_link_libraries(app PRIVATE kfsw::services kfsw::comms)

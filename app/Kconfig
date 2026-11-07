@@ -54,6 +54,15 @@ config KFSW_HIL_PROBES
 
 endmenu
 
+# The components this composition names in table 31.
+config KFSW_HEALTH_SLOTS
+	default y
+	depends on KFSW_HEALTH && KFSW_PARAM
+
+config KFSW_HEALTH_SLOTS_HEADER
+	default "kfsw/app/health_slots.h"
+	depends on KFSW_HEALTH_SLOTS
+
 config SHELL_PROMPT_UART
 	default "kfsw:~$ " if KFSW_DEBUG_SHELL
 
