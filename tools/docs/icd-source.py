@@ -50,6 +50,43 @@ def strip_comments(text):
     return "".join(out)
 
 
+def select_branches(text):
+    """Reduce each #if/#else to its first branch, blanking the rest.
+
+    A macro call may be split across a conditional with each branch supplying
+    its own closing parenthesis, so counting both leaves the text unbalanced and
+    the enclosing set ends early. Lines are blanked rather than removed, so byte
+    offsets stay valid and guard_at() still reports the condition a call sits
+    under.
+    """
+    chars = list(text)
+
+    def blank(start, end):
+        for i in range(start, end):
+            if chars[i] != "\n":
+                chars[i] = " "
+
+    stack, position = [], 0
+    for line in text.splitlines(keepends=True):
+        start, end = position, position + len(line)
+        position = end
+        dropping = any(stack)
+        match = re.match(r"[ \t]*#[ \t]*(if|ifdef|ifndef|elif|else|endif)\b(.*)", line)
+        if match:
+            kind, rest = match.group(1), match.group(2)
+            blank(start, end)
+            if kind in ("if", "ifdef", "ifndef"):
+                # `#if 0` guards code that is not built at all.
+                stack.append(kind == "if" and rest.strip().startswith("0"))
+            elif kind in ("elif", "else") and stack:
+                stack[-1] = True
+            elif kind == "endif" and stack:
+                stack.pop()
+        elif dropping:
+            blank(start, end)
+    return "".join(chars)
+
+
 def macro_calls(text, macros, base=0):
     """Yield (macro, argument text, absolute offset) in source order.
 
@@ -186,7 +223,7 @@ def collect(workspace):
 
     for path in files:
         try:
-            text = strip_comments(path.read_text(errors="replace"))
+            text = select_branches(strip_comments(path.read_text(errors="replace")))
         except OSError:
             continue
         if "SHELL_" not in text:
@@ -483,7 +520,7 @@ def collect_lists(workspace):
             continue
         for path in base.rglob("*.h"):
             try:
-                text = strip_comments(path.read_text(errors="replace"))
+                text = select_branches(strip_comments(path.read_text(errors="replace")))
             except OSError:
                 continue
             for name, (parameters, body) in function_macros(text).items():
@@ -573,7 +610,7 @@ def collect_parameters(workspace):
             continue
         for path in sorted(base.rglob("*.c")):
             try:
-                text = strip_comments(path.read_text(errors="replace"))
+                text = select_branches(strip_comments(path.read_text(errors="replace")))
             except OSError:
                 continue
             if "kfsw_param_definition" not in text:
@@ -715,7 +752,7 @@ def collect_commands(workspace):
             if "/tests/" in str(path) or path.name == "main.c":
                 continue
             try:
-                text = strip_comments(path.read_text(errors="replace"))
+                text = select_branches(strip_comments(path.read_text(errors="replace")))
             except OSError:
                 continue
             if "kfsw_command_definition" not in text:
