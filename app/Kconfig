@@ -63,6 +63,13 @@ config KFSW_HEALTH_SLOTS_HEADER
 	default "kfsw/app/health_slots.h"
 	depends on KFSW_HEALTH_SLOTS
 
+# libcsp defaults to 16, and the service block 8 to 16 already fills it, so
+# there is no room for another port. Both CSP 1 and CSP 2 carry a 6 bit port, so
+# 32 still leaves the outgoing source ports libcsp places above the bind limit
+# (CSP_PORT_MAX_BIND + 1 + i, for CSP_CONN_MAX connections) inside 63.
+config CSP_PORT_MAX_BIND
+	default 32
+
 config SHELL_PROMPT_UART
 	default "kfsw:~$ " if KFSW_DEBUG_SHELL
 
