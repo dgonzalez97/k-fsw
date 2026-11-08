@@ -31,6 +31,16 @@ export PYTHONPATH="$KFSW_TERMINAL_RUNNER/src${PYTHONPATH:+:$PYTHONPATH}"
 
 output_dir="${KFSW_ROBOT_OUT_DIR:-${KFSW_OUTPUT_ROOT:-$KFSW_WORKSPACE_ROOT/build}/robot}"
 
+# A scenario that writes a directory of results refuses an existing one, so
+# that two runs cannot be read as one. That turns the second run on a desk
+# into a failure whose message is about a directory and not about the bench,
+# which is a slow thing to recognise. The runner owns the output tree, so it
+# clears those directories here rather than asking each case to tolerate
+# leftovers. tools/ci/robot.sh does the same for the suites it drives.
+for stale in iperf-bench; do
+	rm -rf -- "$output_dir/$stale"
+done
+
 # shellcheck source=tests/hil/shapes.sh
 source "$KFSW_HIL_DIR/shapes.sh"
 

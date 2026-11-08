@@ -347,6 +347,10 @@ report() {
 }
 
 signing_key="${KFSW_MCUBOOT_KEY:-$HOME/.config/kfsw/mcuboot-signing-key.pem}"
+# Resolved the same way the inventory above resolves it, so the listing and
+# the export can never disagree about where the tools are.
+host_tools_dir="${CARGO_TARGET_DIR:-${KFSW_CSP_TOOLS_DIR:-$KFSW_WORKSPACE_ROOT/tools/kfsw-csp-tools}/target}/release"
+iperf_tool="${KFSW_CSP_IPERF_TEST_BINARY:-$host_tools_dir/csp-iperf}"
 
 discover_serial
 discover_probe
@@ -371,6 +375,16 @@ if [[ "${1:-}" == "--export" ]]; then
 	# which key to sign with, so the bench declares it here once. A board
 	# carrying MCUboot otherwise fails the first case of the board shape.
 	[[ -r "$signing_key" ]] && printf 'KFSW_MCUBOOT_KEY=%s\n' "$signing_key"
+	# The host tools are a bench input too. The CSP echo benchmark skips
+	# without its binary and the CSP link, and a scenario that skips for a
+	# missing variable looks exactly like one that passed, so this coverage
+	# was lost in silence until a run declared them by hand. Only the
+	# benchmark is named here: the diagnostics and firmware-batch cases also
+	# want a console variable, and they need a composition carrying the
+	# command service, which this shape does not flash.
+	[[ -n "$found_second_serial" ]] &&
+		printf 'KFSW_DIAGNOSTICS_KISS=%s\n' "$found_second_serial"
+	[[ -x "$iperf_tool" ]] && printf 'KFSW_CSP_IPERF_TEST_BINARY=%s\n' "$iperf_tool"
 	exit 0
 fi
 
