@@ -22,6 +22,11 @@ uint32_t __wrap_kfsw_platform_watchdog_configured_timeout_ms(void)
 
 static void *health_setup(void)
 {
+#if CONFIG_KFSW_HEALTH_SLOTS
+	const struct kfsw_param_definition_set *sets[] = {&kfsw_health_param_definitions};
+
+	zassert_ok(kfsw_param_init(sets, ARRAY_SIZE(sets)));
+#endif
 	return NULL;
 }
 
@@ -229,5 +234,140 @@ ZTEST(services_health, test_state_names_are_reported)
 	zassert_str_equal(kfsw_health_state_name(KFSW_HEALTH_STOPPED), "stopped");
 	zassert_str_equal(kfsw_health_state_name((enum kfsw_health_state)77), "unknown");
 }
+
+#if CONFIG_KFSW_HEALTH_SLOTS
+/* --------------------------------------------------------- per-component slots */
+
+/* health_test_slots.h names alpha at index 0, gamma at 1 and beta at 3. */
+#define ALPHA_STATE_OFFSET 0x20U
+#define ALPHA_SINCE_OFFSET 0x24U
+#define GAMMA_STATE_OFFSET 0x28U
+#define BETA_STATE_OFFSET 0x38U
+
+static uint8_t read_u8(const char *name)
+{
+	struct kfsw_param_value value;
+
+	zassert_ok(kfsw_param_get(name, &value), "%s", name);
+	zassert_equal(value.type, KFSW_PARAM_U8, "%s", name);
+	return value.scalar.u8;
+}
+
+static uint32_t read_u32(const char *name)
+{
+	struct kfsw_param_value value;
+
+	zassert_ok(kfsw_param_get(name, &value), "%s", name);
+	zassert_equal(value.type, KFSW_PARAM_U32, "%s", name);
+	return value.scalar.u32;
+}
+
+static uint8_t offset_of(const char *name)
+{
+	struct kfsw_param_info info;
+
+	zassert_ok(kfsw_param_get_info(name, &info), "%s", name);
+	zassert_equal(info.table, KFSW_HEALTH_PARAM_TABLE_ID, "%s", name);
+	return info.offset;
+}
+
+ZTEST(services_health, test_a_registered_slot_reads_its_state_and_age)
+{
+	struct kfsw_param_value by_id;
+	uint32_t since;
+	uint8_t handle = 0U;
+
+	zassert_ok(kfsw_health_register("alpha", 5000U, &handle));
+	zassert_equal(read_u8("health_alpha_state"), KFSW_HEALTH_SLOT_OK);
+	since = read_u32("health_alpha_since_ms");
+	zassert_true(since < 5000U, "just registered, so well inside its deadline");
+
+	k_sleep(K_MSEC(30));
+	zassert_true(read_u32("health_alpha_since_ms") >= since + 30U,
+		     "the age is sampled on read, not latched at registration");
+
+	/* The ground addresses it by table and offset. */
+	zassert_equal(offset_of("health_alpha_state"), ALPHA_STATE_OFFSET);
+	zassert_equal(offset_of("health_alpha_since_ms"), ALPHA_SINCE_OFFSET);
+	zassert_ok(kfsw_param_get_by_id(
+		KFSW_PARAM_ID(KFSW_HEALTH_PARAM_TABLE_ID, ALPHA_STATE_OFFSET), &by_id));
+	zassert_equal(by_id.scalar.u8, KFSW_HEALTH_SLOT_OK);
+
+	zassert_ok(kfsw_health_report(handle));
+	zassert_true(read_u32("health_alpha_since_ms") < 30U, "a report moves the age back");
+}
+
+ZTEST(services_health, test_an_overdue_slot_reads_overdue)
+{
+	uint8_t handle = 0U;
+
+	zassert_ok(kfsw_health_register("alpha", SHORT_DEADLINE_MS, &handle));
+	k_sleep(K_MSEC(SHORT_DEADLINE_MS + (SHORT_DEADLINE_MS / 2U)));
+
+	zassert_equal(read_u8("health_alpha_state"), KFSW_HEALTH_SLOT_OVERDUE);
+	zassert_true(read_u32("health_alpha_since_ms") > SHORT_DEADLINE_MS);
+
+	/* Observation only: the service state and its decision are untouched. */
+	zassert_equal(read_u8("health_state"), KFSW_HEALTH_STOPPED);
+	zassert_equal(kfsw_health_evaluate(), -EINVAL);
+
+	/* A report clears it: the slot follows the component, it does not latch. */
+	zassert_ok(kfsw_health_report(handle));
+	zassert_equal(read_u8("health_alpha_state"), KFSW_HEALTH_SLOT_OK);
+}
+
+ZTEST(services_health, test_an_unregistered_slot_reads_absent)
+{
+	uint8_t handle = 0U;
+
+	zassert_equal(read_u8("health_beta_state"), KFSW_HEALTH_SLOT_ABSENT);
+	zassert_equal(read_u32("health_beta_since_ms"), KFSW_HEALTH_SLOT_SINCE_ABSENT);
+	zassert_not_equal(KFSW_HEALTH_SLOT_ABSENT, KFSW_HEALTH_SLOT_OK);
+
+	/* A component that stops being watched goes back to absent. */
+	zassert_ok(kfsw_health_register("alpha", 5000U, &handle));
+	zassert_equal(read_u8("health_alpha_state"), KFSW_HEALTH_SLOT_OK);
+	zassert_ok(kfsw_health_unregister(handle));
+	zassert_equal(read_u8("health_alpha_state"), KFSW_HEALTH_SLOT_ABSENT);
+	zassert_equal(read_u32("health_alpha_since_ms"), KFSW_HEALTH_SLOT_SINCE_ABSENT);
+}
+
+ZTEST(services_health, test_registration_order_does_not_pick_the_slot)
+{
+	struct kfsw_param_info info;
+	uint8_t other = 0U;
+	uint8_t beta = 0U;
+
+	/* beta takes the second registration entry but keeps index 3's offset. */
+	zassert_ok(kfsw_health_register("zeta", 5000U, &other));
+	zassert_ok(kfsw_health_register("beta", 5000U, &beta));
+	zassert_not_equal(beta, 3U);
+
+	zassert_equal(offset_of("health_beta_state"), BETA_STATE_OFFSET);
+	zassert_equal(read_u8("health_beta_state"), KFSW_HEALTH_SLOT_OK);
+	zassert_equal(offset_of("health_gamma_state"), GAMMA_STATE_OFFSET);
+	zassert_equal(read_u8("health_gamma_state"), KFSW_HEALTH_SLOT_ABSENT);
+
+	/* A component the composition does not name has no slot. */
+	zassert_equal(kfsw_param_get_info("health_zeta_state", &info), -ENOENT);
+}
+
+ZTEST(services_health, test_slots_leave_the_aggregate_offsets_alone)
+{
+	struct kfsw_param_value value = {.type = KFSW_PARAM_U8, .size = sizeof(uint8_t)};
+
+	zassert_equal(offset_of("health_faulted_by"), 0x00U);
+	zassert_equal(offset_of("health_faults"), 0x10U);
+	zassert_equal(offset_of("health_feeds"), 0x14U);
+	zassert_equal(offset_of("health_interval_ms"), 0x18U);
+	zassert_equal(offset_of("health_state"), 0x1aU);
+	zassert_equal(offset_of("health_feeding"), 0x1bU);
+	zassert_equal(offset_of("health_components"), 0x1cU);
+
+	/* Written only by the service, never by an operator. */
+	value.scalar.u8 = KFSW_HEALTH_SLOT_OK;
+	zassert_equal(kfsw_param_set("health_alpha_state", &value), -EACCES);
+}
+#endif
 
 ZTEST_SUITE(services_health, NULL, health_setup, health_before, NULL, NULL);

@@ -106,6 +106,7 @@ if [[ -d "$KFSW_WORKSPACE_ROOT/kfsw-modules" ]]; then
 fi
 
 python3 "$KFSW_CI_DIR/descriptions.py"
+python3 "$KFSW_CI_DIR/health-slots.py"
 
 # Checked after the formatter has run, so a missing analyser doesn't hide
 # formatting errors.

@@ -1404,6 +1404,15 @@ one misses its deadline health stops feeding and the hardware watchdog resets
 the board. A board stuck with interrupts running but its threads blocked is
 reset this way. Health needs the hardware watchdog, so it is off on Linux.
 
+Table 31 also carries one slot per component the composition names in
+`app/include/kfsw/app/health_slots.h`: `health_<name>_state` reads 0 ok,
+1 overdue or 2 absent, and `health_<name>_since_ms` the time since its last
+report, or 4294967295 when absent. Absent means no component of that name is
+registered. A slot is found by name, so the order components register in does
+not move it, and its index fixes its offsets, so an index is never reused. The
+table fits 14 slots; a list longer than that fails the build. The slots only
+report: they do not change when health feeds the watchdog.
+
 ### Ground watchdog
 
 The ground watchdog resets a node nobody has talked to for too long, so a

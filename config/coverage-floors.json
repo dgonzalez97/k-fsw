@@ -21,6 +21,14 @@
     "kfsw-services/src/golden/golden.c": {
       "lines": 87,
       "branches": 72
+    },
+    "kfsw-services/src/health-parameters/health_table.c": {
+      "lines": 70,
+      "branches": 70
+    },
+    "kfsw-services/src/health/health.c": {
+      "lines": 60,
+      "branches": 55
     }
   }
 }

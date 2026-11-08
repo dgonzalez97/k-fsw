@@ -459,6 +459,27 @@ ZTEST(app_param_tables, test_a_service_table_sits_in_the_service_band)
 	zassert_str_equal(kfsw_param_band_name(info.table), "service");
 }
 
+ZTEST(app_param_tables, test_the_composed_health_slots_have_fixed_offsets)
+{
+	struct kfsw_param_info info;
+	struct kfsw_param_value value;
+
+	/* Nothing registers in this suite, so both slots read absent. */
+	zassert_ok(kfsw_param_get_info("health_app_state", &info));
+	zassert_equal(info.id, KFSW_PARAM_ID(KFSW_HEALTH_PARAM_TABLE_ID, 0x20U));
+	zassert_ok(kfsw_param_get("health_app_state", &value));
+	zassert_equal(value.scalar.u8, KFSW_HEALTH_SLOT_ABSENT);
+
+	zassert_ok(kfsw_param_get_info("health_app_since_ms", &info));
+	zassert_equal(info.id, KFSW_PARAM_ID(KFSW_HEALTH_PARAM_TABLE_ID, 0x24U));
+	zassert_str_equal(info.unit, "ms");
+
+	zassert_ok(kfsw_param_get_info("health_csp_state", &info));
+	zassert_equal(info.id, KFSW_PARAM_ID(KFSW_HEALTH_PARAM_TABLE_ID, 0x28U));
+	zassert_ok(kfsw_param_get("health_csp_since_ms", &value));
+	zassert_equal(value.scalar.u32, KFSW_HEALTH_SLOT_SINCE_ABSENT);
+}
+
 ZTEST(app_param_tables, test_update_state_cannot_be_set_from_outside)
 {
 	struct kfsw_param_value value;

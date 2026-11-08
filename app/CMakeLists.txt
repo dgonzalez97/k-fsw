@@ -221,6 +221,10 @@ target_sources_ifdef(CONFIG_KFSW_HK app PRIVATE src/hk_entries.c)
 
 target_include_directories(app PRIVATE src)
 
+# The health slot list is read by kfsw-services, so its path has to reach every
+# library and not only the application.
+zephyr_include_directories(include)
+
 target_link_libraries(app PRIVATE
     kfsw::platform
     kfsw::services
