@@ -75,9 +75,7 @@ COUNTERS = re.compile(r"tx=(\d+) rx=(\d+) txerr=(\d+) rxerr=(\d+) drop=(\d+)")
 
 def counters(link):
     link.reset_input_buffer()
-    link.write(b"comms can info\n")
-    time.sleep(2.0)
-    text = link.read(link.in_waiting or 1).decode(errors="replace")
+    text = ask(link, b"comms can info\n", COUNTERS)
     found = COUNTERS.search(text)
     if not found:
         print(f"CAN TX ACCOUNTING RESULT: FAIL - the board did not report counters:\n{text}")
@@ -85,13 +83,35 @@ def counters(link):
     return [int(value) for value in found.groups()]
 
 
+BOARD = re.compile(r"board: (\S+)")
+
+
+def ask(link, command, pattern, seconds=8.0):
+    """Send a command and read until the answer arrives or the time is up.
+
+    A single sleep then read is enough only when the shell is idle. Straight
+    after another scenario has released the console the first answer can miss
+    the window, which reads as a board that did not answer at all rather than
+    one that was busy.
+    """
+    link.reset_input_buffer()
+    link.write(command)
+    text = ""
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        time.sleep(0.25)
+        waiting = link.in_waiting
+        if waiting:
+            text += link.read(waiting).decode(errors="replace")
+            if pattern.search(text):
+                return text
+    return text
+
+
 with serial.Serial(console, 115200, timeout=1) as link:
     time.sleep(1.0)
-    link.reset_input_buffer()
-    link.write(b"status\n")
-    time.sleep(2.0)
-    identity = link.read(link.in_waiting or 1).decode(errors="replace")
-    named = re.search(r"board: (\S+)", identity)
+    identity = ask(link, b"status\n", BOARD)
+    named = BOARD.search(identity)
     if not named:
         print(f"CAN TX ACCOUNTING RESULT: FAIL - {console} did not answer `status`")
         raise SystemExit(1)
