@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Hardware test for health monitoring: the board must stay up past the watchdog
 # timeout while healthy, reset through the watchdog when a registered component
-# stops reporting, and name the watchdog on the next boot.
+# stops reporting, name the watchdog on the next boot, and publish each
+# component this composition names as a slot of table 31.
 #
 # Required environment:
 #   KFSW_DEBUG_SERIAL  NUCLEO ST-LINK virtual COM port, by-id path only.
@@ -67,6 +68,17 @@ since_mark()
 }
 
 marker_offset=0
+
+# `param get <name>` answers "<name> = <value>", so one read is a send, a wait
+# and a match against that shape.
+param_get()
+{
+	mark
+	send "param get $1"
+	sleep 1.5
+	since_mark | sed -n "s/.*$1 = \\([^[:space:]]*\\).*/\\1/p" | tail -1
+}
+
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -159,6 +171,41 @@ sleep 1.5
 since_mark | grep -aq "app" && pass "the application thread is watched" || \
 	fail "no component is being watched"
 
+banner "Each named slot is published in table 31"
+# The slots are compiled from the composition's header, so the names here are
+# the names that header lists. A slot reads 0 while its component reports
+# inside its deadline, 1 once it is overdue and 2 when nothing of that name is
+# registered at all.
+for slot in app csp; do
+	state="$(param_get "health_${slot}_state")"
+	case "$state" in
+		0) pass "health_${slot}_state reads ok on hardware" ;;
+		1) fail "health_${slot}_state reads overdue while the board is healthy" ;;
+		2) fail "health_${slot}_state reads absent; nothing registered ${slot}" ;;
+		*) fail "health_${slot}_state answered '${state:-nothing}'" ;;
+	esac
+done
+
+# The age has to be a real sample rather than a constant, and it has to sit
+# inside the deadline the component registered with.
+first_age="$(param_get health_app_since_ms)"
+sleep 2
+second_age="$(param_get health_app_since_ms)"
+if [[ "$first_age" =~ ^[0-9]+$ && "$second_age" =~ ^[0-9]+$ ]]; then
+	if [[ "$first_age" -lt "$deadline_ms" ]]; then
+		pass "health_app_since_ms is ${first_age} ms, inside its ${deadline_ms} ms deadline"
+	else
+		fail "health_app_since_ms is ${first_age} ms, past its ${deadline_ms} ms deadline"
+	fi
+	if [[ "$second_age" != "$first_age" ]]; then
+		pass "health_app_since_ms is sampled, not a constant"
+	else
+		fail "health_app_since_ms did not change across two seconds"
+	fi
+else
+	fail "health_app_since_ms answered '${first_age:-nothing}' and '${second_age:-nothing}'"
+fi
+
 banner "A component that stops reporting resets the board"
 printf 'this takes about %s s\n' "$(( (deadline_ms + timeout_ms) / 1000 + 5 ))"
 
@@ -200,6 +247,27 @@ send "health status"
 sleep 1.5
 since_mark | grep -aq "state: ok" && pass "health is supervising again after the reset" || \
 	fail "health did not resume after the reset"
+
+for slot in app csp; do
+	state="$(param_get "health_${slot}_state")"
+	if [[ "$state" == 0 ]]; then
+		pass "health_${slot}_state reads ok again after the reset"
+	else
+		fail "health_${slot}_state reads '${state:-nothing}' after the reset"
+	fi
+done
+
+# `health watch` registered a component at run time. Slots are compiled, so no
+# parameter may appear for it: a table that grew at run time would break the
+# document and the wire offsets with it.
+mark
+send "param get health_stuck_state"
+sleep 1.5
+if since_mark | grep -aq "health_stuck_state = "; then
+	fail "a component registered at run time created a parameter"
+else
+	pass "a run time registration created no parameter"
+fi
 
 banner "Result"
 if [[ "$failures" -eq 0 ]]; then
