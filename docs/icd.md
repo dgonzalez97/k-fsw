@@ -212,7 +212,7 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | 37 | `table` | 7 | Uploaded table files, adoptions and reverts | always | `kfsw-services/src/table-parameters/table_parameters.c` |
 | 38 | `remexec` | 9 | Remote shell execution and its refusals | always | `kfsw-services/src/remexec-parameters/remexec_table.c` |
 | 39 | `scrub` | 17 | Resident image checksums and their references | always | `kfsw-services/src/scrub-parameters/scrub_table.c` |
-| 40 | `limits` | 11 | Parameter limits | always | `kfsw-services/src/limits-parameters/limits_table.c` |
+| 40 | `limits` | 13 | Parameter limits | always | `kfsw-services/src/limits-parameters/limits_table.c` |
 | 50 | `radio_uhf` | 17 | UHF radio identity, link and encryption | always | `kfsw-modules/radio-uhf/parameters/radio_uhf_table.c` |
 | 51 | `temp_example` | 7 | Die temperature readings and alarm | always | `kfsw-modules/temperature-sensor-example/parameters/temperature_sensor_example_table.c` |
 | 52 | `gpredict` | 19 | Pass tracking state, bearings and grace period | always | `kfsw-modules/gpredict/parameters/gpredict_table.c` |
@@ -438,6 +438,8 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | `limits` | 0x18 | `limits_last_fired_ms` | u32 | r | ms | Uptime of the last release; 0 before any |
 | `limits` | 0x1c | `limits_last_fired` | u8 | r | - | Index of the rule that fired last; 255 before any |
 | `limits` | 0x1e | `limits_error_line` | u16 | r | - | Line that got the last file refused; 0 for none |
+| `limits` | 0x20 | `limits_remote_failures` | u32 | r | - | Remote reads that failed, counted per rule |
+| `limits` | 0x24 | `limits_failed_by` | u16 | r | - | Last node whose read failed; 0 on recovery or load |
 | `radio_uhf` | 0x00 | `uhf_implementation` | str | ri | - | Radio implementation this build selected |
 | `radio_uhf` | 0x20 | `uhf_expected_hardware` | str | ri | - | Hardware this composition expects; not a live readback |
 | `radio_uhf` | 0x40 | `uhf_expected_baud` | u32 | r | baud | Serial rate the radio profile expects; not applied here |

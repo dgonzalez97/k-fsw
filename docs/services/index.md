@@ -1326,7 +1326,7 @@ hold a reference.
 
 ## Limits
 
-`KFSW_LIMITS` watches local numeric parameters against a bound and releases a
+`KFSW_LIMITS` watches local or remote numeric parameters against a bound and releases a
 command when one is crossed. The rules are one text file,
 `limits/limits.txt` under the FTP root, uploaded as a procedure is and read at
 boot and on `limits load [file]`:
@@ -1340,6 +1340,14 @@ The first five whitespace separated fields are the parameter, the comparison
 (`>`, `>=`, `<`, `<=`, `==`, `!=`), the bound, the dwell and the node. Everything
 after them is the action, a registered command with its arguments, kept as
 written. A line starting with `#` is a comment; there are no trailing comments.
+
+A parameter may have a `<node>:` prefix, for example `12:t_x > 5 1 0 count`.
+The prefix selects where to read; the node column still selects where to release
+the action. `0:` and this node's own address read locally. The prefix must be an
+unsigned unicast CSP address; an empty prefix or name, a second colon and a
+broadcast address are refused. A nonzero prefix needs `KFSW_PARAM_CSP`.
+Remote rules load without contacting the peer and bind their type on a successful
+read. A float-only bound with `==` or `!=` is refused at load.
 
 The bound is read as the parameter's own type, so a fractional bound on an
 integer parameter is refused, and `==` and `!=` are refused on a float. The
@@ -1357,6 +1365,25 @@ address another node. The rule then latches, and re-arms on the first sweep that
 finds the comparison false. A release that fails is counted in `limits_failures`
 and tried again on the next sweep.
 
+Remote reads run on a dedicated workqueue with a 2560-byte default stack and
+priority 4, below the router and servers. Each sweep gives remote I/O half the
+interval, capped at 5000 ms; manual sweeps with interval zero use 5000 ms.
+Rules are grouped by node, up to 16 names per call. Each group gets its own
+deadline from the time left divided by the remaining groups, with a 10 ms
+minimum. Name resolution can cost an exchange per cache miss, and the descriptor
+cache holds one node, so calls do not imply one wire exchange per node.
+When less than 10 ms remains, the sweep logs a warning and leaves unfinished
+rules for the next sweep, resuming at the first unread rule. Deferred rules keep
+their streak and latch and are excluded from the shell's evaluated count.
+
+A failed remote read resets each affected streak, keeps the latch and releases
+nothing. Both failure counters rise once per affected rule. `limits_failed_by`
+names the last node whose read failed and clears when that node next answers or
+a file loads successfully. A returned non-numeric type, float equality or a bound
+that does not fit resets the streak and adds only to `limits_failures`; it never
+compares. Local rules run first, so a rule watching `limits_failed_by` sees a
+remote failure on the next sweep.
+
 | Parameter | Access | Meaning |
 | --- | --- | --- |
 | `limits_rules` | r | Rules in force |
@@ -1366,6 +1393,8 @@ and tried again on the next sweep.
 | `limits_sweeps` | r | Sweeps completed while enabled |
 | `limits_fires` | r | Actions released |
 | `limits_failures` | r | Parameter reads and releases that failed |
+| `limits_remote_failures` | r | Remote reads that failed, counted per rule |
+| `limits_failed_by` | r | Last node whose read failed; 0 on recovery or load |
 | `limits_parse_errors` | r | Files refused for a bad line |
 | `limits_last_fired_ms` | r | Uptime of the last release; 0 before any |
 | `limits_last_fired` | r | Index of the rule that fired last; 255 before any |
