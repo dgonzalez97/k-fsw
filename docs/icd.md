@@ -59,6 +59,7 @@ Read from the `SHELL_*` macros in the sources, so a command a particular image s
 | `ftp ls` | 0-2 | List a directory: ls [node] [path] | always | `k-fsw/app/src/shell/shell_ftp.c` |
 | `ftp mkdir` | 1-2 | Create a directory: mkdir [node] &lt;path&gt; | always | `k-fsw/app/src/shell/shell_ftp.c` |
 | `ftp put` | 3 | Upload to a remote node: put &lt;node&gt; &lt;local&gt; &lt;remote&gt; | always | `k-fsw/app/src/shell/shell_ftp.c` |
+| `ftp rm` | 1-2 | Remove a file or empty directory: rm [node] &lt;path&gt; | always | `k-fsw/app/src/shell/shell_ftp.c` |
 | `ftp stat` | 1-2 | Show metadata: stat [node] &lt;path&gt; | always | `k-fsw/app/src/shell/shell_ftp.c` |
 | `ftp verify` | 2 | Compare two local files: verify &lt;first&gt; &lt;second&gt; | always | `k-fsw/app/src/shell/shell_ftp.c` |
 | `fwu` | - | Firmware update. | always | `k-fsw/app/src/shell/shell_fwu.c` |

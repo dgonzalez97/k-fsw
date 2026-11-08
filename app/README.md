@@ -58,13 +58,15 @@ native node can't be reached.
 
 ```text
 ftp mkdir [node] <directory>
+ftp rm [node] <path>
 ftp ls [node] [directory]
 ftp stat [node] <path>
 ftp put <node> <local-path> <remote-path>
 ftp get <node> <remote-path> <local-path>
 ```
 
-Without a node, `mkdir`, `ls` and `stat` act on this node. Listing `/` also
+Without a node, `mkdir`, `rm`, `ls` and `stat` act on this node. `ftp rm` removes
+one file or empty directory; directories with entries are refused. Listing `/` also
 shows `boot`, the firmware slots, and `hk`, the housekeeping files, when they
 exist; both are read-only.
 

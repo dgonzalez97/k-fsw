@@ -436,15 +436,19 @@ Paths are virtual and rooted at `/kfsw/ftp` on the node.
 | `ftp ls` | `[node] [directory]` | List a directory |
 | `ftp stat` | `[node] <path>` | Kind, size and CRC |
 | `ftp mkdir` | `[node] <directory>` | Create a directory |
+| `ftp rm` | `[node] <path>` | Remove a file or empty directory |
 | `ftp put` | `<node> <local> <remote>` | Upload a file |
 | `ftp get` | `<node> <remote> <local>` | Download a file |
 | `ftp generate` | `<path> <bytes>` | Create a test file of up to 32768 bytes |
 | `ftp verify` | `<first> <second>` | Compare two local files |
 
-Without a node, `ls`, `stat` and `mkdir` act on this node, without a
+Without a node, `ls`, `stat`, `mkdir` and `rm` act on this node, without a
 connection; `put` and `get` need another node. A transfer that would leave
 less than `CONFIG_KFSW_FTP_SPACE_MARGIN_BYTES` (4096) free on its volume is
 refused before any data moves: `not enough free space`.
+
+`ftp rm` refuses directories with entries, read-only paths and the storage
+root. It does not delete recursively. Removing a missing path reports `not found`.
 
 Listing `/` also shows these directories when they exist:
 

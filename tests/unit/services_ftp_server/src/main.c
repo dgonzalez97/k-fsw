@@ -389,6 +389,135 @@ ZTEST(kfsw_ftp_server, test_a_directory_is_made_and_then_already_exists)
 		      "making a directory twice was not reported as already existing");
 }
 
+static void assert_remove_response(uint8_t status)
+{
+	zassert_equal(link_fake.sends, 1U);
+	zassert_equal(link_fake.response[0].opcode, KFSW_FTP_OP_REMOVE_RESPONSE);
+	zassert_equal(link_fake.response[0].request_id, link_fake.request.request_id);
+	zassert_equal(link_fake.response[0].status, status);
+	zassert_equal(link_fake.releases, 1U);
+}
+
+ZTEST(kfsw_ftp_server, test_remove_file_and_empty_directory)
+{
+	struct fs_dirent entry;
+	struct kfsw_ftp_stats before;
+	struct kfsw_ftp_stats after;
+
+	zassert_ok(kfsw_ftp_get_stats(&before));
+	zassert_ok(fs_mkdir(KFSW_FTP_STORAGE_ROOT "/remove-empty"));
+	write_file(KFSW_FTP_STORAGE_ROOT "/remove-empty/file", "remove me");
+	given_request(KFSW_FTP_OP_REMOVE_REQUEST, "/remove-empty/file");
+	serve();
+	assert_remove_response(KFSW_FTP_STATUS_OK);
+	zassert_equal(fs_stat(KFSW_FTP_STORAGE_ROOT "/remove-empty/file", &entry), -ENOENT);
+
+	given_request(KFSW_FTP_OP_REMOVE_REQUEST, "/remove-empty");
+	serve();
+	assert_remove_response(KFSW_FTP_STATUS_OK);
+	zassert_equal(fs_stat(KFSW_FTP_STORAGE_ROOT "/remove-empty", &entry), -ENOENT);
+	zassert_ok(kfsw_ftp_get_stats(&after));
+	zassert_equal(after.transfers, before.transfers);
+	zassert_equal(after.failures, before.failures);
+	zassert_equal(after.bytes, before.bytes);
+}
+
+ZTEST(kfsw_ftp_server, test_remove_refuses_nonempty_directory)
+{
+	struct fs_file_t file;
+	struct fs_dirent entry;
+	char contents[7];
+
+	zassert_ok(fs_mkdir(KFSW_FTP_STORAGE_ROOT "/remove-full"));
+	write_file(KFSW_FTP_STORAGE_ROOT "/remove-full/file", "keep me");
+	given_request(KFSW_FTP_OP_REMOVE_REQUEST, "/remove-full");
+	serve();
+	assert_remove_response(KFSW_FTP_STATUS_NOT_EMPTY);
+	zassert_ok(fs_stat(KFSW_FTP_STORAGE_ROOT "/remove-full", &entry));
+	fs_file_t_init(&file);
+	zassert_ok(fs_open(&file, KFSW_FTP_STORAGE_ROOT "/remove-full/file", FS_O_READ));
+	zassert_equal(fs_read(&file, contents, sizeof(contents)), sizeof(contents));
+	zassert_mem_equal(contents, "keep me", sizeof(contents));
+	zassert_ok(fs_close(&file));
+}
+
+ZTEST(kfsw_ftp_server, test_remove_refuses_readonly_paths)
+{
+	struct fs_dirent entry;
+	const char *paths[] = {"/hk/remove.bin", "hk/remove.bin", "/hk", "/boot/file"};
+	int result = fs_mkdir(KFSW_FTP_READONLY_ROOT);
+
+	zassert_true((result == 0) || (result == -EEXIST));
+	write_file(KFSW_FTP_READONLY_ROOT "/remove.bin", "housekeeping");
+	for (size_t i = 0U; i < ARRAY_SIZE(paths); i++) {
+		given_request(KFSW_FTP_OP_REMOVE_REQUEST, paths[i]);
+		serve();
+		assert_remove_response(KFSW_FTP_STATUS_READ_ONLY);
+	}
+	zassert_ok(fs_stat(KFSW_FTP_READONLY_ROOT "/remove.bin", &entry));
+	zassert_equal(entry.size, strlen("housekeeping"));
+}
+
+ZTEST(kfsw_ftp_server, test_remove_refuses_roots_and_invalid_paths)
+{
+	const char *paths[] = {NULL, "", "/", "a/../b"};
+	struct fs_dirent entry;
+
+	for (size_t i = 0U; i < ARRAY_SIZE(paths); i++) {
+		given_request(KFSW_FTP_OP_REMOVE_REQUEST, paths[i]);
+		serve();
+		assert_remove_response(KFSW_FTP_STATUS_INVALID_PATH);
+	}
+	zassert_ok(fs_stat(KFSW_FTP_STORAGE_ROOT, &entry));
+	zassert_equal(entry.type, FS_DIR_ENTRY_DIR);
+}
+
+ZTEST(kfsw_ftp_server, test_remove_missing_path)
+{
+	given_request(KFSW_FTP_OP_REMOVE_REQUEST, "/remove-missing");
+	serve();
+	assert_remove_response(KFSW_FTP_STATUS_NOT_FOUND);
+}
+
+ZTEST(kfsw_ftp_server, test_remove_recovers_free_bytes)
+{
+	static char contents[16385];
+	struct kfsw_storage_info before;
+	struct kfsw_storage_info written;
+	struct kfsw_storage_info removed;
+
+	memset(contents, 'a', sizeof(contents) - 1U);
+	zassert_ok(kfsw_storage_get_info(&before));
+	write_file(KFSW_FTP_STORAGE_ROOT "/remove-space", contents);
+	zassert_ok(kfsw_storage_get_info(&written));
+	zassert_true(written.free_bytes < before.free_bytes);
+	given_request(KFSW_FTP_OP_REMOVE_REQUEST, "/remove-space");
+	serve();
+	assert_remove_response(KFSW_FTP_STATUS_OK);
+	zassert_ok(kfsw_storage_get_info(&removed));
+	zassert_true(removed.free_bytes >= written.free_bytes + sizeof(contents) - 1U);
+	printk("Remote remove recovered %llu free bytes\n",
+	       (unsigned long long)(removed.free_bytes - written.free_bytes));
+}
+
+ZTEST(kfsw_ftp_server, test_remove_refuses_payload_fields)
+{
+	struct fs_dirent entry;
+
+	write_file(KFSW_FTP_STORAGE_ROOT "/remove-invalid", "keep me");
+	given_request(KFSW_FTP_OP_REMOVE_REQUEST, "/remove-invalid");
+	link_fake.request.offset = 1U;
+	serve();
+	assert_remove_response(KFSW_FTP_STATUS_INVALID_REQUEST);
+	zassert_ok(fs_stat(KFSW_FTP_STORAGE_ROOT "/remove-invalid", &entry));
+
+	given_request(KFSW_FTP_OP_REMOVE_REQUEST, "/remove-invalid");
+	link_fake.request.flags = KFSW_FTP_FLAG_RESUME;
+	serve();
+	assert_remove_response(KFSW_FTP_STATUS_INVALID_REQUEST);
+	zassert_ok(fs_stat(KFSW_FTP_STORAGE_ROOT "/remove-invalid", &entry));
+}
+
 ZTEST(kfsw_ftp_server, test_a_file_is_reported_with_its_size)
 {
 	write_file(KFSW_FTP_STORAGE_ROOT "/sized.bin", "abcdefghij");

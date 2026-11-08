@@ -926,7 +926,7 @@ interruption acceptance remain outstanding.
 ## File transfer
 
 K-FSW FTP is the project's own protocol and is not compatible with Internet
-FTP, FTPS, SFTP or TFTP. It supports list, stat, mkdir, put and get. The server
+FTP, FTPS, SFTP or TFTP. It supports list, stat, mkdir, rm, put and get. The server
 listens on CSP port 9 and requires RDP and CRC32. Each message has a 24-byte
 header with the request ID, offset, total size and file CRC.
 
@@ -934,7 +934,12 @@ Remote FTP read-only refusals (`/hk` and `/boot`) use wire status 13 and
 return `-EROFS`, like local refusals. Existing status numbers are unchanged;
 older clients map the new status to `-EIO`. The FTP client returns this errno
 to shell callers. Failed put/get transfers also record positive errno 30 in
-transfer failure events and increment failure counters. Mkdir has no transfer event.
+transfer failure events and increment failure counters. Mkdir and rm have no transfer event.
+
+`ftp rm [node] <path>` removes one file or empty directory and frees its storage.
+Directories with entries are refused without deleting their contents. The storage
+root is never removable. A missing path returns `NOT_FOUND` (`-ENOENT`). A non-empty
+directory returns `-ENOTEMPTY` locally and the existing `IO_ERROR` (`-EIO`) remotely.
 
 Paths are virtual and rooted at `/kfsw/ftp` on each node:
 
@@ -966,7 +971,7 @@ and is not checked.
 
 ### The local node
 
-`ls`, `stat` and `mkdir` addressed to the node's own CSP address run
+`ls`, `stat`, `mkdir` and `rm` addressed to the node's own CSP address run
 directly on local storage, without a connection or a route. They need storage
 mounted and the service started, otherwise they return `-EACCES`. `put` and
 `get` need two nodes and return `-ENOTSUP` for the local address.

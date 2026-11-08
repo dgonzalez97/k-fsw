@@ -44,7 +44,8 @@ a UHF radio, board buttons and LEDs, and an MCU temperature sensor.
 
 - **Parameters:** named values with validation, remote access, callbacks and optional persistence.
 - **CSP:** communications router, with routes selecting UART/KISS or CAN links.
-- **Files:** upload, download, list and create directories, with CRC32 and RDP.
+- **Files:** upload, download, list, create directories and remove files or empty
+  directories (`ftp rm`), with CRC32 and RDP.
 - **Firmware update:** binaries over FTP, with MCUboot test,
   confirm, and rollback. FWU lite sends blocks over CSP without a filesystem.
 - **Commands and events:** a shell and remote commanding.

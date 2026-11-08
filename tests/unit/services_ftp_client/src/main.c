@@ -133,6 +133,53 @@ ZTEST(services_ftp_client, test_a_refusal_from_the_peer_becomes_its_errno)
 		      "a refused request still closes its connection");
 }
 
+ZTEST(services_ftp_client, test_remove_asks_the_named_node_and_closes_after)
+{
+	reply.opcode = KFSW_FTP_OP_REMOVE_RESPONSE;
+	zassert_ok(kfsw_ftp_remove(REMOTE_NODE, TEST_PATH));
+	zassert_equal(__wrap_kfsw_ftp_link_connect_fake.arg1_val, REMOTE_NODE);
+	zassert_equal(sent_request.opcode, KFSW_FTP_OP_REMOVE_REQUEST);
+	zassert_equal(sent_request.path_size, strlen(TEST_PATH));
+	zassert_mem_equal(sent_request.path, TEST_PATH, strlen(TEST_PATH));
+	zassert_equal(__wrap_kfsw_ftp_link_close_fake.call_count, 1U);
+}
+
+ZTEST(services_ftp_client, test_remove_refusals_become_their_errno)
+{
+	reply.opcode = KFSW_FTP_OP_REMOVE_RESPONSE;
+	reply.status = KFSW_FTP_STATUS_READ_ONLY;
+	zassert_equal(kfsw_ftp_remove(REMOTE_NODE, "/hk/file"), -EROFS);
+	reply.status = KFSW_FTP_STATUS_NOT_FOUND;
+	zassert_equal(kfsw_ftp_remove(REMOTE_NODE, TEST_PATH), -ENOENT);
+	reply.status = KFSW_FTP_STATUS_IO_ERROR;
+	zassert_equal(kfsw_ftp_remove(REMOTE_NODE, TEST_PATH), -EIO);
+	/* A full directory must not arrive as a filesystem fault. */
+	reply.status = KFSW_FTP_STATUS_NOT_EMPTY;
+	zassert_equal(kfsw_ftp_remove(REMOTE_NODE, TEST_PATH), -ENOTEMPTY);
+	zassert_equal(__wrap_kfsw_ftp_link_close_fake.call_count, 4U);
+}
+
+ZTEST(services_ftp_client, test_remove_refuses_roots_before_connecting)
+{
+	zassert_equal(kfsw_ftp_remove(REMOTE_NODE, NULL), -EINVAL);
+	zassert_equal(kfsw_ftp_remove(REMOTE_NODE, ""), -EINVAL);
+	zassert_equal(kfsw_ftp_remove(REMOTE_NODE, "/"), -EINVAL);
+	zassert_equal(kfsw_ftp_remove(REMOTE_NODE, "a/../b"), -EINVAL);
+	zassert_equal(__wrap_kfsw_ftp_link_connect_fake.call_count, 0U);
+}
+
+ZTEST(services_ftp_client, test_remove_refuses_wrong_response)
+{
+	zassert_equal(kfsw_ftp_remove(REMOTE_NODE, TEST_PATH), -EBADMSG);
+	zassert_equal(__wrap_kfsw_ftp_link_close_fake.call_count, 1U);
+}
+
+ZTEST(services_ftp_client, test_local_remove_requires_started_service)
+{
+	zassert_equal(kfsw_ftp_remove(LOCAL_NODE, TEST_PATH), -EACCES);
+	zassert_equal(__wrap_kfsw_ftp_link_connect_fake.call_count, 0U);
+}
+
 ZTEST(services_ftp_client, test_an_answer_to_another_request_is_refused)
 {
 	reply_echoes_request_id = false;

@@ -203,6 +203,10 @@ entries: 1
 
 `tests/k-ground-ftp-smoke.sh` runs this sequence, including a missing file.
 
+After checking the copies, `ftp rm 16 /uplink/test.txt` removes the remote file.
+`ftp rm 16 /uplink` then removes the empty directory. Omit the node to remove
+a local file or empty directory.
+
 ## Telemetry in Yamcs
 
 [Yamcs](https://yamcs.org/) stores housekeeping samples and has a telemetry
