@@ -453,16 +453,16 @@ if $have_storage; then
 		'comms uart info' >&3
 
 	wait_for_output "$work_dir/linux.log" \
-		"FTP put node=2 source=/build/hil-4k.bin destination=/hil/hil-4k.bin: PASS bytes=4096" \
+		"FTP put 2 /build/hil-4k.bin -> /hil/hil-4k.bin: PASS" \
 		"$linux_pid" || fail "4 KiB physical FTP upload did not pass"
 	wait_for_output "$work_dir/linux.log" \
-		"FTP verify first=/build/hil-4k.bin second=/build/hil-4k-returned.bin: PASS" \
+		"FTP verify /build/hil-4k.bin /build/hil-4k-returned.bin: PASS" \
 		"$linux_pid" || fail "4 KiB physical FTP round trip did not match"
 	wait_for_output "$work_dir/linux.log" \
-		"FTP put node=2 source=/build/hil-16k.bin destination=/hil/hil-16k.bin: PASS bytes=16384" \
+		"FTP put 2 /build/hil-16k.bin -> /hil/hil-16k.bin: PASS" \
 		"$linux_pid" || fail "16 KiB physical FTP upload did not pass"
 	wait_for_output "$work_dir/linux.log" \
-		"FTP verify first=/build/hil-16k.bin second=/build/hil-16k-returned.bin: PASS" \
+		"FTP verify /build/hil-16k.bin /build/hil-16k-returned.bin: PASS" \
 		"$linux_pid" || fail "16 KiB physical FTP round trip did not match"
 	wait_for_output "$work_dir/linux.log" "2:test_u32 = 42" "$linux_pid" || \
 		fail "PARAM did not work after physical FTP transfers"
