@@ -244,7 +244,10 @@ udevadm info --query=property --name "$ftdi_device" |
 	grep -E '^(ID_VENDOR_ID|ID_MODEL_ID|ID_SERIAL|ID_PATH)=' || true
 lsusb | grep -Ei '0403:6001|FT232|FTDI' || true
 echo "Debug shell: $debug_serial"
-echo "YP-05 logic selection: 3.3 V required"
+# Any 3.3 V USB-UART works here. Naming one adapter sent a bench hunting
+# for a selector jumper its FT232R does not have.
+echo "FTDI logic levels: 3.3 V required (5 V adapters must not be used)"
+echo "Wiring: adapter TX to board RX, adapter RX to board TX, grounds common"
 
 KFSW_BUILD_DIR="$linux_build_dir" "$KFSW_ROOT/k-fsw/tools/build.sh" linux
 if [[ "$target" == nucleo_f746zg ]]; then
