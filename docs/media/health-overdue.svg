@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 210" width="640" height="210"
+     font-family="DejaVu Sans, Helvetica, sans-serif" font-size="12">
+  <g stroke="#222" stroke-width="1.4" fill="none">
+    <path d="M40,120 L600,120"/>
+    <path d="M40,114 L40,126"/><path d="M180,114 L180,126"/>
+    <path d="M320,108 L320,132"/><path d="M460,108 L460,132"/><path d="M580,114 L580,126"/>
+  </g>
+  <g fill="#222">
+    <text x="40" y="146" text-anchor="middle" font-size="11">report</text>
+    <text x="180" y="146" text-anchor="middle" font-size="11">report</text>
+    <text x="320" y="148" text-anchor="middle" font-size="11" font-weight="bold">deadline passes</text>
+    <text x="460" y="148" text-anchor="middle" font-size="11" font-weight="bold">feed withheld</text>
+    <text x="580" y="146" text-anchor="middle" font-size="11">reset</text>
+    <text x="320" y="94" text-anchor="middle" font-size="11">slot reads 1, service reads faulted</text>
+    <text x="460" y="78" text-anchor="middle" font-size="11">watchdog counts down alone</text>
+    <text x="580" y="94" text-anchor="middle" font-size="11">next boot:</text>
+    <text x="580" y="108" text-anchor="middle" font-size="11">reset_cause=watchdog</text>
+    <text x="320" y="186" text-anchor="middle" font-size="11">health_&lt;slot&gt;_since_ms keeps rising throughout</text>
+  </g>
+</svg>
