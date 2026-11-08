@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include <zephyr/shell/shell.h>
 
@@ -25,6 +26,8 @@ static int cmd_limits_status(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "interval: %u ms", kfsw_limits_interval_ms);
 	shell_print(sh, "sweeps: %u fires: %u failures: %u", status.sweeps, status.fires,
 		    status.failures);
+	shell_print(sh, "remote_failures: %u failed_by: %u", status.remote_failures,
+		    status.failed_by);
 	if (status.last_fired_index == KFSW_LIMITS_NO_RULE) {
 		shell_print(sh, "last_fired: none");
 	} else {
@@ -41,8 +44,15 @@ static int cmd_limits_status(const struct shell *sh, size_t argc, char **argv)
 static bool print_rule(const struct kfsw_limits_rule *rule, void *context)
 {
 	const struct shell *sh = context;
+	char parameter[KFSW_PARAM_NAME_MAX + 7U];
 
-	shell_print(sh, "%3u  %-24s %-2s %-12s %5u %5u  %-7s %s", rule->index, rule->parameter,
+	if (rule->read_node != 0U) {
+		(void)snprintf(parameter, sizeof(parameter), "%u:%s", rule->read_node,
+			       rule->parameter);
+	} else {
+		(void)snprintf(parameter, sizeof(parameter), "%s", rule->parameter);
+	}
+	shell_print(sh, "%3u  %-24s %-2s %-12s %5u %5u  %-7s %s", rule->index, parameter,
 		    kfsw_limits_cmp_text(rule->cmp), rule->bound_text, rule->dwell, rule->node,
 		    rule->latched ? "fired" : "armed", rule->action);
 	return true;

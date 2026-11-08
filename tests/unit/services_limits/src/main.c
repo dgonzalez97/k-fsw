@@ -373,3 +373,21 @@ ZTEST(limits, test_the_table_reports_what_the_service_counted)
 	zassert_ok(kfsw_param_get("limits_last_fired", &value));
 	zassert_equal(value.scalar.u8, 0U);
 }
+
+ZTEST(limits, test_zero_prefix_reads_the_local_parameter)
+{
+	zassert_ok(load("0:t_counter > 10 1 0 count\n"));
+	zassert_equal(first_rule().read_node, 0U);
+	zassert_str_equal(first_rule().parameter, "t_counter");
+	counter = 11U;
+	uint32_t fires = status().fires;
+	zassert_equal(kfsw_limits_sweep(), 1);
+	zassert_equal(status().fires, fires + 1U);
+}
+
+ZTEST(limits, test_remote_prefix_without_csp_is_refused)
+{
+	zassert_ok(load("t_counter > 10 1 0 count\n"));
+	expect_refused("12:t_counter > 10 1 0 count\n", 1U, "this build has no remote parameters");
+	zassert_str_equal(first_rule().parameter, "t_counter");
+}
