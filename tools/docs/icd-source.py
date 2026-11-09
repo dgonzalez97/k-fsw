@@ -635,7 +635,7 @@ def collect_parameters(workspace):
                     if "name" in fields:
                         fields["offset"] = offset_text(fields.get("offset"), numbers)
                         entries.append(fields)
-                arrays[match.group(1)] = entries
+                arrays[(where, match.group(1))] = entries
 
             for match in re.finditer(
                 r"struct\s+kfsw_param_definition_set\s+(\w+)\s*=", text
@@ -647,6 +647,7 @@ def collect_parameters(workspace):
                         "table": resolve(fields.get("table"), defines),
                         "name": resolve(fields.get("name"), defines),
                         "holds": literal(fields.get("description", "")),
+                        "description": fields.get("description", ""),
                         "array": (fields.get("definitions") or "").strip(),
                         "file": where,
                         "guard": guard_at(text, match.start()),
@@ -685,7 +686,7 @@ def render_parameters(sets, arrays):
     out.append("| Table | Name | Params | Holds | Built when | Defined in |")
     out.append("| --- | --- | --- | --- | --- | --- |")
     for item in sorted(sets, key=lambda s: (str(s["table"]).zfill(3), s["name"])):
-        count = len(arrays.get(item["array"], []))
+        count = len(arrays.get((item["file"], item["array"]), []))
         gate = f"`{item['guard']}`" if item["guard"] else "always"
         out.append(
             f"| {item['table']} | `{item['name']}` | {count} | {cell(item['holds']) or '-'} "
@@ -698,7 +699,7 @@ def render_parameters(sets, arrays):
     out.append("| --- | --- | --- | --- | --- | --- | --- |")
     total = 0
     for item in sorted(sets, key=lambda s: (str(s["table"]).zfill(3), s["name"])):
-        for entry in arrays.get(item["array"], []):
+        for entry in arrays.get((item["file"], item["array"]), []):
             total += 1
             offset = entry.get("offset", "").rstrip("U")
             kind = TYPE_NAMES.get(entry.get("type", "").strip(), entry.get("type", ""))
