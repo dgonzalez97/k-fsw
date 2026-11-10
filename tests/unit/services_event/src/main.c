@@ -98,6 +98,7 @@ ZTEST(services_event, test_wrap_overwrites_oldest_and_counts_the_loss)
 ZTEST(services_event, test_invalid_input_is_rejected_and_counted)
 {
 	static const uint8_t oversized[KFSW_EVENT_MAX_PAYLOAD_SIZE + 1U] = {0};
+	static const enum kfsw_event_source invalid_sources[] = {0, 11, 200, 999};
 	struct kfsw_event_stats before;
 	struct kfsw_event_stats after;
 
@@ -105,13 +106,40 @@ ZTEST(services_event, test_invalid_input_is_rejected_and_counted)
 	kfsw_event_get_stats(&before);
 
 	kfsw_event_emit(KFSW_EVENT_SOURCE_APP, 1U, KFSW_EVENT_INFO, oversized, sizeof(oversized));
-	kfsw_event_emit((enum kfsw_event_source)999, 1U, KFSW_EVENT_INFO, NULL, 0U);
+	for (size_t i = 0U; i < ARRAY_SIZE(invalid_sources); i++) {
+		kfsw_event_emit(invalid_sources[i], 1U, KFSW_EVENT_INFO, NULL, 0U);
+	}
 	kfsw_event_emit(KFSW_EVENT_SOURCE_APP, 1U, KFSW_EVENT_INFO, NULL, 4U);
 
 	kfsw_event_get_stats(&after);
 	zassert_equal(after.held, 0U, "no invalid record may be stored");
-	zassert_equal(after.rejected - before.rejected, 3U);
+	zassert_equal(after.rejected - before.rejected, ARRAY_SIZE(invalid_sources) + 2U);
 	zassert_equal(after.recorded, before.recorded, "a rejection is not a record");
+}
+
+ZTEST(services_event, test_table_scrub_and_limits_sources_are_recorded_and_named)
+{
+	static const enum kfsw_event_source sources[] = {
+		KFSW_EVENT_SOURCE_TABLE, KFSW_EVENT_SOURCE_SCRUB, KFSW_EVENT_SOURCE_LIMITS};
+	static const char *const names[] = {"table", "scrub", "limits"};
+	struct kfsw_event_record record;
+	struct kfsw_event_stats before;
+	struct kfsw_event_stats after;
+
+	kfsw_event_clear();
+	kfsw_event_get_stats(&before);
+	for (size_t i = 0U; i < ARRAY_SIZE(sources); i++) {
+		kfsw_event_emit(sources[i], (uint16_t)i, KFSW_EVENT_WARNING, NULL, 0U);
+	}
+	kfsw_event_get_stats(&after);
+	zassert_equal(after.recorded - before.recorded, ARRAY_SIZE(sources));
+	zassert_equal(after.rejected, before.rejected);
+	for (size_t i = 0U; i < ARRAY_SIZE(sources); i++) {
+		zassert_ok(kfsw_event_get((uint16_t)(ARRAY_SIZE(sources) - i - 1U), &record));
+		zassert_equal(record.source, sources[i]);
+		zassert_equal(record.id, i);
+		zassert_equal(strcmp(kfsw_event_source_name(sources[i]), names[i]), 0);
+	}
 }
 
 ZTEST(services_event, test_empty_payload_is_valid)

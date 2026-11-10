@@ -293,10 +293,10 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | `event` | 0x08 | `events_rejected` | u32 | r | - | Events refused for an invalid payload size or source |
 | `event` | 0x0c | `events_held` | u16 | r | - | Records currently in the ring |
 | `event` | 0x0e | `events_capacity` | u16 | r | - | Ring capacity |
-| `command` | 0x00 | `cmd_invoked` | u32 | r | - | Invocations that reached a handler or were refused before one |
-| `command` | 0x04 | `cmd_failed` | u32 | r | - | Invocations whose handler reported a failure |
-| `command` | 0x08 | `cmd_unknown` | u32 | r | - | Invocations naming a command that is not registered |
-| `command` | 0x0c | `cmd_rejected` | u32 | r | - | Invocations refused before the handler ran |
+| `command` | 0x00 | `cmd_invoked` | u32 | r | - | Recorded dispatch outcomes since boot; wraps at 2^32 |
+| `command` | 0x04 | `cmd_failed` | u32 | r | - | Outcomes other than OK, UNKNOWN, DENIED; wraps at 2^32 |
+| `command` | 0x08 | `cmd_unknown` | u32 | r | - | UNKNOWN outcomes since boot; wraps at 2^32 |
+| `command` | 0x0c | `cmd_rejected` | u32 | r | - | DENIED outcomes since boot; wraps at 2^32 |
 | `command` | 0x10 | `cmd_registered` | u16 | r | - | Commands in the frozen registry |
 | `command` | 0x14 | `cmd_timeout_ms` | u32 | rwc | ms | Timeout for new remote invocations |
 | `command` | 0x18 | `echo_enabled` | u8 | rwc | - | Console repeats what is typed at it |

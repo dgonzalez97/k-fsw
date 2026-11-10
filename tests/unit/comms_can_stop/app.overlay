@@ -1,0 +1,17 @@
+/ {
+	fake_can_a: fake_can_a {
+		compatible = "zephyr,fake-can";
+		status = "okay";
+	};
+	fake_can_b: fake_can_b {
+		compatible = "zephyr,fake-can";
+		status = "okay";
+	};
+	fake_can_c: fake_can_c {
+		compatible = "zephyr,fake-can";
+		status = "okay";
+	};
+	chosen {
+		kfsw,csp-can = &fake_can_a;
+	};
+};
