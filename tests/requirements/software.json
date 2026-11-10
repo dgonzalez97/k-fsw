@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "evidence_kind": "hosted",
+  "required": [
+    {
+      "id": "startup.hosted",
+      "suite": ["Hil", "Boot"],
+      "test": "Hosted Image Reports Boot And Ready",
+      "source": "tests/hil/boot.robot"
+    },
+    {
+      "id": "parameters.persistence.hosted",
+      "suite": ["Hil", "Terminal"],
+      "test": "KFSW Linux Persists Parameters Across Restart",
+      "source": "tests/hil/terminal.robot"
+    }
+  ]
+}

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Exercise CI selection and board accounting without hardware."""
 
+import hashlib
+import json
+import os
 import re
 from pathlib import Path
 import shutil
@@ -8,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -237,6 +241,290 @@ printf '<robot><suite><test name="case"><status status="%s">fixture reason</stat
         result = self.run_script('board.sh')
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn('f746-proof (exit 7)', result.stdout)
+
+
+class RequiredEvidence(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix='kfsw-required-')
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.report = self.root / 'output.xml'
+        self.manifest = self.root / 'required.json'
+        self.case = {'id': 'startup', 'suite': ['Hil', 'Boot'], 'test': 'Ready',
+                     'source': 'tests/hil/boot.robot'}
+        self.selection = {'version': 1, 'required': [self.case]}
+        self.manifest.write_text(json.dumps(self.selection))
+
+    def write_report(self, cases):
+        root = ET.Element('robot')
+        suites = {}
+        for identity, status in cases:
+            parent = root
+            for depth, name in enumerate(identity[:-1], 1):
+                path = tuple(identity[:depth])
+                if path not in suites:
+                    suite = ET.SubElement(parent, 'suite', name=name)
+                    ET.SubElement(suite, 'status', status='PASS')
+                    suites[path] = suite
+                parent = suites[path]
+            test = ET.SubElement(parent, 'test', name=identity[-1])
+            ET.SubElement(test, 'status', status=status)
+        ET.ElementTree(root).write(self.report)
+        return root
+
+    def check(self, *options, required=True):
+        arguments = [sys.executable, str(REPO / 'tools/ci/robot-counts.py'), str(self.report)]
+        if required:
+            arguments += ['--required', str(self.manifest)]
+        return subprocess.run(arguments + list(options), text=True, capture_output=True,
+                              env=dict(os.environ, KFSW_ROBOT_ACCEPTANCE='0'), timeout=5)
+
+    def test_complete_selection(self):
+        self.write_report([(('Hil', 'Boot', 'Ready'), 'PASS'),
+                           (('Hil', 'Optional', 'Other'), 'SKIP')])
+        result = self.check()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('REQUIRED CASES: PASS 1', result.stdout)
+
+    def test_required_case_must_be_present_and_pass_once(self):
+        for states in ([], ['SKIP'], ['FAIL'], ['PASS', 'PASS'], ['PASS', 'SKIP']):
+            with self.subTest(states=states):
+                self.write_report([(('Hil', 'Optional', 'Other'), 'PASS')] +
+                                  [(('Hil', 'Boot', 'Ready'), state) for state in states])
+                result = self.check('--board')
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn('startup', result.stdout)
+
+    def test_equal_test_names_in_different_suites_are_distinct(self):
+        self.write_report([(('Hil', 'Boot', 'Ready'), 'PASS'),
+                           (('Hil', 'Other', 'Ready'), 'SKIP')])
+        self.assertEqual(self.check().returncode, 0)
+        self.write_report([(('Hil', 'Other', 'Ready'), 'PASS')])
+        self.assertEqual(self.check().returncode, 1)
+        self.write_report([(('Hil.Boot', 'Ready'), 'PASS')])
+        self.assertEqual(self.check().returncode, 1)
+
+    def test_explicit_empty_manifest_does_not_disable_the_gate(self):
+        self.write_report([(('Hil', 'Optional', 'Other'), 'PASS')])
+        result = self.check('--required', '')
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('ROBOT COUNTS ERROR', result.stderr)
+
+    def test_duplicate_suite_paths_are_ambiguous(self):
+        root = self.write_report([(('Hil', 'Boot', 'Ready'), 'PASS')])
+        suite = root.find('suite/suite')
+        root.find('suite').append(ET.fromstring(ET.tostring(suite)))
+        ET.ElementTree(root).write(self.report)
+        self.assertEqual(self.check().returncode, 1)
+
+    def test_malformed_reports_fail(self):
+        reports = ['<robot>', '<results/>', '<robot/>',
+                   '<robot><suite><test name="Ready"><status status="PASS"/>'
+                   '</test></suite></robot>']
+        for xml in reports:
+            with self.subTest(xml=xml):
+                self.report.write_text(xml)
+                self.assertEqual(self.check().returncode, 1)
+        for state in ('', 'NOT RUN', 'UNKNOWN'):
+            self.write_report([(('Hil', 'Boot', 'Ready'), state)])
+            self.assertEqual(self.check().returncode, 1)
+        for bad_status in ('missing', 'duplicate'):
+            root = self.write_report([(('Hil', 'Boot', 'Ready'), 'PASS')])
+            test = root.find('.//test')
+            if bad_status == 'missing':
+                test.remove(test.find('status'))
+            else:
+                ET.SubElement(test, 'status', status='PASS')
+            ET.ElementTree(root).write(self.report)
+            self.assertEqual(self.check().returncode, 1)
+        self.report.unlink()
+        self.assertEqual(self.check().returncode, 1)
+
+    def test_failed_suite_cannot_be_accepted(self):
+        for status in ('FAIL', 'SKIP'):
+            with self.subTest(status=status):
+                root = self.write_report([(('Hil', 'Boot', 'Ready'), 'PASS')])
+                root.find('suite/status').set('status', status)
+                ET.ElementTree(root).write(self.report)
+                self.assertEqual(self.check().returncode, 1)
+
+    def test_malformed_or_empty_manifests_fail(self):
+        self.write_report([(('Hil', 'Boot', 'Ready'), 'PASS')])
+        for manifest in ([], {}, {'version': True, 'required': [self.case]},
+                         {'version': 2, 'required': [self.case]},
+                         {'version': 1, 'required': []},
+                         {'version': 1, 'required': [self.case, self.case]},
+                         {'version': 1, 'required': [self.case, dict(self.case, id='other')]},
+                         {'version': 1, 'required': [self.case, dict(self.case, test='Other')]},
+                         {'version': 1, 'required': [dict(self.case, suite='Hil.Boot')]},
+                         {'version': 1, 'required': [dict(self.case, test='')]},
+                         {'version': 1, 'required': [dict(self.case, test=None)]}):
+            with self.subTest(manifest=manifest):
+                self.manifest.write_text(json.dumps(manifest))
+                self.assertEqual(self.check().returncode, 1)
+        for text in ('{', '{"version": 1, "version": 1, "required": []}'):
+            self.manifest.write_text(text)
+            self.assertEqual(self.check().returncode, 1)
+        self.manifest.unlink()
+        self.assertEqual(self.check().returncode, 1)
+
+    def test_defaults_keep_optional_and_empty_report_behavior(self):
+        self.write_report([(('Hil', 'Optional', 'Other'), 'SKIP')])
+        self.assertEqual(self.check(required=False).returncode, 0)
+        self.assertEqual(self.check('--board', required=False).returncode, 3)
+        self.report.write_text('<robot><suite/></robot>')
+        self.assertEqual(self.check(required=False).returncode, 0)
+        self.assertEqual(self.check('--board', required=False).returncode, 3)
+
+    def test_seed_manifest_references_exist(self):
+        identifiers = set()
+        for path in sorted((REPO / 'tests/requirements').glob('*.json')):
+            manifest = json.loads(path.read_text())
+            for case in manifest['required']:
+                self.assertNotIn(case['id'], identifiers)
+                identifiers.add(case['id'])
+                source = REPO / case['source']
+                self.assertTrue(source.is_file(), source)
+                self.assertEqual(source.read_text().splitlines().count(case['test']), 1)
+                self.assertEqual(case['suite'], ['Hil', source.stem.replace('_', ' ').title()])
+            self.manifest.write_text(json.dumps(manifest))
+            self.write_report([(tuple(case['suite']) + (case['test'],), 'PASS')
+                               for case in manifest['required']])
+            self.assertEqual(self.check().returncode, 0)
+        self.assertEqual(len(identifiers), 4)
+        mapping = REPO / 'tests/requirements/README.md'
+        for target in re.findall(r'\]\(([^)]+)\)', mapping.read_text()):
+            self.assertTrue((mapping.parent / target).is_file(), target)
+        health_case = 'test_a_component_is_late_before_it_is_overdue'
+        self.assertIn(health_case, mapping.read_text())
+        self.assertIn(f'ZTEST(services_health, {health_case})',
+                      (REPO / 'tests/unit/services_health/src/main.c').read_text())
+
+    def binding_fixture(self):
+        self.write_report([(('Hil', 'Boot', 'Ready'), 'PASS')])
+        self.selection['evidence_kind'] = 'hosted'
+        self.manifest.write_text(json.dumps(self.selection))
+        self.image = self.root / 'zephyr.exe'
+        self.image.write_bytes(b'fixture executable image')
+        self.config = self.root / '.config'
+        self.config.write_bytes(b'CONFIG_KFSW_PARAM_TEST_DEFINITIONS=y\n')
+        self.context = self.root / 'expected-context.json'
+        self.expected = {
+            'version': 1, 'sources': {'k-fsw': 'a' * 40, 'kfsw-services': 'b' * 40},
+            'snapshot_sha256': 'c' * 64, 'profile': 'linux-robot',
+            'config_sha256': hashlib.sha256(self.config.read_bytes()).hexdigest(),
+            'evidence_kind': 'hosted',
+        }
+        self.context.write_text(json.dumps(self.expected))
+        self.binding = self.root / 'binding.json'
+        self.record = {
+            'version': 1, 'context': self.expected,
+            'report_sha256': hashlib.sha256(self.report.read_bytes()).hexdigest(),
+            'image_sha256': hashlib.sha256(self.image.read_bytes()).hexdigest(),
+        }
+        self.binding.write_text(json.dumps(self.record))
+
+    def check_binding(self, *options, required=True):
+        return self.check('--binding', str(self.binding), '--image', str(self.image),
+                          '--context', str(self.context), '--config', str(self.config),
+                          *options, required=required)
+
+    def test_matching_image_binding(self):
+        self.binding_fixture()
+        result = self.check_binding()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('IMAGE BINDING: PASS', result.stdout)
+        # Clean contexts may omit a snapshot; omission does not prove cleanliness.
+        del self.expected['snapshot_sha256']
+        self.context.write_text(json.dumps(self.expected))
+        self.binding.write_text(json.dumps(self.record))
+        self.assertEqual(self.check_binding().returncode, 0)
+
+    def test_image_binding_checks_actual_files(self):
+        for artifact in ('report', 'image', 'config'):
+            with self.subTest(artifact=artifact):
+                self.binding_fixture()
+                path = getattr(self, artifact)
+                changed = b'\n<!--changed-->\n' if artifact == 'report' else b'\nchanged'
+                path.write_bytes(path.read_bytes() + changed)
+                result = self.check_binding()
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn('sha256', result.stderr)
+                path.unlink()
+                self.assertEqual(self.check_binding().returncode, 1)
+
+    def test_image_binding_matches_independent_context(self):
+        replacements = {
+            'sources': {'k-fsw': 'd' * 40, 'kfsw-services': 'b' * 40},
+            'snapshot_sha256': 'd' * 64, 'profile': 'different-profile',
+            'config_sha256': 'e' * 64, 'evidence_kind': 'physical',
+        }
+        for key, value in replacements.items():
+            with self.subTest(key=key):
+                self.binding_fixture()
+                record = json.loads(self.binding.read_text())
+                record['context'][key] = value
+                self.binding.write_text(json.dumps(record))
+                result = self.check_binding()
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+
+    def test_hosted_binding_cannot_satisfy_physical_selection(self):
+        self.binding_fixture()
+        self.selection['evidence_kind'] = 'physical'
+        self.manifest.write_text(json.dumps(self.selection))
+        self.assertEqual(self.check_binding().returncode, 1)
+        self.selection['evidence_kind'] = 'hosted'
+        self.manifest.write_text(json.dumps(self.selection))
+        self.assertEqual(self.check_binding('--board').returncode, 1)
+        del self.selection['evidence_kind']
+        self.manifest.write_text(json.dumps(self.selection))
+        self.assertEqual(self.check_binding().returncode, 1)
+
+    def test_malformed_image_bindings_fail(self):
+        self.binding_fixture()
+        for key in self.record:
+            record = dict(self.record)
+            del record[key]
+            self.binding.write_text(json.dumps(record))
+            self.assertEqual(self.check_binding().returncode, 1)
+        for key, value in (('version', True), ('version', 2), ('extra', 1),
+                           ('report_sha256', ''), ('image_sha256', 'A' * 64),
+                           ('report_sha256', True), ('context', [])):
+            with self.subTest(key=key, value=value):
+                self.binding.write_text(json.dumps(dict(self.record, **{key: value})))
+                self.assertEqual(self.check_binding().returncode, 1)
+        for content in ('{', '[]', '{"version":1,"version":1}'):
+            self.binding.write_text(content)
+            self.assertEqual(self.check_binding().returncode, 1)
+        self.binding.unlink()
+        self.assertEqual(self.check_binding().returncode, 1)
+
+    def test_malformed_expected_context_fails(self):
+        self.binding_fixture()
+        for key, value in (('version', True), ('sources', {}),
+                           ('sources', {'k-fsw': 'short'}),
+                           ('sources', {'other': 'a' * 40}),
+                           ('snapshot_sha256', None), ('profile', ''),
+                           ('config_sha256', 'wrong'), ('evidence_kind', 'unknown'),
+                           ('extra', True)):
+            with self.subTest(key=key, value=value):
+                self.context.write_text(json.dumps(dict(self.expected, **{key: value})))
+                self.assertEqual(self.check_binding().returncode, 1)
+        self.context.unlink()
+        self.assertEqual(self.check_binding().returncode, 1)
+
+    def test_binding_options_require_a_complete_selection(self):
+        self.binding_fixture()
+        self.assertEqual(self.check('--binding', str(self.binding)).returncode, 2)
+        self.assertEqual(self.check('--image', str(self.image)).returncode, 2)
+        self.assertEqual(self.check_binding(required=False).returncode, 2)
+
+    def test_binding_does_not_replace_required_case_checks(self):
+        self.binding_fixture()
+        self.write_report([(('Hil', 'Boot', 'Ready'), 'SKIP')])
+        self.record['report_sha256'] = hashlib.sha256(self.report.read_bytes()).hexdigest()
+        self.binding.write_text(json.dumps(self.record))
+        self.assertEqual(self.check_binding().returncode, 1)
 
 
 if __name__ == '__main__':

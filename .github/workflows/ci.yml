@@ -273,6 +273,11 @@ jobs:
       - name: Validate all Robot suites and run software scenarios
         run: ./k-fsw/tools/ci/robot.sh
 
+      - name: Check required software evidence
+        run: >-
+          python3 k-fsw/tools/ci/robot-counts.py build/robot/software/output.xml
+          --required k-fsw/tests/requirements/software.json
+
       - name: Upload Robot diagnostics
         if: failure()
         uses: actions/upload-artifact@v7
