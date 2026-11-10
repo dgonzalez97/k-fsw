@@ -92,4 +92,52 @@ KFSW_SYSBUILD=1 expect_error 1 'KFSW_SYSBUILD needs KFSW_MCUBOOT_KEY' nucleo_l49
 status=0
 BUILD_OPTIONS_WEST_STATUS=7 run_build nucleo_l496zg --semihost || status=$?
 [[ "$status" == 7 ]]
+
+# Reusing a ground role must not make its Kconfig input newer on every run.
+# Otherwise each Robot pair regenerates CMake even when the role is unchanged.
+export KGROUND_STATION_DIR="$work_dir/station"
+export KGROUND_BUILD_ROOT="$KFSW_OUTPUT_ROOT/ground"
+mkdir -p "$KGROUND_STATION_DIR/nodes"
+cat > "$KGROUND_STATION_DIR/nodes/kfsw-ops.env" <<'SH'
+KFSW_ROLE=kfsw-ops
+KFSW_CSP_NODE=19
+KFSW_CSP_PEER=16
+SH
+run_ground() {
+	bash "$repo_dir/tools/k-ground" build kfsw-ops "$@" > "$work_dir/log" 2>&1
+}
+run_ground
+ground_config="$KGROUND_BUILD_ROOT/config/kfsw-ops-node-19.conf"
+cp "$ground_config" "$work_dir/ground.conf"
+touch -d '2001-01-01 00:00:00 UTC' "$ground_config"
+ground_stamp="$(stat -c %Y "$ground_config")"
+run_ground
+cmp "$ground_config" "$work_dir/ground.conf"
+[[ "$(stat -c %Y "$ground_config")" == "$ground_stamp" ]]
+run_ground --peer 21
+grep -q '^CONFIG_KFSW_CSP_UART_PEER_ADDRESS=21$' "$ground_config"
+[[ "$(stat -c %Y "$ground_config")" != "$ground_stamp" ]]
+status=0
+BUILD_OPTIONS_WEST_STATUS=7 run_ground || status=$?
+[[ "$status" == 7 ]]
+
+cp "$ground_config" "$work_dir/ground.conf"
+for tool in cp mv; do
+	cat > "$work_dir/bin/$tool" <<'SH'
+#!/usr/bin/env bash
+exit 91
+SH
+	chmod +x "$work_dir/bin/$tool"
+	rm -f "$BUILD_OPTIONS_CAPTURE"
+	status=0
+	run_ground --peer 22 || status=$?
+	[[ "$status" == 1 ]]
+	[[ ! -e "$BUILD_OPTIONS_CAPTURE" ]]
+	cmp "$ground_config" "$work_dir/ground.conf"
+	if compgen -G "$ground_config.*" > /dev/null; then
+		echo "ERROR: failed $tool left a temporary ground configuration" >&2
+		exit 1
+	fi
+	rm "$work_dir/bin/$tool"
+done
 echo 'BUILD OPTIONS RESULT: PASS'
