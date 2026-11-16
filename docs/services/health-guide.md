@@ -11,7 +11,7 @@ radio and a spare, and nothing in it decides to degrade instead of resetting.
 Those are jobs for `limits` and the command registry, and the last section shows
 how to reach them from here.
 
-![What takes part](../media/health-shape.svg)
+![What takes part](media/health-shape.svg)
 
 ## Where it runs
 
@@ -110,7 +110,7 @@ Ok is zero for both the service and a slot, so `> 0` is the useful comparison.
 
 ## What happens when a component goes overdue
 
-![One component stops reporting](../media/health-overdue.svg)
+![One component stops reporting](media/health-overdue.svg)
 
 Health notices at its next check, marks the slot overdue, sets the service
 faulted and names the component in `health_faulted_by`. From that moment it
