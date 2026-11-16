@@ -129,9 +129,10 @@ or `codechecker_intentional` comment and the reason. CodeChecker needs
 `./.venv/bin/pip install codechecker clang-tidy`.
 
 Not in place yet: clang as a second compiler and sparse, which need system
-packages, and LTO, which shrinks the NUCLEO image by about 20 KB but needs
-`CONFIG_SHARED_INTERRUPTS=n` (no interrupt is shared today) and a run on the
-board before it changes a flight image.
+packages, and LTO. LTO does not link on the pinned Zephyr: it needs
+`ISR_TABLES_LOCAL_DECLARATION`, which conflicts with the shared interrupts this
+composition builds with, so the saving has never been measured. @ref
+project_status carries that lever with the others.
 
 ## Linux diagnostics
 

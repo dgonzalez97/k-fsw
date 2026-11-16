@@ -33,19 +33,21 @@ that is meant to move them.
 
 | Section | Bytes |
 | --- | --- |
-| `text` | 147,488 |
-| `rodata` | 53,024 |
-| `data` | 1,139 |
-| `bss` | 47,203 |
-| `noinit` | 107,208 |
+| `text` | 183,908 |
+| `rodata` | 73,196 |
+| `datas` | 2,254 |
+| `bss` | 77,821 |
+| `noinit` | 155,156 |
 
-That is 206,452 bytes of the 983,040-byte flash region, and 155,550 bytes of
-the 327,680-byte RAM.
+That is 264,572 bytes of the 983,040-byte flash region, 26.9 per cent, and
+236,308 bytes of the 327,680-byte RAM, 72.1 per cent. Measured on `716e8b5`.
+The figure is the plain image; a signed image under MCUboot is measured against
+its slot instead, which is a different denominator and a different number.
 
-The September size work took `text` down to 138,628 bytes; composing the
-diagnostics layer - last words, the retained log ring, the hardware watchdog and
-health - spent 8,860 of that back, which is the trade the budget exists to make
-visible.
+The September size work took `text` down to 138,628 bytes. Composing the
+diagnostics layer, meaning last words, the retained log ring, the hardware
+watchdog and health, spent 8,860 of that back. Everything added since has spent
+the rest: `text` is 45,280 bytes above that September figure.
 
 Levers, each measured on its own against that image:
 

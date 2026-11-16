@@ -103,6 +103,15 @@ bootloader has had the chance to revert an unconfirmed update. A run that
 stays healthy for `CONFIG_KFSW_BOOT_BUDGET_STABLE_S` refills the count, so
 only startups that never became stable add up.
 
+A refused Golden ends the chain. The install checks the recovery image's own
+SHA-256 before it erases the secondary slot, so a damaged one is refused with
+the slot untouched; `tests/unit/services_golden` covers that case as
+`test_damaged_image_refused_before_the_slot_erase`. The node then keeps running
+the image that was failing to confirm, with no attempts left to spend and
+nothing further to try on its own. Getting it out of that state needs the
+ground, which is what the scrub reference and the journal are for: they are how
+an operator finds out the node is there.
+
 Neither of those mechanisms exists in the recovery image: `KFSW_BOOT_BUDGET`
 depends on `!KFSW_GOLDEN_IMAGE`, so Golden compiles neither the spend at
 startup nor the stable-run refill. Golden spends no attempts and refills the
