@@ -88,6 +88,7 @@ board_poll() {
 
 python="$KFSW_ROOT/.venv/bin/python"
 [[ -x "$python" ]] || python=python3
+[[ -x "$python" ]] || python=python3
 "$python" "$KFSW_REPO_DIR/tools/ground/stage-file.py" \
 	--flash "$work/kiss.bin" --offset 0xfc000 --size 0x40000 \
 	"$here/two-links.txt" /ftp/limits/two-links.txt >"$work/stage.log" 2>&1

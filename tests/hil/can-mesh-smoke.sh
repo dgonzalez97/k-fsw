@@ -55,7 +55,9 @@ state="$(ip -details link show "$interface" | awk '/can state/ {print $3; exit}'
 cd "$root"
 # shellcheck source=/dev/null
 [[ -f .venv/bin/activate ]] && . .venv/bin/activate
-python3 -c "import serial" 2>/dev/null || skip "no pyserial; install it in the workspace .venv"
+python="$root/.venv/bin/python"
+[[ -x "$python" ]] || python=python3
+"$python" -c "import serial" 2>/dev/null || skip "no pyserial; install it in the workspace .venv"
 
 echo "CAN MESH: CSP $version on $interface at $bitrate bps, nodes $flight, $second and ground $ground"
 
@@ -98,7 +100,7 @@ sleep 3
 
 ping_from_board() # console, peer, label
 {
-	"$root/.venv/bin/python" - "$1" "$2" <<'PYTHON'
+	"$python" - "$1" "$2" <<'PYTHON'
 import sys, time
 import serial
 console, peer = sys.argv[1], sys.argv[2]
