@@ -270,7 +270,26 @@ jobs:
           packages: socat tmux
           requirements: k-fsw/tests/hil/requirements.txt
 
+      - name: Fetch and build the CSP host tools
+        run: |
+          west config manifest.group-filter +host-tools
+          west update kfsw-csp-tools
+          ./k-fsw/tools/kfsw-csp-tools build
+
+      - name: Bring up vcan0
+        run: sudo ./k-fsw/tests/vcan-up.sh vcan0
+
+      - name: Record which interface carried the CAN scenarios
+        run: |
+          {
+            echo 'CAN scenarios ran over vcan0, a virtual interface on the runner.'
+            echo 'This is not evidence for a physical CAN bus.'
+            ip -br link show vcan0
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Validate all Robot suites and run software scenarios
+        env:
+          KFSW_ROBOT_ACCEPTANCE: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && '0' || '1' }}
         run: ./k-fsw/tools/ci/robot.sh
 
       - name: Check required software evidence
