@@ -14,7 +14,7 @@ CSP Benchmark Validates Linux Echo Replies
     [Tags]    software    diagnostics    csp    iperf
     Skip If    not $IPERF_TOOL or not __import__('os').access($IPERF_TOOL, 1)    Install Rust and run tools/host-tools.sh, then set KFSW_CSP_IPERF_TEST_BINARY to the built csp-iperf binary.
     ${result}=    Run Process
-    ...    ${KFSW_REPO_DIR}/../.venv/bin/python    ${KFSW_REPO_DIR}/tests/csp-iperf-smoke.py
+    ...    ${KFSW_PYTHON}    ${KFSW_REPO_DIR}/tests/csp-iperf-smoke.py
     ...    --executable    ${KFSW_BUILD_ROOT}/linux/zephyr/zephyr.exe
     ...    --tool    ${IPERF_TOOL}    --output    ${OUTPUT DIR}/iperf-native
     ...    stderr=STDOUT    timeout=30
@@ -25,7 +25,7 @@ CSP Benchmark Validates Bench Echo Replies
     Skip If    not $IPERF_TOOL or not $IPERF_DEVICE
     ...    Set KFSW_CSP_IPERF_TEST_BINARY and KFSW_DIAGNOSTICS_KISS explicitly.
     ${result}=    Run Process
-    ...    ${KFSW_REPO_DIR}/../.venv/bin/python    ${KFSW_REPO_DIR}/tests/csp-iperf-smoke.py
+    ...    ${KFSW_PYTHON}    ${KFSW_REPO_DIR}/tests/csp-iperf-smoke.py
     ...    --device    ${IPERF_DEVICE}    --baud    ${IPERF_BAUD}
     ...    --node    ${IPERF_NODE}    --source    ${IPERF_SOURCE}
     ...    --tool    ${IPERF_TOOL}    --output    ${OUTPUT DIR}/iperf-bench
