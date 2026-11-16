@@ -12,7 +12,7 @@ example `rpi_pico_w` maps to `rpi_pico/rp2040/w`.
 | --- | --- | --- | --- |
 | `linux` | `native_sim/native/64` | Shell, storage, parameters, persistence, CSP UART/KISS, remote parameters, FTP | Software tests in CI |
 | `nucleo_l496zg` | `nucleo_l496zg` | Same as Linux; shell on ST-LINK, CSP on USART3 | CI build; boot, storage, UART/KISS, CSP, remote parameters and FTP on the bench |
-| `frdm_k64f` | `frdm_k64f/mk64f12` | Shell only; full support deferred to tag2.0 | Boot and shell on the board |
+| `frdm_k64f` | `frdm_k64f/mk64f12` | Shell only; full support deferred to tag 2.0 | Boot and shell on the board |
 | `rpi_pico_w` | `rpi_pico/rp2040/w` | Full service software composition; USB shell, UART0 CSP and persistent LittleFS | Recorded software build success; service HIL NOT RUN |
 
 Only Linux and the NUCLEO are built in CI.
@@ -239,7 +239,7 @@ radio.
 
 The `frdm_k64f` target maps to `frdm_k64f/mk64f12` and uses the OpenSDA serial
 console and the OpenOCD runner. CSP, parameters, persistence, FTP, storage and
-the filesystem are disabled. Full FRDM service support is deferred to tag2.0.
+the filesystem are disabled. Full FRDM service support is deferred to tag 2.0.
 
 ```bash
 ./k-fsw/tools/build.sh frdm_k64f
