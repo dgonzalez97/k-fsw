@@ -27,7 +27,7 @@ fail() { echo "GOLDEN HANG RESULT: FAIL - $*"; exit 1; }
 skip() { echo "GOLDEN HANG RESULT: NOT RUN - $*"; exit 0; }
 
 probe="${KFSW_L496_STLINK:-0670FF3732504E3043093407}"
-console="$(ls "/dev/serial/by-id/"*"$probe"*-if02 2>/dev/null | head -1)"
+console="$(ls "/dev/serial/by-id/"*"$probe"*-if02 2>/dev/null | head -1 || true)"
 [[ -n "$console" ]] || skip "no L496 console; is it plugged in?"
 key="${KFSW_MCUBOOT_KEY:-$HOME/.config/kfsw/mcuboot-signing-key.pem}"
 [[ -r "$key" ]] || skip "no MCUboot signing key at $key"
@@ -35,6 +35,7 @@ key="${KFSW_MCUBOOT_KEY:-$HOME/.config/kfsw/mcuboot-signing-key.pem}"
 cd "$root"
 # shellcheck source=/dev/null
 [[ -f "$root/../.venv/bin/activate" ]] && . "$root/../.venv/bin/activate"
+python3 -c "import serial" 2>/dev/null || skip "no pyserial; install it in the workspace .venv"
 openocd_cfg="$root/../zephyr/boards/st/nucleo_l496zg/support/openocd.cfg"
 profiles="$root/config/profiles"
 # Slot 1 starts at 0x68000; swap using offset expects the image one 2 KiB
