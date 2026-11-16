@@ -22,8 +22,15 @@ Before a tag, prepare the bench and run:
 This runs the software sequence first, then `tools/ci/board.sh`. The board
 stage can also run on its own. It selects Robot's `board`, `board-uart`,
 `board-can` and `radio` shapes with their existing tags and preflights, then
-runs the standalone watchdog, health, MCUboot rollback, Golden recovery,
-CAN limit and FRDM shell checks. Radio firmware update is already in Robot.
+runs the standalone watchdog, health, MCUboot rollback, Golden automatic
+install, Golden hang in both its trial and confirmed forms, damaged Golden,
+Golden recovery, CAN limit, CAN mesh and FRDM shell checks. Radio firmware
+update is already in Robot.
+
+The Golden cases run in a fixed order. `golden-hang-confirmed` ends with the
+board running Golden and no flight image, and `golden-corrupt` is the case that
+flashes the flight image back, so anything placed between those two starts from
+Golden instead of from where it expects to be.
 These checks reflash boards, rewrite firmware slots or Golden, and reset
 nodes. Back up the bench first. Radio update takes tens of minutes; CAN
 acceptance adds a one-hour soak when enabled.
