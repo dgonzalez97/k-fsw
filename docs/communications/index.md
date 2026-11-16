@@ -53,9 +53,12 @@ node 2.
 | 16 | Remote log (log history and journal) | `KFSW_LOG_REMOTE_PORT` |
 
 Every node serves ports 0 and 1; libcsp's ports 2 to 6 are not served. Both
-ends of a link must use the same port numbers. `CSP_PORT_MAX_BIND` is 16 and
-raising it costs connection slots, so port 7 is the room left for a new
-service rather than 17 and up.
+ends of a link must use the same port numbers. libcsp binds 16 ports by
+default, which the service block 8 to 16 already fills, so `app/Kconfig` raises
+`CSP_PORT_MAX_BIND` to 32. A new service takes 17 or above, or port 7. Both
+CSP 1 and CSP 2 carry a six bit port, and libcsp places an outgoing source port
+at `CSP_PORT_MAX_BIND + 1 + i` for each of `CSP_CONN_MAX` connections, so 32
+keeps those inside 63.
 
 **Packet.** A CSP header (addresses, ports and flags such as CRC32 or RDP) and
 a payload. Packets come from a fixed buffer pool and stay datagrams, also with
