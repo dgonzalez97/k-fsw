@@ -55,6 +55,7 @@ grep -q 'can state ERROR-ACTIVE' "$work/can.state" || skip "$interface is not an
 
 python="$KFSW_ROOT/.venv/bin/python"
 [[ -x "$python" ]] || python=python3
+[[ -x "$python" ]] || python=python3
 
 build() {
 	local target="$1" name="$2" conf="$3" overlay="${4:-}"
