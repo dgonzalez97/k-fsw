@@ -138,8 +138,10 @@ printf '<robot><suite><test name="case"><status status="%s">fixture reason</stat
                             for line in self.trace()))
         self.assertNotIn('PASS', result.stdout)
         for name in ('board', 'board-uart', 'board-can', 'radio', 'watchdog', 'health',
-                     'mcuboot', 'golden-recovery', 'limits-can', 'can-acceptance',
-                     'radio-crypto', 'frdm-shell', 'f746-proof', 'pico-shell', 'button-acceptance'):
+                     'mcuboot', 'golden-auto', 'golden-hang-trial', 'golden-hang-confirmed',
+                     'golden-corrupt', 'golden-recovery', 'limits-can', 'can-mesh',
+                     'can-acceptance', 'radio-crypto', 'frdm-shell', 'f746-proof',
+                     'pico-shell', 'button-acceptance'):
             self.assertIn(f'BOARD: {name} NOT RUN:', result.stdout)
 
     def test_robot_results(self):
