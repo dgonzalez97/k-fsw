@@ -10,6 +10,7 @@ clang_format=""
 
 bash "$KFSW_REPO_DIR/tests/build-options-test.sh"
 python3 "$KFSW_REPO_DIR/tests/ci-suite-test.py"
+python3 "$KFSW_REPO_DIR/tests/profile-config-test.py"
 
 quality_python="$KFSW_WORKSPACE_ROOT/.venv/bin/python"
 [[ -x "$quality_python" ]] || quality_python=python3
