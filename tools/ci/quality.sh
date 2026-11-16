@@ -14,6 +14,8 @@ python3 "$KFSW_REPO_DIR/tests/profile-config-test.py"
 
 quality_python="$KFSW_WORKSPACE_ROOT/.venv/bin/python"
 [[ -x "$quality_python" ]] || quality_python=python3
+echo "QUALITY: CAN load fixture tests"
+"$quality_python" "$KFSW_REPO_DIR/tests/can-acceptance-test.py"
 echo "QUALITY: F746 offline proof tests"
 started=$SECONDS
 "$quality_python" "$KFSW_REPO_DIR/tests/f746-proof-test.py"
