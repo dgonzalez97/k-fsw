@@ -30,6 +30,12 @@ elif [[ "${1:-}" == --interrupted ]]; then
 	bytes=32768
 	shift
 fi
+# Repeated runtime trials may reuse the images built by the first trial.
+build_nodes=1
+if [[ "${1:-}" == --no-build ]]; then
+	build_nodes=0
+	shift
+fi
 if [[ $# -ne 0 ]]; then
 	echo "ERROR: unknown argument: $1"
 	exit 1
@@ -101,10 +107,12 @@ for node_file in kfsw-gnd-uhf kfsw-ops; do
 	printf '%s\n' "KFSW_CSP_VERSION=$csp_version" >>"$station_dir/nodes/$node_file.env"
 done
 
-KGROUND_STATION_DIR="$station_dir" \
-	"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-gnd-uhf
-KGROUND_STATION_DIR="$station_dir" \
-	"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-ops
+if [[ "$build_nodes" -eq 1 ]]; then
+	KGROUND_STATION_DIR="$station_dir" \
+		"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-gnd-uhf
+	KGROUND_STATION_DIR="$station_dir" \
+		"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-ops
+fi
 
 node16_executable="$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16$csp_suffix/zephyr/zephyr.exe"
 node19_executable="$KGROUND_BUILD_ROOT/kfsw-ops-node-19$csp_suffix/zephyr/zephyr.exe"
@@ -163,10 +171,10 @@ if [[ "$interrupted" -eq 1 ]]; then
 	wait_for_output "$work_dir/bridge.ready" "lossy link ready" "$bridge_pid" || \
 		fail "the cutting bridge did not become ready"
 elif [[ "$lossy_link" -eq 1 ]]; then
-	# Drop bytes in runs, like lost packets.
+	# Drop one complete upload data frame; its retry must reach the receiver.
 	python3 "$KGROUND_REPO_DIR/tests/support/lossy-link.py" \
 		--left "$node16_pty" --right "$node19_pty" --csp-version "$csp_version" \
-		--drop-every 9000 --drop-bytes 6 \
+		--drop-every 1000000000 --drop-bytes 0 --drop-put-data 4 \
 		--ftp-stats "$work_dir/ftp-stats.json" \
 		--ready-file "$work_dir/bridge.ready" \
 		>"$work_dir/socat.log" 2>&1 &
@@ -207,7 +215,9 @@ if [[ "$interrupted" -eq 1 ]]; then
 	wait_for_output "$work_dir/socat.log" "lossy link: forwarding again" \
 		"$bridge_pid" || fail "the bridge never came back"
 	printf '%s\n' 'ftp ls 19 /build' >&4
-	wait_for_output "$work_dir/node19.log" "down-copy.bin.part" "$node19_pid" || \
+	wait_for_output "$work_dir/node19.log" "entries: 2" "$node19_pid" || \
+		fail "the interrupted download did not list its partial and note"
+	grep -Fq "down-copy.bin.part" "$work_dir/node19.log" || \
 		fail "the interrupted download kept nothing to continue from"
 	grep -Fq "down-copy.bin.part.map" "$work_dir/node19.log" || \
 		fail "the partial was left without the note that names its file"
@@ -225,6 +235,9 @@ if [[ "$interrupted" -eq 1 ]]; then
 		fail "the second pass continued from nowhere"
 	grep -Fq "crc32: $source_crc" "$work_dir/node19.log" || \
 		fail "the stitched file is not the one node 16 holds"
+
+	wait_for_output "$work_dir/node19.log" "entries: 1" "$node19_pid" || \
+		fail "the completed download did not finish listing its file"
 
 	# Nothing of the transfer may outlive it.
 	after_last_listing="$(tr -d '\r' <"$work_dir/node19.log" |
