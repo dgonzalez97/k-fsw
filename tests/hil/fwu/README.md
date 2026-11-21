@@ -64,6 +64,19 @@ space for the candidate and readbacks; the board's storage geometry is unchanged
 Use `--reboot-pin` if the board's PIN differs from `0000`. The ground profile
 uses 1,000 clock ticks per second for SocketCAN's transmit-completion polling.
 
+`can-up.sh` sets `can0`'s `txqueuelen` to 1000 and checks the value before
+bringing the interface up. Both `can-update.py` and `can-acceptance.py` require
+`ERROR-ACTIVE` at 500000 bit/s and a queue of at least 1000. A short or missing
+queue length fails before opening the serial port or starting an upload. For
+another adapter name, set `sudo ip link set dev <interface> txqueuelen 1000`
+after configuring its bitrate, then check `ip -details link show <interface>`
+for `qlen 1000` or higher.
+
+The default SocketCAN queue of 10 is too short for CFP1 FWU bursts. A larger
+queue reduces queue exhaustion; it does not fix the native driver's failure
+to report a refused write. If CAN TX stops, restore an acknowledged bus and
+restart the ground process. Driver error handling and retry remain required.
+
 ## Timing and interrupted uploads
 
 Add `probes.conf` to the flight build, then install and confirm that image.
@@ -107,4 +120,6 @@ sudo bash k-fsw/tests/hil/stm32/nucleo-l496zg/can-up.sh 500000 normal
 ```
 
 Check `ip -details -statistics link show can0` before transmitting.
-`ERROR-ACTIVE` is the normal CAN controller state; record the error counters too.
+Require `ERROR-ACTIVE`, bitrate 500000 and `qlen 1000` or higher; record the
+error counters too. Repeat `can-up.sh` after an adapter reset to restore the
+queue length.

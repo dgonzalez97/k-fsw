@@ -483,6 +483,22 @@ The NUCLEO uses CAN1 on PD0/PD1 with an external transceiver, and a Linux node
 uses a SocketCAN interface. Both ends of the bus need the same bitrate; the
 profiles use 500 kbit/s.
 
+Bring up a real SocketCAN adapter with:
+
+```bash
+sudo bash k-fsw/tests/hil/stm32/nucleo-l496zg/can-up.sh 500000 normal
+ip -details -statistics link show can0
+```
+
+The setup script sets and verifies `txqueuelen 1000`. Check `qlen 1000` or
+higher before transmitting. For another interface name, configure its bitrate
+and set `sudo ip link set dev <interface> txqueuelen 1000` before use. The
+default queue of 10 can fill during CFP1 firmware uploads. The native driver
+currently reports success on a refused write and then waits for a completion
+that never arrives, so CAN TX can stop until the ground process restarts.
+A longer queue reduces this risk; driver error handling and retry are still
+needed. The HIL preflight and CAN FWU scripts reject queues below 1000.
+
 ### Virtual CAN on Linux
 
 `vcan` carries CAN frames between processes on one host. To test two Linux
@@ -500,6 +516,9 @@ both ways, reads remote parameters and checks the counters afterwards.
 The interface name comes from `--can-if` at run time, so the same images run
 against a real adapter by naming `can0` instead. A virtual bus has no bit
 timing, so it proves routing, framing and the services, not the wire.
+The default virtual bus has no transmit queue and does not exercise a real
+adapter's queue exhaustion. The physical CAN queue requirement does not apply
+to this software test.
 
 ## Shell UART and CSP UART
 

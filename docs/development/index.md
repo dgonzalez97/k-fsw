@@ -247,6 +247,12 @@ Every one of these has cost a bench session at least once.
   assertions wants the counters at zero, so a bus that misbehaved earlier fails a
   run that is otherwise clean. Bring it up again:
   `sudo tests/hil/stm32/nucleo-l496zg/can-up.sh 500000 normal`
+- **Set the SocketCAN transmit queue.** The same `can-up.sh` command sets and
+  verifies `txqueuelen 1000`. Check `ip -details link show can0` for `qlen 1000`
+  or higher. The default queue of 10 can drop CFP1 FWU frames and leave the
+  native driver's CAN TX waiting for a completion that never arrives. The
+  `board-can` preflight and both CAN FWU scripts reject a short or missing
+  queue length. Software tests on the default `vcan0` do not use this queue.
 - **One ground profile per build directory.** `tools/k-ground` includes the
   profile and node number in each build directory, so `kfsw-gnd-can`,
   `kfsw-gnd-uhf` and a local `-bench.env` variant never overwrite each other's
