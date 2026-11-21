@@ -19,7 +19,7 @@ fail() { echo "GOLDEN CORRUPT RESULT: FAIL - $*"; exit 1; }
 skip() { echo "GOLDEN CORRUPT RESULT: NOT RUN - $*"; exit 0; }
 
 probe="${KFSW_L496_STLINK:-0670FF3732504E3043093407}"
-console="$(ls "/dev/serial/by-id/"*"$probe"*-if02 2>/dev/null | head -1)"
+console="$(ls "/dev/serial/by-id/"*"$probe"*-if02 2>/dev/null | head -1 || true)"
 [[ -n "$console" ]] || skip "no L496 console; is it plugged in?"
 key="${KFSW_MCUBOOT_KEY:-$HOME/.config/kfsw/mcuboot-signing-key.pem}"
 [[ -r "$key" ]] || skip "no MCUboot signing key at $key"
@@ -27,6 +27,7 @@ key="${KFSW_MCUBOOT_KEY:-$HOME/.config/kfsw/mcuboot-signing-key.pem}"
 cd "$root"
 # shellcheck source=/dev/null
 [[ -f "$root/../.venv/bin/activate" ]] && . "$root/../.venv/bin/activate"
+python3 -c "import serial" 2>/dev/null || skip "no pyserial; install it in the workspace .venv"
 openocd_cfg="$root/../zephyr/boards/st/nucleo_l496zg/support/openocd.cfg"
 profiles="$root/config/profiles"
 golden_offset=0x080C0000
@@ -121,7 +122,7 @@ grep -q "Boot attempts exhausted; recovering" "$work/refuse.log" ||
 	fail "the exhausted budget was not reported; see $work/refuse.log"
 grep -q "Recovery image failed its own SHA-256" "$work/refuse.log" ||
 	fail "the damaged image was not refused; see $work/refuse.log"
-grep -q "Recovery image installed" "$work/refuse.log" &&
+! grep -q "Recovery image installed" "$work/refuse.log" ||
 	fail "the damaged image was installed; see $work/refuse.log"
 grep -q "image=application" "$work/refuse.log" ||
 	fail "the flight image did not keep running; see $work/refuse.log"

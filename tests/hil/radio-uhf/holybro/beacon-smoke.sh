@@ -18,6 +18,7 @@ debug_serial="${KFSW_DEBUG_SERIAL:-$KFSW_SERIAL}"
 radio_baud="${KGROUND_HOLYBRO_BAUD:-57600}"
 nucleo_build_dir="$KFSW_ROOT/build/hil/holybro/nucleo_l496zg"
 python="$KFSW_ROOT/.venv/bin/python"
+[[ -x "$python" ]] || python=python3
 work_dir="$(mktemp -d /tmp/k-fsw-holybro-beacon.XXXXXX)"
 debug_capture_pid=""
 debug_stty=""

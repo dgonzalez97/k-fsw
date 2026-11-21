@@ -28,7 +28,7 @@ fail() { keep=1; echo "GOLDEN RECOVERY RESULT: FAIL - $*"; exit 1; }
 skip() { echo "GOLDEN RECOVERY RESULT: NOT RUN - $*"; exit 0; }
 
 probe="${KFSW_L496_STLINK:-0670FF3732504E3043093407}"
-console="$(ls "/dev/serial/by-id/"*"$probe"*-if02 2>/dev/null | head -1)"
+console="$(ls "/dev/serial/by-id/"*"$probe"*-if02 2>/dev/null | head -1 || true)"
 [[ -n "$console" ]] || skip "no L496 console; is it plugged in?"
 ip link show "$interface" >/dev/null 2>&1 || skip "no $interface; is the adapter plugged in?"
 state="$(ip -details link show "$interface" | awk '/can state/ {print $3; exit}')"
@@ -38,6 +38,7 @@ state="$(ip -details link show "$interface" | awk '/can state/ {print $3; exit}'
 cd "$root"
 # shellcheck source=/dev/null
 [[ -f "$root/../.venv/bin/activate" ]] && . "$root/../.venv/bin/activate"
+python3 -c "import serial" 2>/dev/null || skip "no pyserial; install it in the workspace .venv"
 
 profiles="$root/config/profiles"
 key="${KFSW_MCUBOOT_KEY:-$HOME/.config/kfsw/mcuboot-signing-key.pem}"
