@@ -369,7 +369,7 @@ class Inputs(unittest.TestCase):
                 '--serial', self.args.serial, '--output', str(output), '--profile', 'minimal',
                 '--seconds', '1', '--flight-image', str(self.flight_image),
                 '--flight-config', str(self.flight_config), '--context', str(self.context)]
-        state = {'linkinfo': {'info_data': {'state': 'ERROR-ACTIVE', 'bittiming': {'bitrate': 500000}}}}
+        state = {'txqlen': 1000, 'linkinfo': {'info_data': {'state': 'ERROR-ACTIVE', 'bittiming': {'bitrate': 500000}}}}
         with patch.object(load.sys, 'argv', argv), \
                 patch.object(load.serial, 'Serial'), \
                 patch.object(load.bench, 'Console', side_effect=[board or Console(), Console(node=17, remote_node=2)]), \
