@@ -199,7 +199,7 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | 5 | `storage` | 4 | Filesystem size, free space, mount | always | `k-fsw/app/src/parameters/storage_table.c` |
 | 6 | `watchdog` | 7 | Hardware watchdog timing and feeds | always | `k-fsw/app/src/parameters/watchdog_table.c` |
 | 25 | `log` | 7 | Log levels, colour and counters | always | `kfsw-services/src/log.c` |
-| 26 | `param` | 10 | Parameter counts and snapshot saves | always | `kfsw-services/src/param-parameters/param_table.c` |
+| 26 | `param` | 11 | Parameter counts and snapshot saves | always | `kfsw-services/src/param-parameters/param_table.c` |
 | 27 | `event` | 5 | Event record counters | always | `kfsw-services/src/event-parameters/event_table.c` |
 | 28 | `command` | 7 | Command counters, timeout and echo | always | `kfsw-services/src/command-parameters/command_table.c` |
 | 29 | `ftp` | 7 | File transfers and limits | always | `kfsw-services/src/ftp-parameters/ftp_table.c` |
@@ -288,6 +288,7 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | `param` | 0x18 | `param_persist_max_bytes` | u32 | r | - | Most space a snapshot is allowed |
 | `param` | 0x1c | `param_requests_dropped` | u32 | r | - | Value requests dropped before worker admission |
 | `param` | 0x20 | `param_read_resends` | u32 | r | - | Extra read request packets after timeouts since boot; saturates |
+| `param` | 0x24 | `param_save_failures` | u32 | r | - | Snapshot writes that failed since boot |
 | `event` | 0x00 | `events_recorded` | u32 | r | - | Events accepted since start |
 | `event` | 0x04 | `events_overwritten` | u32 | r | - | Events lost to the ring wrapping before they were read |
 | `event` | 0x08 | `events_rejected` | u32 | r | - | Events refused for an invalid payload size or source |

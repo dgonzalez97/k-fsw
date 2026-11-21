@@ -522,6 +522,49 @@ ZTEST(param_persistence, test_a_persistent_value_is_written_without_being_asked)
 }
 
 /*
+ * The autosave in kfsw_param_set cannot report a failed snapshot through its
+ * return value: the value is applied and live, so failing the set would be
+ * wrong. It therefore has to be counted, or the node reports a persistent value
+ * as set and loses it at the next reset with nothing said anywhere.
+ */
+ZTEST(param_persistence, test_a_failed_autosave_is_counted_and_the_set_still_succeeds)
+{
+	struct kfsw_param_stats before;
+	struct kfsw_param_stats after;
+	struct kfsw_param_value value;
+	struct fs_file_t file;
+
+	zassert_true(kfsw_param_autosave_enabled(), "autosave is off, so nothing would be saved");
+	zassert_ok(kfsw_param_get_stats(&before), "stats read failed");
+
+	/* A regular file where the snapshot directory belongs makes the write fail.
+	 * persist_clear may already have removed both, so clearing the path is
+	 * best effort and only the blocking file has to be there. */
+	(void)fs_unlink(SNAPSHOT_PATH);
+	(void)fs_unlink(SNAPSHOT_DIRECTORY);
+	fs_file_t_init(&file);
+	zassert_ok(fs_open(&file, SNAPSHOT_DIRECTORY, FS_O_CREATE | FS_O_WRITE),
+		   "blocking file create failed");
+	zassert_ok(fs_close(&file), "blocking file close failed");
+
+	zassert_ok(kfsw_param_get("log_level", &value), "parameter get failed");
+	value.scalar.u8 = 2U;
+	zassert_ok(kfsw_param_set("log_level", &value),
+		   "the set reported a failure, although the value is applied and live");
+
+	zassert_ok(kfsw_param_get_stats(&after), "stats read failed");
+	zassert_equal(after.save_failures, before.save_failures + 1U,
+		      "a snapshot that never reached flash was not counted");
+	zassert_equal(after.saves, before.saves, "a failed snapshot counted as written");
+
+	zassert_ok(kfsw_param_get("log_level", &value), "parameter get failed");
+	zassert_equal(value.scalar.u8, 2U, "the value was not applied");
+
+	zassert_ok(fs_unlink(SNAPSHOT_DIRECTORY), "blocking file removal failed");
+	zassert_ok(fs_mkdir(SNAPSHOT_DIRECTORY), "snapshot directory recovery failed");
+}
+
+/*
  * A hex value is an unsigned value that the shell prints differently, and the
  * snapshot stores widths rather than display styles. This is here because the
  * format once knew nothing about the hex types, and the first table to keep
