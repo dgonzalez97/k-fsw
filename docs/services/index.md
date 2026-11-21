@@ -21,16 +21,16 @@ markers (see [Logging](#logging) for how markers differ from other messages):
 
 ```text
 @SERVICES ok failures=0
-@BOOT sw=<image version> board=<board target> unit=<hardware id> reset=<flags> reset_rc=<result> reset_cause=<name>
+@BOOT sw=<image version> board=<board target> image=<application|golden> unit=<hardware id> reset=<flags> reset_rc=<result> reset_cause=<name>
 @SOURCE <release commit or development>
 @READY uptime_ms=<milliseconds>
 ```
 
 The image version is `git describe` of the `k-fsw` repository when the build
-is configured, and `version` prints the same string. `@SERVICES degraded
-failures=N` means some services failed to start. `@READY` marks the end of
-startup; release builds set the version and source commit explicitly, see
-@ref development.
+is configured, and `version` prints the same string. `image` is `golden` in the
+recovery image. `@SERVICES degraded failures=N` means N services failed to
+start. `@READY` marks the end of startup. Release builds set the version and
+source commit explicitly; see @ref development.
 
 ### Build revisions
 
@@ -50,10 +50,9 @@ uncommitted changes at build time.
 ### Restart count
 
 `boot_count` in table 32 counts restarts across the life of the node. It is
-saved only when a parameter snapshot already exists: a new flash, or one
-cleared with `param clear`, keeps nothing stored, which is the state to recover
-from a bad saved value. Until something saves a snapshot, every restart counts
-as the first; `param save` starts the count.
+saved only when a parameter snapshot already exists, so after a new flash or
+`param clear` every restart counts as the first until `param save` starts the
+count.
 
 ### Image trials and reverts
 
@@ -66,32 +65,27 @@ Table 32 exposes read-only trial diagnostics. `version` prints them too.
 | `0x2a` | `boot_trial_valid` | 1 when recovery and the current save succeeded; otherwise 0. |
 
 The service identifies images by their signed SHA256 TLV and records a boot
-immediately after storage mount. It saves `/kfsw/boot-trial.dat` in the existing
-persistent filesystem, independently of parameter snapshots and autosave. A
-magic and CRC32 validate the record; a synced temporary file is renamed over
-the previous copy. An interrupted write leaves the previous good copy intact.
-The count survives power cuts after a completed save. Boots that fail before
-the service records them cannot be counted, and an interrupted save may lose
-the latest increment.
+immediately after storage mount, in `/kfsw/boot-trial.dat`, separate from the
+parameter snapshot. A magic and CRC32 validate the record, and a synced
+temporary file is renamed over the previous copy, so an interrupted write
+leaves the previous copy. A boot that fails before the service records it is
+not counted, and an interrupted save can lose the latest increment.
 
-The reason is the one the service can establish, not a verdict from the
-bootloader: an image previously observed unconfirmed is no longer running.
-Reason 1 also means MCUboot had scheduled a revert while that image was last
-recorded, and that the service had not recorded its confirmation. The previous
-image identity is kept in the same record. The reason remains
-stored when the running image is confirmed; only the attempt count resets.
-Confirming through `boot_confirmed` saves that reset immediately. Confirmation
-through the separate MCUboot shell is reflected at the next service startup.
+The revert reason is what the service observed: an image it last saw
+unconfirmed is no longer running. Reason 1 adds that MCUboot had a revert
+pending when that image was last recorded. The record keeps the previous image
+identity. Confirming the running image resets the attempt count and keeps the
+reason. A confirmation through `boot_confirmed` is saved at once; one through
+the MCUboot shell is seen at the next startup.
 
-Without MCUboot, including on native_sim, or if image identity, storage or
-snapshot validation fails, attempts is `4294967295`, reason is `255`, and
-validity is 0. A corrupt record is preserved and reported invalid rather than
-silently restarting the count at one.
+Without MCUboot, including on native_sim, or when image identity, storage or
+snapshot validation fails, attempts reads `4294967295`, reason `255` and
+validity 0. A corrupt record is kept and reported invalid; the count does not
+restart at one.
 
-Software recovery coverage runs the native_sim ztest image twice against the
-same flash file with `tests/boot-diagnostics-restart.sh <zephyr.exe>`. Physical
-power-cut and MCUboot rollback acceptance require hardware and have not been
-run for this change.
+`tests/boot-diagnostics-restart.sh <zephyr.exe>` runs the native_sim ztest
+image twice against the same flash file. Power-cut and MCUboot rollback have
+not been tested on hardware.
 
 ## Housekeeping
 
@@ -110,52 +104,47 @@ keeps the existing sample files and their sequence numbers.
 
 ### Retrieval classes
 
-K-FSW uses its own eight-class scheme, not Space Inventor's representation.
-A report definition carries a three-bit class value, 0..7, alongside the schema
-it already holds. Class **4** is the default for existing definitions, older
-saved definitions (versions 1 and 2), and compositions that set no class.
-The class only orders retrieval: it changes neither what is collected nor when.
+A report definition carries a retrieval class from 0 to 7, K-FSW's own
+scheme, not Space Inventor's. Class 4 is the default, including for saved
+definitions of versions 1 and 2. The class orders retrieval only; it changes
+neither what is collected nor when.
 
-Lower numbers come down first. Assign reports by the decision the operator must
-make, rather than by the device that produced the values:
+Lower classes come down first. Assign reports by the decision the operator must
+make, not by the device that produced the values:
 
 | Class | Operational use |
 | --- | --- |
-| 0 | Survival now: battery voltage, battery current and power-bus state. With eight minutes of pass left, retrieve this first to decide whether loads must be shed. |
-| 1 | Immediate fault diagnosis: reset cause, watchdog faults, safe-mode state and critical temperatures. Read this before commanding recovery. |
-| 2 | Whether the recovery worked: power-switch states, subsystem health and command outcome. Get this during the same pass. |
-| 3 | Link and resource margins: radio errors, packet drops and free storage. Use this to plan the rest of the pass. |
-| 4 | Routine platform telemetry. The default keeps an unchanged composition's newest-first behaviour. |
-| 5 | Payload status and recent science summaries. Retrieve after the vehicle and link are understood. |
-| 6 | Engineering trends: detailed temperatures and long performance histories. Defer to a later pass when bandwidth is short. |
-| 7 | Bulk diagnostics and commissioning detail that can wait a week, provided the configured history retains it. This is not a retention guarantee. |
+| 0 | Survival: battery voltage and current, power-bus state. Decides whether to shed loads. |
+| 1 | Fault diagnosis: reset cause, watchdog faults, safe mode, critical temperatures. Read before commanding recovery. |
+| 2 | Whether recovery worked: power switches, subsystem health, command outcome. |
+| 3 | Link and resource margins: radio errors, packet drops, free storage. |
+| 4 | Routine platform telemetry; the default. |
+| 5 | Payload status and recent science summaries. |
+| 6 | Engineering trends: detailed temperatures, performance histories. |
+| 7 | Bulk diagnostics and commissioning detail, while the configured history holds it. |
 
 Define locally with `hk define 0 class=0 3:0`, or remotely with
-`hk define 1 0 class=0 3:0` (node 1, report 0). `class=N` must precede the
-entries; values above 7 are refused. Omit it to use class 4. The remote command
-`hk_define` carries the same prefix in its entry-list text argument.
-`hk show` prints each definition's class. Parameter table 33 (`hk`), offset
-`0x30`, publishes read-only `hk_classes`: one byte per report, 255 when
-undefined. Read it locally or through remote PARAM; use `hk define` to change
-the definition and its class together. With HK persistence composed, the
-version-3 settings snapshot saves the class on each accepted definition change.
+`hk define 1 0 class=0 3:0` (node 1, report 0). `class=N` precedes the entries;
+a value above 7 is refused, and omitting it gives class 4. The `hk_define`
+command carries the same prefix in its entry-list argument. `hk show` prints
+each definition's class, and read-only `hk_classes` (table 33, offset `0x30`)
+holds one byte per report, 255 when undefined. With HK persistence, the
+version-3 settings snapshot saves the class with each definition.
 
-Retrieval uses a separate eight-bit selection mask: bit n selects class n.
-`0x01` requests survival telemetry; `0x0f` selects classes 0..3; `0xff`
-selects all eight; zero selects nothing. For example, the ground bridge's
-`--class-mask 0x0f --count 12` asks for up to twelve selected RAM samples.
-It returns lower classes first and newest collection first within each class,
-including across reports. A requested count larger than available history can
-produce fewer packets (the bridge reports its timeout). Collection order is
-used even if UTC steps backwards. Count and starting index apply to the
-selected, ordered stream. This path reads RAM history; file extraction keeps
-its existing per-report filters and oldest-first order.
+Retrieval takes an eight-bit mask in which bit n selects class n: `0x01` is
+survival telemetry, `0x0f` classes 0 to 3, `0xff` all eight, zero nothing. The
+ground bridge's `--class-mask 0x0f --count 12` asks for up to twelve RAM
+samples from classes 0 to 3, lower classes first and newest collection first
+within a class, across reports. Collection order holds even if UTC steps
+backwards. Count and starting age apply to the selected stream, and a count
+larger than the history returns fewer packets. File extraction keeps its
+per-report filters and oldest-first order.
 
 On CSP port 14, the existing five-byte request remains version, report, count,
 starting age (big-endian u16). Class retrieval uses report 255 and adds a sixth
-byte, the selection mask. Replies remain one unchanged sample frame per packet;
-the frame's report number identifies its schema. The mask is a retrieval
-selection, not the report's class value or a CSP packet priority.
+byte, the mask. Replies are one sample frame per packet, and the frame's
+report number identifies its schema. The mask has no relation to CSP packet
+priority.
 
 Replacing a definition, including its class, discards its RAM history and
 removes its store file. A collection already in progress is cancelled. A sample
@@ -165,13 +154,11 @@ recorded under the old definition is never read back using the new schema.
 
 `hk store <report> <ms>` keeps samples in `/kfsw/hk/report<N>.bin`, a ring of
 fixed-size slots where each record is the frame itself: version, report,
-sequence, collection time, entry count, flags and the values. So a stored record
-needs no decoding to be served again, and `hk stored <report>` prints it exactly
-as `hk get` prints a live one.
+sequence, collection time, entry count, flags and the values. `hk stored
+<report>` prints a stored record as `hk get` prints a live one.
 
-The record count is what the ring holds, not what was ever collected. Once the
-file is full the oldest slot is overwritten, and the readable window is the last
-`CONFIG_KFSW_HK_STORE_CAPACITY` sequence numbers.
+Once the file is full the oldest slot is overwritten, so the readable window is
+the last `CONFIG_KFSW_HK_STORE_CAPACITY` sequence numbers (256 by default).
 
 A filter narrows what is read or extracted. Each part is optional and a zero
 means no bound:
@@ -184,8 +171,8 @@ means no bound:
 | `until=<seconds>` | records collected at or before it |
 | `skip=<flags>` | leaves out records carrying any of those flags |
 
-Sequence numbers wrap at 16 bits, so a window is compared as a signed
-difference and a range across the wrap still selects what it should.
+Sequence numbers wrap at 16 bits and are compared as a signed difference, so
+a range across the wrap still works.
 
 `hk extract <report> <path> [filters]` writes the selected records to a file for
 downlink. It has a 20-byte header (magic `KHKD`, version, report, record size,
@@ -202,9 +189,8 @@ hk extract 0 /kfsw/hk/pass.bin since=1790744000
 ftp get 1 /hk/pass.bin ./pass.bin
 ```
 
-An extract counts the selection before writing and refuses with `-EAGAIN` if the
-ring moved between the two passes, rather than leaving a file whose header
-disagrees with its records.
+An extract counts the selection before writing and refuses with `-EAGAIN` if
+the ring moved between the two passes.
 
 ## File based operations
 
@@ -239,9 +225,8 @@ event record. There are no loops or jumps.
 
 `wait-until <unix-seconds> <late-tolerance-seconds>` waits on the existing UTC
 clock. For example, `wait-until 1900000002 1` permits a step at that UTC second
-or up to one second late. Set the clock before starting the procedure; it does
-not synchronize time.
-The target range is 1..2147483647, matching the current CSP clock.
+or up to one second late. The target range is 1 to 2147483647, matching the
+CSP clock. Set the clock before starting the procedure.
 
 The initial wait and late tolerance must not exceed `CONFIG_KFSW_FBO_WAIT_MAX_S`
 (default 600 seconds). UTC is checked every 100 ms. A forward step may make the
@@ -249,13 +234,11 @@ line due or too late; a backward step keeps waiting, with a monotonic deadline
 of at most the configured maximum from entry. An unset/failed clock aborts the
 line, including if it becomes unset while waiting. `fbo stop` wakes the wait
 immediately; it cannot be bypassed by `on-error continue`. Other errors follow
-the procedure's `on-error` policy. Execution time is not guaranteed, and
-pending waits are lost at restart.
+the procedure's `on-error` policy. A pending wait is lost at restart.
 
 ### The time-tagged queue
 
-A procedure needs someone to start it. The queue is for the other case: leave a
-single command behind and let the node release it when its time comes, with
+The queue holds single commands that the node releases at a set time, with
 nobody listening.
 
 ```text
@@ -269,15 +252,13 @@ fbo sched status
 
 `+seconds` counts from the moment the entry is accepted, on the monotonic clock,
 so it is unaffected by anything that happens to the wall clock afterwards.
-`@utc` is a UTC second and is refused with `-ENODATA` while the clock has never
-been set this power cycle, because a release at the wrong time is worse than a
-release that never happens. The node after the time is where the command runs;
+`@utc` is a UTC second and is refused with `-ENODATA` while the clock has not
+been set this power cycle. The node after the time is where the command runs;
 `0` is this one.
 
 Adding, cancelling and clearing are ordinary commands, `fbo_sched_add`,
 `fbo_sched_cancel` and `fbo_sched_clear`, so the ground reaches them over CSP the
-same way the shell does. The shell's `fbo sched` subcommands are the same
-handlers, not a second parser.
+same way the shell does.
 
 An entry is addressed by the CRC32 of its content, so an uplink that arrives
 twice does not queue the command twice: the second add reports `repeated=yes`
@@ -285,29 +266,27 @@ and names the slot already holding it. `fbo_sched_hash` is the CRC32 over the
 whole queue, which is how the ground confirms the node holds the plan it sent.
 
 An entry released later than `fbo_sched_latency_s` after its deadline reports
-`overdue` and does not run. The buffer exists because a release waits its turn
-behind whatever command is in flight; it must stay above the command reply
-timeout, and the service refuses a value below it. `CONFIG_KFSW_FBO_SCHEDULE_BURST`
-bounds how many entries one pass may release, so a forward clock step does not
-set off everything at once.
+`overdue` and does not run. A release waits behind any command in flight, so
+the service refuses a value below the command reply timeout.
+`CONFIG_KFSW_FBO_SCHEDULE_BURST` (default 1) bounds how many entries one pass
+releases, so a forward clock step does not release everything at once.
 
-The queue is a fixed array of `CONFIG_KFSW_FBO_SCHEDULE_ENTRIES` slots and does
-not survive a reset. A full queue refuses with `-ENOSPC` and changes nothing.
-Cancelling an entry that has already run returns `-EALREADY`, so a cancel never
-claims to have stopped something that fired.
+The queue is a fixed array of `CONFIG_KFSW_FBO_SCHEDULE_ENTRIES` slots (8 by
+default) and does not survive a reset. A full queue refuses with `-ENOSPC`.
+Cancelling an entry that has already run returns `-EALREADY`.
 
-Everything the ground needs to operate a queue it cannot see is in parameter
-table 34: `fbo_sched_entries`, `fbo_sched_scheduled`, `fbo_sched_overdue`,
+Table 34 carries the queue state: `fbo_sched_entries`, `fbo_sched_scheduled`, `fbo_sched_overdue`,
 `fbo_sched_clock_set`, `fbo_sched_next_due_s`, `fbo_sched_next_due_utc`,
 `fbo_sched_releases`, `fbo_sched_refusals`, `fbo_sched_overdues` and
 `fbo_sched_hash`.
 
 ## Persistent event journal
 
-`CONFIG_KFSW_JOURNAL` adds a fixed-size journal to the existing storage volume.
-The Linux image enables it. Boot/reset reports are always selected; other
-events must meet `CONFIG_KFSW_JOURNAL_MIN_SEVERITY` (warning by default).
-Text logging and the existing RAM event ring remain separate.
+`CONFIG_KFSW_JOURNAL` adds a fixed-size journal to the storage volume. The
+Linux and Pico W images enable it. It accepts events from every source, boot
+through limits. Boot and reset reports are always kept; other events must meet
+`CONFIG_KFSW_JOURNAL_MIN_SEVERITY` (1, warning, by default). The text log and
+the RAM event ring are separate.
 
 ```text
 journal stats
@@ -318,40 +297,37 @@ journal tail 2 0
 
 Age 0 is the newest committed record. `journal tail` returns boot identity,
 source, event ID, severity and the original payload in hex. `journal time`
-returns the journal sequence, original event uptime in microseconds, UTC and
-its validity. Uptime is captured with the event; UTC is sampled by the writer.
-New records shift the ages. Read `journal time` before and after the tail and
-check that the sequence is unchanged.
-The C read API returns all fields from one record. Reads do not consume data.
+returns the journal sequence, the event uptime in microseconds, UTC and its
+validity. Uptime is taken with the event; the writer samples UTC. New records
+shift the ages, so read `journal time` before and after the tail and check the
+sequence is unchanged. The C read API returns all fields of one record. Reads
+consume nothing.
 
-The writer wakes every `CONFIG_KFSW_JOURNAL_FLUSH_MS` (1000 ms by default),
-draining at most the configured queue depth (16) per batch. Each record is
-written and synced on the worker. No filesystem or wall-clock driver calls
-run in the emitter/ISR. A full queue drops incoming events and increments
-`drop`. Boot-ready and retained-lastwords reports are queued once per boot;
-a failed queue insertion permits a later attempt. Repeated start calls do
-not allocate another boot identity or start another writer.
+The writer wakes every `CONFIG_KFSW_JOURNAL_FLUSH_MS` (1000 ms by default)
+and drains at most `CONFIG_KFSW_JOURNAL_QUEUE_DEPTH` (16) records per batch,
+writing and syncing each on its own thread. The emitter makes no filesystem or
+wall-clock calls. A full queue drops incoming events and increments `drop`.
+Boot-ready and retained last-words reports are queued once per boot; a failed
+insertion is retried later. A repeated start allocates no new boot identity and
+no second writer.
 
-The default file `/kfsw/journal.bin` retains 128 records and occupies at most
-9232 bytes on the volume: a 16-byte header plus 128 checksummed 72-byte slots.
-Filesystem metadata, copy-on-write space and flash wear are additional. The
-queue and one pending record are RAM-only. Adjust severity and flush interval
-for the expected event rate. Bulk text belongs in the console log.
+`/kfsw/journal.bin` holds `CONFIG_KFSW_JOURNAL_CAPACITY` records (128 by
+default) in at most 9232 bytes: a 16-byte header and 128 checksummed 72-byte
+slots, plus filesystem metadata. The queue and one pending record are in RAM
+only.
 
-Restart recovery validates the header and each slot, skips records with bad
-checksums and incomplete trailing data, and resumes after the largest valid
-sequence. It never reformats a corrupt or incompatible header. Capacity is
-part of the header: changing it requires an explicit migration/new journal.
-Boot identities advance from retained history and restart at one on a new
-volume; they are unique only within that history.
+At restart the journal validates the header and each slot, skips records with
+bad checksums or incomplete trailing data, and resumes after the largest valid
+sequence. It never reformats a corrupt or incompatible header. Capacity is in
+the header, so changing it needs a new journal. Boot identities continue from
+the retained history and restart at one on a new volume.
 
-Write failures retain one pending record and retry its slot after rescanning,
-so a failed sync does not create two journal entries. Subsequent events can
-fill the queue and be dropped. `journal_stats` exposes queue depth, drops,
-write errors, damaged slots found in the latest recovery, readiness and the
-last error. Records still queued, failed or in progress can be lost at power
-failure. Native fault tests cover these policies; physical power-cut
-qualification remains pending.
+A failed write keeps the pending record and retries its slot after a rescan, so
+a failed sync does not create two entries; later events can fill the queue and
+be dropped meanwhile. `journal_stats` reports queue depth, drops, write errors,
+damaged slots found at the last recovery, readiness and the last error. Records
+queued or in progress are lost at power failure. Native fault tests cover these
+cases; power-cut testing on hardware is pending.
 
 ## Logging {#logging}
 
@@ -402,19 +378,17 @@ and debug dim. The colour codes wrap the whole line, so `[LEVEL] message`
 stays intact for scripts. `log_color` turns colour off.
 
 `CONFIG_KFSW_LOG_SHELL=y` also sends messages and markers to active shell
-sessions. The option defaults off; Linux and NUCLEO keep it disabled unless an
-extra configuration enables it. `config/profiles/log-shell.conf` enables the
-capability through `KFSW_EXTRA_CONF_FILE`. With PARAM built, `param set log_shell 0`
-stops mirroring and `param set log_shell 1` resumes it immediately. This u8
-parameter is table 25 offset `0x0d`, live and not persistent; it starts at 1
-when the capability is built. Messages before the shell is ready and messages
-from interrupt context still reach only the existing console backend.
+sessions. It is off by default and in every target; `config/profiles/log-shell.conf`
+enables it through `KFSW_EXTRA_CONF_FILE`. `param set log_shell 0` stops the
+mirror and `param set log_shell 1` resumes it. The parameter is a u8 at table
+25 offset `0x0d`, live, not persistent, and starts at 1. Messages before the
+shell is ready and messages from interrupt context reach only the console.
 
 `CONFIG_KFSW_LOG_HISTORY` keeps the most recent K-FSW messages in a RAM ring
-(32 records by default, configurable from 1 to 128). Each record keeps the
-message as a cbprintf package: the address of its format string, the
-arguments, and any strings that were in RAM. Text is rebuilt when someone
-reads it, so a record costs 128 bytes instead of its full text. A message too
+(`CONFIG_KFSW_LOG_HISTORY_DEPTH`, 32 records by default, 1 to 128). Each
+record keeps the message as a cbprintf package: the address of its format
+string, the arguments, and any strings that were in RAM. The text is rebuilt
+when read, so a record costs 128 bytes. A message too
 long to package is kept as text, cut at 127 bytes and marked truncated.
 `log history` prints up to 32 records locally, with sequence, uptime in
 milliseconds, module, severity and up to 191 text bytes. Log filters apply
@@ -423,12 +397,11 @@ captured.
 
 ### Debugger text mirror
 
-`config/profiles/log-semihost.conf` opts into full-text K-FSW mirroring.
-It preserves the USB/UART text console and copies the already-rendered bounded
-message, severity, colour escapes and final newline to a platform-owned sink.
-Markers are included without a severity prefix, as on the local console.
-The sink does not capture arbitrary Zephyr logs, driver output, or shell replies.
-It does not use `CONFIG_LOG_BACKEND_SEMIHOST` or change remote dictionary export.
+`config/profiles/log-semihost.conf` copies each K-FSW console line, as
+rendered with severity, colour escapes and newline, to a semihosting sink in
+the platform layer. The UART console is unchanged. Markers are included, Zephyr
+logs, driver output and shell replies are not. The profile does not use
+`CONFIG_LOG_BACKEND_SEMIHOST` and does not change remote dictionary export.
 
 From the workspace root, build the reference NUCLEO-L496ZG image:
 
@@ -437,50 +410,41 @@ From the workspace root, build the reference NUCLEO-L496ZG image:
 ./k-fsw/tools/debug.sh nucleo_l496zg
 ```
 
-The option appends the profile to any existing `KFSW_EXTRA_CONF_FILE` list.
-It is off by default; `./k-fsw/tools/build.sh --help` describes the option.
-The option supports `nucleo_l496zg`, `nucleo_f746zg` and `frdm_k64f`;
-other targets are rejected before building.
+`--semihost` appends the profile to any `KFSW_EXTRA_CONF_FILE` list. It
+accepts `nucleo_l496zg`, `nucleo_f746zg` and `frdm_k64f` and rejects other
+targets before building.
 
-Use the NUCLEO's ST-Link through the OpenOCD runner. Before letting the image
-execute, issue these commands in GDB:
+To capture the mirror on a NUCLEO:
 
-```text
-monitor reset halt
-monitor arm semihosting enable
-monitor arm semihosting_fileio disable
-continue
-```
+1. Start the debugger through the ST-Link and the OpenOCD runner.
+2. Before the image runs, enter in GDB:
 
-OpenOCD handles terminal writes on its own output. Keep that output available
-for capture. The sink uses Zephyr's `semihost_write` with stdout handle 1, as
-the pinned Zephyr semihost log backend does. Zero unwritten bytes means success;
-partial writes, negative errors and invalid results are rejected without retry
-or recursive logging. Concurrent mirror attempts are skipped without waiting.
+   ```text
+   monitor reset halt
+   monitor arm semihosting enable
+   monitor arm semihosting_fileio disable
+   continue
+   ```
 
-The guard checks CMSIS DHCSR C_DEBUGEN on supported mainline Cortex-M targets.
-It skips calls when detached, in a handler, with interrupts masked, or in
-unprivileged thread mode. Cortex-M0/M0+, TrustZone configurations and non-Cortex-M
-targets return unsupported. History locks are released before mirroring.
-A probe attachment does **not** prove a semihost handler is active: enabling the
-handler before execution is mandatory. Detachment can race the guard and BKPT;
-keep the debugger connected for the whole opt-in session. A build option cannot
-make asynchronous debugger removal safe at every instruction boundary.
+3. Read the lines on OpenOCD's own output, and keep the debugger connected
+   for the whole session.
 
-Overhead is **unmeasured**. Each accepted mirror copies one bounded line and
-halts the core for a host write; host latency has no firmware bound. Measure
-log-call latency and missed deadlines on the intended debugger/board before
-using this in timing-sensitive debugging. The normal build disables both
-options, compiling out the sink and mirror, with no extra formatting or
-semihost calls. Do not enable this profile in flight builds.
+The sink calls Zephyr's `semihost_write` with stdout handle 1. Zero unwritten
+bytes is success; a partial write or an error is dropped without retry or
+recursive logging, and a concurrent mirror attempt is skipped.
 
-For HIL, record the exact ELF, probe, OpenOCD version and capture. Compare a
-warning, a long/truncated message and a boot marker against the UART console;
-confirm a detached boot skips the sink, and ISR/IRQ-masked logging never enters
-BKPT. Test handler-disabled execution only under controlled debugger recovery.
-Native tests cover sink policy, text preservation and failed/partial write
-results through linker wrappers; CMSIS register behavior and detach timing
-remain HIL-only. No physical acceptance or timing measurement is claimed here.
+The guard reads CMSIS DHCSR C_DEBUGEN on mainline Cortex-M and skips the call
+when no debugger is attached, in a handler, with interrupts masked, or in
+unprivileged thread mode. Cortex-M0/M0+, TrustZone and non-Cortex-M targets
+return unsupported. The guard sees an attached probe, not whether its
+semihosting handler is enabled, which is why step 2 comes before the image
+runs. A detach can race the guard.
+
+The overhead has not been measured. Each line halts the core for a host write,
+and host latency has no bound. Do not enable the profile in flight builds; the
+normal build compiles out the sink and the mirror. Native tests cover the sink
+policy, text and failed or partial writes through linker wrappers; register
+behaviour and detach timing need hardware and have not been tested.
 
 ### Remote log
 
@@ -496,7 +460,7 @@ kfsw-ground# journal remote 1 10     # newest 10 journal records
 
 Reads are bounded (1 to 32 records), do not remove anything, and do not need
 UTC. A node that does not answer within `CONFIG_KFSW_LOG_REMOTE_TIMEOUT_MS`
-(3 s) is logged as a warning.
+(3000 ms) is logged as a warning.
 
 The serving node's `log_remote_format` parameter picks how messages travel.
 Text remains the compiled default. To start in dictionary mode, add this to an
@@ -506,11 +470,9 @@ extra configuration alongside `config/profiles/log-remote.conf`:
 CONFIG_KFSW_LOG_REMOTE_DEFAULT_DICTIONARY=y
 ```
 
-`CONFIG_KFSW_LOG_REMOTE_DEFAULT_TEXT=y` selects text instead. This choice sets
-both the initial value and the parameter reset default. A restored persistent
-`log_remote_format` value still takes precedence, and runtime writes still
-select 0 or 1 immediately. Neither choice changes local formatted text,
-cbprintf packaging, text fallback, CRCs, or the remote wire representation.
+`CONFIG_KFSW_LOG_REMOTE_DEFAULT_TEXT=y` selects text. The choice sets the
+initial value and the reset default; a restored persistent value takes
+precedence, and a write to `log_remote_format` applies at once.
 
 The formats are:
 
@@ -531,16 +493,15 @@ dictionary parser, and prints each line with the text in place of the package
 and CRC only when the CRC agrees with the node-rendered string. The CRC covers
 at most 191 bytes, with CR/LF replaced by spaces and without the terminating NUL.
 A missing, malformed or different CRC leaves the record marked `not decoded`
-and returns exit 1. This checks rendered text agreement, not ELF identity:
-another image rendering byte-identical text still passes, as can a CRC32
-collision.
+and the decoder exits 1. The CRC compares rendered text, so a different image
+that renders the same text also passes.
 
 An old node sends packages without a CRC; a new decoder refuses to decode them.
 Text mode remains usable. A new node's dictionary reply has a four-byte trailer
 that an old requesting node rejects as malformed. A new requesting node prints
-`pkg=00000000:<hex>`: the `00000000:` guard makes an old host decoder attempt
-a four-byte package and fail explicitly. Upgrade the requester and decoder for
-dictionary mode; text mode remains compatible in both directions.
+`pkg=00000000:<hex>`, and the `00000000:` guard makes an old decoder fail on a
+four-byte package. Dictionary mode needs a new requester and decoder; text mode
+works in both directions.
 
 The Linux composition enables the service; other CSP compositions can use
 `config/profiles/log-remote.conf`. Start the server after the CSP router.
@@ -551,9 +512,9 @@ readable, and sequence numbers continue rather than restarting. The ring
 carries a magic, a version, the depth, the record size and a CRC32, all
 checked on first use, together with an identity of the running image, since
 a package points into it. A ring that does not belong to the running image
-starts clean, and a single record whose slot disagrees reads as missing.
-A power cycle clears RAM, so nothing is retained across one. Set the option
-to `n` for a ring that always starts empty.
+starts clean, and a record whose slot disagrees reads as missing. A power
+cycle clears the ring. Set the option to `n` for a ring that always starts
+empty.
 
 ## Parameters
 
@@ -598,9 +559,9 @@ are unique inside a table. Names are unique on the node and up to
 `KFSW_PARAM_NAME_MAX` (32) characters; a longer name is refused at
 registration.
 
-A definition set can carry a `description`, one short line saying what the
-table holds; `param whichtables` prints it in its `holds` column. Every table in
-the five repositories has one, and a new table should too.
+A definition set carries a `description`, one line saying what the table
+holds, which `param whichtables` prints in its `holds` column. Give a new table
+one.
 
 | ID | Layer | Name | Source |
 | --- | --- | --- | --- |
@@ -623,32 +584,35 @@ the five repositories has one, and a new table should too.
 | 34 | service | `fbo` | `kfsw-services/src/fbo-parameters/` |
 | 35 | service | `gndwdt` | `kfsw-services/src/gndwdt-parameters/` |
 | 36 | service | `resmon` | `kfsw-services/src/resmon-parameters/` |
+| 37 | service | `table` | `kfsw-services/src/table-parameters/` |
+| 38 | service | `remexec` | `kfsw-services/src/remexec-parameters/` |
 | 39 | service | `scrub` | `kfsw-services/src/scrub-parameters/` |
 | 40 | service | `limits` | `kfsw-services/src/limits-parameters/` |
 | 50 | module | `radio_uhf` | `kfsw-modules/radio-uhf/parameters/` |
 | 51 | module | `temp_example` | `kfsw-modules/temperature-sensor-example/parameters/` |
-| 67 | module | `hw_test` | `kfsw-modules/button-test/` |
+| 52 | module | `gpredict` | `kfsw-modules/gpredict/parameters/` |
+| 67 | module | `hw_test` | `kfsw-modules/button-test/parameters/` |
 
-A table is only registered when its service or module is enabled. The `fwu`
-table is read-only. `health_interval_ms` is checked against the watchdog
-timing before it is stored. Core tables are in the application because the
-platform and comms layers can't depend on the parameter service.
+A table is registered only when its service or module is enabled. The `fwu`
+table is read-only. Core tables are in the application because the platform
+and comms layers cannot depend on the parameter service.
 
 ### Write modes
 
 The `mode` column of `param listall` comes from each definition:
 
-| Letter | Meaning |
+| Mode | Meaning |
 | --- | --- |
 | `r` | Read-only |
-| `w` | Writable |
-| `p` | Saved in the snapshot |
-| `b` | Applied at the next boot |
+| `rp` | Read-only, saved in the snapshot |
+| `w` | Applied now, lost at reset |
+| `wp` | Applied now and saved |
+| `wb` | Read at the next boot, lost at reset |
+| `wpb` | Saved and read at the next boot |
 
-`wp` is saved and applied now, `wpb` is saved and applied at the next boot,
-and `w` is applied now and lost at reset. A definition with a change callback
-is applied immediately. Writing a `b` parameter prints that a reboot is
-needed.
+A definition with a change callback, or flagged live, applies at once. Writing
+a `b` parameter prints that a reboot is needed. The service tables below use
+the same letters.
 
 ### Strings and arrays
 
@@ -667,10 +631,10 @@ would otherwise overwrite the incoming value before `changed` applies it.
 
 ### Console echo and colour
 
-`echo_enabled` in table 28 is off by default, so a scripted session doesn't
+`echo_enabled` in table 28 is off by default, so a scripted session does not
 show each command twice. Turn it on to see what the console received, for
-example when checking tab completion. The shell prompt is jade; its colour is
-set at runtime because Kconfig strings can't hold escape sequences.
+example when checking tab completion. The prompt colour is set at run time
+because a Kconfig string cannot hold an escape sequence.
 
 ### Build-time settings
 
@@ -697,9 +661,10 @@ A named read asks the node for that one descriptor and then the value. A node
 that doesn't answer the lookup is read by downloading its whole descriptor
 list. The list is downloaded one indexed descriptor at a time and checked with
 a table CRC, so a failed download leaves no partial cache.
-`CONFIG_KFSW_PARAM_LIST_TIMEOUT_MS` (3 s) limits the download, and so how long
-the shell waits for a node that does not answer. The radio compositions raise
-it to 40 s, since a listing takes about 35 s over a 57600 baud radio.
+`CONFIG_KFSW_PARAM_LIST_TIMEOUT_MS` (10000 ms) limits the download of one
+table's descriptors, and so how long the shell waits for a node that does not
+answer. `config/profiles/nucleo-testbench.conf` raises it to 40000 ms, because
+a listing takes about 35 s over that bench's 57600 baud radio.
 
 The cache holds `CONFIG_KFSW_PARAM_REMOTE_POOL_SIZE` descriptors. Value requests
 are handled by a worker thread; when its queue is full the request is dropped
@@ -707,23 +672,21 @@ and `param_requests_dropped` increases.
 
 Remote reads retry only `-ETIMEDOUT`, with at most three total read attempts
 inside the caller's original deadline, including mutex waits. The default
-budget is `CONFIG_KFSW_PARAM_LIST_TIMEOUT_MS + CONFIG_KFSW_PARAM_TIMEOUT_MS`.
-Earlier successful batches may be requested again; the values are not a snapshot.
-Other errors return immediately. Remote writes remain single-shot.
+budget is `CONFIG_KFSW_PARAM_LIST_TIMEOUT_MS + CONFIG_KFSW_PARAM_TIMEOUT_MS`
+(1000 ms). A retry may request earlier batches again, so the values are not one
+snapshot. Other errors return at once. Remote writes are single-shot.
 
 On the requesting node, read-only `param_read_resends` (table 26, offset `0x20`,
 wire ID `0x1a20`) counts extra request packets sent during read retries,
-including descriptor requests. It starts at boot, saturates at `4294967295`,
-and survives service restarts. Read it locally with `param get param_read_resends`,
-or from another node with `param get <requesting-node> param_read_resends`.
-It indicates timeout recovery traffic, without distinguishing request loss,
+including descriptor requests. It starts at zero each boot, saturates at
+`4294967295` and survives service restarts. It does not tell request loss from
 reply loss, congestion or server drops. FWU's `resent` count is separate.
 
 Each node validates the complete remote write before applying it. A request
 containing a fallible scalar must contain exactly one value, including repeated
-writes to the same parameter. Software-only batches remain supported. Rejected
-writes keep the previous value; failed application receives no success ACK.
-Cached peer values never invoke local appliers.
+writes to the same parameter; batches of other values are accepted. A rejected
+write keeps the previous value, and a failed application gets no success
+acknowledgement. Cached peer values never run local appliers.
 
 ### Defaults, save and load
 
@@ -776,20 +739,17 @@ may be both persistent and fallible. `boot_attempts_left` and
 `.apply` that can fail, and held in the platform boot store rather than the
 snapshot.
 
-Read-only and persistent is a legitimate combination and needs no exemption:
-`boot_count` is saved in the snapshot and refused to a writer.
+Read-only and persistent needs no exemption: `boot_count` is saved in the
+snapshot and refused to a writer.
 
-The rule is the same in both directions. There is no case in which a single
-persistent parameter with an `.apply` is accepted; `kfsw_param_init()` rejects
-the set at registration rather than at restore time, so a composition that
-breaks the rule fails on the bench and not in orbit.
+`kfsw_param_init()` applies the rule at registration, so a composition that
+breaks it fails on the bench, not at restore.
 
 ## Parameter tables as files
 
-A snapshot is written by the node, covers every persistent value across all
-tables, and is adopted at boot. A table file is the other direction: written on
-the ground, addressing one table, and adopted when an operator says so. Both use
-the same value encoding, so one decoder reads either.
+A snapshot is written by the node, covers every persistent value and is
+adopted at boot. A table file is written on the ground, addresses one table and
+is adopted on command. Both use the same value encoding.
 
 ```text
   ground            node
@@ -801,32 +761,35 @@ the same value encoding, so one decoder reads either.
 The file has a 20-byte header (magic `KTBL`, version 1, payload size, entry
 count, the table identifier and a CRC32) and then one entry per value: the
 offset within the table, the type code, the length and the big-endian value.
-`CONFIG_KFSW_TABLE_MAX_ENTRIES` caps how many entries a file may carry, and sets
-the read buffer and the number of replaced values held for a revert.
+`CONFIG_KFSW_TABLE_MAX_ENTRIES` (16 by default) caps the entries in a file and
+sizes the read buffer and the values held for a revert.
 
 A load is refused whole. Before anything is written the service checks the
 header and the CRC, then every entry: the offset has to name a parameter in that
 table, the type code has to be the one that parameter is written as, the length
 has to match it, the parameter must not be read-only, the same offset must not
 appear twice, and the parameter's own range check has to pass. The first entry
-that fails stops the load and is reported by position, offset and errno, so an
-operator knows which line of the file to fix. Nothing is applied, so a file with
-one bad value leaves the table exactly as it was.
+that fails stops the load and is reported by position, offset and errno.
+Nothing is applied, so the table stays as it was.
 
 A successful load keeps the values it replaced, and `table revert` puts them
-back. Only the most recent load can be undone, and only once; there is no stack
-of loads. The held values do not survive a reset, so a load that needs to outlive
-one is followed by `param save`.
+back. Only the most recent load can be undone, and only once. The held values
+do not survive a reset, so follow a load that must outlive one with
+`param save`.
 
-A file containing a fallible scalar must contain only that value. The same rule
-applies to undo. File validation performs no application. A failed load returns
-the application errno and preserves the previous undo state. A failed undo can
-be retried. No physical rollback is attempted.
+A file containing a fallible scalar must contain only that value, and the same
+holds for a revert. A failed load returns the application errno and keeps the
+previous revert state; a failed revert can be retried. A revert does not undo
+any physical effect.
 
-`table dump <table> <path>` writes what is running as a file, so the usual way
-to change a table is to fetch that, edit one value on the ground and upload it
-back rather than composing a file from the manual. Read-only parameters and
-types no file carries are left out, because a load could not write them anyway.
+`table dump <table> <path>` writes the running values as a file, leaving out
+read-only parameters and types no file carries. To change a table:
+
+1. Run `table dump <table> <path>` on the node and fetch the file with
+   `ftp get`.
+2. Edit the value on the ground and upload the file with `ftp put`.
+3. Run `table check <path>`, then `table load <path>`.
+4. Check the result with `table show`; undo with `table revert` if needed.
 
 Table 37 reports the state, the last file, and the load, rejection and revert
 counters.
@@ -834,9 +797,9 @@ counters.
 ## Storage
 
 K-FSW mounts a [LittleFS](https://github.com/littlefs-project/littlefs)
-volume in flash at `/kfsw` and, where the composition has a RAM disk, a 32 KB
+volume in flash at `/kfsw` and, where the composition has a RAM disk, a
 scratch volume at `/kfsw/tmp` that `kfsw_storage_tmp_mount()` formats at every
-boot. The platform layer handles init, mount, unmount and capacity. Once it is mounted, services use the normal Zephyr
+boot: 32 KiB on Linux and the NUCLEO, 16 KiB on the Pico W. The platform layer handles init, mount, unmount and capacity. Once it is mounted, services use the normal Zephyr
 [filesystem API](https://docs.zephyrproject.org/4.4.0/services/file_system/index.html).
 
 The partition is selected with the `kfsw,storage-partition` devicetree
@@ -865,30 +828,25 @@ not mounted.
 
 ### One filesystem, two block layers
 
-LittleFS is the only filesystem K-FSW mounts, on every target. What changes
-between boards is what lies underneath it, and only because the flash does.
-LittleFS keeps directory metadata in a pair of erase blocks, so a partition
+LittleFS is the only filesystem K-FSW mounts, on every target. What lies
+under it changes with the flash. LittleFS keeps directory metadata in a pair of erase blocks, so a partition
 needs more than two of them to hold a directory tree at all: measured on the
 hosted image, two and three 256 KiB blocks both fail on the first directory
 with `-28`, the F746's four 32 KiB sectors fail on the second, and 4 KiB blocks
 work. The STM32F746 has 256 KiB sectors, so LittleFS cannot sit on its internal
 flash directly.
 
-The ZMS disk below closes that gap: Zephyr's own ZMS subsystem presented as an
-ordinary `disk_access` device, with fine logical sectors over the coarse
-physical ones. Above it nothing changes. The mount path, the platform storage
-API and every service that reads or writes a file are identical on both boards,
-so a new MCU with coarse sectors is a profile and a sector count, not a port.
-That is why the L496, whose 2 KiB pages suit LittleFS, stays on flash directly:
-the uniformity that matters is the filesystem and the API, and both are already
-uniform.
+The ZMS disk below presents Zephyr's ZMS subsystem as a `disk_access` device,
+with small logical sectors over the large physical ones. The mount path, the
+platform storage API and the services are the same on both boards. The L496,
+whose 2 KiB pages suit LittleFS, stays on flash directly.
 
 ### Optional ZMS block translation
 
 `config/profiles/f746-zms-storage.conf` and
 `config/profiles/f746-zms-storage.overlay` opt into the platform ZMS disk.
-Use them with the shared `f746-recovery-flash.overlay` map, after the
-minimal A profile. Existing target defaults do not enable this backend.
+Use them with the shared `f746-recovery-flash.overlay` map, after
+`f746-minimal.conf`. No target enables this backend by default.
 The selected partition must contain two erase-aligned physical sectors;
 the F746 map reserves `[0x80000, 0x100000)`, two 256 KiB sectors.
 
@@ -906,21 +864,18 @@ Before ZMS mount, the adapter scans the partition and recognizes the pinned
 Zephyr 4.4.0 version 1, 32-bit-ID empty-sector headers. Blank media may be
 initialized. Unknown nonblank media, unsupported valid headers, and media
 with all headers destroyed are refused without writes. This guard is tied
-to the pinned on-media format and must be checked when updating Zephyr.
-LittleFS formatting remains allowed only when every logical sector is erased.
+to the pinned on-media format; check it when updating Zephyr. LittleFS may
+format only when every logical sector is erased.
 
-The native suite is `tests/unit/platform_storage_zms`. Physical erase stalls,
-wear, watchdog margins, UART/CAN behavior and reset/power-loss acceptance
-require separate F746 measurements. No firmware update or recovery writer
-uses this disk.
+The profile also enables persistent parameters and FTP in the A image. Keep it
+out of the golden image, which uses the recovery uploader and never mounts the
+file region. Check each build's fit with the linker memory report and the
+`zephyr.signed.bin` size against the 256 KiB A partition. No firmware update or
+recovery writer uses this disk.
 
-The opt-in `f746-zms-storage.conf` profile also enables persistent parameters
-and FTP in the running A image. Apply it after `f746-minimal.conf`, with the
-shared recovery flash map and `f746-zms-storage.overlay`. Keep this profile out
-of Golden: Golden uses the separate recovery uploader and never mounts the
-file region. Check software fit for each build using the linker memory report and the
-`zephyr.signed.bin` size against the 256 KiB A partition. Physical storage and
-interruption acceptance remain outstanding.
+The native suite is `tests/unit/platform_storage_zms`. Erase stalls, wear,
+watchdog margins, UART and CAN behaviour and power-loss behaviour have not been
+measured on the F746.
 
 
 ## File transfer
@@ -950,9 +905,9 @@ FTP path              Zephyr path
 ```
 
 Paths are up to 96 bytes. Relative paths, empty components, `.` and `..`,
-backslashes, control characters and embedded NULs are rejected. The sandbox is
-not access control. Three more roots sit beside it, and a listing of `/` shows
-each one that exists as a directory:
+backslashes, control characters and embedded NULs are rejected. The sandbox
+confines paths; it does not control access. Three more roots sit beside it,
+and a listing of `/` shows each one that exists as a directory:
 
 | Path | Volume | Writable |
 | --- | --- | --- |
@@ -962,7 +917,8 @@ each one that exists as a directory:
 
 `/tmp` is LittleFS on a RAM disk, formatted at every boot; nothing in it
 survives a reset. The composition picks the disk with the `kfsw,tmp-disk`
-chosen node: 32 KB in the Linux composition and in SRAM2 on the NUCLEO.
+chosen node: 32 KiB in the Linux composition and in SRAM2 on the NUCLEO,
+16 KiB on the Pico W.
 
 A transfer that would leave less than `CONFIG_KFSW_FTP_SPACE_MARGIN_BYTES`
 (4096 by default) free on its destination volume is refused with `-ENOSPC`
@@ -1023,9 +979,8 @@ it. An existing file is left alone until the rename.
 
 ### Resuming a transfer
 
-A transfer interrupted by a lost link continues on the next attempt, without an
-operator asking. Asking for the same file again is the whole interface, in both
-directions.
+A transfer interrupted by a lost link continues when the same file is asked
+for again, in either direction.
 
 Whichever node receives keeps `<path>.part` after an interruption instead of
 deleting it, and records what it is going to become in `<path>.part.map`: a
@@ -1038,22 +993,17 @@ PUT request and the server continues only when its note matches them. On a
 download the receiver is the one holding a partial and the only one that knows
 which file it belongs to, so the GET request carries the note's size and CRC32
 together with how much is already on disk, and the sending node compares them
-against the file it holds now. A claim about anything else is refused with a
-zero offset in `GET_INFO`, and the client discards its partial and starts the
-file again. Either way a transfer never wastes a pass discovering at the end
-that it joined two different files.
+against the file it holds now. Any mismatch gets a zero offset in `GET_INFO`,
+and the client discards its partial and starts again.
 
 The resume point is the partial's own size, not a number from the note, because a
 reset can leave the note ahead of what reached flash. The CRC32 of those bytes is
 recomputed before the transfer continues, and the final check still covers the
-whole file, so a resumed upload is verified exactly like a fresh one.
+whole file.
 
 Chunks arrive strictly in order, so the note holds no chunk map. `PUT_READY`
 and `GET_INFO` carry the offset the transfer starts from, and a request without
-the resume flag gets the original behaviour: the partial is discarded and the
-transfer starts at zero. The node that holds the file has the last word on both
-sides, because it is the one that can tell whether the partial still belongs to
-it.
+the resume flag discards the partial and starts at zero.
 
 A partial for a file that is never asked for again stays on disk until that
 path is transferred or deleted.
@@ -1077,10 +1027,10 @@ ground   ID 2, port 11  found by ID
    same definition, validation and handler
 ```
 
-There is no shell command that runs any command by name. Each one is reached
-from the group an operator looks in, `status`, `event`, `journal`, `hk`,
-`reboot` or `gndwdt`, so a new command that operators run also needs its place
-in a group.
+No shell command runs a registry command by name. Each is reached from its
+shell group: `status`, `event`, `journal`, `hk`, `fbo sched`, `golden`,
+`reboot`, `csp reboot` and `gndwdt`. A new command that operators run needs a
+place in a group.
 
 Commands are registered at build time as sets and the registry is fixed at
 startup. Duplicate IDs or names, missing handlers and too many arguments are
@@ -1098,8 +1048,22 @@ authentication flag that is always false. See @ref kfsw_services_command.
 
 A handler runs to completion and returns a status and an optional short text.
 Legacy requests are not deduplicated, so check the node state before sending
-a command again after a lost reply. Remote parameters use the parameter service,
-not commands.
+a command again after a lost reply.
+
+Table 28 counts dispatch outcomes. The four counters start at zero each boot,
+are not saved, and wrap modulo 2^32; they do not saturate. Only recorded
+dispatch outcomes count: a call refused before dispatch, or one made before
+the registry is initialised, is not counted. An outcome is classified by its
+final status, whether or not a handler ran.
+
+| Parameter | Description in the table |
+| --- | --- |
+| `cmd_invoked` | Recorded dispatch outcomes since boot; wraps at 2^32 |
+| `cmd_failed` | Outcomes other than OK, UNKNOWN, DENIED; wraps at 2^32 |
+| `cmd_unknown` | UNKNOWN outcomes since boot; wraps at 2^32 |
+| `cmd_rejected` | DENIED outcomes since boot; wraps at 2^32 |
+| `cmd_registered` | Commands in the frozen registry |
+| `cmd_timeout_ms` | Timeout for new remote invocations |
 
 ### Ticketed retries
 
@@ -1115,10 +1079,10 @@ or a handler resets the node, the outcome can remain unknown; inspect the
 node before starting another operation. A request without `--retry` keeps its
 one-shot behaviour.
 
-The node keeps eight tickets for 60 seconds by default. New calls get BUSY when
-all are in use, and an expired or unknown ticket gets UNAVAILABLE. A restart
-discards every ticket. Tickets stop duplicates within their lifetime; they are
-not authentication and do not survive a reset.
+The node keeps `CONFIG_KFSW_COMMAND_RETRY_SLOTS` tickets (8) for
+`CONFIG_KFSW_COMMAND_RETRY_WINDOW_MS` (60000) by default. A new call gets BUSY
+when all are in use, and an expired or unknown ticket gets UNAVAILABLE. A
+restart discards every ticket.
 
 #### Wire format
 
@@ -1129,23 +1093,22 @@ execute carries the returned random server ticket. The cache matches source
 node, ticket, command ID, request ID, argument count and the entire payload.
 A repeated prepare within its lifetime returns the same ticket without
 extending its deadline. A repeated execute returns the recorded result. A
-failed entropy read prevents allocation. Handlers still run synchronously and
-need their own execution bounds. Changing clocks does not affect ticket
-lifetimes.
+failed entropy read prevents allocation. Handlers run synchronously and need
+their own execution bounds. Ticket lifetimes do not follow clock changes.
 
 ## Remote shell execution
 
 `CONFIG_KFSW_REMEXEC` lets an operator read which shell commands a node offers
 and run one of them, on CSP port 8, with its output coming back to the node
-that asked. The Linux image and the NUCLEO L496 image enable it. Capturing
-output costs a second shell instance, measured on the L496 at 6924 bytes of
-flash and 8832 of RAM.
+that asked. The Linux, NUCLEO L496 and Pico W images enable it. Capturing
+output needs a second shell instance, one more thread of
+`CONFIG_SHELL_STACK_SIZE`, measured on the L496 at 6924 bytes of flash and 8832
+of RAM.
 
-**Allowlist.** A command is unreachable until the composition marks it in the
-list handed to `kfsw_remexec_init()`. The listing reads the same array the
-executor checks, so there is nothing to keep in step. There is no wildcard, no
-debug mode and no PIN, and a composition that marks nothing lists nothing and
-refuses every execution.
+A command is unreachable until the composition marks it in the list handed to
+`kfsw_remexec_init()`. The listing reads the same array the executor checks.
+There is no wildcard, no debug mode and no PIN; a composition that marks
+nothing lists nothing and refuses every execution.
 
 ### How a composition marks a command
 
@@ -1160,8 +1123,8 @@ static const struct kfsw_remexec_entry remexec_entries[] = {
 
 `command` is the shell command as typed, with its subcommand and without
 arguments. `help` is the line the listing shows. Marking a command marks its
-arguments too, so mark only commands whose whole argument space is safe to run
-from the ground: the reference list is read-only commands that finish promptly
+arguments too, so mark only commands whose every argument is safe to run from
+the ground. The reference list holds read-only commands that finish promptly
 and print little.
 
 `kfsw_remexec_init()` refuses a list rather than serving part of one. It
@@ -1180,15 +1143,16 @@ remexec: 'storage test' is not offered for remote execution
 ```
 
 A command line is at most 64 bytes and must be printable ASCII; a longer or
-malformed one is refused with its own reason. Only one execution runs at a
-time: a second request is refused `busy` rather than queued.
+malformed one is refused with its own reason. One server thread serves one
+connection at a time, with a listen backlog of one, so a second request waits
+for the first to finish and times out at the client if it waits too long.
 
 ### The output cap and what truncation looks like
 
 A reply carries at most `CONFIG_KFSW_REMEXEC_OUTPUT_MAX` bytes, 200 by
 default, which keeps one reply inside a single CSP buffer on the narrowest
 link. The service counts every byte the command printed, keeps the first cap
-bytes and reports the rest as dropped, so the count is exact:
+bytes and reports the rest as dropped:
 
 ```text
 node: 2
@@ -1198,10 +1162,8 @@ K-FSW: v1.1.0
 ...
 ```
 
-Whether the command succeeded is separate from whether its output fitted. A
-command that returns zero and overruns the cap reports `status: ok` with
-`truncated`; a command that fails and prints two bytes reports the failure and
-no truncation. The listing shares the cap: a long allowlist comes back
+The status and the truncation are reported separately: a command that returns
+zero and overruns the cap reports `status: ok` with `truncated`. The listing shares the cap: a long allowlist comes back
 truncated, and `remexec <node> get <command>` narrows it.
 
 ### Execution and timeout
@@ -1210,39 +1172,41 @@ Execution runs on the remote execution server thread, so a slow handler cannot
 stall the CSP router. A shell handler runs to completion and cannot be
 aborted, so `CONFIG_KFSW_REMEXEC_TIMEOUT_MS` (5000) is the budget the serving
 node measures an execution against and reports as `timeout` afterwards, and
-the client's own wait for a reply. A handler that never returns holds the
-executor and every later request is refused `busy`; the allowlist is the control
-for that, not the timeout.
+the client's wait for a reply. A handler that never returns holds the server
+thread: no later request is served, and each client times out. Only the
+allowlist guards against that.
 
 If the requesting node goes away mid-execution, the command still runs to
 completion. The reply is sent on the connection and discarded by the link,
 nothing is queued and nothing is retried, and the serving node's counters
-still record the execution. A client that timed out therefore does not know
-whether the command ran; read table 38 or the log on the next pass.
+still record the execution. A client that timed out does not know whether the
+command ran; read table 38 or the log on the next pass.
 
-Capturing output costs a second shell instance, so composing the service adds
-one thread of `CONFIG_SHELL_STACK_SIZE`. A node cannot be asked to run its own
-commands through `remexec`: the capture shell cannot be driven from the shell
-that asked, so a request addressed to the local node is refused.
+A request addressed to the local node is refused: the capture shell cannot be
+driven from the shell that asked.
 
-Table 38 publishes what the service counted, so a refusal is visible without
-reading a log:
+Table 38, all read-only:
 
-| Parameter | Access | Meaning |
-| --- | --- | --- |
-| `remexec_accepted` | r | Requests whose command was allowed and run |
-| `remexec_refused` | r | Requests refused before any command ran |
-| `remexec_truncated` | r | Replies that could not carry all the output |
-| `remexec_offered` | r | Commands marked for remote execution |
-| `remexec_refusal` | r | Why the most recent request was refused |
+| Parameter | Meaning |
+| --- | --- |
+| `remexec_accepted` | Requests whose command was allowed and run |
+| `remexec_refused` | Requests refused before any command ran |
+| `remexec_truncated` | Replies that could not carry all the output |
+| `remexec_offered` | Commands marked for remote execution |
+| `remexec_refusal` | Why the most recent request was refused |
+| `remexec_running` | Whether a command is running on this node now |
+| `remexec_last_result` | What the last command returned; zero before any ran |
+| `remexec_last_ms` | How long the last command took |
+| `remexec_last_command` | The last command line asked for, with its arguments |
 
 See @ref kfsw_services_remexec.
 
 ## Resource monitor
 
-The resource monitor periodically reads the kernel's thread list and records
-stack use. Threads need no registration. Check both the percentage used and
-the bytes left, under the workload the node will run.
+The resource monitor reads the kernel's thread list every
+`CONFIG_KFSW_RESMON_PERIOD_MS` (10000 ms by default) and records stack use.
+Threads need no registration. Check both the percentage used and the bytes
+left, under the workload the node will run.
 
 Table 36 exposes the measurements:
 
@@ -1250,7 +1214,7 @@ Table 36 exposes the measurements:
 | --- | --- | --- |
 | `stack_worst_used` | r | Highest stack use on any thread since start |
 | `stack_last_used` | r | Highest stack use in the most recent sweep |
-| `stack_alert_used` | rw | A thread at or above this raises an event |
+| `stack_alert_used` | w | A thread at or above this raises an event; `CONFIG_KFSW_RESMON_ALERT_PERCENT`, 90 |
 | `stack_worst_free` | r | Unused bytes on the busiest thread |
 | `stack_worst_size` | r | Stack size of that thread |
 | `stack_sweeps` | r | Sweeps completed |
@@ -1265,12 +1229,11 @@ requires a sweep below the threshold first.
 From the shell: `resmon show`, `resmon sample` to sweep now, and
 `resmon alert <percent>`.
 
-MCU targets measure the configured thread stacks. Native simulation uses host
-stacks, so its reported values do not measure stack headroom.
+On native_sim the threads run on host stacks, so the values say nothing about
+stack headroom.
 
 `KFSW_RESMON` selects `INIT_STACKS`, `THREAD_STACK_INFO`, `THREAD_MONITOR` and
-`THREAD_NAME`. Measurements use the initial stack fill and the kernel thread
-list. Disable the service if the target cannot afford that overhead.
+`THREAD_NAME`. Leave the service out where the target cannot afford them.
 
 ## Image scrub
 
@@ -1286,9 +1249,7 @@ reference that outlives a reset.
 | `slot1` | `slot1_partition` | `kfsw_fwu_slot_write_offset()`, one sector in |
 | `golden` | the `kfsw,golden-partition` node | the partition start |
 
-The storage partition is not a region. It is a mutable filesystem holding the
-parameter snapshots, the journal and the procedure files, so a checksum over it
-would differ after every ordinary write.
+The storage partition is not a region: it changes with every ordinary write.
 
 A region is swept only when it holds an image, meaning the bootloader's magic
 at that region's image offset. The length swept comes from the image header, so
@@ -1297,7 +1258,7 @@ an erased tail does not change the result and an empty secondary slot reads as
 
 | Parameter | Access | Meaning |
 | --- | --- | --- |
-| `<region>_reference` | rwb | The learned CRC32; 0 means none is |
+| `<region>_reference` | wpb | The learned CRC32; 0 means none is |
 | `<region>_measured` | r | What the last sweep read |
 | `<region>_bytes` | r | Image bytes swept |
 | `<region>_state` | r | 0 empty, 1 unknown, 2 ok, 3 mismatch, 4 unreadable |
@@ -1313,18 +1274,16 @@ region and takes what is on flash now as the reference, then writes the
 parameter snapshot, because a reference held only in RAM would be relearned at
 every boot and could never report a mismatch.
 
-A mismatch logs an error and raises an event once per crossing, so one decayed
-image is a single finding rather than one per sweep. It re-arms when a sweep
-finds the region matching again, which happens after a new image is written and
+A mismatch logs an error and raises an event once per crossing. It re-arms when
+a sweep finds the region matching again, after a new image is written and
 learned.
 
 From the shell: `scrub status`, `scrub sweep [region]` and
 `scrub learn <region>`.
 
 `KFSW_SCRUB` depends on `KFSW_FWU`, because the secondary image sits where the
-update service writes it and because scrubbing a slot nothing writes to is work
-without a question behind it. A sweep reads hundreds of kilobytes of flash, so
-`KFSW_SCRUB_PERIOD_MS` defaults to an hour; the read is chunked and yields
+update service writes it. A sweep reads hundreds of kilobytes of flash, so
+`KFSW_SCRUB_PERIOD_MS` defaults to 3600000 ms; the read is chunked and yields
 between chunks, so it does not starve the watchdog feed. The recovery
 composition leaves scrub off: it has no parameter persistence, so it could not
 hold a reference.
@@ -1338,7 +1297,7 @@ boot and on `limits load [file]`:
 
 ```text
 # parameter          cmp  bound  dwell  node  action
-stack_worst_used     >    90     3      0     resmon sample
+stack_worst_used     >    90     3      0     event_stats
 ```
 
 The first five whitespace separated fields are the parameter, the comparison
@@ -1346,7 +1305,7 @@ The first five whitespace separated fields are the parameter, the comparison
 after them is the action, a registered command with its arguments, kept as
 written. A line starting with `#` is a comment; there are no trailing comments.
 
-A parameter may have a `<node>:` prefix, for example `12:t_x > 5 1 0 count`.
+A parameter may have a `<node>:` prefix, for example `12:t_x > 5 1 0 noop`.
 The prefix selects where to read; the node column still selects where to release
 the action. `0:` and this node's own address read locally. The prefix must be an
 unsigned unicast CSP address; an empty prefix or name, a second colon and a
@@ -1357,8 +1316,9 @@ read. A float-only bound with `==` or `!=` is refused at load.
 The bound is read as the parameter's own type, so a fractional bound on an
 integer parameter is refused, and `==` and `!=` are refused on a float. The
 dwell is how many consecutive sweeps must satisfy the comparison, from 1 to 255.
-The action must name a registered command with the right arguments when the file
-is loaded, not when it fires.
+The action must be a command from the command registry, such as `event_stats`
+or `noop`, with the right arguments; shell commands are not actions. It is
+checked when the file loads, not when it fires.
 
 A file with any bad line is refused whole. The previous rules stay in force,
 `limits_parse_errors` rises, and `limits status` and `limits_error_line` name
@@ -1370,8 +1330,10 @@ address another node. The rule then latches, and re-arms on the first sweep that
 finds the comparison false. A release that fails is counted in `limits_failures`
 and tried again on the next sweep.
 
-Remote reads run on a dedicated workqueue with a 2560-byte default stack and
-priority 4, below the router and servers. Each sweep gives remote I/O half the
+Rules are swept every `CONFIG_KFSW_LIMITS_INTERVAL_MS` (10000 ms by default).
+Remote reads run on a dedicated workqueue, `CONFIG_KFSW_LIMITS_STACK_SIZE`
+(2560 bytes) at `CONFIG_KFSW_LIMITS_PRIORITY` (4), below the router and
+servers. Each sweep gives remote I/O half the
 interval, capped at 5000 ms; manual sweeps with interval zero use 5000 ms.
 Rules are grouped by node, up to 16 names per call. Each group gets its own
 deadline from the time left divided by the remaining groups, with a 10 ms
@@ -1389,12 +1351,12 @@ that does not fit resets the streak and adds only to `limits_failures`; it never
 compares. Local rules run first, so a rule watching `limits_failed_by` sees a
 remote failure on the next sweep.
 
-| Parameter | Access | Meaning |
+| Parameter | Mode | Meaning |
 | --- | --- | --- |
 | `limits_rules` | r | Rules in force |
 | `limits_running` | r | Whether the periodic sweep is scheduled |
-| `limits_enabled` | rwb | 0 stops the sweeps and keeps the loaded rules |
-| `limits_interval_ms` | rwb | Between sweeps; 0 for none, otherwise 100 to 3600000 |
+| `limits_enabled` | wp | 0 stops the sweeps and keeps the loaded rules |
+| `limits_interval_ms` | wp | Between sweeps; 0 for none, otherwise 100 to 3600000 |
 | `limits_sweeps` | r | Sweeps completed while enabled |
 | `limits_fires` | r | Actions released |
 | `limits_failures` | r | Parameter reads and releases that failed |
@@ -1416,9 +1378,9 @@ mechanisms.
 
 | Watchdog | Proves | Fed by | Timeout | Enabled in |
 | --- | --- | --- | --- | --- |
-| Hardware | the CPU still runs | health, while every watched component reports | 8000 ms on the NUCLEO | `CONFIG_KFSW_WATCHDOG`, NUCLEO |
-| Health | the threads still run | the main loop (`app`) and the CSP router probe (`csp`) | 4000 ms and 8000 ms deadlines | `CONFIG_KFSW_HEALTH`, NUCLEO |
-| Ground | somebody still talks to the node | a ground watchdog feed over CSP | 24 h, from 2 h to 5 days | `CONFIG_KFSW_GNDWDT`, Linux and NUCLEO |
+| Hardware | the CPU still runs | health, while every watched component reports | 8000 ms on the NUCLEO | `CONFIG_KFSW_WATCHDOG`, NUCLEO and Pico W |
+| Health | the threads still run | the main loop (`app`) and the CSP router probe (`csp`) | 4000 ms and 8000 ms deadlines | `CONFIG_KFSW_HEALTH`, NUCLEO and Pico W |
+| Ground | somebody still talks to the node | a ground watchdog feed over CSP | 24 h, from 2 h to 5 days | `CONFIG_KFSW_GNDWDT`, Linux, NUCLEO and Pico W |
 
 ### Hardware watchdog
 
@@ -1437,15 +1399,8 @@ deadline; while all of them report in time, health feeds the watchdog, and when
 one misses its deadline health stops feeding and the hardware watchdog resets
 the board. A board stuck with interrupts running but its threads blocked is
 reset this way. Health needs the hardware watchdog, so it is off on Linux.
-
-Table 31 also carries one slot per component the composition names in
-`app/include/kfsw/app/health_slots.h`: `health_<name>_state` reads 0 ok,
-1 overdue or 2 absent, and `health_<name>_since_ms` the time since its last
-report, or 4294967295 when absent. Absent means no component of that name is
-registered. A slot is found by name, so the order components register in does
-not move it, and its index fixes its offsets, so an index is never reused. The
-table fits 14 slots; a list longer than that fails the build. The slots only
-report: they do not change when health feeds the watchdog.
+Table 31 publishes the service and one slot per named component. See
+@ref health-guide for registration, the slots and reacting before the reset.
 
 ### Ground watchdog
 
@@ -1476,7 +1431,8 @@ A node does not feed itself: `gndwdt feed` refuses its own address. Underneath
 it is command 16, `ground_wtd`, with `KFSWWSFK` or `get`, which is what a ground
 tool sends. Both nodes need `CONFIG_KFSW_GNDWDT` and
 `CONFIG_KFSW_COMMAND_CSP`. The command uses port 11 by default. The magic word
-checks intent; it is not authentication. A repeated legacy request feeds again.
+guards against an accidental feed and authenticates nobody. A repeated legacy
+request feeds again.
 With a ticketed request, a duplicate returns the saved result without feeding
 again.
 
@@ -1486,10 +1442,10 @@ on` arms it.
 
 Table 35 exposes:
 
-| Parameter | Access | Meaning |
+| Parameter | Mode | Meaning |
 | --- | --- | --- |
-| `gndwdt_enabled` | rw | Whether the countdown is armed |
-| `ground_wtd_timeout` | rw | Timeout in seconds, 7200-432000; default 86400 |
+| `gndwdt_enabled` | w | Whether the countdown is armed |
+| `ground_wtd_timeout` | w | Timeout in seconds, 7200 to 432000; default 86400 |
 | `ground_wtd_cnt` | r | Seconds remaining; zero when stopped, expired or waiting to reset |
 | `gndwdt_since_s` | r | Seconds since startup or the last valid feed |
 | `gndwdt_contacts` | r | Valid feed commands accepted |
@@ -1508,9 +1464,10 @@ Send a valid feed first. A reset already queued is not cancelled.
 
 ## Event record
 
-`CONFIG_KFSW_EVENT` keeps events in a RAM ring. Each event has an ID, a
-monotonic timestamp, a sequence number, a severity and a small payload. Event
-IDs and payloads can be decoded without parsing console text.
+`CONFIG_KFSW_EVENT` keeps events in a RAM ring of `CONFIG_KFSW_EVENT_RING_DEPTH`
+records (32 by default). Each event has a source, an ID, a monotonic timestamp,
+a sequence number, a severity and a small payload, so it can be decoded without
+parsing console text.
 
 ```text
 console  FTP put 2 /build/test.txt -> /uplink/test.txt: PASS
@@ -1521,13 +1478,26 @@ event    source=ftp id=1 payload={node:2, bytes:256, crc32:0x0ce9d363}
 
 Sequence gaps identify missing events.
 
-IDs and payload layouts are declared in each producer's public header. Boot
-records the reset cause, the command service records every dispatch, and file
-transfer records completed and failed transfers. Payloads are stored as given;
-a producer that sends one over a link writes it big-endian.
+There are ten sources, numbered 1 to 10, and `kfsw_event_emit()` refuses any
+other:
 
-The ring size is set in Kconfig. When it is full the oldest record is
-overwritten and `events_overwritten` increases. Recording takes a short
+| Source | Name | Records |
+| --- | --- | --- |
+| 1 | `boot` | The reset cause |
+| 2 | `command` | Every recorded dispatch, with ID, node and status |
+| 3 | `ftp` | Completed and failed transfers |
+| 4 | `app` | Health faults and module events |
+| 5 | `fbo` | File based operations |
+| 6 | `gndwdt` | Ground watchdog expiry |
+| 7 | `resmon` | Stack alerts |
+| 8 | `table` | Table file loads, rejections and reverts |
+| 9 | `scrub` | Image mismatches |
+| 10 | `limits` | Rules that fired |
+
+IDs and payload layouts are declared in each producer's public header. Payloads
+are stored as given; a producer that sends one over a link writes it
+big-endian. When the ring is full the oldest record is overwritten and
+`events_overwritten` increases. Recording takes a short
 spinlock, so it can be called from any context.
 
 Read another node's events with `event stats <node>` and
@@ -1542,6 +1512,7 @@ these services. Each module has its own parameter table, numbered 50 to 99.
 | --- | --- | --- |
 | `radio-uhf` | 50 | Holybro SiK UHF radio: identity, status and optional link encryption |
 | `temperature-sensor-example` | 51 | The MCU's die temperature, sampled on a work queue; the module to copy |
+| `gpredict` | 52 | Pass tracking driven by Gpredict on the ground: rotator bearing and corrected frequency |
 | `button-test` | 67 | A board button and three LEDs, for bench tests |
 
 The [kfsw-modules README](https://github.com/dgonzalez97/kfsw-modules#readme)

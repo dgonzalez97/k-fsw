@@ -24,16 +24,15 @@ its own address.
 `config/profiles/csp-v1.conf` (`CONFIG_KFSW_CSP_VERSION_1=y`) selects CSP 1
 for talking to older CSP 1 systems: a four-byte header and 5-bit addresses,
 so nodes 1 to 30, with 31 as broadcast. Every node on a link must use the same
-version; a CSP 2 node and a CSP 1 node do not understand each other. An
-address the selected version cannot carry stops the build. `csp info` prints
-the version in use as `protocol: CSP vN`.
+version. An address the selected version cannot carry stops the build. `csp
+info` prints the version in use as `protocol: CSP vN`.
 
-CSP 1 is less exercised than CSP 2. What the tests cover: a two-node exchange,
+CSP 1 is less exercised than CSP 2. The tests cover a two-node exchange,
 remote PARAM, multi-KISS, and firmware upload through FWU lite and FTP over
 clean and lossy pseudo-terminal links, plus NUCLEO builds with and without
-CAN. What they do not: physical CAN, RF, bootloader swaps, rollback and
-confirmation. And this is libcsp 2.x in its CSP 1 mode, so byte compatibility
-with a real libcsp 1.x node is untested.
+CAN. They do not cover physical CAN, RF, bootloader swaps, rollback or
+confirmation. This is libcsp 2.x in its CSP 1 mode; byte compatibility with a
+real libcsp 1.x node is untested.
 
 **Port.** A service on a node: "node 2, port 9" is the file transfer service on
 node 2.
@@ -55,7 +54,7 @@ node 2.
 Every node serves ports 0 and 1; libcsp's ports 2 to 6 are not served. Both
 ends of a link must use the same port numbers. `CSP_PORT_MAX_BIND` is 16 and
 raising it costs connection slots, so port 7 is the room left for a new
-service rather than 17 and up.
+service.
 
 **Packet.** A CSP header (addresses, ports and flags such as CRC32 or RDP) and
 a payload. Packets come from a fixed buffer pool and stay datagrams, also with
@@ -72,11 +71,10 @@ and framing state.
 The longest matching prefix wins. The router delivers packets for the local
 node and forwards the rest.
 
-A composition names its routes with `CONFIG_KFSW_CSP_ROUTE_TABLE`. The Linux
-and NUCLEO images use `0/0 KISS`: every other node is reached over the serial
-link. Without a table the node loads `0/0 LOOP` and reaches only itself, so a
-link is never picked by whichever interface came up first. Routes are fixed
-once the router starts.
+A composition names its routes with `CONFIG_KFSW_CSP_ROUTE_TABLE`. The Linux,
+NUCLEO and Pico W images use `0/0 KISS`: every other node is reached over the
+serial link. Without a table the node loads `0/0 LOOP` and reaches only
+itself, so a link is never picked by whichever interface came up first.
 
 More detail is in the libcsp
 [basic architecture](https://github.com/libcsp/libcsp/blob/develop/doc/basic.md),
@@ -86,22 +84,28 @@ documents.
 
 ## Radio encryption
 
-Add `config/profiles/radio-crypto.conf` to both builds. The NUCLEO also needs
-`nucleo-radio-crypto.overlay` for its hardware RNG. The radio module protects
-the KISS interface named by `KFSW_RADIO_UHF_CRYPTO_INTERFACE`.
+The radio module protects the KISS interface named by
+`KFSW_RADIO_UHF_CRYPTO_INTERFACE` (`KISS` by default). To set up an encrypted
+link:
 
-Generate a 256-bit key with `openssl rand -hex 32`, then on each node's
-console:
+1. Put the same 16-byte HMAC key on each build host at
+   `CONFIG_KFSW_CSP_HMAC_KEY_FILE`, `~/.config/kfsw/csp-hmac.key` by default,
+   for example with `head -c 16 /dev/urandom`. The profile turns on HMAC
+   signing and the build fails without the file.
+2. Add `config/profiles/radio-crypto.conf` to both builds. On the NUCLEO, add
+   `nucleo-radio-crypto.overlay` as well, for its hardware RNG.
+3. Set `KFSW_CSP_UART_PEER_ADDRESS` on each node to the other's address.
+4. Generate a 256-bit radio key with `openssl rand -hex 32`.
+5. On each node's console, write the same key and check it was accepted:
 
-```text
-param set uhf_key_hex <64 hex digits>
-param get uhf_crypto_error
-comms uhf connect
-comms uhf status
-```
+   ```text
+   param set uhf_key_hex <64 hex digits>
+   param get uhf_crypto_error
+   ```
 
-Use the same key on both ends and set `KFSW_CSP_UART_PEER_ADDRESS` on each
-node. The key reads back empty and can't be written from another node. Radio
+6. Run `comms uhf connect`, then `comms uhf status`.
+
+The key reads back empty and can't be written from another node. Radio
 settings are saved outside the FTP directory.
 
 `uhf_encrypt_enable` turns protection on or off, and `uhf_encrypt_tx` and
@@ -147,19 +151,21 @@ flowchart LR
     CANHW <--> PEERS
 ```
 
-`kfsw_csp_init()` (`kfsw-comms/src/csp.c`) builds this once. It opens every
-UART under a `kfsw,csp-kiss-uarts` devicetree node, or the single UART chosen
-as `kfsw,csp-uart`, as a KISS interface (`src/uart.c`), opens the controller chosen by `kfsw,csp-can`
-as a CAN interface (`src/can.c`), gives the loopback interface the node's
-address, then checks and loads the route table. The router thread
-(`kfsw_csp_router_thread`) starts in `kfsw_csp_start()`, which `main()` calls
-after the PARAM server binds and before the other servers start.
+`kfsw_csp_init()` (`kfsw-comms/src/csp.c`) builds this once. It sets the
+hostname, model, revision and address, calls `csp_init()`, opens every UART
+under a `kfsw,csp-kiss-uarts` devicetree node, or the single UART chosen as
+`kfsw,csp-uart`, as a KISS interface (`src/uart.c`), opens the controller
+chosen by `kfsw,csp-can` as a CAN interface (`src/can.c`), gives the loopback
+interface the node's address, then checks and loads the route table, and
+binds the ping handler. Services bind their ports after it returns. The router
+thread (`kfsw_csp_router_thread`, calling `csp_route_work()`) starts in
+`kfsw_csp_start()`, which `main()` calls after the PARAM server binds and
+before the other servers start.
 
 A packet for the node's own address goes to `LOOP` and comes back in as if it
 had arrived. Any other destination is looked up in the route table, and the
 longest matching prefix names the interface. The table is fixed once the
-router starts: there is no route discovery and no failover. A node with no
-table gets `0/0 LOOP` and reaches only itself.
+router starts: there is no route discovery and no failover.
 
 The radio codec is only there with `CONFIG_KFSW_RADIO_UHF_CRYPTO`. It sits
 between the router and one named KISS interface: received packets go through
@@ -233,26 +239,10 @@ libcsp uses preallocated buffers:
 
 To retry, build a new packet.
 
-## Startup
-
-`kfsw-comms` sets up libcsp once:
-
-1. Set the hostname, model, revision and address.
-2. Call `csp_init()`.
-3. Give the loopback interface the local address.
-4. Create the KISS and CAN interfaces, then check and load the routes.
-5. Bind the ping handler.
-6. Start the router thread, which calls `csp_route_work()`.
-
-Services bind their ports after `kfsw_csp_init()`. The application starts
-the router before starting its remote services. The API gives the state,
-interfaces, routes, free buffers and ping. `csp interfaces` and `comms uart info`
-show the counters since boot.
-
 ## Counters
 
-`csp interfaces` shows what each link carried. `csp counters` shows libcsp's
-error counters:
+`csp interfaces` and `comms uart info` show what each link carried since boot.
+`csp counters` shows libcsp's error counters:
 
 | Counter | Raised when |
 | --- | --- |
@@ -269,22 +259,21 @@ so read them as an indication. `csp counters clear` zeroes them before a run.
 Parameter table 4 carries the same values, so a ground station reads them like
 any other parameter.
 
-Tracing is a dial an operator can move from the ground through the CSP
-parameters: `packet_trace` selects packet dumps (0 off, 1 on), and `rdp_trace`
-selects RDP detail (0 off, 1 errors, 2 with the protocol). Both take effect
+Two table 4 parameters set tracing, locally or from the ground:
+`packet_trace` (0 off, 1 on) and `rdp_trace` (0 off, 1 errors, 2 with the
+protocol), the same settings as `csp debug` and `csp rdp`. Both take effect
 immediately and neither survives a reset.
 
 ## Remote interface counters
 
 `csp ifstat 2 KISS` reads a named interface on node 2 through CSP management.
-It reports packet and byte counts, transmit/receive errors, drops, authentication
-and framing errors, and the driver's interrupt count. `csp interfaces` still
-lists this node's interfaces; the remote name must be known beforehand.
+It reports packet and byte counts, transmit and receive errors, drops,
+authentication and framing errors, and the driver's interrupt count. The
+remote interface name must be known beforehand.
 
-The query has a one-second timeout. An unknown interface also times out because
-CMP has no not-found reply. Counts can wrap and change while read, and the
-query itself contributes traffic. Parameter table 4 continues to expose the
-aggregate counters.
+The query has a one-second timeout. An unknown interface also times out,
+because CMP has no not-found reply. Counts can wrap and change while read, and
+the query itself adds traffic.
 
 ## Capturing traffic
 
@@ -333,28 +322,25 @@ normal west updates leave the `host-tools` group disabled.
   --packet-size 64 --tx-rate 640 --duration 10 --reply-timeout 1 --json
 ```
 
-`csp build` builds both host binaries. `perf` dispatches to `csp-iperf`; put
-`perf` before its options. It uses the node's existing ping service and does
-not change clocks or firmware configuration. The source address defaults to
-30 (`--src-addr`), baud to 115200. The source must be unused and the link must
-have only one host reader.
+`perf` runs `csp-iperf` against the node's ping service; put `perf` before its
+options. The source address defaults to 30 (`--src-addr`) and the baud rate
+to 115200. The source must be unused and the link must have only one host
+reader.
 
-The offered rate is CSP bytes/second, including the CSP header/checksum but
-excluding KISS framing. Replies must match both addresses, ports, a random
-run ID, sequence and the full expected payload. RTT uses host monotonic time.
-JSON reports unique replies, final loss, duplicate/reordered/late replies and
-RTT. Silence and trailing loss count as loss; a reordered reply within its
-deadline recovers its gap. The run ends after the sending duration and reply
-drain, exiting 2 on any loss. Invalid rates fail before the device is opened.
+The offered rate is CSP bytes per second, including the CSP header and
+checksum but not KISS framing. A reply must match both addresses, ports, a
+random run ID, the sequence and the full payload. RTT uses host monotonic
+time. The JSON reports unique replies, final loss, duplicate, reordered and
+late replies, and RTT. Silence and trailing loss count as loss; a reordered
+reply within its deadline fills its gap. The run ends after the sending
+duration and the reply drain, and exits 2 on any loss.
 
-TX byte rate uses the sending window; RX rates include the final drain and
-its duration is reported as `elapsed_seconds`. Actual rate can be lower than
-the offered rate. Native PTYs verify the protocol; only a real link shows its capacity.
-Use 64-byte packets for the smoke test; larger sizes must fit the node's CSP
-buffers. `--reply-size` is for a separately configured CSP 1 echo server;
-K-FSW's standard ping echoes the original size. CAN/ZMQ remain CSP 1 only.
-The bench fixture is in `tests/hil/diagnostics/README.md` in the application
-checkout.
+The TX rate uses the sending window; RX rates include the final drain, whose
+duration is `elapsed_seconds`. Native PTYs test the protocol; only a real link
+shows its capacity. Use 64-byte packets for the smoke test; larger sizes must
+fit the node's CSP buffers. `--reply-size` is for a separate CSP 1 echo
+server; K-FSW's ping echoes the original size. The bench fixture is in
+`tests/hil/diagnostics/README.md`.
 
 ## Discovery
 
@@ -362,9 +348,6 @@ checkout.
 ./tools/kfsw-linux csp --device /dev/pts/7 discover --nodes 1,2 --output nodes.jsonl
 ./tools/kfsw-linux csp --device /dev/pts/7 --source 100 discover --range 1:16 --budget-ms 5000
 ```
-
-Another node's log and journal are read from a K-FSW shell with `log remote`
-and `journal remote`; see the services guide.
 
 `discover` queries explicit unicast addresses or an inclusive range, up to
 64 addresses. It pings each node and then asks for CMP identity. It reports
@@ -375,15 +358,15 @@ states whether every requested node was queried. `--timeout-ms` bounds each
 exchange and `--budget-ms` bounds the whole inventory. Ctrl-C stops either
 command; flushed records remain, without a successful completion marker.
 
-The source address defaults to 16 and must not be included in the requested
-nodes. The broadcast address, 16383, is excluded. `discover` observes nodes reachable through
-configured CSP routes; it does not implement ARP, build a routing topology,
-or detect duplicate addresses. Queries use the existing ping and CMP services
-and make no configuration or clock changes.
+The source address defaults to 16 and must not be among the requested nodes.
+The broadcast address, 16383, is excluded. `discover` finds only nodes
+reachable through the configured routes; it does not build a topology or
+detect duplicate addresses. It changes no configuration or clock.
 
 ### Log history wire format
 
-All integers below are big endian. Requests and replies require CSP CRC32C;
+A K-FSW shell reads another node's log and journal with `log remote` and
+`journal remote` (@ref logging). All integers below are big endian. Requests and replies require CSP CRC32C;
 the KISS link adds its own checksum. One request is served per connection.
 
 | Message | Fields, in order |
@@ -423,9 +406,6 @@ node 10                         router                         node 11
                             10 -> KISS_1   11 -> KISS_2 via 11
 ```
 
-The router's two interfaces have different addresses because libcsp doesn't
-forward a packet between interfaces in the same subnet.
-
 ## Route table
 
 `CONFIG_KFSW_CSP_ROUTE_TABLE` uses the libcsp parser's syntax:
@@ -436,22 +416,22 @@ destination[/prefix-length] interface [via], next-entry
 ```
 
 The prefix length counts address bits: 14 in CSP 2, 5 in CSP 1. No prefix
-matches one node and `/0` every node, in both versions, so a table written
-without prefixes or with `/0` builds for either; CSP 1 rejects a prefix above
-`/5`. The multi-KISS test router uses `tests/config/multi-kiss-router-csp1.overlay`
-under CSP 1 for the interfaces' own `/5` prefixes. Two entries with the same destination and prefix are both used,
-not tried in order. `via` is the link-layer next hop; KISS ignores it, but
-`csp routes` still shows it.
+matches one node and `/0` every node, so a table written without prefixes or
+with `/0` builds for either version; CSP 1 rejects a prefix above `/5`. Under
+CSP 1 the multi-KISS test router uses
+`tests/config/multi-kiss-router-csp1.overlay` for the interfaces' own `/5`
+prefixes. Two entries with the same destination and prefix are both used, not
+tried in order. `via` is the link-layer next hop; KISS ignores it, but `csp
+routes` still shows it.
 
 Ground node files can set the same table with `KFSW_CSP_ROUTES`. At startup
 the table is checked with `csp_rtable_check()`, the interface names, the
 parser's 99-character limit and the table size, and only then loaded. A bad
 table fails initialization.
 
-`KFSW_CSP_PEER` in a ground node file supplies the UART peer address
-(`KFSW_CSP_UART_PEER_ADDRESS`). It identifies the neighbor on that interface;
-it does not select routes or prove reachability. Select destinations separately
-with `KFSW_CSP_ROUTES` and check the effective table with `csp routes`.
+`KFSW_CSP_PEER` in a ground node file sets the UART peer address
+(`KFSW_CSP_UART_PEER_ADDRESS`), the neighbour on that interface. It does not
+select routes; `KFSW_CSP_ROUTES` does, and `csp routes` shows the result.
 
 With several UARTs, each one is a child of a `kfsw,csp-kiss-uarts` devicetree
 node. Interface names are one to nine characters from `[A-Za-z0-9_-]`, which is
@@ -475,13 +455,21 @@ in the libcsp fork the build uses.
 
 CAN uses libcsp's CAN interface on the controller chosen with `kfsw,csp-can`.
 Under CSP 2 frames use CFP2, the CAN Fragmentation Protocol for 14-bit
-addresses; under CSP 1 they use CFP1 and its 5-bit addresses, and
-`CONFIG_KFSW_CSP_CAN_PREFIX_LENGTH` defaults to 5. The fields are the `CFP2_*`
+addresses, and `CONFIG_KFSW_CSP_CAN_PREFIX_LENGTH` defaults to 14; under CSP 1
+they use CFP1 and its 5-bit addresses, and the default is 5. The fields are the `CFP2_*`
 and `CFP_*` definitions in
 [csp_if_can.h](https://github.com/dgonzalez97/kfsw-libcsp/blob/kfsw/include/csp/interfaces/csp_if_can.h).
 The NUCLEO uses CAN1 on PD0/PD1 with an external transceiver, and a Linux node
 uses a SocketCAN interface. Both ends of the bus need the same bitrate; the
 profiles use 500 kbit/s.
+
+`can_speed` in table 1 changes the bitrate at run time: 125000, 250000,
+500000, 800000 or 1000000. The node stops the CAN interface and opens it again
+at the new rate, so a change made over CAN cuts the link until the other nodes
+follow. If the stop fails, the driver keeps the interface, its queue and its
+receive thread, and the node stays at the old rate. Read `can_speed` back
+after writing it: it reports the rate in use, and writing the value again
+retries the stop.
 
 ### Virtual CAN on Linux
 
@@ -498,8 +486,8 @@ runs a node at address 2 against the `kfsw-gnd-can` ground role at 17, pings
 both ways, reads remote parameters and checks the counters afterwards.
 
 The interface name comes from `--can-if` at run time, so the same images run
-against a real adapter by naming `can0` instead. A virtual bus has no bit
-timing, so it proves routing, framing and the services, not the wire.
+against a real adapter by naming `can0`. A virtual bus has no bit timing: it
+tests routing, framing and the services, not the wire.
 
 ## Shell UART and CSP UART
 

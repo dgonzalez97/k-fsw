@@ -4,8 +4,8 @@
 
 ## Start a change
 
-Keep one responsibility per branch. Include the tests and docs needed to
-review that change. Preserve existing work before updating any repository.
+Keep one responsibility per branch, with the tests and docs that change
+needs. Save existing work before updating any repository.
 
 From the workspace root:
 
@@ -46,8 +46,8 @@ git config user.name
 git config user.email
 ```
 
-The subject is uppercase area tags and then the thing that changed, as a noun
-phrase, not an instruction:
+The subject is one or two uppercase area tags, then the thing that changed as
+a noun phrase:
 
 ```text
 [PARAM] Remote table list descriptor changes
@@ -82,9 +82,9 @@ git diff --stat
 git diff --check
 ```
 
-Run checks appropriate to the change; @ref testing lists the entry points.
-Docs changes need Doxygen, PDF, link checks, and visual inspection.
-Record physical tests only when they were observed on the bench.
+Run the checks that cover the change; @ref testing lists them. A docs change
+needs Doxygen, the PDF, the link checks and a look at the result. Record a
+physical test only when someone observed it on the bench.
 
 ## Change a west dependency
 
@@ -115,8 +115,8 @@ west update kfsw-services
 git -C kfsw-services rev-parse HEAD
 ```
 
-The checked-out SHA must match the manifest. Hosted CI must be able to fetch
-it from the declared remote.
+The checked-out SHA must match the manifest, and hosted CI must be able to
+fetch it from the declared remote.
 
 ## Forked dependencies
 
@@ -182,10 +182,9 @@ Use `build/nucleo_l496zg/zephyr/zephyr.elf` and check that build's
 
 ## Documentation
 
-Edit guides under `docs/` and document public C APIs in their headers.
-Use short descriptions of what the code does. For procedures, give the command,
-expected result and relevant limits. Link to upstream references for RTOS and
-protocol background.
+Edit guides under `docs/` and document public C APIs in their headers. For a
+procedure, give the command, the expected result and its limits. Link to
+upstream references for RTOS and protocol background.
 
 Draw diagrams as fenced code blocks marked `mermaid`. GitHub draws them in
 place, and `tools/docs/build.sh` passes them through `tools/docs/mermaid-filter.py`
@@ -207,12 +206,10 @@ test results when capabilities change.
 
 ## Bench gate before a tag
 
-Software CI says the code builds and behaves in simulation. It cannot say the
+Software CI shows that the code builds and behaves in simulation. Whether the
 board keeps a log across a reset, answers over CAN, or comes back from an
-interrupted update. A tag claims all of it, so the bench runs first.
-
-Run `tools/ci/all.sh` before a commit. Before a tag, prepare and back up the
-bench, then run the board suite. See @ref testing for optional baseline inputs.
+interrupted update needs the bench, so the bench runs before a tag. Back the
+bench up first.
 
 | Step | Command | Needs |
 | --- | --- | --- |
@@ -221,16 +218,12 @@ bench, then run the board suite. See @ref testing for optional baseline inputs.
 | 3 | `tests/hil/shell-smoke.sh rpi_pico_w` | a person to copy the UF2 and reconnect the console |
 | 4 | `tests/hil/button-test/button-acceptance.sh` | a person to press the button and judge its behaviour |
 
-The suite reports the last two checks as NOT RUN. CAN acceptance needs a
-confirmed probes-enabled baseline; encrypted radio needs its prepared flight
-image. Supply their inputs as described in @ref testing. Run them separately
-if another fixture has replaced those baselines. `tools/f746-proof.sh build`
-is included only with an explicitly set readable `KFSW_MCUBOOT_KEY`; it is
-an offline artifact check, not physical evidence.
+Step 2 reports steps 3 and 4 as NOT RUN. CAN acceptance and encrypted radio
+need prepared baselines and inputs (@ref testing); run them separately if
+another fixture has replaced those baselines.
 
 Record which steps ran, which were skipped for want of hardware, and the exact
-output of each. A step nobody ran is not a step that passed, and the tag notes
-say which is which.
+output of each. The tag notes list the skipped steps.
 
 ### Preconditions that nothing checks for you
 
@@ -282,9 +275,9 @@ erase command, which takes the golden region and LittleFS with it.
 Then follow `tests/hil/fwu/README.md`, which builds the ground node and the two
 signed images, installs the baseline, and runs the acceptance.
 
-The acceptance is not repeatable on its own: it leaves the board running the
-candidate, and a second run refuses because the candidate and running revisions
-must differ. Reinstall and confirm the baseline between runs.
+The acceptance leaves the board running the candidate, and a second run
+refuses because the candidate and running revisions must differ. Reinstall and
+confirm the baseline between runs.
 
 Robot runs the same acceptance when both images are named:
 
@@ -294,7 +287,7 @@ export KFSW_FWU_CAN_IMAGE=$B/after/app/zephyr/zephyr.signed.bin
 tests/hil/run.sh board-can
 ```
 
-Without them that case is skipped, and a skip is not a pass.
+Without them that case is skipped and reported as NOT RUN.
 
 ## Release builds
 
@@ -343,9 +336,9 @@ to be reachable and to take a new image, and `tools/golden.sh` checks that it
 fits the 188 KiB golden partition. A target without that partition has no
 recovery image and `recovery_image` is null.
 
-Flash it once per board, at `0x080C0000`, with `tools/golden.sh flash`. It is
-not flashed by the release and it does not change when the flight image does,
-which is the point: it is the version you fall back to.
+Flash it once per board, at `0x080C0000`, with `tools/golden.sh flash`. The
+release does not flash it, and it stays the same when the flight image
+changes.
 
 #### How recovery works
 
@@ -363,12 +356,11 @@ Two things can ask for that:
   parameter snapshot. The boot budget section of @ref firmware_update has the
   details.
 
-The swap is a trial, not a permanent one: if the recovery image cannot boot
-either, the bootloader still has somewhere to go back to. The recovery image
-confirms itself once it has finished starting, because no operator is going to
-confirm it for a node that is already in trouble. That is
-`CONFIG_KFSW_BOOT_CONFIRM_AT_START`, and an image an operator confirms should
-leave it off.
+The swap is a trial, so if the recovery image cannot boot either, the
+bootloader reverts. The recovery image confirms itself once it has finished
+starting (`CONFIG_KFSW_BOOT_CONFIRM_AT_START`), because a node in trouble may
+have no operator to confirm it. An image the operator confirms leaves that
+option off.
 
 The early budget survives both confirmation and MCUboot revert. A node with
 no ground contact can exhaust it even when MCUboot restores the previous image.

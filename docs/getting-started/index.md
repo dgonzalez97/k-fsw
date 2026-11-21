@@ -89,12 +89,13 @@ west update
 ./k-fsw/tools/zephyr-patch.sh
 ```
 
-`./k-fsw/tools/zephyr-patch.sh` applies the shell Tab help and mandatory ZMS
-close-error patches to the pinned Zephyr and reports when each is already
-applied. Tab lists one option per line with its help. Builds never apply the
-patches; run the helper after `west update`. `--check` only reports their state.
-`tools/ci/all.sh` and the release script stop if either patch is absent or
-conflicts. GitHub workspace setup applies them as a separate step.
+`zephyr-patch.sh` applies two patches from `k-fsw/patches/zephyr/` to the
+pinned Zephyr: the shell Tab help, which lists one option per line with its
+help, and the ZMS close error, which is mandatory. It reports a patch that is
+already applied. Builds never apply them, so run the helper after every
+`west update`. With `--check` it only reports; `tools/ci/all.sh` and
+`tools/release.py` run it that way and stop if a patch is missing or
+conflicts.
 
 Install Zephyr's Python requirements and export its CMake package:
 
@@ -128,13 +129,13 @@ west update
 git -C k-fsw submodule update --init --recursive
 ```
 
-Preserve local dependency changes before updating. If `west update` refuses
-to overwrite a modified file, inspect the changes before proceeding. The patch
-helper accepts both pristine and already patched Zephyr trees and refuses
-conflicting changes. A tree carrying an earlier revision of the patch counts as
-conflicting; restore the file with
-`git -C zephyr checkout -- subsys/shell/shell.c`, which discards any other
-local edits to it, and run the helper again. Dependencies normally end up on a detached `HEAD` at the
+Save local dependency changes before updating; `west update` refuses to
+overwrite a modified file. The patch helper accepts a pristine or an already
+patched Zephyr and refuses anything else, including an earlier revision of a
+patch. It names the conflicting file (`subsys/shell/shell.c` or
+`subsys/kvss/zms/zms.c`). Restore that file with
+`git -C zephyr checkout -- <file>`, which discards any other local edits to
+it, and run the helper again. Dependencies end up on a detached `HEAD` at the
 manifest commit.
 
 ## First KFSW-Linux build
@@ -225,12 +226,10 @@ west build -t menuconfig -d build/linux
 
 ![The chooser on a configured build directory](media/menuconfig-root.png)
 
-It covers every option the build knows, K-FSW's and Zephyr's alike: this
+It covers every option the build knows, K-FSW's and Zephyr's: this
 application is the first entry, and the four other K-FSW repositories are under
-`Modules`. A target is composed out of those options rather than written, which
-is how the same tree builds both the full image and the golden recovery one.
-What the chooser writes is a build artefact; @ref zephyr_integration says how to
-keep a choice in a `.conf`.
+`Modules`. What the chooser writes is a build artefact; @ref zephyr_integration
+says how to keep a choice in a `.conf`.
 
 Other useful files:
 
@@ -257,7 +256,7 @@ Or one at a time:
 ./k-fsw/tools/build.sh nucleo_l496zg
 ```
 
-CI only builds these two. The FRDM and Pico profiles build the same way:
+CI builds only these two. The FRDM and Pico targets build the same way:
 
 ```bash
 ./k-fsw/tools/build.sh frdm_k64f
@@ -362,9 +361,9 @@ The HTML includes the C API; the PDF only has the manual.
 ## Add a module
 
 A module is the code for one device or subsystem. Start from the temperature
-example in `kfsw-modules/temperature-sensor-example/`: it is small, it runs on
-KFSW-Linux without hardware, and it has one of everything a module usually
-needs. Its `README.md` lists the files and what each one shows.
+example in `kfsw-modules/temperature-sensor-example/`: it runs on KFSW-Linux
+without hardware and has a parameter table, a command, a shell group and
+events. Its `README.md` lists the files.
 
 ### Run the example first
 
@@ -386,9 +385,9 @@ kfsw:~$ cmd list
 ```
 
 native_sim has no temperature sensor, so the reading is the reserved invalid
-value and `temp_valid` is 0. Everything else, the table, the counters, the
-alarm setting, the command and the events, behaves as on a board. Build
-again with `KFSW_PRISTINE=always` and without the profile to turn it off.
+value and `temp_valid` is 0. The table, the counters, the alarm setting, the
+command and the events behave as on a board. To turn the example off, build
+again with `KFSW_PRISTINE=always` and without the profile.
 
 ### Copy it
 
@@ -419,17 +418,16 @@ again with `KFSW_PRISTINE=always` and without the profile to turn it off.
 7. Add a profile under `config/profiles/` that turns the module on, as
    `linux-temperature.conf` does, so it can be built and checked without
    changing the reference compositions.
-8. If the module registers shell commands, keep that file out of the module's
-   own archive and give it a Zephyr library of its own, as the example's
-   `CMakeLists.txt` does. A shell group is reached only through a linker
-   section, so an archive member that holds nothing else is never pulled in and
-   the commands are missing from `help` with no error anywhere. Zephyr links
-   its own libraries whole, which is what keeps the registration.
+8. If the module registers shell commands, put that file in a Zephyr library
+   of its own, as the example's `CMakeLists.txt` does. A shell group is reached
+   only through a linker section, so an archive member that holds nothing else
+   is never linked and the commands are missing from `help` without an error.
+   Zephyr links its own libraries whole.
 
 A module calls the services and the platform, never the other way round
 (@ref architecture). If two modules need the same mechanism, it belongs in a
-service. @ref data_flow shows how the module's
-values and commands reach the ground once it is registered.
+service. @ref data_flow shows how the module's values and commands reach the
+ground.
 
 ### Check it
 
@@ -438,9 +436,8 @@ values and commands reach the ground once it is registered.
 ./k-fsw/tools/ci/unit.sh
 ```
 
-Then build the board you are targeting. A module that talks to hardware needs
-a bench test as well; @ref testing says how the existing fixtures are laid
-out.
+Then build the target board. A module that talks to hardware also needs a
+bench test; @ref testing describes the existing fixtures.
 
 ## Common problems
 
@@ -464,8 +461,7 @@ west manifest --validate
 west update
 ```
 
-Don't clone a branch into that directory by hand; west checks out the pinned
-revision.
+Do not clone a branch into that directory by hand.
 
 ### The MCU toolchain is not found
 
@@ -486,8 +482,8 @@ device open.
 ### A command is missing
 
 Commands depend on Kconfig. Check the target `.conf` and the generated
-`.config`. The FRDM and Pico profiles have no CSP, parameter, storage, UART or
-FTP commands.
+`.config`. The FRDM image has no CSP, parameter, storage, UART or FTP
+commands.
 
 ### Old state in storage
 
@@ -499,4 +495,4 @@ simulator's flash erase options.
 
 Read @ref architecture and @ref zephyr_integration before adding a service or
 target, @ref development before changing a dependency, and @ref commands for
-the shell. @ref cfs_concept_map maps K-FSW to cFS for readers who know it.
+the shell.

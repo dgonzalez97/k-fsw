@@ -68,8 +68,9 @@ of `node:table:offset` references, set with `hk define` or the `hk_define`
 command and saved with `CONFIG_KFSW_HK_PERSISTENCE`. The collector thread
 reads each reference through the PARAM service at the report's period, local
 or remote alike. `hk store` keeps the samples in a ring file in flash, so a
-pass can read what was collected while the node was out of contact. The ground pulls them from port 14. A report with a beacon
-interval is also sent unasked to port 15, where a ground listener picks it up.
+pass can read what was collected while the node was out of contact. The
+ground pulls them from port 14. A report with a beacon interval is also sent
+unasked to port 15.
 
 `tools/ground/hk-bridge.py` is the usual reader. It speaks CSP over KISS on a
 serial device, a Linux node's pseudo-terminal or the radio, requests samples
@@ -95,8 +96,9 @@ big-endian by the producer. It takes a spinlock for a few instructions, so an
 interrupt handler may call it. The ring is read with the `event_stats` and
 `event_tail` commands, locally or over port 11, and a gap in the sequence
 numbers says what was overwritten. The ring is lost at a reset. With
-`CONFIG_KFSW_JOURNAL`, the journal keeps boot reports and the events marked
-important in flash, and `journal remote` reads them over port 16.
+`CONFIG_KFSW_JOURNAL`, the journal keeps boot reports and events of
+`CONFIG_KFSW_JOURNAL_MIN_SEVERITY` and above (default 1, warning) in flash,
+from all ten event sources, and `journal remote` reads them over port 16.
 
 ## A log line
 
