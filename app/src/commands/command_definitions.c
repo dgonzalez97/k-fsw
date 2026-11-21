@@ -524,6 +524,7 @@ static const struct kfsw_command_definition app_commands[] = {
 	{
 		.id = KFSW_COMMAND_ID_HK_DEFINE,
 		.name = "hk_define",
+		.flags = KFSW_COMMAND_FLAG_MUTATING,
 		.help = "Name what a report collects: <report> \"[class=N] [node:]table:offset "
 			"...\".",
 		.arg_count = 2U,
@@ -533,6 +534,7 @@ static const struct kfsw_command_definition app_commands[] = {
 	{
 		.id = KFSW_COMMAND_ID_HK_PERIOD,
 		.name = "hk_period",
+		.flags = KFSW_COMMAND_FLAG_MUTATING,
 		.help = "Collect repeatedly: hk_period <report> <ms>, 0 to stop.",
 		.arg_count = 2U,
 		.arg_types = hk_period_args,
@@ -541,6 +543,7 @@ static const struct kfsw_command_definition app_commands[] = {
 	{
 		.id = KFSW_COMMAND_ID_HK_CLEAR,
 		.name = "hk_clear",
+		.flags = KFSW_COMMAND_FLAG_MUTATING,
 		.help = "Forget a report: hk_clear <report>.",
 		.arg_count = 1U,
 		.arg_types = hk_clear_args,
