@@ -75,12 +75,13 @@ reported and the compiled defaults stay.
 The parameter snapshot holds every parameter flagged persistent, across all
 tables, by name. Loading skips names it does not know and types that changed,
 so an image built later keeps the values it still understands. It is written
-by `param save` and read once, at startup.
+by `param save`, or on every accepted change while `param_autosave` is set, and
+read once, at startup.
 
 ## Logs and files
 
 The journal (`/kfsw/journal.bin`) is a ring written by its own thread. It keeps
-boot reports and important events, not every log line, and it accepts losing
+boot reports and events of warning severity and above, not log lines, and it accepts losing
 the newest queued record in a power cut. `hk store` keeps each report's
 samples in a ring file of fixed-size slots under `/kfsw/hk`, overwritten
 oldest first.

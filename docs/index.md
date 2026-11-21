@@ -1,10 +1,10 @@
 # K-FSW (KFSW) flight software manual {#k_fsw_manual}
 
-K-FSW, also written KFSW, is modular flight software on Zephyr for small
-satellites. It gives spacecraft components the common services a mission needs:
-a console, ground links, parameters, files, logs, events, commands,
-housekeeping, and firmware updates. Enable what an OBC, radio, ADCS, EPS,
-or payload needs, then write the mission-specific code.
+K-FSW, also written KFSW, is flight software for small-satellite nodes built
+on Zephyr. It provides a console, CSP links over UART/KISS and CAN,
+parameters, files, logs, events, commands, housekeeping and firmware updates.
+Each node, whether OBC, radio, ADCS, EPS or payload, enables the services it
+needs in Kconfig and adds its own modules.
 
 ## Start here
 
@@ -39,10 +39,10 @@ Zephyr provides the RTOS, device drivers, board support, Kconfig, devicetree,
 and build tools. Its native simulator runs the application on Linux, so
 service and link tests can run before hardware is available.
 
-K-FSW is not tied to one MCU vendor or board. A new Zephyr target supplies
-its hardware description and configuration. Modules and services can also
-be reused in another RTOS port, but their Zephyr kernel, driver, and
-filesystem calls need adapting. See @ref zephyr_integration.
+A new Zephyr target supplies its own hardware description and
+configuration; no service names a board. Porting to another RTOS means
+adapting the Zephyr kernel, driver and filesystem calls in each module and
+service. See @ref zephyr_integration.
 
 CSP is optional. Local parameters, persistence, logging and the shell work
 without it.
@@ -67,5 +67,6 @@ See @ref getting_started for workspace setup.
 - @ref testing covers software checks and hardware tests.
 - @ref project_status lists bench results and known limits.
 
-Linux and NUCLEO-L496ZG are the reference targets. FRDM-K64F and Pico W run
-shell-only profiles.
+Linux and NUCLEO-L496ZG are the reference targets. FRDM-K64F runs a
+shell-only image. Pico W builds with the core services, which have not been run
+on the board.

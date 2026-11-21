@@ -8,13 +8,10 @@ Zephyr supplies the RTOS kernel, drivers, board descriptions, shell,
 filesystems, and build tools used by K-FSW. Its native simulator runs the
 application on Linux for service and integration tests.
 
-Kconfig selects software; devicetree selects devices and wiring.
-This lets the same services run on different MCU vendors without embedding
-board names in service code.
-
-K-FSW currently uses Zephyr APIs directly. Reusing modules and services on
-another RTOS requires porting their kernel, device, storage, and build
-dependencies as well as the platform layer.
+Kconfig selects software; devicetree selects devices and wiring, so no
+service names a board. K-FSW calls Zephyr APIs directly: reusing a module or
+service on another RTOS means porting its kernel, device, storage and build
+dependencies, as well as the platform layer.
 
 ## Kernel use
 
@@ -46,11 +43,10 @@ See the [device model](https://docs.zephyrproject.org/4.4.0/kernel/drivers/index
 
 ## Kconfig
 
-Every service, every adapter and every limit is a Kconfig symbol, so a target is
-composed rather than written: the golden recovery image drops the shell and the
-file services by configuration alone, and the same tree still builds the full
-flight composition. Nothing is hidden in a script or a header, and the chooser
-below shows all of it as one tree.
+Every service, adapter and limit is a Kconfig symbol. The golden recovery
+image drops the shell and the file services by configuration alone
+(`config/profiles/nucleo-golden.conf`), from the same tree as the full
+composition.
 
 Configuration is combined at build time:
 
@@ -68,7 +64,7 @@ FTP needs CSP and storage.
 Inspect the generated result from the workspace root:
 
 ```bash
-rg '^CONFIG_KFSW_' build/linux/zephyr/.config
+grep '^CONFIG_KFSW_' build/linux/zephyr/.config
 ```
 
 Change the source `.conf` or Kconfig file and rebuild.
@@ -127,8 +123,8 @@ tried straight away, but a pristine build regenerates it from the `.conf` files
 and the choice is gone. `tools/build.sh` builds with `west build -p auto`, and
 `tools/golden.sh` and CI use `always`.
 
-So copy the file first, then compare afterwards. `diffconfig -m` prints the
-difference in `.conf` format:
+Copy the file first, then compare. `diffconfig -m` prints the difference in
+`.conf` format. Here, remote execution was turned on in a build without it:
 
 ```bash
 cp build/nucleo_l496zg/zephyr/.config /tmp/before
@@ -147,8 +143,8 @@ CONFIG_KFSW_REMEXEC_SERVER_STACK_SIZE=3072
 CONFIG_KFSW_REMEXEC_TIMEOUT_MS=5000
 ```
 
-Turning one option on brings its defaults with it. Paste only the lines that are
-a decision; the six defaults above belong in Kconfig, where they already are.
+Turning one option on brings its defaults with it. Keep only the lines that
+are a decision; the six defaults above are already in Kconfig.
 
 Then put the kept lines where that target or variant is composed: a board file
 such as `app/boards/nucleo_l496zg.conf` for everything that target always has,
@@ -168,8 +164,8 @@ KFSW_EXTRA_CONF_FILE="$PWD/k-fsw/config/profiles/nucleo-can.conf;$PWD/k-fsw/conf
 west build -t menuconfig -d build/nucleo_l496zg
 ```
 
-The comparison then shows what the layers already decided as well as what you
-changed, so check each line against the profiles before copying it anywhere.
+The comparison then shows what the profiles set as well as what you changed;
+check each line against the profiles before copying it.
 
 ## Devicetree
 

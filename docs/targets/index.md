@@ -5,38 +5,32 @@
 ## Supported targets
 
 A Zephyr board selects the SoC, devices and flash runner. A K-FSW target adds
-the application configuration and tool defaults under `config/targets/`; for
-example `rpi_pico_w` maps to `rpi_pico/rp2040/w`.
+the application configuration and tool defaults in `config/targets/<target>.env`;
+for example `rpi_pico_w` maps to `rpi_pico/rp2040/w`.
 
 | Target | Zephyr board | Default composition | Tested |
 | --- | --- | --- | --- |
-| `linux` | `native_sim/native/64` | Shell, storage, parameters, persistence, CSP UART/KISS, remote parameters, FTP | Software tests in CI |
-| `nucleo_l496zg` | `nucleo_l496zg` | Same as Linux; shell on ST-LINK, CSP on USART3 | CI build; boot, storage, UART/KISS, CSP, remote parameters and FTP on the bench |
-| `frdm_k64f` | `frdm_k64f/mk64f12` | Shell only; full support deferred to tag2.0 | Boot and shell on the board |
-| `rpi_pico_w` | `rpi_pico/rp2040/w` | Full service software composition; USB shell, UART0 CSP and persistent LittleFS | Recorded software build success; service HIL NOT RUN |
+| `linux` | `native_sim/native/64` | Full reference composition, including the journal, HK store, command retry and FWU | Software tests in CI |
+| `nucleo_l496zg` | `nucleo_l496zg` | Full MCU composition; shell on the ST-LINK, CSP on USART3 | CI build; boot, storage, UART/KISS, CSP, remote parameters and FTP on the bench |
+| `frdm_k64f` | `frdm_k64f/mk64f12` | Shell only until tag 2.0 | Boot and shell on the board |
+| `rpi_pico_w` | `rpi_pico/rp2040/w` | Core services; USB shell, UART0 CSP, persistent LittleFS | Software build only; service HIL not run |
 
-Only Linux and the NUCLEO are built in CI.
+The board files are `app/boards/<board>.conf` and `.overlay`. Only `linux` and
+`nucleo_l496zg` are built in CI.
 
 ### Required board transports
 
-Every supported hardware board must provide CSP over both CAN and UART/KISS.
-Board acceptance must check both links, including normal and Golden application
-images where provided. This requirement does not establish automatic route
-failover: each composition must define its routes explicitly.
+Every supported hardware board must carry CSP over both CAN and UART/KISS, and
+board acceptance checks both links on the normal image and, where there is
+one, the Golden image. Each composition defines its routes explicitly; there
+is no automatic failover.
 
-The table above describes current implementations. It does not establish that
-every target has completed this transport requirement.
-
-| Board | Current transport status | Remaining work |
+| Board | Transport status | Remaining work |
 | --- | --- | --- |
-| NUCLEO-L496ZG | UART/KISS in the board configuration; CAN added by the CAN profile. Prepared update images enable both. | Make dual-link support part of the standard board composition and acceptance matrix. |
-| NUCLEO-F746ZG | Prepared A and Golden images (`tools/f746-proof.sh`) use CAN1 PD0/PD1 at 500 kbit/s as the default bus and USART6 UART/KISS for node 1, with route `1 KISS,0/0 CAN`. CAN requires an external transceiver. | Verify both links physically on A and Golden. No observed hardware evidence yet. |
-| Pico W | UART/KISS configured; no CAN controller configured. | Select an external CAN controller with a Zephyr driver, define its wiring, check RAM use and test both links. |
-| FRDM-K64F | Current application is shell-only despite the board's CAN peripheral. | Include CAN and a dedicated UART/KISS link in the full-service work planned for 2.0. |
-
-The RP2040 has no built-in CAN controller. A CAN transceiver alone is not
-sufficient for Pico: the board also needs a CAN controller. Physical wiring and
-module selection must be recorded before hardware acceptance.
+| NUCLEO-L496ZG | UART/KISS in the board configuration; CAN from `nucleo-can.conf`. The update images enable both. | Make both links part of the standard composition and acceptance matrix. |
+| NUCLEO-F746ZG | The A and Golden images built by `tools/f746-proof.sh` use CAN1 PD0/PD1 at 500 kbit/s and UART/KISS on USART6, route `1 KISS,0/0 CAN`. CAN needs an external transceiver. | Verify both links on A and Golden. Not run on hardware. |
+| Pico W | UART/KISS only. The RP2040 has no CAN controller, so a transceiver alone is not enough. | Choose an external CAN controller with a Zephyr driver, record its wiring, check RAM and test both links. |
+| FRDM-K64F | Shell only, although the SoC has a CAN peripheral. | CAN and a UART/KISS link in the 2.0 work. |
 
 ## Identifying a unit
 
@@ -47,10 +41,8 @@ board target, so `csp ident` names the hardware too.
 
 ![A ground node reaching three boards over CAN and a UHF radio](../media/multi-board-can.gif)
 
-In this recording the FRDM and the Pico run bench configurations with CSP, on
-CAN and behind a UHF radio. The `frdm_k64f` and `rpi_pico_w` targets in the
-table now have different defaults: FRDM remains shell only, while Pico composes
-the services below. The recording does not verify the Pico default image.
+The FRDM and the Pico in this recording run bench configurations with CSP on
+CAN and behind a UHF radio, not their current default images.
 
 ## KFSW-Linux
 
@@ -80,9 +72,12 @@ Valgrind checks a normal boot and one with a corrupted snapshot.
 
 ## NUCLEO-L496ZG
 
-The NUCLEO build enables storage, local and remote parameters, persistence,
-CSP, UART/KISS and FTP. Flash is split into a 960 KiB application partition
-and a 64 KiB LittleFS partition.
+The NUCLEO image carries storage, local and remote parameters, persistence,
+CSP over UART/KISS, FTP, commands, events, housekeeping and beacons, log
+history and remote logs, last words, remote execution, file based operations,
+limits, the resource monitor, the ground watchdog, the hardware watchdog and
+health. Flash is split into a 960 KiB application partition and a 64 KiB
+LittleFS partition.
 
 | Connection | Hardware | Use |
 | --- | --- | --- |
@@ -109,19 +104,14 @@ The manual test is in `tests/hil/button-test/`.
 
 ### Wall clock
 
-`csp clock set <seconds>` sets the wall time. Without an RTC the time is kept
-in RAM and lost at reset, and samples collected after the reset have a zero
-timestamp.
+The default image keeps wall time in the RTC (`CONFIG_RTC` and the
+`kfsw,rtc` chosen node), and `csp clock set <seconds>` sets it. The RTC
+counter is not cleared by a reset. The board devicetree clocks the RTC from
+the LSI. In a composition without an RTC, setting and reading the wall clock
+returns `-ENOTSUP`.
 
-`config/profiles/nucleo-clock.conf` and `nucleo-clock.overlay` enable the RTC.
-It runs from the low-speed oscillator, keeps counting across resets and
-low-power states, and survives a power loss when VBAT is connected.
-
-```bash
-KFSW_EXTRA_CONF_FILE="$PWD/k-fsw/config/profiles/nucleo-clock.conf" \
-KFSW_EXTRA_DTC_OVERLAY_FILE="$PWD/k-fsw/config/profiles/nucleo-clock.overlay" \
-  ./k-fsw/tools/build.sh nucleo_l496zg
-```
+`config/profiles/nucleo-clock.conf` and `nucleo-clock.overlay` add Zephyr's
+counter and POSIX clock APIs on top; no test or tool uses them.
 
 ### Last words
 
@@ -143,64 +133,59 @@ KFSW_MCUBOOT_DTC_OVERLAY_FILE="$P/nucleo-mcuboot-flash.overlay" \
   ./k-fsw/tools/build.sh nucleo_l496zg
 ```
 
-The profiles are in
-[config/profiles](https://github.com/dgonzalez97/k-fsw/tree/main/config/profiles):
 `nucleo-mcuboot.conf` turns the bootloader on and the two overlays lay out the
 flash for it.
 
 | Partition | Address | Size |
 | --- | --- | --- |
-| `boot_partition` | `0x000000` | 64 KB |
-| `slot0_partition` | `0x010000` | 352 KB |
-| `slot1_partition` | `0x068000` | 352 KB |
+| `boot_partition` | `0x000000` | 64 KiB |
+| `slot0_partition` | `0x010000` | 352 KiB |
+| `slot1_partition` | `0x068000` | 352 KiB |
 | `kfsw_golden_partition` | `0x0C0000` | 188 KiB, recovery image |
-| `kfsw_boot_budget_partition` | `0x0EF000` | 4 KiB, early flash budget |
-| `kfsw_storage_partition` | `0x0F0000` | 64 KB |
+| `kfsw_boot_budget_partition` | `0x0EF000` | 4 KiB, early boot budget |
+| `kfsw_storage_partition` | `0x0F0000` | 64 KiB |
 
 The bootloader and the application use the same flash map overlay. The
 storage partition stays at `0xF0000`, so an existing filesystem survives the
 move to MCUboot; the rollback test checks that a stored value is still there
-after every swap. The golden partition holds the recovery image built by
-`tools/golden.sh`: the composition in `config/profiles/nucleo-golden.conf`, with
-CSP, parameters, the command server and both update routes and nothing else. It
-is signed and linked like any other image. The bootloader only boots the slots,
-so installing it means copying it into the secondary slot and swapping, which
-`golden_install` does on command and the boot service does on its own once
-`boot_attempts_left` reaches zero. The early flash record occupies 4 KiB at
-`0xEF000`; Golden now has 188 KiB.
+after every swap.
+
+The golden partition holds the recovery image built by `tools/golden.sh` from
+`config/profiles/nucleo-golden.conf`: CSP, parameters, the command server and
+both update routes, and nothing else. It is signed and linked like any other
+image. The bootloader only boots the slots, so installing it means copying it
+into the secondary slot and swapping. `golden_install` does that on command,
+and the boot service does it on its own once `boot_attempts_left` reaches zero.
 
 #### Signing
 
 The signing key is private and kept outside the repository. With
 `KFSW_MCUBOOT_KEY` the build puts its public key in the bootloader and signs
-the application. `tools/build.sh` refuses a sysbuild build without it. The
-development key from MCUboot's own repository, which anyone can sign with, is
-used only when `KFSW_MCUBOOT_KEY` names it, as CI does; the rollback test checks
-that a board built with the real key rejects an image signed with it.
+the application. `tools/build.sh` refuses a sysbuild build without it. MCUboot's
+development key, which anyone can sign with, is used only when
+`KFSW_MCUBOOT_KEY` names it, as CI does; the rollback test checks that a board
+built with the real key rejects an image signed with it.
 
 Bootloader settings go in `app/sysbuild.conf` as `SB_CONFIG_*` symbols.
 Sysbuild overrides settings placed in a fragment on the bootloader image.
 
 ### Watchdog
 
-The hardware watchdog is in the default image, with an 8000 ms timeout, armed at
-start. A watchdog that waits for a ground command does not cover a hang before
-the first pass, and the STM32 independent watchdog cannot be disarmed once
-started. The overlay binds it to `kfsw,watchdog`, because the board's
-`watchdog0` alias is the window watchdog, which resets when it is fed too early
-and has a much shorter timeout.
-The independent watchdog runs from the low-speed oscillator, goes up to about
-32 s and keeps running in most low-power states.
+The hardware watchdog is in the default image, with an 8000 ms timeout, armed
+at the top of `main()`, before the flash and filesystem work. Arming it at
+start covers a hang before the first ground contact, and the STM32 independent
+watchdog cannot be disarmed once started. The overlay binds it through
+`kfsw,watchdog`, because the board's `watchdog0` alias is the window watchdog,
+which resets when fed too early and has a much shorter timeout.
 
-The application arms it at the top of `main()`, before the flash and
-filesystem work. In the MCUboot profile the bootloader has already started the
-same watchdog with a 30 s timeout (`app/sysbuild/mcuboot.conf`), so a hang in
-driver initialisation, or an image that never reaches `main()`, still resets
-the board and an unconfirmed trial is reverted. `nucleo-mcuboot-flash.overlay`
+In the MCUboot profile the bootloader has already started the same watchdog
+with a 30 s timeout (`app/sysbuild/mcuboot.conf`), so a hang in driver
+initialisation, or an image that never reaches `main()`, still resets the
+board and an unconfirmed trial is reverted. `nucleo-mcuboot-flash.overlay`
 points the bootloader's `watchdog0` at the independent watchdog for this.
 Every application booted by this bootloader must arm and feed the watchdog
-within 30 s. That is the longest the independent watchdog can be set to: it
-counts a 12-bit reload at LSI/256, so it reaches 32.768 s and no more.
+within 30 s. That is close to the ceiling: the IWDG counts a 12-bit reload at
+LSI/256, so it reaches 32.768 s and no more.
 
 ### Build, flash and console
 
@@ -232,14 +217,14 @@ The boot test checks that the ST-LINK is there, builds, flashes, captures the
 console and waits for `@BOOT` and `@READY`. The UART/KISS test adds an FTDI
 cable and a KFSW-Linux peer, and checks ping, `comms uart test`, storage, a remote
 parameter, 4 KiB and 16 KiB transfers and the KISS counters; see
-@ref communications. The Holybro profile sets USART3 to 57600 baud for the
-radio.
+@ref communications. The radio bench profile, `nucleo-testbench.conf` and its
+overlay, sets USART3 to 57600 baud for the Holybro radio.
 
 ## FRDM-K64F
 
 The `frdm_k64f` target maps to `frdm_k64f/mk64f12` and uses the OpenSDA serial
 console and the OpenOCD runner. CSP, parameters, persistence, FTP, storage and
-the filesystem are disabled. Full FRDM service support is deferred to tag2.0.
+the filesystem are disabled until tag 2.0.
 
 ```bash
 ./k-fsw/tools/build.sh frdm_k64f
@@ -250,46 +235,44 @@ KFSW_SERIAL=/dev/serial/by-id/<frdm-console> \
 The test builds, flashes, waits for `kfsw:~$` and runs `status`, `version` and
 `help`.
 
-## NUCLEO-F746ZG executable Golden prototype
+## NUCLEO-F746ZG Golden prototype
 
-The default F746 bench profile is unchanged. The opt-in phase 1 composition
-uses pinned MCUboot firmware-loader mode, with this erase-aligned map:
+The default F746 composition (`app/boards/nucleo_f746zg.conf`) is a second CSP
+node for the CAN bench, without storage. The opt-in recovery compositions use
+MCUboot's firmware loader mode with this map (`f746-recovery-flash.overlay`):
 
-| Region | Flash offset range, half open | Budget |
+| Region | Flash offset range, half open | Size |
 | --- | --- | --- |
 | MCUboot | `[0x00000, 0x10000)` | 64 KiB |
-| Permanent executable Golden | `[0x10000, 0x40000)` | 192 KiB |
-| Running A | `[0x40000, 0x80000)` | 256 KiB |
-| Reserved physical file region | `[0x80000, 0x100000)` | 512 KiB |
+| Permanent executable Golden (`image-1`) | `[0x10000, 0x40000)` | 192 KiB |
+| Running A (`image-0`) | `[0x40000, 0x80000)` | 256 KiB |
+| File region (`storage`) | `[0x80000, 0x100000)` | 512 KiB |
 
-Flash base is `0x08000000`. Golden links at its own recovery region, including
-its MCUboot header; A links at offset `0x40000`, including its header. MCUboot
-calls Golden the secondary image internally. This is permanent recovery code;
-there is no B update slot or previous-image rollback.
+Flash is mapped at `0x08000000`. Each image links at its own region, MCUboot
+header included. MCUboot calls Golden the secondary image internally, but
+there is no B update slot and no rollback to a previous A.
 
-`f746-uart.conf`, `f746-can.conf` and `f746-minimal.conf` compose A with both CSP links,
-PARAM and command/status. Golden adds `f746-golden.conf` and keeps CSP and PARAM
-status, with commands and shell disabled. Both use node 3, peer 1, route
-`1 KISS,0/0 CAN`: CAN is the default bus; UART/KISS uses PG14 TX/PG9 RX
-at 115200 8N1. USART3 is not the CSP transport.
-These are source compositions, not measured fit or reachability results.
+| Profile | Adds |
+| --- | --- |
+| `f746-uart.conf`, `f746-can.conf`, `f746-minimal.conf` | Image A: node 3, peer 1, both CSP links, PARAM and the command service, no shell, no storage |
+| `f746-golden.conf` | Golden on top of A's profiles: CSP and PARAM, commands and shell off |
+| `f746-golden-upload.conf` | The recovery writer: FWU lite over CSP writes A from Golden, with the command service back for the reboot |
+| `f746-zms-storage.conf` and `.overlay` | LittleFS over the ZMS disk in the file region, with parameter persistence and FTP, for image A |
 
-The storage adapter and recovery upload writer are **not delivered in phase 1**.
-The physical file region is only reserved; no filesystem, persistence, usable
-logical capacity or upload service is claimed. Existing L4 FWU and Golden paths
-remain unchanged and are disabled here. Redirecting that FWU implementation to
-A would reserve a 256 KiB erase/trailer region and could erase executing code.
+UART/KISS runs on USART6, PG14 TX and PG9 RX, at 115200 8N1; USART3 is the
+ST-LINK console. CAN is the default route.
 
-Pinned `boot/zephyr/firmware_loader.c` uses `BOOT_VALIDATE_SLOT0` for both
-primary and recovery signature validation. `f746-mcuboot.conf` enables that
-check on every boot, invalid-A fallback (`BOOT_FIRMWARE_LOADER_NO_APPLICATION`)
-and GPIO recovery entrance. `mcuboot-button0` aliases the board user button,
-PC13 active high. Pressing the user button at reset requests Golden. If Golden
-is invalid on forced entrance, the pinned implementation still tries A; if A
-and Golden are invalid it cannot select a valid image. A correctly signed A
-that hangs is not detected by this fallback policy.
+`f746-mcuboot.conf` validates both images on every boot
+(`BOOT_VALIDATE_SLOT0`, which the pinned `boot/zephyr/firmware_loader.c`
+applies to both), falls back to Golden when A is invalid
+(`BOOT_FIRMWARE_LOADER_NO_APPLICATION`) and enters Golden when the user button,
+PC13 active high, is held at reset (`mcuboot-button0`). If Golden is invalid on
+a forced entry, the bootloader still tries A. A correctly signed A that hangs
+is not detected by this policy. @ref firmware_update describes the upload into
+A.
 
-From this repository root, using an existing signing key:
+`tools/f746-proof.sh` builds A and Golden without the upload and storage
+profiles and checks them offline. From the `k-fsw` directory:
 
 ```bash
 # KFSW_MCUBOOT_KEY defaults to ~/.config/kfsw/mcuboot-signing-key.pem.
@@ -298,44 +281,39 @@ From this repository root, using an existing signing key:
 python3 tests/f746-proof-test.py
 ```
 
-`tools/ci/quality.sh` runs the synthetic `f746-proof-test.py` checks in the
-software sequence. `tools/ci/all.sh --suite board` also runs the real offline
-build and proof when `KFSW_MCUBOOT_KEY` explicitly names a readable file.
+The tool has no flash subcommand. The checker reads the generated devicetrees,
+Kconfig, ELF files and signed binaries. It checks the shared map, entry
+bounds, signed lengths and headers, compares the SHA-256 TLV (type `0x10`) with
+the hash of the MCUboot header and payload, verifies the ECDSA signatures
+against the generated public key, and rejects wrong modes, missing validation,
+overlap and oversized images. `check` needs Python's `cryptography` package and
+the pinned Zephyr devicetree sources; only use `edt.pickle` files generated
+locally.
 
-The tool has no flash subcommand. It uses `tools/build.sh` separately for A and
-Golden, with sysbuild firmware-updater mode and an MCUboot-only extra config.
-The checker reads generated devicetrees, Kconfig, ELF and signed binaries;
-checks the common map, entry bounds, complete signed lengths and headers.
-Its primary integrity check compares the SHA-256 TLV (type `0x10`) with the hash
-of the MCUboot header and payload. It also verifies existing ECDSA signatures
-against the generated MCUboot public key. It rejects wrong modes, missing
-validation, overlap and oversized artifacts.
-Only use trusted locally generated `edt.pickle` files. `check` needs Python's
-`cryptography` package and the pinned Zephyr devicetree Python sources.
+`tools/ci/golden.py`, part of `tools/ci/all.sh`, builds Golden with the upload
+profile and checks that it fits `slot1_partition`. `tools/ci/quality.sh` runs
+the synthetic `f746-proof-test.py` cases, and `tools/ci/all.sh --suite board`
+runs the real offline build when a signing key is readable. No test or tool
+builds the ZMS storage profile.
 
-Real F746 builds, signing and fit reports remain required. A successful offline
-proof does not establish boot execution. HIL is **NOT RUN**. Phase 2 still needs
-valid-A selection, invalid-A fallback, button entrance, invalid-Golden and
-wrong-key refusal evidence, then the platform storage adapter and recovery-only
-A writer in their owning repositories. Interrupted upload, bounded erase/write,
-filesystem durability and usable capacity need separate tests before physical
-power-cut trials. Do not enable the L4 swap path to supply those features.
+None of this has run on an F746. Before physical trials it still needs
+valid-A selection, invalid-A fallback, button entry, invalid-Golden and
+wrong-key refusal evidence, then interrupted upload, bounded erase and write,
+filesystem durability and usable capacity. Do not enable the L4 swap path on
+this map: its erase and trailer region would overlap the running A.
 
 ## Raspberry Pi Pico W
 
-The `rpi_pico_w` target maps to `rpi_pico/rp2040/w`. Its default is a full
-service software composition: local and CSP parameters, automatic parameter
-persistence, table files, FTP, command service with retry, events and persistent
-journal, HK collection, sample files and beacons, retained and remote logs,
-last words, allowlisted remexec, FBO and scheduling, limits, resource monitoring,
-ground watchdog, hardware watchdog and health supervision. These reuse the
-existing owners and application startup sequence. Beacons need a configured
-report interval before they transmit.
+The `rpi_pico_w` default image carries local and CSP parameters with
+persistence, table files, FTP, the command service with retry, events and the
+journal, HK collection, sample files and beacons, log history and remote logs,
+last words, remote execution, file based operations, limits, the resource
+monitor, the ground watchdog, the hardware watchdog and health. Beacons stay
+off until a report has an interval.
 
-The USB CDC ACM console and shell remain separate from CSP. The shell waits
-for DTR. UART0 uses the board's unchanged `uart0_default` pinctrl at 115200
-8N1, without flow control. Pico is CSP v2 node 3, with peer 1 and route
-`0/0 KISS`; other nodes on the bench must have distinct addresses and use v2.
+The USB CDC ACM console is separate from CSP, and the shell waits for DTR.
+UART0 uses the board's `uart0_default` pinctrl at 115200 8N1 without flow
+control. The Pico is CSP 2 node 3, with peer 1 and route `0/0 KISS`.
 
 | Connection | Pico W header | Peer connection |
 | --- | --- | --- |
@@ -344,99 +322,75 @@ for DTR. UART0 uses the board's unchanged `uart0_default` pinctrl at 115200
 | Common ground | GND, physical pin 3 | UART GND |
 | Debug shell | USB CDC ACM | Host USB terminal with DTR |
 
-### Flash and RAM contract
+### Flash and RAM
 
-The board has 2 MiB of external XIP flash, mapped at `0x10000000`. Partition
-offsets below are relative to that address; ranges are half open.
+The board has 2 MiB of external XIP flash at `0x10000000`. Offsets are
+relative to that address; ranges are half open.
 
 | Region | Offset range | Size |
 | --- | --- | --- |
-| Zephyr RP2040 boot2 | `[0x000000, 0x000100)` | 256 B |
+| RP2040 boot2 | `[0x000000, 0x000100)` | 256 B |
 | Application `code_partition` | `[0x000100, 0x1c0000)` | `0x1bff00` B (1,834,752 B) |
 | Persistent LittleFS | `[0x1c0000, 0x200000)` | 256 KiB |
 
-The overlay shrinks the existing board code partition and leaves boot2 intact.
-`CONFIG_USE_DT_CODE_PARTITION=y` makes Zephyr generate load offset `0x100` and
-load size `0x1bff00`; its linker limits the XIP application to that region.
-boot2 stays at `0x10000000`, code starts at `0x10000100`, and storage starts at
-`0x101c0000`. The storage partition is aligned to the 4096 B erase sectors.
-Zephyr's RP2040 flash driver uses the Pico SDK RAM/ROM flash routines and a
-256 B staging buffer while interrupts are locked. No filesystem is placed
-over the application or boot2. Flash stalls can delay UART reception and
-watchdog feeding; their effects under concurrent transfers and autosave need
-physical measurement.
+The overlay shrinks the board's code partition and leaves boot2 intact.
+`CONFIG_USE_DT_CODE_PARTITION=y` makes Zephyr link the application at offset
+`0x100` with a load size of `0x1bff00`. The storage partition is aligned to the
+4096 B erase sectors. Zephyr's RP2040 flash driver runs the Pico SDK flash
+routines with interrupts locked, so a flash write can delay UART reception
+and watchdog feeding; nobody has measured how much.
 
-The platform owns the mount at `/kfsw`: erased media is formatted on first
-mount, existing media is mounted without formatting, and non-erased corrupt
-media is refused. Parameter snapshots, journal, HK files and FTP share this
-finite volume. Free-space and full-volume refusals still apply; capacity is
-not a promise that every configured ring and upload can coexist.
+The platform mounts the volume at `/kfsw`: erased media is formatted on first
+mount, existing media is mounted as it is, and corrupt media that is not
+erased is refused. Parameter snapshots, the journal, HK files and FTP share
+the 256 KiB.
 
-The existing scratch mount `/kfsw/tmp` uses a separate 32 x 512 B RAM disk,
-formatted every boot. Its 16 KiB buffer is allocated by Zephyr in the normal
-SRAM region, so the linker counts it against the RP2040's 264 KiB (270,336 B)
-SRAM. It leaves at most 248 KiB (253,952 B) for all other static data, stacks,
-filesystem caches, driver state and heaps. Main stack is 2048 B, shell stack
-3072 B, and remexec adds another 3072 B shell stack plus its default 3072 B
-server stack. The libcsp startup heap reservation is 2048 B; CSP buffer,
-connection RX queue and QFIFO counts are each 32. Service stack and table
-capacities retain their defaults; they have not been reduced to fit.
+`/kfsw/tmp` is a 32 x 512 B RAM disk, formatted at every boot. Its 16 KiB
+comes out of the 264 KiB SRAM, which also holds the main stack (2048 B), the
+shell stack (3072 B), the second shell instance remote execution uses (3072 B)
+and its server stack (3072 B). Service stacks and table capacities keep their
+defaults. Static RAM is close to full in this composition: check the `RAM`
+line of the linker's memory report, and `ram_report`, before adding anything.
 
-Build acceptance must inspect `.config`, `zephyr.dts`, `linker.cmd`, the map
-and `ram_report` before accepting fit. Resource monitoring is enabled for later
-stack measurements. The latest verified prior report records 299,440 B flash
-and 263,776 B RAM,
-leaving 6,560 B static RAM headroom. This is a tight margin for that recorded
-composition, not a new measurement of the current tree. Reproduce the exact
-configuration and reports before using those figures for acceptance. Runtime
-stack margin and physical behavior remain unverified.
-
-The watchdog starts after service initialization with an 8000 ms timeout,
-500 ms health checks and a 4000 ms application deadline. This is below the
-RP2040 driver's approximately 8388 ms maximum after erratum RP2040-E1.
-The RP2040 RTC is selected for the existing CSP clock adapter; retention
-across resets and power loss is not claimed.
+The watchdog has an 8000 ms timeout and is armed at the top of `main()`, as on
+the NUCLEO; health checks every 500 ms with a 4000 ms application deadline.
+8000 ms is below the RP2040 driver's maximum of about 8388 ms after erratum
+RP2040-E1. The RP2040 RTC backs the CSP clock; whether it keeps time across a
+reset or power loss has not been checked.
 
 ### Scope and verification
 
-Full service composition does not mean parity with every optional profile.
-MCUboot, FWU, golden recovery and scrub are unsupported by this layout: no
-secondary, golden or bootloader partitions are reserved. They need a separate
-shared application/bootloader layout contract. The STM32 supply-voltage last
-words detector is unavailable on RP2040. CAN, radio crypto, Wi-Fi transport and
-example device modules are not composed. Float parameters are disabled as on
-the reference boards; the composed tables do not declare them.
+MCUboot, FWU, golden recovery and scrub are not available: the layout reserves
+no bootloader, secondary or golden partition. The STM32 supply-voltage last
+words detector does not exist on the RP2040. CAN, radio crypto, Wi-Fi and the
+example device modules are not composed. Float parameters are off, as on the
+reference boards.
 
-The delivered board configuration composes the services listed above. Prior
-software builds succeeded; this documentation update runs no new build.
-Earlier physical evidence covers USB shell bring-up only. Pico service HIL is
-**NOT RUN**. Before physical acceptance,
-verify USB shell and boot markers, storage write/reset/read, parameter
-save/reset/restore, bidirectional CSP ping and effective routes, remote PARAM,
-FTP integrity and full-volume refusal, HK/log reads, remexec allowlist refusal,
-FBO/limits actions and watchdog recovery. Record UART error/drop counters while
-flash is being written. A corrupt non-erased filesystem must remain unformatted.
+The only physical evidence is USB shell bring-up. The service composition has
+been built but not run on a Pico. Physical acceptance needs:
 
-From the isolated repository root, build and inspect the generated reports:
+1. USB shell and boot markers.
+2. Storage write, reset and read; parameter save, reset and restore.
+3. CSP ping in both directions and the effective routes; remote PARAM.
+4. FTP integrity and full-volume refusal; HK and log reads.
+5. Remote execution allowlist refusal; FBO and limits actions.
+6. Watchdog recovery.
+7. UART error and drop counters recorded while flash is being written.
+8. A corrupt, non-erased filesystem left unformatted.
+
+To build it with its reports, from the `k-fsw` directory:
 
 ```bash
-repo="$PWD"
-export KFSW_OUTPUT_ROOT="$repo/build/pico-services"
-KFSW_PRISTINE=always "$repo/tools/build.sh" linux
-KFSW_PRISTINE=always "$repo/tools/build.sh" rpi_pico_w
+export KFSW_OUTPUT_ROOT="$PWD/build/pico-services"
+KFSW_PRISTINE=always ./tools/build.sh rpi_pico_w
 west build -d "$KFSW_OUTPUT_ROOT/rpi_pico_w" -t ram_report
 west build -d "$KFSW_OUTPUT_ROOT/rpi_pico_w" -t rom_report
 ```
 
-Hosted storage, persistence, CSP, FTP, HK, remexec, FBO and limits regressions
-must use the Linux executable from that output root. Builds and hosted tests
-are not rerun by this documentation update; recorded Pico build success does
-not establish hosted regression or physical acceptance. Existing NUCLEO-only
-physical scripts retain
-their restrictions: Pico flash and USB console contracts have not been added
-to those service tests. `tests/hil/shell-smoke.sh rpi_pico_w` remains only a
-shell bring-up check, using the UF2 runner and a stable USB serial identity;
-manual UF2 installation can use its existing `KFSW_FLASH=0` path.
+`tests/hil/shell-smoke.sh rpi_pico_w` checks shell bring-up only, through the
+UF2 runner and a stable USB serial path; with `KFSW_FLASH=0` it skips flashing
+for a UF2 copied by hand. The NUCLEO service tests have no Pico flash or USB
+console support.
 
 ## Shell test and target files
 
@@ -457,15 +411,13 @@ differently.
 
 ## Adding a target
 
-A new target needs:
-
-1. a Zephyr board, upstream or in the project;
-2. `config/targets/<name>.env` with the board and tool settings;
-3. `app/boards/<board>.conf` with the default composition;
-4. an overlay if K-FSW has to choose a UART, storage partition or console;
-5. a clean build;
-6. software tests for any new shared code; and
-7. a hardware test for the services it enables.
+1. Use a Zephyr board, upstream or in the project.
+2. Add `config/targets/<name>.env` with the board and tool settings.
+3. Add `app/boards/<board>.conf` with the default composition.
+4. Add an overlay if K-FSW has to choose a UART, storage partition or console.
+5. Build it from clean.
+6. Add software tests for any new shared code.
+7. Add a hardware test for the services it enables.
 
 Moving the NUCLEO configuration to another board also means checking the
 storage layout, UART wiring, flash runner, console and memory sizes.

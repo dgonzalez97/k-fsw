@@ -2,12 +2,11 @@
 
 [TOC]
 
-Fault handling in K-FSW is not one service. Each mechanism watches one thing
-and does one thing when it goes wrong, and most of them do no more than tell
-the ground. The ones that act have a fixed order: report, then a command the
-operator wrote in advance, then a reset, and after enough unexplained resets,
-the recovery image. This page puts them on one page; @ref services has each
-one in detail.
+K-FSW has no single fault service. Each mechanism watches one thing and does
+one thing when it goes wrong, and most only tell the ground. The ones that act
+escalate in a fixed order: report, then a command the operator wrote in
+advance, then a reset, and after enough unexplained resets, the recovery
+image. @ref services describes each one.
 
 ```mermaid
 flowchart TD
@@ -26,6 +25,7 @@ flowchart TD
     GOLDEN["Golden installed"]
 
     MONITORS --> EVENT
+    LIMITS --> EVENT
     LIMITS --> ACTION
     HEALTH --> NOTE
     HEALTH -- "stops feeding" --> IWDG
@@ -53,8 +53,9 @@ publish.
 
 Limits (`KFSW_LIMITS`) watch numeric parameters. A rule names a parameter, a
 comparison, a bound, how many consecutive sweeps it must hold, and a command
-to release. The command goes through the file based operations scheduler, so
-the release is logged and can address another node. This is where a mission
+to release. A rule that fires records a `limits` event, and the command goes
+through the file based operations scheduler, so the release is logged and can
+address another node. This is where a mission
 writes its local recovery: switch off a load, change a mode, restart a
 subsystem. The rule file is uploaded like any other file, and nothing in the
 image has to change.
@@ -110,8 +111,8 @@ record once at its own startup, which is the retry for an install-time refill
 that failed.
 @ref firmware_update has the sequence.
 
-The persistent journal (`KFSW_JOURNAL`) keeps boot reports and important
-events in flash, and the trial diagnostics in `/kfsw/boot-trial.dat` count
+The persistent journal (`KFSW_JOURNAL`) keeps boot reports and events of
+warning severity and above in flash, and the trial diagnostics in `/kfsw/boot-trial.dat` count
 the unconfirmed boots of the running image. A ground station reads both at
 the next pass to learn what happened while nobody was listening.
 

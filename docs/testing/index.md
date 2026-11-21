@@ -8,78 +8,23 @@ Run the checks that cover the change. From the workspace root:
 ./k-fsw/tools/ci/integration.sh
 ```
 
-Before a commit, run `./k-fsw/tools/ci/all.sh` from the workspace root.
-It defaults to `--suite software` and runs the software sequence, including
-FWU recovery guards and restart after Twister in `unit.sh`, and the synthetic
-F746 proof tests in `quality.sh`.
+Before a commit, run `./k-fsw/tools/ci/all.sh`. It defaults to
+`--suite software`: the Zephyr patch check, the manifest, the CI builds, the
+ICD check, the golden recovery builds (`golden.py`), then `quality.sh`,
+`unit.sh`, `coverage.sh`, `integration.sh`, `csp-v1.sh`, `valgrind.sh`,
+`robot.sh` and `docs.sh`.
 
-Before a tag, prepare the bench and run:
+| Stage | Also runs |
+| --- | --- |
+| `quality.sh` | `tests/build-options-test.sh` and `tests/ci-suite-test.py` (the build and CI scripts against stubs), the synthetic F746 proof tests, ruff, clang-format, the description and health slot checks, cppcheck |
+| `unit.sh` | Twister on both native widths over `tests/unit` and `kfsw-modules/tests`, then the FWU recovery guard and restart check |
 
-```bash
-./k-fsw/tools/ci/all.sh --suite board
-```
-
-This runs the software sequence first, then `tools/ci/board.sh`. The board
-stage can also run on its own. It selects Robot's `board`, `board-uart`,
-`board-can` and `radio` shapes with their existing tags and preflights, then
-runs the standalone watchdog, health, MCUboot rollback, Golden recovery,
-CAN limit and FRDM shell checks. Radio firmware update is already in Robot.
-These checks reflash boards, rewrite firmware slots or Golden, and reset
-nodes. Back up the bench first. Radio update takes tens of minutes; CAN
-acceptance adds a one-hour soak when enabled.
-
-Every unavailable case prints NOT RUN with its reason. The final board result
-names skipped shapes and individual Robot cases. Missing hardware and
-all-skipped shapes are never PASS. Missing hardware, case scripts or required
-tools do not fail the command; a case that executes and fails does. A zero exit with NOT RUN is incomplete
-bench coverage, and the tag notes must record it. Physical acceptance still
-needs human-observed evidence.
-
-CAN acceptance and encrypted radio run before the other cases overwrite their
-prepared baselines. For CAN acceptance, install and confirm the probes-enabled
-baseline described in `tests/hil/fwu/README.md`, set
-`KFSW_FWU_CAN_ACCEPTANCE_READY=1`, and supply `KFSW_FWU_CAN_GROUND`,
-`KFSW_FWU_CAN_IMAGE` and `KFSW_FWU_CAN_FLASH` (the ground flash containing
-`/candidate.bin`). The test resets interrupted secondary-slot erase/write.
-For encrypted radio, prepare the baseline in
-`tests/hil/radio-uhf/holybro/README.md`, set `KFSW_RADIO_CRYPTO_READY=1`, and
-supply `KFSW_RADIO_CRYPTO_GROUND` and `KFSW_RADIO_CRYPTO_KEY_FILE`.
-It leaves the encryption key configured. Both cases skip without those inputs.
-The usual preflight serial and CAN overrides still apply.
-
-The board stage also runs `tools/f746-proof.sh build` when the explicitly set
-`KFSW_MCUBOOT_KEY` names a readable file. Otherwise it prints NOT RUN. This is
-an offline build and artifact check, with no hardware IO. Button acceptance
-and the Pico shell smoke always print NOT RUN because they need a person;
-complete them separately in the bench gate in @ref development.
-
-Individual entry points also cover
-Robot, Valgrind, UBSan, coverage, @ref footprint, and Doxygen. Test output
-stays in the build directory.
-
-Read `all.sh`'s own exit status to tell whether it passed. Every stage prints
-`<STAGE> RESULT: PASS`, so a log with no `FAIL` and a tail that reaches
-`DOCS RESULT` is a good sign, but the exit status is the verdict. Doxygen writes
-its warnings to `build/docs/doxygen-warnings.log` rather than the console, with
-`WARN_AS_ERROR` set, so a failing documentation build prints nothing unusual and
-simply stops before its result line. When any stage fails, `set -Eeuo pipefail`
-ends the run there and the log stops mid-stage.
-
-`tools/ci/csp-v1.sh`, part of `all.sh`, repeats the CSP checks under CSP 1: the
-NUCLEO builds with and without CAN, an address CSP 1 cannot carry fails the
-build, the CSP and multi-KISS smokes pass, and a CSP 2 node gets no answer from
-a CSP 1 node. It also reuses the FWU lite and FTP update smokes under CSP 1,
-each with clean and lossy links: receiver CRC32 and byte count, 105 observed
-blocks for 20000 bytes, and retransmissions after loss. Robot's `fwu` suite
-has the same exchanges tagged `software` and `csp1`; its byte-count and CRC
-assertions check remote PARAM replies received by ground, not a local send
-message. Nodes 16 and 19 are legal under CSP 1 and stay unchanged; the fixtures
-use exact-node routes instead of `/14` (CSP 1 has only five address bits),
-and separate `-csp1` builds. These are software exchanges, not physical update
-or bootloader evidence. CSP 1 is a limited compatibility build option, less
-exercised than the default CSP 2. Unit suites that depend on the address width
-also have a
-`.csp1` scenario.
+The exit status of `all.sh` is the verdict. Every stage prints
+`<STAGE> RESULT: PASS`, and `set -Eeuo pipefail` stops the run at the first
+failure, so a log that ends mid-stage failed there. Doxygen writes its
+warnings to `build/docs/doxygen-warnings.log`, not the console, with
+`WARN_AS_ERROR` set: a failing documentation build stops before its result
+line with nothing unusual on screen.
 
 For a focused native suite:
 
@@ -89,8 +34,7 @@ For a focused native suite:
 
 ### Both native widths
 
-Twister runs `native_sim/native/64` and the 32-bit `native_sim/native`. A suite
-that builds on both is worth more than one that builds on either: the two
+Twister runs `native_sim/native/64` and the 32-bit `native_sim/native`. They
 differ in pointer width, type alignment and structure padding, which is where
 a vendored library's assumptions show up.
 
@@ -98,8 +42,7 @@ a vendored library's assumptions show up.
 derives the record stride from `__alignof__(param_t)` and asserts it is 8.
 `param_t` leads with a `uint64_t`, 8-aligned on x86-64 and 4-aligned under
 `-m32`, so the suite failed to compile on the 32-bit target until the fork
-pinned in `west.yml` set `_Alignas(8)` on that member. Anything else linking
-libparam on a 32-bit target depended on the same fix.
+pinned in `west.yml` set `_Alignas(8)` on that member.
 
 Run one suite on one width with `-p`:
 
@@ -107,11 +50,51 @@ Run one suite on one width with `-p`:
 ./k-fsw/tools/ci/unit.sh -s kfsw.services.param_replies -p native_sim/native
 ```
 
+### CSP 1
+
+`tools/ci/csp-v1.sh` repeats the CSP checks under CSP 1: the NUCLEO builds with
+and without CAN, an address CSP 1 cannot carry fails the build, the CSP and
+multi-KISS smokes pass, and a CSP 2 node gets no answer from a CSP 1 node. It
+also runs the FWU lite and FTP update smokes under CSP 1 on clean and lossy
+links, checking the receiver's CRC32 and byte count, 105 blocks for the
+20017-byte image, and retransmissions after loss. Robot's `fwu` suite has the
+same exchanges tagged `software` and `csp1`, checked on the remote PARAM
+replies the ground received. CSP 1 has five address bits, so the fixtures use
+exact-node routes instead of `/14`, and separate `-csp1` builds. Unit suites that depend on
+the address width have a `.csp1` scenario. CSP 1 is a compatibility option and
+gets less exercise than the default CSP 2.
+
+## Required evidence
+
+`tests/requirements/` maps a few requirements to named test cases.
+`software.json` selects two hosted Robot cases (boot and ready, parameters
+across a restart); `l496.json` selects two physical ones on the NUCLEO (boot
+and ready, the reset reason and log across a reset).
+`tools/ci/robot-counts.py` checks a Robot report against a selection: each
+selected case must appear exactly once, with PASS. The Robot CI job checks
+`software.json` after its scenarios run:
+
+```bash
+python3 k-fsw/tools/ci/robot-counts.py build/robot/software/output.xml \
+  --required k-fsw/tests/requirements/software.json
+```
+
+The board stage does not apply `l496.json`; check it by hand on the board
+report:
+
+```bash
+python3 k-fsw/tools/ci/robot-counts.py build/robot/board/board/output.xml \
+  --board --required k-fsw/tests/requirements/l496.json
+```
+
+The optional hash binding of a report to its image and `.config` is in
+`tests/requirements/image-binding.md`; CI does not use it.
+
 ## Analysis
 
-These stages are not part of `all.sh`; run them before a release or after a
-change that touches memory handling. Each prints `<STAGE> RESULT: PASS` or
-`FAIL` and keeps its output under `build/`.
+These stages are not part of `all.sh`. Run them before a release or after a
+change to memory handling. Each prints `<STAGE> RESULT: PASS` or `FAIL` and
+keeps its output under `build/`.
 
 | Stage | Finds | Time on a desktop |
 | --- | --- | --- |
@@ -135,8 +118,8 @@ board before it changes a flight image.
 
 ## Linux diagnostics
 
-The normal integration workflow includes the Python ground-tool tests and the
-HK capture/replay fixture. To include the optional CSP tools fork, from `k-fsw`:
+The integration stage includes the ground-tool tests and the HK capture and
+replay fixture. To add the optional CSP tools fork, from `k-fsw`:
 
 ```bash
 tools/kfsw-linux build
@@ -144,35 +127,34 @@ tools/kfsw-linux csp-tools build
 tools/kfsw-linux diagnostics ../build/diagnostics/run-1
 ```
 
-Use a new output directory. The fixture starts its own native node and keeps
-its console, flash file, captures and replay checks there. Focused tests are
-`tests/ground/` and Twister suite `kfsw.comms.ifstats`. Robot's `diagnostics`
-suite also has software cases and a physical case; the latter remains pending.
-See `tests/hil/diagnostics/README.md` for explicit bench inputs and side effects.
+The fixture starts its own native node and keeps its console, flash file and
+captures in the new output directory. Focused tests
+are `tests/ground/` and the Twister suite `kfsw.comms.ifstats`. Robot's
+`diagnostics` suite has software cases and one physical case, not yet run;
+`tests/hil/diagnostics/README.md` lists its bench inputs and side effects.
 
 ## Bench tests
 
-Physical tests are opt-in. Check the board, wiring, bitrate, and power before
-running a fixture; some fixtures flash or reboot the target.
+Physical tests are opt-in, and some flash or reboot the target. Check the
+board, wiring, bitrate and power first.
 
-Ask the bench what it can serve before flashing anything:
+1. Ask the bench what it can serve:
 
-```bash
-./k-fsw/tests/hil/preflight.sh
-```
+   ```bash
+   ./k-fsw/tests/hil/preflight.sh
+   ```
 
-It reports the debug UART, a second serial adapter, a radio port, a CAN
-interface that is up, and which of the six bench shapes can run. Then run one
-shape rather than every suite:
+   It reports the debug UART, a second serial adapter, a radio port, a CAN
+   interface that is up, and which of the six bench shapes can run.
+2. Run one shape:
 
-```bash
-./k-fsw/tests/hil/run.sh board
-```
+   ```bash
+   ./k-fsw/tests/hil/run.sh board
+   ```
 
 The shapes are `software`, `terminal`, `board`, `board-uart`, `board-can` and
-`radio`; `tests/README.md` says what each needs and covers. A shape that the
-bench cannot serve is refused with the reason, instead of starting and failing
-partway through.
+`radio`; `tests/README.md` says what each needs and covers. A shape the bench
+cannot serve is refused with the reason before it starts.
 
 | Check | Procedure |
 | --- | --- |
@@ -188,6 +170,44 @@ partway through.
 | Robot scenarios | `tests/hil/` |
 
 Keep the source commits, configuration, device identities, routes, interface
-counters, and console logs with each result. A build or native simulation does
-not establish physical timing or link behaviour. See @ref project_status for
-recorded coverage and @ref targets for the supported profiles.
+counters and console logs with each result. @ref project_status has the
+recorded coverage.
+
+### The board suite
+
+Before a tag, prepare and back up the bench, then run:
+
+```bash
+./k-fsw/tools/ci/all.sh --suite board
+```
+
+This runs the software sequence, then `tools/ci/board.sh`, which can also run
+on its own. In order, it runs:
+
+1. CAN acceptance, then encrypted radio, before the other cases overwrite
+   their baselines. Each skips without its inputs.
+2. Robot's `board`, `board-uart`, `board-can` and `radio` shapes.
+3. The standalone watchdog, health, MCUboot rollback, Golden recovery and CAN
+   limit checks (`tests/hil/limits/released-over-can.sh`).
+4. The FRDM shell check, when its probe and serial path are present.
+5. `tools/f746-proof.sh build`, an offline build and image check with no
+   hardware IO, when `KFSW_MCUBOOT_KEY` or
+   `~/.config/kfsw/mcuboot-signing-key.pem` is readable.
+
+These cases reflash boards, rewrite firmware slots and Golden, and reset
+nodes. Radio update takes tens of minutes; CAN acceptance adds an hour. Button acceptance and the Pico shell smoke always print NOT RUN because
+they need a person; run them separately (@ref development).
+
+| Case | Prepare | Supply |
+| --- | --- | --- |
+| CAN acceptance | Install and confirm the probes-enabled baseline in `tests/hil/fwu/README.md`; set `KFSW_FWU_CAN_ACCEPTANCE_READY=1` | `KFSW_FWU_CAN_GROUND`, `KFSW_FWU_CAN_IMAGE`, `KFSW_FWU_CAN_FLASH` (the ground flash holding `/candidate.bin`) |
+| Encrypted radio | Prepare the baseline in `tests/hil/radio-uhf/holybro/README.md`; set `KFSW_RADIO_CRYPTO_READY=1` | `KFSW_RADIO_CRYPTO_GROUND`, `KFSW_RADIO_CRYPTO_KEY_FILE` |
+
+CAN acceptance resets interrupted secondary-slot erases and writes. Encrypted
+radio leaves its key configured. The usual preflight serial and CAN overrides
+apply.
+
+A case that cannot run prints NOT RUN with its reason, and the final line
+names the skipped shapes and cases. Missing hardware, scripts or tools do not
+fail the command; a case that runs and fails does. Record every NOT RUN in the
+tag notes.
