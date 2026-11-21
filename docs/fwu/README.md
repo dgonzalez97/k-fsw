@@ -13,7 +13,9 @@ monitoring stops feeding it.
 On the NUCLEO swap profile the flash holds three images. Slot 0 is the one
 that runs. Slot 1 receives an upload and, after a swap, keeps the image that
 ran before it. The Golden partition holds the recovery image as data; MCUboot
-never boots it from there. @ref targets has the addresses.
+never boots it from there, and nothing on the node writes it. It is flashed
+once per board with `tools/golden.sh flash`, which @ref development covers,
+and every runtime path only reads it. @ref targets has the addresses.
 
 The state that matters is the state of the image in slot 0:
 

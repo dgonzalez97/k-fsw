@@ -8,7 +8,7 @@ Health answers "is this component still reporting on time", not "is this unit
 fit to use". It does not switch to a spare or degrade instead of resetting;
 `limits` and the command registry do that, as the last section shows.
 
-![What takes part](../media/health-shape.svg)
+![What takes part](media/health-shape.svg)
 
 ## Where it runs
 
@@ -112,7 +112,7 @@ service and a slot, so `> 0` is the comparison for a `limits` rule.
 
 ## What happens when a component goes overdue
 
-![One component stops reporting](../media/health-overdue.svg)
+![One component stops reporting](media/health-overdue.svg)
 
 At its next check, health takes the first component past its deadline, sets
 `health_state` to faulted, names it in `health_faulted_by` and stops feeding

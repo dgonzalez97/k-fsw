@@ -39,7 +39,7 @@ Every target reports its chip's unique ID: as `unit=` in the boot marker, in
 STM32L496, 128 on the Kinetis K64 and 64 on the RP2040. The CSP model is the
 board target, so `csp ident` names the hardware too.
 
-![A ground node reaching three boards over CAN and a UHF radio](../media/multi-board-can.gif)
+![A ground node reaching three boards over CAN and a UHF radio](media/multi-board-can.gif)
 
 The FRDM and the Pico in this recording run bench configurations with CSP on
 CAN and behind a UHF radio, not their current default images.

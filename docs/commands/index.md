@@ -689,9 +689,26 @@ the ground bridge.
 | `golden install` | `[node] <pin>` | Install the recovery image and restart |
 | `golden attempts` | `[count]` | Read or set the startups left before recovery |
 
+`fwu_lite` needs `CONFIG_KFSW_FWU_LITE_CSP`. `fwu_lite send` reports how many
+blocks had to be resent. Check link counters if retries increase. A transfer
+that stops part way continues from where it left off rather than starting
+again, which is why `validate` is a separate step.
+
 After a transfer, check `swap_scheduled` in `fwu status`. If it is not set,
 MCUboot has nothing to swap and boots the old image. @ref firmware_update has
 the procedures.
+
+## Recovery image
+
+```text
+golden status              whether the golden partition holds an image
+golden install [node] <pin>  install it and restart
+golden attempts [count]    startups left before recovery, or set the budget
+```
+
+`install` takes a confirmation pin, so a mistyped command cannot replace the
+running image. `attempts` without a count reads the budget; with one it writes
+it, and the value is persisted. @ref fault_recovery has what spends an attempt.
 
 ## Watchdog and health
 

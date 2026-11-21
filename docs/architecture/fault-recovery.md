@@ -104,6 +104,22 @@ bootloader has had the chance to revert an unconfirmed update. A run that
 stays healthy for `CONFIG_KFSW_BOOT_BUDGET_STABLE_S` refills the count, so
 only startups that never became stable add up.
 
+A refused Golden ends the chain. The install checks the recovery image's own
+SHA-256 before it erases the secondary slot, so a damaged one is refused with
+the slot untouched; `tests/unit/services_golden` covers that case as
+`test_damaged_image_refused_before_the_slot_erase`. The node then keeps running
+the image that was failing to confirm, with no attempts left to spend and
+nothing further to try on its own.
+
+That is not a dead node. The flight image is still running and still
+commandable, so the ground can upload a new one and recover the node over the
+link. What the ground cannot repair is the golden partition itself. Nothing in
+the node ever writes it: the service only reads it, to check its digest, to
+copy it into the secondary slot, and for the scrub to compare a CRC32. It is
+written by a programmer, through `tools/golden.sh flash`, and by nothing else.
+So a damaged recovery image stays damaged until the board is in front of
+someone, and the scrub is how an operator learns that before it matters.
+
 Neither of those mechanisms exists in the recovery image: `KFSW_BOOT_BUDGET`
 depends on `!KFSW_GOLDEN_IMAGE`, so Golden compiles neither the spend at
 startup nor the stable-run refill. Golden spends no attempts and refills the
