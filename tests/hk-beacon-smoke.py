@@ -10,16 +10,20 @@ import time
 
 import serial
 
-from firmware_fixture import NativeNode, packets
+from firmware_fixture import NativeNode, packets, wire
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--executable', default=str(Path(os.environ.get(
         'KFSW_OUTPUT_ROOT', Path(__file__).resolve().parents[2] / 'build')) / 'linux/zephyr/zephyr.exe'))
+    parser.add_argument('--csp-version', type=int, choices=(1, 2), default=2)
     args = parser.parse_args()
+    wire.csp_version = args.csp_version
     with tempfile.TemporaryDirectory(prefix='kfsw-hk-beacon-') as directory:
         with NativeNode(args.executable, Path(directory) / 'node') as node:
+            node.command('csp info', f'protocol: CSP v{args.csp_version}')
+            print(f'  [ok]   protocol: CSP v{args.csp_version}')
             node.command('hk define 0 24:8 24:12', 'report 0')
             node.command('hk period 0 1000', 'report 0 every 1000 ms')
             time.sleep(2)

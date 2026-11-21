@@ -11,3 +11,16 @@ tests:
       - native_sim/native/64
     integration_platforms:
       - native_sim/native/64
+  kfsw.comms.uart_duplicate_name.csp1:
+    tags:
+      - unit
+      - comms
+      - csp
+      - uart
+      - routing
+    platform_allow:
+      - native_sim/native/64
+    integration_platforms:
+      - native_sim/native/64
+    extra_configs:
+      - CONFIG_KFSW_CSP_VERSION_1=y

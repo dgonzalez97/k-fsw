@@ -7,6 +7,8 @@ KGROUND_REPO_DIR="$(dirname "$KGROUND_TESTS_DIR")"
 KGROUND_WORKSPACE_ROOT="$(dirname "$KGROUND_REPO_DIR")"
 KGROUND_BUILD_ROOT="${KGROUND_BUILD_ROOT:-${KFSW_OUTPUT_ROOT:-$KGROUND_WORKSPACE_ROOT/build}/k-ground}"
 
+source "$KGROUND_TESTS_DIR/csp-version.sh"
+
 mode="smoke"
 if [[ "${1:-}" == "--terminal" ]]; then
 	mode="terminal"
@@ -76,31 +78,41 @@ cp "$KGROUND_REPO_DIR/ground-station/nodes/kfsw-gnd-uhf.env" \
 	"$station_dir/nodes/kfsw-gnd-uhf.env"
 cp "$KGROUND_REPO_DIR/ground-station/nodes/kfsw-ops.env" \
 	"$station_dir/nodes/kfsw-ops.env"
-printf '%s\n' "KFSW_CSP_ROUTES='19/14 KISS'" \
+printf '%s\n' "KFSW_CSP_ROUTES='19 KISS'" \
 	>>"$station_dir/nodes/kfsw-gnd-uhf.env"
+
+for node_file in kfsw-gnd-uhf kfsw-ops; do
+	printf '%s\n' "KFSW_CSP_VERSION=$csp_version" >>"$station_dir/nodes/$node_file.env"
+done
 
 KGROUND_STATION_DIR="$station_dir" \
 	"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-gnd-uhf
 KGROUND_STATION_DIR="$station_dir" \
 	"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-ops
 
-node16_executable="$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16/zephyr/zephyr.exe"
-node19_executable="$KGROUND_BUILD_ROOT/kfsw-ops-node-19/zephyr/zephyr.exe"
+node16_executable="$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16$csp_suffix/zephyr/zephyr.exe"
+node19_executable="$KGROUND_BUILD_ROOT/kfsw-ops-node-19$csp_suffix/zephyr/zephyr.exe"
 [[ -x "$node16_executable" ]] || fail "node 16 executable is missing"
 [[ -x "$node19_executable" ]] || fail "node 19 executable is missing"
 grep -Fq 'CONFIG_KFSW_RADIO_UHF_HOLYBRO=y' \
-	"$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16/zephyr/.config" || \
+	"$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16$csp_suffix/zephyr/.config" || \
 	fail "node 16 did not compose the Holybro UHF module"
-grep -Fq 'CONFIG_KFSW_CSP_ROUTE_TABLE="19/14 KISS"' \
-	"$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16/zephyr/.config" || \
+grep -Fq 'CONFIG_KFSW_CSP_ROUTE_TABLE="19 KISS"' \
+	"$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16$csp_suffix/zephyr/.config" || \
 	fail "node 16 did not compose its configured CSP route table"
 grep -Fq '# CONFIG_KFSW_RADIO_UHF is not set' \
-	"$KGROUND_BUILD_ROOT/kfsw-ops-node-19/zephyr/.config" || \
+	"$KGROUND_BUILD_ROOT/kfsw-ops-node-19$csp_suffix/zephyr/.config" || \
 	fail "node 19 unexpectedly has the UHF radio module"
 for symbol in KFSW_FWU_LITE KFSW_FWU_LITE_CSP KFSW_FWU_LITE_HOST_FILES; do
 	grep -Fxq "CONFIG_$symbol=y" \
-		"$KGROUND_BUILD_ROOT/kfsw-ops-node-19/zephyr/.config" || \
+		"$KGROUND_BUILD_ROOT/kfsw-ops-node-19$csp_suffix/zephyr/.config" || \
 		fail "node 19 did not enable $symbol"
+done
+
+for node_config in kfsw-gnd-uhf-node-16 kfsw-ops-node-19; do
+	grep -Fxq "CONFIG_KFSW_CSP_VERSION_$csp_version=y" \
+		"$KGROUND_BUILD_ROOT/$node_config$csp_suffix/zephyr/.config" || \
+		fail "$node_config did not select CSP v$csp_version"
 done
 
 mkfifo "$work_dir/node16.in" "$work_dir/node19.in"
@@ -178,8 +190,9 @@ node16_expected=(
 	"Role: kfsw-gnd-uhf"
 	"Name: kfsw-gnd-uhf"
 	"CSP node: 16"
+	"protocol: CSP v$csp_version"
 	"hostname: kfsw-gnd-uhf"
-	"19/14 -> KISS direct"
+	"19/$csp_host_bits -> KISS direct"
 	"implementation: holybro-sik"
 	"expected serial: 57600 8N1"
 	"RF link: unknown"
@@ -192,6 +205,7 @@ node19_expected=(
 	"Role: kfsw-ops"
 	"Name: kfsw-ops"
 	"CSP node: 19"
+	"protocol: CSP v$csp_version"
 	"hostname: kfsw-ops"
 	"kfsw-ops# "
 )
