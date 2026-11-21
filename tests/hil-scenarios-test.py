@@ -358,8 +358,11 @@ class CanQueue(unittest.TestCase):
             flash.touch()
             arguments = ["can-acceptance.py", "--ground", "ground", "--image", "image",
                          "--flash", str(flash), "--serial", "/dev/serial/by-id/fixture",
-                         "--output", str(root / "output")]
+                         "--seconds", "0", "--interruptions", "--output", str(root / "output")]
+            # Input validation has its own tests; this one is about the CAN check's place.
             with mock.patch.object(sys, "argv", arguments), \
+                    mock.patch.object(acceptance, "prepare_inputs",
+                                      return_value=({"ground.exe": b""}, {})), \
                     mock.patch.object(acceptance.bench, "can_state", return_value=self.state), \
                     mock.patch.object(acceptance.serial, "Serial") as serial, \
                     mock.patch.object(acceptance.subprocess, "Popen") as process, \
