@@ -19,5 +19,5 @@ set(CSP_USE_PROMISC OFF CACHE BOOL "" FORCE)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(kfsw_comms_csp_tests LANGUAGES C)
 
-target_sources(app PRIVATE src/main.c)
+target_sources(app PRIVATE src/main.c src/can_rx.c)
 target_link_libraries(app PRIVATE kfsw::comms)
