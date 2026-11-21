@@ -346,6 +346,107 @@ Set `KFSW_CSP_VERSION=1` to repeat with CSP v1. Lite loss tests drop BEGIN and
 final-block replies; contact tests interrupt three contacts while the receiver
 stays running. These software checks provide no physical boot evidence.
 
+## Returning from Golden over CAN {#firmware_golden_return}
+
+A node that is running Golden stays on the recovery image until an application
+is installed again. These steps do that over CAN from a ground node. The reboot
+and swap times were measured on a NUCLEO-L496ZG on 20 November 2026, with CAN at
+1 Mbit/s and CSP v1. The upload was measured there on 21 November at 500 kbit/s,
+in one pass with no block resent.
+
+The host CAN interface needs a transmit queue of 1000 frames. With the default
+of 10, sends fail with ENOBUFS and the upload stops:
+
+```bash
+sudo ip link set can0 txqueuelen 1000
+```
+
+1. Check which image the node runs:
+
+   ```text
+   log remote <node>
+   ```
+
+   The newest `@BOOT` line shows `image=golden`.
+
+2. Upload the application image. The path is read on the ground node's host, so
+   it must be absolute, and the ground node needs
+   `CONFIG_KFSW_FWU_LITE_HOST_FILES`. The image is
+   `build/<target>/app/zephyr/zephyr.signed.bin`.
+
+   ```text
+   fwu_lite send <node> /absolute/path/to/zephyr.signed.bin
+   ```
+
+   A complete upload prints `Upload complete; no validation or activation
+   requested; <n> block(s) resent`, then the status lines, then
+   `Run: fwu_lite validate <node>`. If it stops, the command prints
+   `Upload stopped` and `Receiver progress retained`. Repeat the same command
+   with the same image to resume.
+
+3. Check the bytes stored in the node:
+
+   ```text
+   fwu_lite validate <node>
+   ```
+
+   The output is `Stored image verified; activation not requested`, then status
+   lines that include `state: verified`.
+
+4. Schedule the swap:
+
+   ```text
+   fwu_lite flash <node>
+   ```
+
+   The output is `Node <node> image ready; swap scheduled: yes`, then
+   `No reset requested; check target boot behavior before resetting`. This
+   command does not reset the node.
+
+5. Reset the node:
+
+   ```text
+   csp reboot <node> <pin>
+   ```
+
+   The reply is `rebooting in 500 ms`. The node does not restart at once: it
+   waits for its watchdog, about 20 s on the bench, and then MCUboot takes about
+   40 s to swap the slots and start the application as a trial. Allow about a
+   minute in total. `<pin>` is the node's reboot pin; the compiled default is
+   `0000`.
+
+   Keep the bus quiet until the node answers again. On 20 November the ground
+   polled housekeeping five times a second during the slower trial start. The
+   node ran out of CSP buffers within about six seconds and panicked.
+
+6. Wait for the application to start:
+
+   ```text
+   log remote <node>
+   ```
+
+   Repeat until the newest `@BOOT` line shows `image=application`. If it still
+   shows `image=golden` after the wait in step 5, the application has not
+   started. Do not go on to step 7. Read the log for the cause, then repeat from
+   step 4.
+
+7. Confirm the application:
+
+   ```text
+   param set <node> boot_confirmed 1
+   param get <node> boot_attempts
+   ```
+
+   The set command prints the stored value. `boot_attempts` reads 0 once the
+   confirmation is written. Check the node's health before this step, as in the
+   Boot, check, confirm section above. `boot_confirmed` cannot be cleared once
+   it is set.
+
+If step 7 is skipped, the application stays on trial until the next reset. Any
+reset, including a watchdog reset or a commanded reboot, makes MCUboot swap the
+previous image back. The node then runs Golden again. Check it with step 1 and
+repeat from step 2.
+
 ## Related
 
 - @ref targets has the flash map and MCUboot configuration.

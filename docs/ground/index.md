@@ -521,7 +521,8 @@ needs Rust.
 under Running above, give a gateway and an operator shell joined by a local
 link. Everything an operator does to a flight node is typed in the `kfsw-ops`
 shell with the node number first: `param get 2 boot_image`, `event tail 2 0`,
-`hk define 2 0 ...`, `ftp put 2 ...`, `csp reboot 2 <pin>`.
+`hk define 2 0 ...`, `ftp put 2 ...`, `csp reboot 2 <pin>`. A node left on
+Golden goes back to the application with the steps in @ref firmware_golden_return.
 
 ### A pass
 
