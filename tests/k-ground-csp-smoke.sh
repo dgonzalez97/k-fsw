@@ -97,6 +97,11 @@ grep -Fq 'CONFIG_KFSW_CSP_ROUTE_TABLE="19/14 KISS"' \
 grep -Fq '# CONFIG_KFSW_RADIO_UHF is not set' \
 	"$KGROUND_BUILD_ROOT/kfsw-ops-node-19/zephyr/.config" || \
 	fail "node 19 unexpectedly has the UHF radio module"
+for symbol in KFSW_FWU_LITE KFSW_FWU_LITE_CSP KFSW_FWU_LITE_HOST_FILES; do
+	grep -Fxq "CONFIG_$symbol=y" \
+		"$KGROUND_BUILD_ROOT/kfsw-ops-node-19/zephyr/.config" || \
+		fail "node 19 did not enable $symbol"
+done
 
 mkfifo "$work_dir/node16.in" "$work_dir/node19.in"
 exec 3<>"$work_dir/node16.in"
@@ -150,12 +155,14 @@ fi
 
 printf '%s\n' 'status' 'version' 'comms uhf status' 'csp info' 'csp routes' \
 	'csp ping 19' >&3
-printf '%s\n' 'status' 'version' 'csp info' 'csp ping 16' >&4
+printf '%s\n' 'status' 'version' 'csp info' 'csp ping 16' 'fwu_lite status' >&4
 
 wait_for_output "$work_dir/node16.log" "CSP ping 19: success" \
 	"$node16_pid" || fail "node 16 could not ping node 19"
 wait_for_output "$work_dir/node19.log" "CSP ping 16: success" \
 	"$node19_pid" || fail "node 19 could not ping node 16"
+wait_for_output "$work_dir/node19.log" "state: idle" "$node19_pid" || \
+	fail "node 19 did not expose FWU lite status"
 
 # The ops node feeds the gateway's ground watchdog; it cannot feed its own.
 printf '%s\n' 'gndwdt feed 16' 'gndwdt show 16' 'gndwdt feed 19' >&4
@@ -201,4 +208,5 @@ done
 cat "$work_dir/node16.log"
 cat "$work_dir/node19.log"
 echo "node 19 UHF module: absent"
+echo "node 19 fwu_lite: present"
 echo "K-GROUND CSP RESULT: PASS"

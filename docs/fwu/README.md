@@ -277,9 +277,9 @@ Its protocol is independent of the underlying CSP interface: the effective CSP
 route selects CAN or UART/KISS. I2C requires a working CSP interface in the
 communications layer; this update does not add one or automatic link switching.
 
-On the Linux sending node, builds with `CONFIG_KFSW_FWU_LITE_HOST_FILES` can read
-an absolute host path outside `/kfsw/`. Put the generated test artifact at the
-project checkout root, keeping it out of Git:
+Nodes built with `tools/k-ground` enable `CONFIG_KFSW_FWU_LITE_HOST_FILES` by
+default and can read an absolute host path outside `/kfsw/`. Put the generated
+test artifact at the project checkout root, keeping it out of Git:
 
 ```bash
 cp /absolute/path/to/build/app/zephyr/zephyr.signed.bin ./firmware.bin

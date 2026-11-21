@@ -119,6 +119,10 @@ without it the node keeps `0/0 KISS` from `config/profiles/k-ground.conf`.
 `KFSW_EXTRA_KCONFIG` and `KFSW_EXTRA_OVERLAY` add Kconfig lines and a devicetree overlay, which is how
 `kfsw-gnd-can` enables CAN. `KFSW_RADIO_UHF=holybro` selects the radio module.
 
+Ground nodes include FWU lite and host-file reading by default. From `kfsw-ops`,
+`fwu_lite send <node> /absolute/host/path` sends an image without extra Kconfig.
+See @ref firmware_update for validation and activation.
+
 To copy the reference configuration into your workspace:
 
 ```bash
