@@ -148,25 +148,49 @@ for shape in board board-uart board-can radio; do
 	fi
 done
 
-for case_name in watchdog health mcuboot golden-recovery limits-can; do
+# The Golden order is not arbitrary. golden-hang-confirmed ends with the board
+# running Golden and no flight image, and golden-corrupt is the one that flashes
+# the flight image itself, so it is what brings the board back. A case inserted
+# between those two starts from Golden instead of from where it expects to be.
+for case_name in watchdog health mcuboot golden-auto golden-hang-trial \
+	golden-hang-confirmed golden-corrupt golden-recovery limits-can can-mesh; do
 	shape=board
-	[[ "$case_name" == golden-recovery || "$case_name" == limits-can ]] && shape=board-can
+	case "$case_name" in
+	golden-recovery | limits-can | can-mesh) shape=board-can ;;
+	esac
 	gate "$case_name" "$shape" || continue
+	args=()
 	case "$case_name" in
 	watchdog) script="$hil/watchdog/watchdog-reset.sh" ;;
 	health) script="$hil/health/health-reset.sh" ;;
 	mcuboot)
 		key_gate "$case_name" || continue
 		script="$hil/mcuboot/rollback.sh" ;;
+	golden-auto)
+		key_gate "$case_name" || continue
+		script="$hil/golden-auto-smoke.sh" ;;
+	golden-hang-trial)
+		key_gate "$case_name" || continue
+		script="$hil/golden-hang-smoke.sh"
+		args=(trial) ;;
+	golden-hang-confirmed)
+		key_gate "$case_name" || continue
+		script="$hil/golden-hang-smoke.sh"
+		args=(confirmed) ;;
+	golden-corrupt)
+		key_gate "$case_name" || continue
+		script="$hil/golden-corrupt-smoke.sh" ;;
 	golden-recovery)
 		key_gate "$case_name" || continue
 		script="$hil/golden-recovery-smoke.sh" ;;
 	limits-can) script="$hil/limits/released-over-can.sh" ;;
+	can-mesh) script="$hil/can-mesh-smoke.sh" ;;
 	esac
 	tools=(openocd python3)
 	[[ "$shape" == board-can ]] && tools+=(ip)
 	need "$case_name" "$script" "${tools[@]}" || continue
-	run_case "$case_name" 'reflashes L496 firmware; MCUboot and Golden cases rewrite bootloader or recovery slots' "$script"
+	run_case "$case_name" 'reflashes L496 firmware; MCUboot and Golden cases rewrite bootloader or recovery slots' \
+		"$script" ${args[@]+"${args[@]}"}
 done
 
 frdm_usb="$(sed -n 's/^KFSW_USB_FLASH_ID=//p' "$KFSW_REPO_DIR/config/targets/frdm_k64f.env")"

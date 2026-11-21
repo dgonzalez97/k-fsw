@@ -188,12 +188,18 @@ on its own. In order, it runs:
 1. CAN acceptance, then encrypted radio, before the other cases overwrite
    their baselines. Each skips without its inputs.
 2. Robot's `board`, `board-uart`, `board-can` and `radio` shapes.
-3. The standalone watchdog, health, MCUboot rollback, Golden recovery and CAN
-   limit checks (`tests/hil/limits/released-over-can.sh`).
+3. The standalone watchdog, health, MCUboot rollback, Golden automatic
+   install, Golden hang in its trial and confirmed forms, damaged Golden,
+   Golden recovery, CAN limit (`tests/hil/limits/released-over-can.sh`) and
+   CAN mesh checks.
 4. The FRDM shell check, when its probe and serial path are present.
 5. `tools/f746-proof.sh build`, an offline build and image check with no
    hardware IO, when `KFSW_MCUBOOT_KEY` or
    `~/.config/kfsw/mcuboot-signing-key.pem` is readable.
+
+The Golden cases run in a fixed order. `golden-hang-confirmed` ends with the
+board running Golden and no flight image, and `golden-corrupt` flashes the
+flight image back, so a case placed between them starts from Golden.
 
 These cases reflash boards, rewrite firmware slots and Golden, and reset
 nodes. Radio update takes tens of minutes; CAN acceptance adds an hour. Button acceptance and the Pico shell smoke always print NOT RUN because
