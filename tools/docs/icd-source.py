@@ -370,7 +370,8 @@ def main():
             " `Built when` column names the condition that has to hold for it to"
             " be in an image.",
             "",
-            "Mode letters: `r` read only, `rw` writable, `b` kept across a reset,"
+            "Mode letters: `r` read only, `w` writable, `p` kept across a reset,"
+            " `b` write applied at next boot (without `b`, applied immediately),"
             " `c` operator configuration, `i` system identity, `d` diagnostic,"
             " `o` owner persists it, `l` applied live, `n` local writes only.",
             "",
@@ -633,6 +634,10 @@ def collect_parameters(workspace):
                         break
                     fields = designators(inner)
                     if "name" in fields:
+                        if any(fields.get(callback, "NULL") not in ("NULL", "0")
+                               for callback in ("apply", "changed", "changed_text", "changed_data")):
+                            fields["flags"] = (fields.get("flags", "0")
+                                               + " | KFSW_PARAM_FLAG_LIVE")
                         fields["offset"] = offset_text(fields.get("offset"), numbers)
                         entries.append(fields)
                 arrays[(where, match.group(1))] = entries
@@ -658,7 +663,7 @@ def collect_parameters(workspace):
 
 FLAG_LETTERS = {
     "READ_ONLY": "r",
-    "PERSISTENT": "b",
+    "PERSISTENT": "p",
     "CONFIGURATION": "c",
     "SYSTEM_INFO": "i",
     "DEBUG": "d",
@@ -669,15 +674,16 @@ FLAG_LETTERS = {
 
 
 def flags_text(raw):
-    """The flags as letters, in the order FLAG_LETTERS declares them."""
+    """Shell write semantics followed by the additional metadata letters."""
     found = set(re.findall(r"KFSW_PARAM_FLAG_(\w+)", raw or ""))
-    if not found:
-        return "rw"
-    letters = [letter for name, letter in FLAG_LETTERS.items() if name in found]
+    text = "r" if "READ_ONLY" in found else "w"
+    if "PERSISTENT" in found:
+        text += "p"
+    if "READ_ONLY" not in found and "LIVE" not in found:
+        text += "b"
+    text += "".join(letter for name, letter in FLAG_LETTERS.items()
+                    if name in found and name not in ("READ_ONLY", "PERSISTENT"))
     unknown = sorted(found - set(FLAG_LETTERS))
-    text = "".join(letters)
-    if "r" not in text:
-        text = "rw" + text
     return text + ("+" + ",".join(unknown) if unknown else "")
 
 

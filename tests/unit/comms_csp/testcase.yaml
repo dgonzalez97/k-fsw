@@ -1,4 +1,6 @@
 ---
+common:
+  timeout: 60
 tests:
   kfsw.comms.csp_state:
     tags:

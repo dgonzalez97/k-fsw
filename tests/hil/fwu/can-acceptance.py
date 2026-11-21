@@ -138,8 +138,10 @@ def main():
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     shutil.copyfile(args.flash, output / "ground-flash.bin")
-    (output / "can-before.json").write_text(json.dumps(bench.can_state(args.interface), indent=2))
     try:
+        before = bench.can_state(args.interface)
+        bench.check_can(before, args.interface)
+        (output / "can-before.json").write_text(json.dumps(before, indent=2))
         with ExitStack() as stack:
             port = stack.enter_context(serial.Serial(args.serial, 115200, timeout=1, exclusive=True))
             board_log = stack.enter_context((output / "board.log").open("w"))

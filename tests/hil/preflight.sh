@@ -33,6 +33,8 @@ debug_is_reference=""
 found_second_serial=""
 found_radio=""
 found_can=""
+can_txqueuelen=0
+MIN_CAN_TXQUEUELEN=1000
 can_down=""
 serial_without_driver=""
 have_robot=""
@@ -231,7 +233,7 @@ shape_is_possible() {
 	# The F746 scenario skips itself when that board is absent, so the shape
 	# only needs the adapter the link runs on.
 	board-uart) [[ -n "$have_robot" && -n "$found_debug" && -n "$debug_is_reference" && -n "$found_ftdi" && ( -z "${KFSW_F746_DEBUG_SERIAL:-}" || -n "$found_f746_debug" ) ]] ;;
-	board-can) [[ -n "$have_robot" && -n "$found_debug" && -n "$debug_is_reference" && -n "$found_can" && "$found_can" != *virtual* ]] ;;
+	board-can) [[ -n "$have_robot" && -n "$found_debug" && -n "$debug_is_reference" && -n "$found_can" && "$found_can" != *virtual* && "$can_txqueuelen" -ge "$MIN_CAN_TXQUEUELEN" ]] ;;
 	radio) [[ -n "$have_robot" && -n "$found_debug" && -n "$debug_is_reference" && -n "$found_radio" ]] ;;
 	*) return 1 ;;
 	esac
@@ -263,9 +265,11 @@ missing_for() {
 		;;
 	board-can)
 		if [[ -n "$can_down" ]]; then
-			missing+=("$can_down brought up: sudo ip link set $can_down up type can bitrate 500000")
+			missing+=("$can_down brought up: sudo bash k-fsw/tests/hil/stm32/nucleo-l496zg/can-up.sh 500000 normal")
 		elif [[ -z "$found_can" || "$found_can" == *virtual* ]]; then
 			missing+=("a CAN interface with a board on it")
+		elif [[ "$can_txqueuelen" -lt "$MIN_CAN_TXQUEUELEN" ]]; then
+			missing+=("$found_can txqueuelen of at least $MIN_CAN_TXQUEUELEN: sudo bash k-fsw/tests/hil/stm32/nucleo-l496zg/can-up.sh 500000 normal (can0); for $found_can: sudo ip link set dev $found_can txqueuelen $MIN_CAN_TXQUEUELEN")
 		fi
 		;;
 	radio) [[ -z "$found_radio" ]] && missing+=("a live KFSW_RADIO_SERIAL character device assigned to a confirmed radio") ;;
@@ -355,6 +359,11 @@ iperf_tool="${KFSW_CSP_IPERF_TEST_BINARY:-$host_tools_dir/csp-iperf}"
 discover_serial
 discover_probe
 discover_can
+if [[ -n "$found_can" && "$found_can" != *virtual* ]]; then
+	can_txqueuelen="$(ip -details link show "$found_can" 2>/dev/null |
+		sed -n 's/.* qlen \([0-9][0-9]*\)\([[:space:]].*\)\?$/\1/p' || true)"
+	can_txqueuelen="${can_txqueuelen:-0}"
+fi
 discover_host
 
 # What a caller should export, so a fixture reaches the device that was found.

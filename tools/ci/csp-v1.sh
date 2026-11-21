@@ -34,6 +34,12 @@ fail()
 
 mkdir -p "$out_dir"
 
+echo "CSP V1: UART validation and HK persistence unit scenarios"
+KFSW_TWISTER_OUT_DIR="$out_dir/twister" "$KFSW_CI_DIR/unit.sh" \
+	-s kfsw.comms.uart_duplicate_name.csp1 -s kfsw.services.hk.persistence.csp1 \
+	>"$out_dir/unit.log" 2>&1 || fail "the unit scenarios failed, see $out_dir/unit.log"
+grep -q "UNIT RESULT: PASS" "$out_dir/unit.log" || fail "the unit scenarios did not finish"
+
 echo "CSP V1: NUCLEO, and NUCLEO with CAN"
 KFSW_BUILD_DIR="$out_dir/nucleo" KFSW_EXTRA_CONF_FILE="$profile" KFSW_PRISTINE=always \
 	"$KFSW_TOOLS_DIR/build.sh" nucleo_l496zg >"$out_dir/nucleo.log" 2>&1 ||
@@ -73,6 +79,30 @@ KFSW_CSP_VERSION=1 "$KFSW_REPO_DIR/tests/build-multi-kiss.sh" >"$out_dir/multi-k
 	fail "the multi-KISS nodes did not build, see $out_dir/multi-kiss-build.log"
 KFSW_CSP_VERSION=1 "$KFSW_REPO_DIR/tests/multi-kiss-smoke.sh" >"$out_dir/multi-kiss.log" 2>&1 ||
 	fail "the multi-KISS smoke failed, see $out_dir/multi-kiss.log"
+
+echo "CSP V1: ground CSP smoke"
+KFSW_CSP_VERSION=1 "$KFSW_REPO_DIR/tests/k-ground-csp-smoke.sh" >"$out_dir/k-ground-csp.log" 2>&1 ||
+	fail "the ground CSP smoke failed, see $out_dir/k-ground-csp.log"
+grep -q "K-GROUND CSP RESULT: PASS" "$out_dir/k-ground-csp.log" ||
+	fail "the ground CSP smoke did not finish"
+
+echo "CSP V1: ground FTP, clean, lossy and interrupted"
+for variant in clean lossy interrupted; do
+	options=()
+	[[ "$variant" == clean ]] || options+=("--$variant")
+	KFSW_CSP_VERSION=1 "$KFSW_REPO_DIR/tests/k-ground-ftp-smoke.sh" "${options[@]}" \
+		>"$out_dir/k-ground-ftp-$variant.log" 2>&1 ||
+		fail "the ground FTP $variant smoke failed, see $out_dir/k-ground-ftp-$variant.log"
+	grep -q "K-GROUND FTP RESULT: PASS" "$out_dir/k-ground-ftp-$variant.log" ||
+		fail "the ground FTP $variant smoke did not finish"
+done
+
+echo "CSP V1: HK beacon smoke"
+"$KFSW_REPO_DIR/tests/hk-beacon-smoke.sh" --csp-version 1 \
+	--executable "${KFSW_OUTPUT_ROOT:-$KFSW_ROOT/build}/linux-csp1/zephyr/zephyr.exe" \
+	>"$out_dir/hk-beacon.log" 2>&1 || fail "the HK beacon smoke failed, see $out_dir/hk-beacon.log"
+grep -q "HK BEACON SMOKE RESULT: PASS" "$out_dir/hk-beacon.log" ||
+	fail "the HK beacon smoke did not finish"
 
 echo "CSP V1: firmware update over FWU lite and FTP, clean and lossy"
 for route in lite ftp; do

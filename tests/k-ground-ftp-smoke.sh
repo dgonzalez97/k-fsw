@@ -16,6 +16,8 @@ KGROUND_REPO_DIR="$(dirname "$KGROUND_TESTS_DIR")"
 KGROUND_WORKSPACE_ROOT="$(dirname "$KGROUND_REPO_DIR")"
 KGROUND_BUILD_ROOT="${KGROUND_BUILD_ROOT:-${KFSW_OUTPUT_ROOT:-$KGROUND_WORKSPACE_ROOT/build}/k-ground}"
 
+source "$KGROUND_TESTS_DIR/csp-version.sh"
+
 lossy_link=0
 interrupted=0
 bytes=256
@@ -90,25 +92,32 @@ cp "$KGROUND_REPO_DIR/ground-station/nodes/kfsw-gnd-uhf.env" \
 	"$station_dir/nodes/kfsw-gnd-uhf.env"
 cp "$KGROUND_REPO_DIR/ground-station/nodes/kfsw-ops.env" \
 	"$station_dir/nodes/kfsw-ops.env"
-printf '%s\n' "KFSW_CSP_ROUTES='19/14 KISS'" \
+printf '%s\n' "KFSW_CSP_ROUTES='19 KISS'" \
 	>>"$station_dir/nodes/kfsw-gnd-uhf.env"
-printf '%s\n' "KFSW_CSP_ROUTES='16/14 KISS'" \
+printf '%s\n' "KFSW_CSP_ROUTES='16 KISS'" \
 	>>"$station_dir/nodes/kfsw-ops.env"
+
+for node_file in kfsw-gnd-uhf kfsw-ops; do
+	printf '%s\n' "KFSW_CSP_VERSION=$csp_version" >>"$station_dir/nodes/$node_file.env"
+done
 
 KGROUND_STATION_DIR="$station_dir" \
 	"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-gnd-uhf
 KGROUND_STATION_DIR="$station_dir" \
 	"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-ops
 
-node16_executable="$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16/zephyr/zephyr.exe"
-node19_executable="$KGROUND_BUILD_ROOT/kfsw-ops-node-19/zephyr/zephyr.exe"
+node16_executable="$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16$csp_suffix/zephyr/zephyr.exe"
+node19_executable="$KGROUND_BUILD_ROOT/kfsw-ops-node-19$csp_suffix/zephyr/zephyr.exe"
 [[ -x "$node16_executable" ]] || fail "node 16 executable is missing"
 [[ -x "$node19_executable" ]] || fail "node 19 executable is missing"
 
 for node_config in kfsw-gnd-uhf-node-16 kfsw-ops-node-19; do
 	grep -Fq 'CONFIG_KFSW_FTP=y' \
-		"$KGROUND_BUILD_ROOT/$node_config/zephyr/.config" || \
+		"$KGROUND_BUILD_ROOT/$node_config$csp_suffix/zephyr/.config" || \
 		fail "$node_config did not compose the file-transfer service"
+	grep -Fxq "CONFIG_KFSW_CSP_VERSION_$csp_version=y" \
+		"$KGROUND_BUILD_ROOT/$node_config$csp_suffix/zephyr/.config" || \
+		fail "$node_config did not select CSP v$csp_version"
 done
 
 mkfifo "$work_dir/node16.in" "$work_dir/node19.in"
@@ -145,7 +154,7 @@ if [[ "$interrupted" -eq 1 ]]; then
 	# Forward everything, then go deaf long enough for both ends to give up
 	# on the transfer. --cut-for must outlast the file transfer timeout.
 	python3 "$KGROUND_REPO_DIR/tests/support/lossy-link.py" \
-		--left "$node16_pty" --right "$node19_pty" \
+		--left "$node16_pty" --right "$node19_pty" --csp-version "$csp_version" \
 		--drop-every 1000000000 --drop-bytes 0 \
 		--cut-after-get-data 4 --cut-for 20 \
 		--ready-file "$work_dir/bridge.ready" \
@@ -156,7 +165,7 @@ if [[ "$interrupted" -eq 1 ]]; then
 elif [[ "$lossy_link" -eq 1 ]]; then
 	# Drop bytes in runs, like lost packets.
 	python3 "$KGROUND_REPO_DIR/tests/support/lossy-link.py" \
-		--left "$node16_pty" --right "$node19_pty" \
+		--left "$node16_pty" --right "$node19_pty" --csp-version "$csp_version" \
 		--drop-every 9000 --drop-bytes 6 \
 		--ftp-stats "$work_dir/ftp-stats.json" \
 		--ready-file "$work_dir/bridge.ready" \

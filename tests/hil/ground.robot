@@ -14,6 +14,7 @@ The Ground Pair Comes Up With Its Roles And Routes
     Should Contain    ${out}    implementation: holybro-sik
     Response Should Contain    ${out}    CSP node: 19
     Response Should Contain    ${out}    node 19 UHF module: absent
+    Response Should Contain    ${out}    node 19 fwu_lite: present
 
 Ground Watchdog Accepts A Peer And Refuses Itself
     [Documentation]    The hosted flight peer arms its watchdog; ground feeds it over PTY KISS.
