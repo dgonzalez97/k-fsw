@@ -38,7 +38,8 @@ A module defines one device or subsystem: its interface, state, parameters,
 and tests. The parameter core does not need to change.
 
 Examples in [`kfsw-modules`](https://github.com/dgonzalez97/kfsw-modules):
-a UHF radio, board buttons and LEDs, and an MCU temperature sensor.
+a UHF radio, board buttons and LEDs, an MCU temperature sensor, and
+`gpredict` pass tracking.
 
 ## Services
 

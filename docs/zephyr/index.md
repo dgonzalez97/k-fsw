@@ -193,6 +193,7 @@ and [overlay how-to](https://docs.zephyrproject.org/4.4.0/build/dts/howtos.html)
 | --- | --- |
 | `linux` | `native_sim/native/64` |
 | `nucleo_l496zg` | `nucleo_l496zg` |
+| `nucleo_f746zg` | `nucleo_f746zg` |
 | `frdm_k64f` | `frdm_k64f/mk64f12` |
 | `rpi_pico_w` | `rpi_pico/rp2040/w` |
 
