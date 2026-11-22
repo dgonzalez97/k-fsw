@@ -53,6 +53,7 @@ manual_sources=(
 	"$KFSW_REPO_DIR/docs/ground/index.md"
 	"$KFSW_REPO_DIR/docs/commands/index.md"
 	"$KFSW_REPO_DIR/docs/testing/index.md"
+	"$KFSW_REPO_DIR/docs/testing/64-bit-state.md"
 	"$KFSW_REPO_DIR/docs/development/index.md"
 	"$KFSW_REPO_DIR/docs/status/index.md"
 )

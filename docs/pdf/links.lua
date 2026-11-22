@@ -51,6 +51,20 @@ function Pandoc(document)
       local folder, anchor = link.target:match("([^/]+)/index%.md#?(.*)$")
       if folder and chapters[folder] then
         link.target = "#" .. folder .. (anchor ~= "" and "-" .. anchor or "")
+      else
+        -- A page beside this one: the scoped key is its path with "/" as "__".
+        local file, page_anchor = link.target:match("^([^/#]+%.md)#?(.*)$")
+        local page, matches = nil, 0
+        if file then
+          for key, value in pairs(identifiers) do
+            if key == file or key:sub(-(#file + 2)) == "__" .. file then
+              page, matches = value, matches + 1
+            end
+          end
+        end
+        if matches == 1 then
+          link.target = "#" .. page .. (page_anchor ~= "" and "-" .. page_anchor or "")
+        end
       end
     end
     return link
