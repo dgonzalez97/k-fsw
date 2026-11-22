@@ -77,12 +77,15 @@ def send_packet(port, source, destination, sport, dport, payload):
 
 def packets(port, seconds=2):
     reader = wire.KissReader()
+    header_bytes = wire.csp_header_bytes()
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
         for frame in reader.feed(port.read(max(1, port.in_waiting))):
+            if len(frame) < header_bytes + 8:
+                continue
             header = wire.parse_csp_header(frame)
-            data = frame[6:-8]
-            if frame[-4:] != wire.crc32(frame[6:-4]) or frame[-8:-4] != wire.crc32(data):
+            data = frame[header_bytes:-8]
+            if frame[-4:] != wire.crc32(frame[header_bytes:-4]) or frame[-8:-4] != wire.crc32(data):
                 continue
             yield header, data
 

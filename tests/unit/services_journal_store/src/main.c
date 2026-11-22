@@ -72,6 +72,54 @@ ZTEST(journal_store, test_restart_retains_boot_payload_and_times)
 	zassert_equal(record.sequence, 2);
 }
 
+ZTEST(journal_store, test_table_scrub_and_limits_sources_survive_reopen)
+{
+	static const enum kfsw_event_source sources[] = {
+		KFSW_EVENT_SOURCE_TABLE, KFSW_EVENT_SOURCE_SCRUB, KFSW_EVENT_SOURCE_LIMITS};
+	struct kfsw_journal_record record = {
+		.boot = 1U,
+		.event = {.severity = KFSW_EVENT_ERROR,
+			  .payload_size = 2U,
+			  .payload = {0xaa, 0xbb}},
+	};
+
+	for (size_t i = 0U; i < ARRAY_SIZE(sources); i++) {
+		record.sequence = 0U;
+		record.event.source = (uint16_t)sources[i];
+		record.event.id = (uint16_t)i;
+		zassert_ok(kfsw_journal_store_append(&store, &record));
+	}
+	zassert_ok(kfsw_journal_store_open(&store));
+	zassert_equal(store.held, ARRAY_SIZE(sources));
+	zassert_equal(store.corrupt, 0U);
+	for (size_t i = 0U; i < ARRAY_SIZE(sources); i++) {
+		zassert_ok(kfsw_journal_store_get(&store, (uint16_t)(ARRAY_SIZE(sources) - i - 1U),
+						  &record));
+		zassert_equal(record.event.source, sources[i]);
+		zassert_equal(record.event.id, i);
+		zassert_equal(record.event.payload_size, 2U);
+		zassert_mem_equal(record.event.payload, "\xaa\xbb", 2U);
+	}
+}
+
+ZTEST(journal_store, test_unknown_sources_are_corrupt_even_with_a_valid_crc)
+{
+	static const uint16_t invalid_sources[] = {0U, 11U, 200U};
+	struct kfsw_journal_record record = {
+		.boot = 1U,
+		.event = {.severity = KFSW_EVENT_ERROR},
+	};
+
+	for (size_t i = 0U; i < ARRAY_SIZE(invalid_sources); i++) {
+		record.sequence = 0U;
+		record.event.source = invalid_sources[i];
+		zassert_ok(kfsw_journal_store_append(&store, &record));
+	}
+	zassert_ok(kfsw_journal_store_open(&store));
+	zassert_equal(store.held, 0U);
+	zassert_equal(store.corrupt, ARRAY_SIZE(invalid_sources));
+}
+
 ZTEST(journal_store, test_rotation_stays_bounded_and_newest_first)
 {
 	struct fs_dirent info;

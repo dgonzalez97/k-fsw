@@ -40,7 +40,7 @@ second="${KFSW_CAN_SECOND_NODE:-3}"
 fail() { keep=1; echo "CAN MESH RESULT: FAIL - $*"; exit 1; }
 skip() { echo "CAN MESH RESULT: NOT RUN - $*"; exit 0; }
 
-probe() { ls "/dev/serial/by-id/"*"$1"*-if02 2>/dev/null | head -1; }
+probe() { ls "/dev/serial/by-id/"*"$1"*-if02 2>/dev/null | head -1 || true; }
 l4_probe="${KFSW_L496_STLINK:-0670FF3732504E3043093407}"
 f7_probe="${KFSW_F746_STLINK:-066BFF353056363043044156}"
 l4_console="$(probe "$l4_probe")"
@@ -55,6 +55,9 @@ state="$(ip -details link show "$interface" | awk '/can state/ {print $3; exit}'
 cd "$root"
 # shellcheck source=/dev/null
 [[ -f .venv/bin/activate ]] && . .venv/bin/activate
+python="$root/.venv/bin/python"
+[[ -x "$python" ]] || python=python3
+"$python" -c "import serial" 2>/dev/null || skip "no pyserial; install it in the workspace .venv"
 
 echo "CAN MESH: CSP $version on $interface at $bitrate bps, nodes $flight, $second and ground $ground"
 
@@ -97,7 +100,7 @@ sleep 3
 
 ping_from_board() # console, peer, label
 {
-	"$root/.venv/bin/python" - "$1" "$2" <<'PYTHON'
+	"$python" - "$1" "$2" <<'PYTHON'
 import sys, time
 import serial
 console, peer = sys.argv[1], sys.argv[2]

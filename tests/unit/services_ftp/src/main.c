@@ -139,6 +139,29 @@ ZTEST(services_ftp, test_read_only_status_survives_the_wire)
 	zassert_equal(kfsw_ftp_wire_status_to_errno(UINT8_MAX), -EIO);
 }
 
+ZTEST(services_ftp, test_remove_opcodes_round_trip)
+{
+	struct kfsw_ftp_message message = {.opcode = KFSW_FTP_OP_REMOVE_REQUEST};
+	struct kfsw_ftp_message decoded;
+	uint8_t encoded[KFSW_FTP_PROTOCOL_HEADER_SIZE];
+	size_t size;
+
+	zassert_equal(KFSW_FTP_OP_GET_RESULT, 15U);
+	zassert_equal(KFSW_FTP_OP_REMOVE_REQUEST, 16U);
+	zassert_equal(KFSW_FTP_OP_REMOVE_RESPONSE, 17U);
+	for (uint8_t opcode = KFSW_FTP_OP_REMOVE_REQUEST; opcode <= KFSW_FTP_OP_REMOVE_RESPONSE;
+	     opcode++) {
+		message.opcode = opcode;
+		zassert_ok(kfsw_ftp_protocol_encode(encoded, sizeof(encoded), &message, &size));
+		zassert_ok(kfsw_ftp_protocol_decode(encoded, size, &decoded));
+		zassert_equal(decoded.opcode, opcode);
+	}
+	message.opcode = KFSW_FTP_OP_REMOVE_RESPONSE + 1U;
+	zassert_equal(kfsw_ftp_protocol_encode(encoded, sizeof(encoded), &message, &size), -EINVAL);
+	encoded[1] = message.opcode;
+	zassert_equal(kfsw_ftp_protocol_decode(encoded, sizeof(encoded), &decoded), -ENOTSUP);
+}
+
 ZTEST(services_ftp, test_boot_paths_select_the_read_only_slot_mount)
 {
 	char resolved[KFSW_FTP_FULL_PATH_SIZE];
@@ -256,6 +279,98 @@ static uint16_t local_node(void)
 
 	kfsw_csp_get_info(&csp_info);
 	return csp_info.address;
+}
+
+ZTEST(services_ftp, test_local_remove_file_and_empty_directory)
+{
+	static const uint8_t contents[] = "remove me";
+	const uint16_t node = local_node();
+	struct fs_dirent entry;
+	struct kfsw_ftp_stats before;
+	struct kfsw_ftp_stats after;
+
+	zassert_ok(kfsw_ftp_get_stats(&before));
+	zassert_ok(kfsw_ftp_mkdir(node, "/remove-empty"));
+	write_file(KFSW_FTP_STORAGE_ROOT "/remove-empty/file", contents, sizeof(contents));
+	zassert_ok(kfsw_ftp_remove(node, "/remove-empty/file"));
+	zassert_equal(fs_stat(KFSW_FTP_STORAGE_ROOT "/remove-empty/file", &entry), -ENOENT);
+	zassert_ok(kfsw_ftp_remove(node, "/remove-empty"));
+	zassert_equal(fs_stat(KFSW_FTP_STORAGE_ROOT "/remove-empty", &entry), -ENOENT);
+	zassert_ok(kfsw_ftp_get_stats(&after));
+	zassert_equal(after.transfers, before.transfers);
+	zassert_equal(after.failures, before.failures);
+	zassert_equal(after.bytes, before.bytes);
+}
+
+ZTEST(services_ftp, test_local_remove_refuses_nonempty_directory)
+{
+	static const uint8_t contents[] = "keep me";
+	const uint16_t node = local_node();
+	struct fs_dirent entry;
+
+	zassert_ok(kfsw_ftp_mkdir(node, "/remove-full"));
+	write_file(KFSW_FTP_STORAGE_ROOT "/remove-full/file", contents, sizeof(contents));
+	zassert_equal(kfsw_ftp_remove(node, "/remove-full"), -ENOTEMPTY);
+	zassert_ok(fs_stat(KFSW_FTP_STORAGE_ROOT "/remove-full", &entry));
+	assert_file(KFSW_FTP_STORAGE_ROOT "/remove-full/file", contents, sizeof(contents));
+}
+
+ZTEST(services_ftp, test_local_remove_protects_readonly_paths_and_roots)
+{
+	static const uint8_t contents[] = "housekeeping";
+	const uint16_t node = local_node();
+	struct fs_dirent entry;
+	int result = fs_mkdir(KFSW_FTP_READONLY_ROOT);
+
+	zassert_true((result == 0) || (result == -EEXIST));
+	write_file(KFSW_FTP_READONLY_ROOT "/remove.bin", contents, sizeof(contents));
+	zassert_equal(kfsw_ftp_remove(node, "/hk/remove.bin"), -EROFS);
+	zassert_equal(kfsw_ftp_remove(node, "hk/remove.bin"), -EROFS);
+	zassert_equal(kfsw_ftp_remove(node, "/hk"), -EROFS);
+	zassert_equal(kfsw_ftp_remove(node, "/boot/file"), -EROFS);
+	assert_file(KFSW_FTP_READONLY_ROOT "/remove.bin", contents, sizeof(contents));
+	zassert_equal(kfsw_ftp_remove(node, NULL), -EINVAL);
+	zassert_equal(kfsw_ftp_remove(node, ""), -EINVAL);
+	zassert_equal(kfsw_ftp_remove(node, "/"), -EINVAL);
+	zassert_equal(kfsw_ftp_remove(node, "/tmp"), -EINVAL);
+	zassert_equal(kfsw_ftp_remove(node, "a/../b"), -EINVAL);
+	zassert_ok(fs_stat(KFSW_FTP_STORAGE_ROOT, &entry));
+	zassert_equal(entry.type, FS_DIR_ENTRY_DIR);
+	zassert_ok(fs_stat(KFSW_STORAGE_TMP_MOUNT_POINT, &entry));
+	zassert_equal(entry.type, FS_DIR_ENTRY_DIR);
+}
+
+ZTEST(services_ftp, test_local_remove_missing_path)
+{
+	zassert_equal(kfsw_ftp_remove(local_node(), "/remove-missing"), -ENOENT);
+}
+
+ZTEST(services_ftp, test_local_remove_recovers_free_bytes)
+{
+	static const uint8_t contents[16384] = {0x5a};
+	struct kfsw_storage_info before;
+	struct kfsw_storage_info written;
+	struct kfsw_storage_info removed;
+
+	zassert_ok(kfsw_storage_get_info(&before));
+	write_file(KFSW_FTP_STORAGE_ROOT "/remove-space", contents, sizeof(contents));
+	zassert_ok(kfsw_storage_get_info(&written));
+	zassert_true(written.free_bytes < before.free_bytes);
+	zassert_ok(kfsw_ftp_remove(local_node(), "/remove-space"));
+	zassert_ok(kfsw_storage_get_info(&removed));
+	zassert_true(removed.free_bytes >= written.free_bytes + sizeof(contents));
+	printk("Local remove recovered %llu free bytes\n",
+	       (unsigned long long)(removed.free_bytes - written.free_bytes));
+}
+
+ZTEST(services_ftp, test_local_remove_from_tmp)
+{
+	static const uint8_t contents[] = "scratch";
+	struct fs_dirent entry;
+
+	write_file(KFSW_STORAGE_TMP_MOUNT_POINT "/remove.bin", contents, sizeof(contents));
+	zassert_ok(kfsw_ftp_remove(local_node(), "/tmp/remove.bin"));
+	zassert_equal(fs_stat(KFSW_STORAGE_TMP_MOUNT_POINT "/remove.bin", &entry), -ENOENT);
 }
 
 ZTEST(services_ftp, test_local_node_requests_bypass_csp)

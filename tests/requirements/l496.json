@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "evidence_kind": "physical",
+  "required": [
+    {
+      "id": "startup.l496",
+      "suite": ["Hil", "Boot"],
+      "test": "NUCLEO Reports Boot And Ready",
+      "source": "tests/hil/boot.robot"
+    },
+    {
+      "id": "reset.retention.l496",
+      "suite": ["Hil", "Diagnostics-Reset"],
+      "test": "A Reset Leaves Its Reason And The Log Behind",
+      "source": "tests/hil/diagnostics-reset.robot"
+    }
+  ]
+}

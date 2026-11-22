@@ -19,6 +19,7 @@ ip -details link show "$interface" 2>/dev/null | grep -q 'can state ERROR-ACTIVE
 	skip "$interface is not an active physical CAN bus"
 python="$KFSW_ROOT/.venv/bin/python"
 [[ -x "$python" ]] || python=python3
+[[ -x "$python" ]] || python=python3
 exec "$python" "$here/can-acceptance.py" --ground "$KFSW_FWU_CAN_GROUND" \
 	--image "$KFSW_FWU_CAN_IMAGE" --flash "$KFSW_FWU_CAN_FLASH" \
 	--serial "$hil_board_debug" --interface "$interface" \

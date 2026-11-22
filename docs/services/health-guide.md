@@ -2,36 +2,44 @@
 
 Health watches the components that have to keep running, and it is the only
 thing that feeds the hardware watchdog. If a component stops reporting inside
-its deadline, health stops feeding, and the watchdog resets the node. That is
-the whole mechanism, and everything below is how to take part in it.
+its deadline, health stops feeding, and the watchdog resets the node.
 
-It is deliberately narrow. Health answers "is this component still reporting on
-time", not "is this unit fit to use". Nothing in it chooses between a working
-radio and a spare, and nothing in it decides to degrade instead of resetting.
-Those are jobs for `limits` and the command registry, and the last section shows
-how to reach them from here.
+Health answers "is this component still reporting on time", not "is this unit
+fit to use". It does not switch to a spare or degrade instead of resetting;
+`limits` and the command registry do that, as the last section shows.
 
-![What takes part](../media/health-shape.svg)
+![What takes part](media/health-shape.svg)
 
 ## Where it runs
 
-Health gates a hardware watchdog, so it is composed where there is one. The
-NUCLEO L496 image carries it; the hosted `linux` image does not, because
-native_sim has no independent watchdog to withhold. Reading `health status` on
-the hosted image therefore tells you nothing, and the suites that cover health
-run on `native_sim` with the service switched on explicitly.
+`CONFIG_KFSW_HEALTH` depends on `CONFIG_KFSW_WATCHDOG`. The NUCLEO L496 and
+Pico W images carry it, both checking every 500 ms. The hosted `linux` image
+has no hardware watchdog and no `health` command; the unit suites switch the
+service on explicitly on `native_sim`.
 
-| Option | What it sets |
-| --- | --- |
-| `CONFIG_KFSW_HEALTH` | the service itself |
-| `CONFIG_KFSW_HEALTH_MAX_COMPONENTS` | how many may register, 8 by default |
-| `CONFIG_KFSW_HEALTH_SLOTS` | publish each component in table 31 |
-| `CONFIG_KFSW_HEALTH_SLOTS_HEADER` | the header naming this composition's slots |
+| Option | Default | Effect |
+| --- | --- | --- |
+| `CONFIG_KFSW_HEALTH` | off | The service |
+| `CONFIG_KFSW_HEALTH_MAX_COMPONENTS` | 8 (1 to 32) | Components that may register |
+| `CONFIG_KFSW_HEALTH_INTERVAL_MS` | 1000 (50 to 60000) | How often deadlines are checked |
+| `CONFIG_KFSW_HEALTH_SLOTS` | on in the application | Publish each named component in table 31 |
+| `CONFIG_KFSW_HEALTH_SLOTS_HEADER` | `kfsw/app/health_slots.h` | The header naming this composition's slots |
 
-## Having a component watched
+`health_interval_ms` changes the check interval at run time and refuses a
+value slower than the watchdog feed interval.
 
-Two steps, and both are needed. First the component registers and then reports
-inside the deadline it asked for:
+## To have a component watched
+
+1. Register the component with `kfsw_health_register()`, giving a name of 15
+   characters or fewer and the deadline in milliseconds.
+2. Call `kfsw_health_report(handle)` from the component's own loop, inside
+   every deadline.
+3. Add the name to `app/include/kfsw/app/health_slots.h` with an index from 0
+   to 13 that no other slot has used.
+4. Run `tools/ci/quality.sh` and confirm the `HEALTH SLOTS` line names the
+   component.
+5. On the target, confirm `health list` shows the component and
+   `param get health_<name>_state` reads 0.
 
 ```c
 static uint8_t handle;
@@ -47,11 +55,8 @@ int start(void)
 }
 ```
 
-A component that registers and never reports is worse than one that never
-registers: it will withhold the feed and reset the node. Register at the point
-where you can promise the reporting.
-
-Second, the composition names it as a slot, so the ground can see it:
+A component that registers and never reports resets the node, so register
+only once the component can report.
 
 ```c
 /* app/include/kfsw/app/health_slots.h */
@@ -61,14 +66,15 @@ Second, the composition names it as a slot, so the ground can see it:
 	SLOT(myservice, 2)
 ```
 
-The index fixes the wire offsets, so it is never reused or renumbered. Removing
-a component leaves its index unused rather than shifting the ones after it.
+The index fixes the slot's offsets on the wire, so it is never reused or
+renumbered. Removing a component leaves its index unused. Table 31 holds at
+most 14 slots.
 
-The name appears twice, once in the registration and once in the slot list, and
-nothing in C ties them together. `tools/ci/health-slots.py` does, and it runs
-inside `quality.sh`: it refuses a slot nothing registers, a registration no slot
-names, and a duplicated index. A typo there would otherwise read as a component
-that died before it ever reported, for the life of the image.
+Nothing in C ties the registered name to the slot name.
+`tools/ci/health-slots.py`, run by `quality.sh`, reads the
+`kfsw_health_register()` calls under `app/src`, except the shell's, and refuses
+a slot nothing registers, a registration no slot names, and an index given
+twice.
 
 ## Reading it
 
@@ -81,73 +87,72 @@ health watch <name> <ms> watch a component nothing reports, for testing
 health report <handle>   report one alive by hand
 ```
 
-From the parameter table, which is what the ground and a `limits` rule see.
 Table 31 carries the service as a whole:
 
 | Parameter | Meaning |
 | --- | --- |
 | `health_state` | 0 ok, 1 faulted, 2 stopped |
-| `health_feeding` | whether health is the one feeding the watchdog |
-| `health_faults` | deadline faults since boot |
-| `health_feeds` | feeds issued since boot |
-| `health_faulted_by` | the component that caused the current fault |
-| `health_components` | how many are registered |
-| `health_interval_ms` | how often health checks |
+| `health_feeding` | Whether health is the one feeding the watchdog |
+| `health_faults` | Times the node went from ok to faulted since boot |
+| `health_feeds` | Watchdog feeds issued since boot; stops at 4294967295 |
+| `health_faulted_by` | The component holding the fault, or empty |
+| `health_components` | Components currently watched |
+| `health_interval_ms` | Check interval; writable, refused above the feed interval |
 
 and two parameters for each slot the composition names:
 
 | Parameter | Meaning |
 | --- | --- |
 | `health_<slot>_state` | 0 ok, 1 overdue, 2 absent |
-| `health_<slot>_since_ms` | milliseconds since its last report; `4294967295` when absent |
+| `health_<slot>_since_ms` | Milliseconds since its last report; `4294967295` when absent |
 
-`absent` means nothing of that name is registered in this image. It is not the
-same as a component that is late, and the two must not be read as one: a slot
-that reads absent on a build you expected to carry it means the registration is
-missing or misspelled, not that the component is unwell.
-
-Ok is zero for both the service and a slot, so `> 0` is the useful comparison.
+`absent` means no component of that name is registered: on a build expected
+to carry it, the registration is missing or misspelled. Ok is zero for both the
+service and a slot, so `> 0` is the comparison for a `limits` rule.
 
 ## What happens when a component goes overdue
 
-![One component stops reporting](../media/health-overdue.svg)
+![One component stops reporting](media/health-overdue.svg)
 
-Health notices at its next check, marks the slot overdue, sets the service
-faulted and names the component in `health_faulted_by`. From that moment it
-stops feeding the watchdog, and the watchdog runs down on its own. Nothing else
-intervenes: there is no retry, no attempt to restart the component, and no
-degraded mode. The node resets, and the boot afterwards reports
-`reset_cause=watchdog`, which is how an operator tells this reset from a
-commanded one.
+At its next check, health takes the first component past its deadline, sets
+`health_state` to faulted, names it in `health_faulted_by` and stops feeding
+the watchdog. It logs the fault once, emits `KFSW_EVENT_HEALTH_FAULT` with the
+name as payload, and writes a last-words note when `CONFIG_KFSW_LASTWORDS` is
+on.
 
-Two consequences worth holding on to. A single late component takes the whole
-node down, so a deadline should be generous enough to survive the worst sweep
-the component can have. And because the watchdog is the actuator, the margin
-between a missed deadline and the reset is the watchdog timeout, not something
-health chooses.
+Health does not restart the component. If the component reports again before
+the watchdog expires, the next check feeds again and withdraws the note.
+Otherwise the watchdog resets the node, and the next `@BOOT` line carries
+`reset_cause=watchdog`.
+
+One late component resets the whole node, so set each deadline to survive the
+component's worst cycle. The margin is the watchdog timeout, 8000 ms on the
+NUCLEO, less the time since the last feed.
 
 ## Reacting before the reset
 
 A `limits` rule can watch a slot and release a command before the watchdog
-finishes counting. Rules live in a text file under the FTP root, five
-whitespace-separated fields and then the action:
+expires. Rules live in a text file in the `limits` directory of the FTP root,
+`limits.txt` by default: five whitespace-separated fields, then the action.
+The action is a command from the command registry with its arguments, not a
+shell command; a file naming an unknown command is refused whole.
 
 ```text
 # parameter            cmp  bound  dwell  node  action
-health_csp_state       >    0      2      0     event stats
-health_app_since_ms    >    4000   1      0     log tail 20
+health_csp_state       >    0      2      0     event_stats
+health_app_since_ms    >    3000   1      0     event_tail 0
 ```
 
-`dwell` is how many consecutive checks the comparison must hold before the rule
-fires, which keeps one slow sweep from releasing anything. The rule fires once
-per crossing and re-arms when the comparison goes false again. The `node` column
-is where the action is released, so a rule on one node can act on another.
+`dwell` is how many consecutive sweeps the comparison must hold. A rule fires
+once per crossing and re-arms when the comparison is false again. The `node`
+column is where the action is released.
 
-This is the seam to use when a reset is too blunt an answer. Health will still
-withhold the feed on its own schedule; a rule only gives you something that
-happens first.
+Limits sweeps every 10000 ms by default, longer than the 8000 ms watchdog
+timeout on the NUCLEO. For a rule on a health slot to fire before the reset,
+set `limits_interval_ms` so that dwell times the interval is well below the
+watchdog timeout.
 
-## Proving it
+## Verification
 
 The unit suites cover the service and the slots on `native_sim`:
 
@@ -156,10 +161,8 @@ The unit suites cover the service and the slots on `native_sim`:
 ./k-fsw/tools/ci/unit.sh --test kfsw.services.health.parameters
 ```
 
-The second is the slots: a registered slot reads ok and its age advances, an
-overdue slot reads overdue, an unregistered slot reads absent, registration
-order does not decide which slot a component gets, and the aggregate parameters
-keep their offsets.
+The second covers the slots: ok, overdue and absent states, the age
+advancing, slots independent of registration order, and fixed offsets.
 
 On hardware, with a NUCLEO L496 on its ST-LINK:
 
@@ -168,10 +171,8 @@ KFSW_DEBUG_SERIAL=/dev/serial/by-id/usb-...-if02 \
   ./k-fsw/tests/hil/health/health-reset.sh
 ```
 
-That one is the mechanism end to end: the board stays up past three watchdog
-timeouts while healthy, both slots read ok, the age is sampled rather than
-constant, a component that stops reporting resets the board, the next boot names
-the watchdog, and the slots read ok again afterwards. It also checks that a
-component registered at run time creates no parameter, because the slots are
-compiled and a table that grew at run time would break the document and the wire
-offsets with it.
+The script checks that the board stays up past three watchdog timeouts while
+healthy, both slots read ok and their age changes, a component that stops
+reporting resets the board, the next boot names the watchdog, and the slots
+read ok afterwards. It also checks that a component registered at run time
+creates no parameter, since a table that grew would move the wire offsets.

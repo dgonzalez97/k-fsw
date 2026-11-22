@@ -2,7 +2,7 @@
 
 Every shell command, remote command and parameter the sources define. Read from the sources and not from a running image, so an interface a particular configuration switches off is still described. The `Built when` column names the condition that has to hold for it to be in an image.
 
-Mode letters: `r` read only, `rw` writable, `b` kept across a reset, `c` operator configuration, `i` system identity, `d` diagnostic, `o` owner persists it, `l` applied live, `n` local writes only.
+Mode letters: `r` read only, `w` writable, `p` kept across a reset, `b` write applied at next boot (without `b`, applied immediately), `c` operator configuration, `i` system identity, `d` diagnostic, `o` owner persists it, `l` applied live, `n` local writes only.
 
 ## Shell commands
 
@@ -59,6 +59,7 @@ Read from the `SHELL_*` macros in the sources, so a command a particular image s
 | `ftp ls` | 0-2 | List a directory: ls [node] [path] | always | `k-fsw/app/src/shell/shell_ftp.c` |
 | `ftp mkdir` | 1-2 | Create a directory: mkdir [node] &lt;path&gt; | always | `k-fsw/app/src/shell/shell_ftp.c` |
 | `ftp put` | 3 | Upload to a remote node: put &lt;node&gt; &lt;local&gt; &lt;remote&gt; | always | `k-fsw/app/src/shell/shell_ftp.c` |
+| `ftp rm` | 1-2 | Remove a file or empty directory: rm [node] &lt;path&gt; | always | `k-fsw/app/src/shell/shell_ftp.c` |
 | `ftp stat` | 1-2 | Show metadata: stat [node] &lt;path&gt; | always | `k-fsw/app/src/shell/shell_ftp.c` |
 | `ftp verify` | 2 | Compare two local files: verify &lt;first&gt; &lt;second&gt; | always | `k-fsw/app/src/shell/shell_ftp.c` |
 | `fwu` | - | Firmware update. | always | `k-fsw/app/src/shell/shell_fwu.c` |
@@ -169,9 +170,9 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | 3 | `reboot` | 1 | yes | Reset this node after a short delay: reboot &lt;pin&gt;. | always | `k-fsw/app/src/commands/command_definitions.c` |
 | 4 | `event_stats` | 0 | - | Report event record counters. | always | `k-fsw/app/src/commands/command_definitions.c` |
 | 5 | `event_tail` | 1 | - | Read one recorded event by age, newest is 0. | always | `k-fsw/app/src/commands/command_definitions.c` |
-| 6 | `hk_define` | 2 | - | Name what a report collects: &lt;report&gt; "[class=N] [node:]table:offset ...". | always | `k-fsw/app/src/commands/command_definitions.c` |
-| 7 | `hk_period` | 2 | - | Collect repeatedly: hk_period &lt;report&gt; &lt;ms&gt;, 0 to stop. | always | `k-fsw/app/src/commands/command_definitions.c` |
-| 8 | `hk_clear` | 1 | - | Forget a report: hk_clear &lt;report&gt;. | always | `k-fsw/app/src/commands/command_definitions.c` |
+| 6 | `hk_define` | 2 | yes | Name what a report collects: &lt;report&gt; "[class=N] [node:]table:offset ...". | always | `k-fsw/app/src/commands/command_definitions.c` |
+| 7 | `hk_period` | 2 | yes | Collect repeatedly: hk_period &lt;report&gt; &lt;ms&gt;, 0 to stop. | always | `k-fsw/app/src/commands/command_definitions.c` |
+| 8 | `hk_clear` | 1 | yes | Forget a report: hk_clear &lt;report&gt;. | always | `k-fsw/app/src/commands/command_definitions.c` |
 | 9 | `journal_stats` | 0 | - | Read persistent journal status. | always | `k-fsw/app/src/commands/command_definitions.c` |
 | 10 | `journal_tail` | 1 | - | Read a journal event by age, newest is 0. | always | `k-fsw/app/src/commands/command_definitions.c` |
 | 11 | `journal_time` | 1 | - | Read a journal event's sequence and time by age. | always | `k-fsw/app/src/commands/command_definitions.c` |
@@ -198,13 +199,13 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | 5 | `storage` | 4 | Filesystem size, free space, mount | always | `k-fsw/app/src/parameters/storage_table.c` |
 | 6 | `watchdog` | 7 | Hardware watchdog timing and feeds | always | `k-fsw/app/src/parameters/watchdog_table.c` |
 | 25 | `log` | 7 | Log levels, colour and counters | always | `kfsw-services/src/log.c` |
-| 26 | `param` | 10 | Parameter counts and snapshot saves | always | `kfsw-services/src/param-parameters/param_table.c` |
+| 26 | `param` | 11 | Parameter counts and snapshot saves | always | `kfsw-services/src/param-parameters/param_table.c` |
 | 27 | `event` | 5 | Event record counters | always | `kfsw-services/src/event-parameters/event_table.c` |
 | 28 | `command` | 7 | Command counters, timeout and echo | always | `kfsw-services/src/command-parameters/command_table.c` |
 | 29 | `ftp` | 7 | File transfers and limits | always | `kfsw-services/src/ftp-parameters/ftp_table.c` |
 | 30 | `fwu` | 13 | Firmware update state and checks | always | `kfsw-services/src/fwu-parameters/fwu_table.c` |
 | 31 | `health` | 11 | Health monitor and watchdog feeds | always | `kfsw-services/src/health-parameters/health_table.c` |
-| 32 | `boot` | 13 | Running image, revisions, restarts | always | `kfsw-services/src/boot-parameters/boot_table.c` |
+| 32 | `boot` | 14 | Running image, revisions, restarts | always | `kfsw-services/src/boot-parameters/boot_table.c` |
 | 33 | `hk` | 14 | Housekeeping reports and counters | always | `kfsw-services/src/hk-parameters/hk_table.c` |
 | 34 | `fbo` | 19 | Procedure runs, progress and the time-tagged queue | always | `kfsw-services/src/fbo-parameters/fbo_table.c` |
 | 35 | `gndwdt` | 8 | Ground watchdog countdown | always | `kfsw-services/src/gndwdt-parameters/gndwdt_table.c` |
@@ -229,14 +230,14 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | `board` | 0x30 | `revision` | str | ri | - | Build revision, as reported by csp ident |
 | `board` | 0x02 | `csp_enabled` | u8 | ri | - | Whether CSP is composed into this build |
 | `board` | 0x05 | `can_enabled` | u8 | ri | - | Whether the CAN interface is composed |
-| `board` | 0x0c | `can_speed` | u32 | rw | - | CAN bitrate: 125000, 250000, 500000, 800000 or 1000000 |
+| `board` | 0x0c | `can_speed` | u32 | wl | - | CAN bitrate: 125000, 250000, 500000, 800000 or 1000000 |
 | `board` | 0x03 | `kiss_enabled` | u8 | ri | - | Whether the KISS interface is composed |
 | `board` | 0x04 | `reset_cause` | KFSW_PARAM_X32 | ri | - | Reset cause latched at boot |
 | `board` | 0x08 | `shell_enabled` | u8 | ri | - | Whether the debug shell is composed |
 | `board` | 0x09 | `storage_enabled` | u8 | ri | - | Whether persistent storage is composed |
-| `system` | 0x10 | `reboot_pin` | str | rwbc | - | Digits a remote reboot must quote, 1 to 8 of them |
-| `system` | 0x00 | `boot_delay_ms` | u16 | rwbc | ms | Delay before services start on the next boot |
-| `system` | 0x02 | `app_report_ms` | u16 | rwbcl | ms | How often the application thread reports it is running |
+| `system` | 0x10 | `reboot_pin` | str | wpbc | - | Digits a remote reboot must quote, 1 to 8 of them |
+| `system` | 0x00 | `boot_delay_ms` | u16 | wpbc | ms | Delay before services start on the next boot |
+| `system` | 0x02 | `app_report_ms` | u16 | wpcl | ms | How often the application thread reports it is running |
 | `telemetry` | 0x00 | `uptime_s` | u32 | r | s | Seconds since boot |
 | `telemetry` | 0x04 | `fs_total_kb` | u32 | r | kB | Filesystem capacity, or zero while unmounted |
 | `telemetry` | 0x08 | `fs_free_kb` | u32 | r | kB | Filesystem space available, or zero while unmounted |
@@ -255,8 +256,8 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | `csp` | 0x1a | `invalid_reply` | u8 | r | - | Replies that matched no open connection |
 | `csp` | 0x1b | `last_error` | u8 | r | - | Code of the last libcsp error |
 | `csp` | 0x1c | `last_can_error` | u8 | r | - | Code of the last CAN framing error |
-| `csp` | 0x1d | `rdp_trace` | u8 | rwcl | - | RDP detail: 0 off, 1 errors, 2 with the protocol |
-| `csp` | 0x1e | `packet_trace` | u8 | rwcl | - | Packet dump: 0 off, 1 on |
+| `csp` | 0x1d | `rdp_trace` | u8 | wcl | - | RDP detail: 0 off, 1 errors, 2 with the protocol |
+| `csp` | 0x1e | `packet_trace` | u8 | wcl | - | Packet dump: 0 off, 1 on |
 | `csp` | 0x20 | `route_table` | str | r | - | Compiled routes in libcsp CIDR syntax |
 | `csp` | 0x15 | `router_running` | u8 | r | - | Whether the CSP router thread is running |
 | `storage` | 0x00 | `total_kb` | u32 | r | kB | Filesystem capacity, or zero while unmounted |
@@ -270,40 +271,41 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | `watchdog` | 0x10 | `state` | u8 | r | - | Watchdog lifecycle state |
 | `watchdog` | 0x11 | `device_bound` | u8 | r | - | Whether a watchdog device was bound at initialization |
 | `watchdog` | 0x12 | `keepalive_owned` | u8 | r | - | Whether the platform keep-alive is the one feeding |
-| `log` | 0x00 | `log_level` | u8 | rwbc | - | Runtime logging policy value |
-| `log` | 0x10 | `log_levels` | data | rwbc | - | Minimum level per module, raising the global one for that module |
+| `log` | 0x00 | `log_level` | u8 | wpcl | - | Runtime logging policy value |
+| `log` | 0x10 | `log_levels` | data | wpcl | - | Minimum level per module, raising the global one for that module |
 | `log` | 0x04 | `log_emitted` | u32 | r | - | Messages written since boot |
 | `log` | 0x08 | `log_dropped` | u32 | r | - | Messages below the active level, so not written |
-| `log` | 0x0c | `log_color` | u8 | rwcl | - | Colour log lines by severity; read every line |
-| `log` | 0x0d | `log_shell` | u8 | rwcl | - | Mirror logs to active shells; 0 off, 1 on |
-| `log` | 0x20 | `log_remote_format` | u8 | rwbcl | - | How log remote sends messages: 0 text, 1 dictionary |
+| `log` | 0x0c | `log_color` | u8 | wcl | - | Colour log lines by severity; read every line |
+| `log` | 0x0d | `log_shell` | u8 | wcl | - | Mirror logs to active shells; 0 off, 1 on |
+| `log` | 0x20 | `log_remote_format` | u8 | wpcl | - | How log remote sends messages: 0 text, 1 dictionary |
 | `param` | 0x00 | `param_count` | u16 | r | - | Parameters registered across every table |
 | `param` | 0x02 | `param_tables` | u16 | r | - | Tables registered |
 | `param` | 0x04 | `param_persistent` | u16 | r | - | Of those, the ones a snapshot carries |
 | `param` | 0x08 | `param_saves` | u32 | r | - | Snapshots written since boot |
 | `param` | 0x0c | `param_load_failures` | u32 | r | - | Snapshot loads that failed for a reason other than absence |
-| `param` | 0x10 | `param_autosave` | u8 | rwbcl | - | Write a snapshot after every accepted change |
+| `param` | 0x10 | `param_autosave` | u8 | wpcl | - | Write a snapshot after every accepted change |
 | `param` | 0x14 | `param_persist_bytes` | u32 | r | - | Space the last snapshot occupied |
 | `param` | 0x18 | `param_persist_max_bytes` | u32 | r | - | Most space a snapshot is allowed |
 | `param` | 0x1c | `param_requests_dropped` | u32 | r | - | Value requests dropped before worker admission |
 | `param` | 0x20 | `param_read_resends` | u32 | r | - | Extra read request packets after timeouts since boot; saturates |
+| `param` | 0x24 | `param_save_failures` | u32 | r | - | Snapshot writes that failed since boot |
 | `event` | 0x00 | `events_recorded` | u32 | r | - | Events accepted since start |
 | `event` | 0x04 | `events_overwritten` | u32 | r | - | Events lost to the ring wrapping before they were read |
 | `event` | 0x08 | `events_rejected` | u32 | r | - | Events refused for an invalid payload size or source |
 | `event` | 0x0c | `events_held` | u16 | r | - | Records currently in the ring |
 | `event` | 0x0e | `events_capacity` | u16 | r | - | Ring capacity |
-| `command` | 0x00 | `cmd_invoked` | u32 | r | - | Invocations that reached a handler or were refused before one |
-| `command` | 0x04 | `cmd_failed` | u32 | r | - | Invocations whose handler reported a failure |
-| `command` | 0x08 | `cmd_unknown` | u32 | r | - | Invocations naming a command that is not registered |
-| `command` | 0x0c | `cmd_rejected` | u32 | r | - | Invocations refused before the handler ran |
+| `command` | 0x00 | `cmd_invoked` | u32 | r | - | Recorded dispatch outcomes since boot; wraps at 2^32 |
+| `command` | 0x04 | `cmd_failed` | u32 | r | - | Outcomes other than OK, UNKNOWN, DENIED; wraps at 2^32 |
+| `command` | 0x08 | `cmd_unknown` | u32 | r | - | UNKNOWN outcomes since boot; wraps at 2^32 |
+| `command` | 0x0c | `cmd_rejected` | u32 | r | - | DENIED outcomes since boot; wraps at 2^32 |
 | `command` | 0x10 | `cmd_registered` | u16 | r | - | Commands in the frozen registry |
-| `command` | 0x14 | `cmd_timeout_ms` | u32 | rwc | ms | Timeout for new remote invocations |
-| `command` | 0x18 | `echo_enabled` | u8 | rwc | - | Console repeats what is typed at it |
+| `command` | 0x14 | `cmd_timeout_ms` | u32 | wcl | ms | Timeout for new remote invocations |
+| `command` | 0x18 | `echo_enabled` | u8 | wcl | - | Console repeats what is typed at it |
 | `ftp` | 0x00 | `ftp_transfers` | u32 | r | - | Transfers that committed, in either direction |
 | `ftp` | 0x04 | `ftp_failures` | u32 | r | - | Transfers that failed or were abandoned |
 | `ftp` | 0x08 | `ftp_bytes` | u32 | r | B | Bytes moved by transfers that committed |
-| `ftp` | 0x0c | `ftp_timeout_ms` | u32 | rwc | ms | Reply timeout for new transfers; a running one keeps its value |
-| `ftp` | 0x10 | `ftp_chunk_size` | u16 | rwc | B | File data per message; can only be shortened |
+| `ftp` | 0x0c | `ftp_timeout_ms` | u32 | wcl | ms | Reply timeout for new transfers; a running one keeps its value |
+| `ftp` | 0x10 | `ftp_chunk_size` | u16 | wcl | B | File data per message; can only be shortened |
 | `ftp` | 0x12 | `ftp_busy` | u8 | r | - | Whether the server is handling a transfer |
 | `ftp` | 0x20 | `ftp_root` | str | r | - | Sandbox the service resolves every path against |
 | `fwu` | 0x00 | `fwu_total_size` | u32 | r | B | Image size the sender declared |
@@ -316,13 +318,13 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | `fwu` | 0x1c | `fwu_state` | u8 | r | - | idle, receiving, ready or failed |
 | `fwu` | 0x1d | `fwu_swap_scheduled` | u8 | r | - | Whether the bootloader accepted the image |
 | `fwu` | 0x1e | `fwu_target_bound` | u8 | r | - | Whether a target partition was bound at build time |
-| `fwu` | 0x20 | `fwu_lite_timeout_ms` | u32 | rwc | ms | Reply timeout for the next block |
-| `fwu` | 0x24 | `fwu_lite_retries` | u8 | rwc | - | Times a block is repeated before the transfer is abandoned |
+| `fwu` | 0x20 | `fwu_lite_timeout_ms` | u32 | wcl | ms | Reply timeout for the next block |
+| `fwu` | 0x24 | `fwu_lite_retries` | u8 | wcl | - | Times a block is repeated before the transfer is abandoned |
 | `fwu` | 0x26 | `fwu_lite_block_size` | u16 | r | B | Image bytes per block; fixed at build time |
 | `health` | 0x00 | `health_faulted_by` | str | r | - | Component holding the system faulted, or empty |
 | `health` | 0x10 | `health_faults` | u32 | r | - | Times the system was judged unwell since boot |
 | `health` | 0x14 | `health_feeds` | u32 | r | - | Watchdog feeds this service has issued |
-| `health` | 0x18 | `health_interval_ms` | u16 | rwc | ms | How often deadlines are checked; refused above the feed interval |
+| `health` | 0x18 | `health_interval_ms` | u16 | wcl | ms | How often deadlines are checked; refused above the feed interval |
 | `health` | 0x1a | `health_state` | u8 | r | - | ok, faulted or stopped |
 | `health` | 0x1b | `health_feeding` | u8 | r | - | Whether health is the one feeding the watchdog |
 | `health` | 0x1c | `health_components` | u8 | r | - | Components currently watched |
@@ -330,22 +332,23 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | `health` | 0x24 | `health_app_since_ms` | u32 | r | ms | Since it last reported; 4294967295 when absent |
 | `health` | 0x28 | `health_csp_state` | u8 | r | - | 0 ok, 1 overdue, 2 absent |
 | `health` | 0x2c | `health_csp_since_ms` | u32 | r | ms | Since it last reported; 4294967295 when absent |
-| `boot` | 0x2b | `boot_attempts_left` | u8 | rwbo | - | Attempts remaining; ground writes persist in early flash |
-| `boot` | 0x3c | `boot_attempts_max` | u8 | rwbo | - | Boot attempt limit: 3, 5 or 10; raising never refills |
+| `boot` | 0x2b | `boot_attempts_left` | u8 | wpol | - | Attempts remaining; ground writes persist in early flash |
+| `boot` | 0x3c | `boot_attempts_max` | u8 | wpol | - | Boot attempt limit: 3, 5 or 10; raising never refills |
 | `boot` | 0x2c | `boot_attempts` | u32 | r | - | Persisted unconfirmed boots of this image; UINT32_MAX invalid |
 | `boot` | 0x29 | `boot_revert_reason` | u8 | r | - | 0 none, 1 missed confirmation, 2 replaced unknown, 255 invalid |
 | `boot` | 0x2a | `boot_trial_valid` | u8 | r | - | Trial diagnostics were recovered and saved successfully |
+| `boot` | 0x3d | `boot_trial_quarantined` | u8 | r | - | Rejected trial records moved to boot-trial.bad since startup |
 | `boot` | 0x00 | `boot_image` | str | ri | - | Version of the running image, from the build |
 | `boot` | 0x40 | `boot_revisions` | str | ri | - | Short revision of each repository compiled into this image |
-| `boot` | 0x20 | `boot_count` | u32 | rb | - | Restarts recorded across the life of the node |
+| `boot` | 0x20 | `boot_count` | u32 | rp | - | Restarts recorded across the life of the node |
 | `boot` | 0x24 | `boot_reset_cause` | KFSW_PARAM_X32 | r | - | Cause latched at boot, before the flags were cleared |
 | `boot` | 0x30 | `last_reason` | u8 | r | - | 0 quiet, 1 commanded, 2 brownout, 3 fatal, 4 starved, 5 unknown |
 | `boot` | 0x34 | `last_detail` | KFSW_PARAM_X32 | r | - | Meaningful with the reason: the faulting address for a fatal |
 | `boot` | 0x38 | `last_uptime_ms` | u32 | r | ms | How long the previous run had been up when it went away |
-| `boot` | 0x28 | `boot_confirmed` | u8 | rwcl | - | Mark the running image good; can only be set, never cleared |
+| `boot` | 0x28 | `boot_confirmed` | u8 | wcl | - | Mark the running image good; can only be set, never cleared |
 | `hk` | 0x30 | `hk_classes` | data | r | - | Definition classes by report; 255 undefined; define to change |
 | `hk` | 0x00 | `hk_reports` | u8 | r | - | Reports currently defined |
-| `hk` | 0x01 | `hk_enabled` | u8 | rwc | - | Collect periodic reports |
+| `hk` | 0x01 | `hk_enabled` | u8 | wcl | - | Collect periodic reports |
 | `hk` | 0x02 | `hk_collections` | u32 | r | - | Reports collected since boot |
 | `hk` | 0x06 | `hk_failures` | u32 | r | - | Collections that produced nothing |
 | `hk` | 0x0a | `hk_entries_failed` | u32 | r | - | Values that could not be read and were left absent |
@@ -374,10 +377,10 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | `fbo` | 0x61 | `fbo_sched_refusals` | u32 | r | - | Entries refused when they were added |
 | `fbo` | 0x65 | `fbo_sched_overdues` | u32 | r | - | Entries that went overdue since boot |
 | `fbo` | 0x69 | `fbo_sched_hash` | u32 | rl | - | CRC32 over the queue, to compare against what was uploaded |
-| `fbo` | 0x6d | `fbo_sched_latency_s` | u32 | rwc | s | An entry later than this reports overdue instead of running |
+| `fbo` | 0x6d | `fbo_sched_latency_s` | u32 | wcl | s | An entry later than this reports overdue instead of running |
 | `fbo` | 0x71 | `fbo_sched_next_due_utc` | i64 | rl | - | UTC second of the earliest absolute entry, 0 for none |
-| `gndwdt` | 0x00 | `gndwdt_enabled` | u8 | rw | - | Whether the countdown is armed |
-| `gndwdt` | 0x04 | `ground_wtd_timeout` | u32 | rw | s | Timeout in seconds, 7200 to 432000 |
+| `gndwdt` | 0x00 | `gndwdt_enabled` | u8 | wl | - | Whether the countdown is armed |
+| `gndwdt` | 0x04 | `ground_wtd_timeout` | u32 | wl | s | Timeout in seconds, 7200 to 432000 |
 | `gndwdt` | 0x08 | `gndwdt_since_s` | u32 | r | s | Seconds since the last contact |
 | `gndwdt` | 0x0c | `gndwdt_contacts` | u32 | r | - | Valid ground_wtd feeds since boot |
 | `gndwdt` | 0x10 | `gndwdt_expiries` | u32 | r | - | Times the timeout passed since start |
@@ -386,7 +389,7 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | `gndwdt` | 0x18 | `ground_wtd_cnt` | u32 | r | s | Seconds remaining on the ground watchdog |
 | `resmon` | 0x00 | `stack_worst_used` | u32 | r | % | Highest stack use seen on any thread since start |
 | `resmon` | 0x04 | `stack_last_used` | u32 | r | % | Highest stack use in the most recent sweep |
-| `resmon` | 0x08 | `stack_alert_used` | u32 | rw | % | A thread at or above this raises an event |
+| `resmon` | 0x08 | `stack_alert_used` | u32 | wl | % | A thread at or above this raises an event |
 | `resmon` | 0x0c | `stack_worst_free` | u32 | r | B | Unused bytes on the busiest thread |
 | `resmon` | 0x10 | `stack_worst_size` | u32 | r | B | Stack size of the busiest thread |
 | `resmon` | 0x14 | `stack_sweeps` | u32 | r | - | Sweeps completed since start |
@@ -410,15 +413,15 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | `remexec` | 0x18 | `remexec_last_result` | i32 | r | - | What the last command returned; zero before any ran |
 | `remexec` | 0x1c | `remexec_last_ms` | u32 | r | ms | How long the last command took |
 | `remexec` | 0x20 | `remexec_last_command` | str | r | - | The last command line asked for, with its arguments |
-| `scrub` | 0x00 | `slot0_reference` | KFSW_PARAM_X32 | rwb | - | Learned CRC32 of the primary slot image; 0 unlearned |
+| `scrub` | 0x00 | `slot0_reference` | KFSW_PARAM_X32 | wpb | - | Learned CRC32 of the primary slot image; 0 unlearned |
 | `scrub` | 0x04 | `slot0_measured` | KFSW_PARAM_X32 | r | - | CRC32 the last sweep read from the primary slot |
 | `scrub` | 0x08 | `slot0_bytes` | u32 | r | - | Image bytes swept in the primary slot |
 | `scrub` | 0x0c | `slot0_state` | u8 | r | - | 0 empty, 1 unknown, 2 ok, 3 mismatch, 4 unreadable |
-| `scrub` | 0x10 | `slot1_reference` | KFSW_PARAM_X32 | rwb | - | Learned CRC32 of the secondary slot image; 0 unlearned |
+| `scrub` | 0x10 | `slot1_reference` | KFSW_PARAM_X32 | wpb | - | Learned CRC32 of the secondary slot image; 0 unlearned |
 | `scrub` | 0x14 | `slot1_measured` | KFSW_PARAM_X32 | r | - | CRC32 the last sweep read from the secondary slot |
 | `scrub` | 0x18 | `slot1_bytes` | u32 | r | - | Image bytes swept in the secondary slot |
 | `scrub` | 0x1c | `slot1_state` | u8 | r | - | 0 empty, 1 unknown, 2 ok, 3 mismatch, 4 unreadable |
-| `scrub` | 0x20 | `golden_reference` | KFSW_PARAM_X32 | rwb | - | Learned CRC32 of the recovery image; 0 unlearned |
+| `scrub` | 0x20 | `golden_reference` | KFSW_PARAM_X32 | wpb | - | Learned CRC32 of the recovery image; 0 unlearned |
 | `scrub` | 0x24 | `golden_measured` | KFSW_PARAM_X32 | r | - | CRC32 the last sweep read from the recovery image |
 | `scrub` | 0x28 | `golden_bytes` | u32 | r | - | Image bytes swept in the recovery partition |
 | `scrub` | 0x2c | `golden_state` | u8 | r | - | 0 empty, 1 unknown, 2 ok, 3 mismatch, 4 unreadable |
@@ -429,8 +432,8 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | `scrub` | 0x3d | `scrub_running` | u8 | r | - | Whether the periodic sweep is running |
 | `limits` | 0x00 | `limits_rules` | u8 | r | - | Rules in force |
 | `limits` | 0x01 | `limits_running` | u8 | r | - | Whether the periodic sweep is scheduled |
-| `limits` | 0x02 | `limits_enabled` | u8 | rwbl | - | 0 stops the sweeps and keeps the loaded rules |
-| `limits` | 0x04 | `limits_interval_ms` | u32 | rwbl | ms | Between periodic sweeps; 0 or 100 to 3600000 |
+| `limits` | 0x02 | `limits_enabled` | u8 | wpl | - | 0 stops the sweeps and keeps the loaded rules |
+| `limits` | 0x04 | `limits_interval_ms` | u32 | wpl | ms | Between periodic sweeps; 0 or 100 to 3600000 |
 | `limits` | 0x08 | `limits_sweeps` | u32 | r | - | Sweeps completed while enabled |
 | `limits` | 0x0c | `limits_fires` | u32 | r | - | Actions released |
 | `limits` | 0x10 | `limits_failures` | u32 | r | - | Parameter reads and releases that failed |
@@ -446,10 +449,10 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | `radio_uhf` | 0x44 | `uhf_expected_flow` | u8 | r | - | Whether the profile expects hardware flow control |
 | `radio_uhf` | 0x45 | `uhf_status_available` | u8 | r | - | Whether this implementation reads the modem back at all |
 | `radio_uhf` | 0x46 | `uhf_link_state` | u8 | r | - | unknown, down or up; unknown unless the modem is read back |
-| `radio_uhf` | 0x50 | `uhf_key_hex` | str | rwcn | - | Local 64-digit hex key; reads return empty |
-| `radio_uhf` | 0x98 | `uhf_encrypt_enable` | u8 | rwcn | - | Enable radio packet protection |
-| `radio_uhf` | 0x99 | `uhf_encrypt_tx` | u8 | rwcn | - | Encrypt transmitted radio packets |
-| `radio_uhf` | 0x9a | `uhf_encrypt_rx` | u8 | rwcn | - | Require authenticated encrypted radio packets |
+| `radio_uhf` | 0x50 | `uhf_key_hex` | str | wcln | - | Local 64-digit hex key; reads return empty |
+| `radio_uhf` | 0x98 | `uhf_encrypt_enable` | u8 | wcln | - | Enable radio packet protection |
+| `radio_uhf` | 0x99 | `uhf_encrypt_tx` | u8 | wcln | - | Encrypt transmitted radio packets |
+| `radio_uhf` | 0x9a | `uhf_encrypt_rx` | u8 | wcln | - | Require authenticated encrypted radio packets |
 | `radio_uhf` | 0x9b | `uhf_key_set` | u8 | r | - | - |
 | `radio_uhf` | 0x9c | `uhf_tx_ready` | u8 | r | - | - |
 | `radio_uhf` | 0x9d | `uhf_rx_ready` | u8 | r | - | - |
@@ -463,7 +466,7 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | `temp_example` | 0x0c | `temp_last_ms` | u32 | r | ms | Uptime of the latest successful read |
 | `temp_example` | 0x10 | `temp_valid` | u8 | r | - | Whether temp_mcu_mc is a reading or the reserved value |
 | `temp_example` | 0x14 | `temp_alarms` | u32 | r | - | Readings that crossed the alarm threshold upwards |
-| `temp_example` | 0x18 | `temp_alarm_mc` | i32 | rwbc | mC | Alarm threshold, -40000 to 125000 |
+| `temp_example` | 0x18 | `temp_alarm_mc` | i32 | wpcl | mC | Alarm threshold, -40000 to 125000 |
 | `gpredict` | 0x00 | `gp_state` | u8 | rl | - | parked, tracking, holding, parking or fault |
 | `gpredict` | 0x04 | `gp_az_mdeg` | i32 | rl | mdeg | Azimuth last accepted from the predictor |
 | `gpredict` | 0x08 | `gp_el_mdeg` | i32 | rl | mdeg | Elevation last accepted from the predictor |
@@ -471,7 +474,7 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | `gpredict` | 0x10 | `gp_actual_el_mdeg` | i32 | rl | mdeg | Elevation the rotator last reported, not the commanded one |
 | `gpredict` | 0x18 | `gp_frequency_hz` | u64 | rl | Hz | Doppler-corrected frequency last accepted; 0 if none |
 | `gpredict` | 0x20 | `gp_silence_ms` | u32 | rl | ms | Since the last bearing; 0 while none has arrived |
-| `gpredict` | 0x24 | `gp_grace_ms` | u32 | rwc | ms | Silence the antenna holds through before it parks |
+| `gpredict` | 0x24 | `gp_grace_ms` | u32 | wcl | ms | Silence the antenna holds through before it parks |
 | `gpredict` | 0x28 | `gp_bearings` | u32 | r | - | Bearings accepted since boot; saturates |
 | `gpredict` | 0x2c | `gp_refusals` | u32 | r | - | Bearings refused outside the travel or in fault; saturates |
 | `gpredict` | 0x30 | `gp_passes_ended` | u32 | r | - | Passes that ended because the predictor went quiet |
@@ -485,6 +488,6 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | `gpredict` | 0x44 | `gp_profile_name` | str | rl | - | Name of the selected profile; empty when none |
 | `hw_test` | 0x00 | `press_count` | u32 | rd | count | Valid debounced button presses since boot |
 | `hw_test` | 0x04 | `last_press_s` | u32 | rd | s | Monotonic whole seconds of the latest valid press |
-| `hw_test` | 0x08 | `led_green` | u8 | rwd | - | Logical green developer LED state |
-| `hw_test` | 0x09 | `led_blue` | u8 | rwd | - | Logical blue developer LED state |
-| `hw_test` | 0x0a | `led_red` | u8 | rwd | - | Logical red developer LED state |
+| `hw_test` | 0x08 | `led_green` | u8 | wdl | - | Logical green developer LED state |
+| `hw_test` | 0x09 | `led_blue` | u8 | wdl | - | Logical blue developer LED state |
+| `hw_test` | 0x0a | `led_red` | u8 | wdl | - | Logical red developer LED state |

@@ -8,6 +8,7 @@ case "${1:-500000}" in
 esac
 
 bitrate="${1:-500000}"
+txqueuelen=1000
 mode="${2:-normal}"          # normal | listen-only | loopback | down
 
 ip link set can0 down 2>/dev/null || true
@@ -26,6 +27,12 @@ normal)      opts=(listen-only off loopback off) ;;
 esac
 
 ip link set can0 type can bitrate "$bitrate" "${opts[@]}" restart-ms 100
+ip link set can0 txqueuelen "$txqueuelen"
+actual_txqueuelen="$(cat /sys/class/net/can0/tx_queue_len)"
+if [[ "$actual_txqueuelen" != "$txqueuelen" ]]; then
+	echo "can0 txqueuelen is $actual_txqueuelen; expected $txqueuelen" >&2
+	exit 1
+fi
 ip link set can0 up
-echo "can0 up at ${bitrate} bps, ${mode}"
+echo "can0 up at ${bitrate} bps, ${mode}, txqueuelen ${txqueuelen}"
 ip -details link show can0 | sed -n '3p'

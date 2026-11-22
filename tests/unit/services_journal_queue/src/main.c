@@ -155,6 +155,66 @@ ZTEST(journal_queue, test_unavailable_storage_and_service_sources)
 	zassert_equal(record.event.id, 115);
 }
 
+ZTEST(journal_queue, test_table_scrub_and_limits_sources_reach_storage)
+{
+	static const enum kfsw_event_source sources[] = {
+		KFSW_EVENT_SOURCE_TABLE, KFSW_EVENT_SOURCE_SCRUB, KFSW_EVENT_SOURCE_LIMITS};
+	struct kfsw_journal_stats before;
+	struct kfsw_journal_stats after;
+	struct kfsw_journal_record stored;
+	struct kfsw_event_record event = {
+		.id = 200U,
+		.severity = KFSW_EVENT_CRITICAL,
+		.payload_size = 2U,
+		.payload = {0xaa, 0xbb},
+	};
+
+	zassert_ok(kfsw_journal_flush());
+	for (size_t i = 0U; i < ARRAY_SIZE(sources); i++) {
+		event.source = (uint16_t)sources[i];
+		kfsw_journal_get_stats(&before);
+		kfsw_journal_submit(&event);
+		kfsw_journal_get_stats(&after);
+		zassert_equal(after.queued, before.queued + 1U);
+		zassert_equal(after.dropped, before.dropped);
+		zassert_ok(kfsw_journal_flush());
+		zassert_ok(kfsw_journal_get(0U, &stored));
+		zassert_equal(stored.event.source, sources[i]);
+		zassert_mem_equal(stored.event.payload, event.payload, event.payload_size);
+
+		kfsw_event_emit(sources[i], 201U, KFSW_EVENT_CRITICAL, event.payload,
+				event.payload_size);
+		zassert_ok(kfsw_journal_flush());
+		zassert_ok(kfsw_journal_get(0U, &stored));
+		zassert_equal(stored.event.source, sources[i]);
+		zassert_equal(stored.event.id, 201U);
+	}
+}
+
+ZTEST(journal_queue, test_invalid_source_severity_and_payload_are_dropped)
+{
+	static const uint16_t invalid_sources[] = {0U, 11U, 200U};
+	struct kfsw_event_record event = {.severity = KFSW_EVENT_CRITICAL};
+	struct kfsw_journal_stats before;
+	struct kfsw_journal_stats after;
+
+	zassert_ok(kfsw_journal_flush());
+	kfsw_journal_get_stats(&before);
+	for (size_t i = 0U; i < ARRAY_SIZE(invalid_sources); i++) {
+		event.source = invalid_sources[i];
+		kfsw_journal_submit(&event);
+	}
+	event.source = KFSW_EVENT_SOURCE_APP;
+	event.severity = UINT8_MAX;
+	kfsw_journal_submit(&event);
+	event.severity = KFSW_EVENT_CRITICAL;
+	event.payload_size = KFSW_EVENT_MAX_PAYLOAD_SIZE + 1U;
+	kfsw_journal_submit(&event);
+	kfsw_journal_get_stats(&after);
+	zassert_equal(after.dropped - before.dropped, ARRAY_SIZE(invalid_sources) + 2U);
+	zassert_equal(after.queued, before.queued);
+}
+
 static void emit_from_isr(const void *unused)
 {
 	ARG_UNUSED(unused);

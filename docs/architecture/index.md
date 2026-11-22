@@ -95,8 +95,6 @@ local parameter core. Kconfig checks these dependencies.
 
 Use `west manifest --resolve` to inspect revisions. See @ref targets for
 profiles and @ref zephyr_integration for generated configuration.
-Changing RTOS requires adapting the Zephyr APIs used by the selected code;
-moving to another Zephyr board usually changes configuration and device bindings.
 
 ## Device modules
 
@@ -121,8 +119,7 @@ by name or duplicate a router, transport, or service.
 ## Application startup
 
 A node starts in three stages: the bootloader, the Zephyr init levels, and
-`main()`. Only the last one is K-FSW's own code, but the first two decide
-what it can rely on.
+`main()`.
 
 ```mermaid
 flowchart TD

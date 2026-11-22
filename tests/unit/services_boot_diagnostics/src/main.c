@@ -10,11 +10,12 @@
 
 #define RECORD_PATH KFSW_STORAGE_MOUNT_POINT "/boot-trial.dat"
 #define TEMP_PATH KFSW_STORAGE_MOUNT_POINT "/boot-trial.tmp"
+#define REJECTED_PATH KFSW_STORAGE_MOUNT_POINT "/boot-trial.bad"
 
 static const uint8_t image_a[KFSW_BOOT_IMAGE_ID_SIZE] = {1U};
 static const uint8_t image_b[KFSW_BOOT_IMAGE_ID_SIZE] = {2U};
 
-static void check(uint32_t attempts, uint8_t reason, bool valid)
+static void check(uint32_t attempts, uint8_t reason, bool valid, uint8_t quarantined)
 {
 	struct kfsw_boot_diagnostics value;
 
@@ -22,6 +23,22 @@ static void check(uint32_t attempts, uint8_t reason, bool valid)
 	zassert_equal(value.attempts, attempts);
 	zassert_equal(value.revert_reason, reason);
 	zassert_equal(value.valid, valid);
+	zassert_equal(value.quarantined, quarantined);
+}
+
+static void check_file(const char *path, const void *expected, size_t size)
+{
+	struct fs_file_t file;
+	uint8_t bytes[80];
+	uint8_t extra;
+
+	zassert_true(size <= sizeof(bytes));
+	fs_file_t_init(&file);
+	zassert_ok(fs_open(&file, path, FS_O_READ));
+	zassert_equal(fs_read(&file, bytes, size), size);
+	zassert_mem_equal(bytes, expected, size);
+	zassert_equal(fs_read(&file, &extra, 1U), 0);
+	zassert_ok(fs_close(&file));
 }
 
 static void write_bad_file(const char *path)
@@ -49,8 +66,9 @@ static void test_record_errors(void)
 	zassert_ok(fs_open(&file, RECORD_PATH, FS_O_WRITE | FS_O_TRUNC));
 	zassert_equal(fs_write(&file, record, sizeof(record)), sizeof(record));
 	zassert_ok(fs_close(&file));
-	zassert_equal(kfsw_boot_record_image(image_a, false, true), -EBADMSG);
-	check(UINT32_MAX, UINT8_MAX, false);
+	zassert_ok(kfsw_boot_record_image(image_a, false, true));
+	check(1U, KFSW_BOOT_REVERT_NONE, true, 2U);
+	check_file(REJECTED_PATH, record, sizeof(record));
 	record[4] ^= 1U;
 	/* Saturate below the reserved invalid value. */
 	sys_put_be32(UINT32_MAX - 1U, &record[36]);
@@ -59,21 +77,47 @@ static void test_record_errors(void)
 	zassert_equal(fs_write(&file, record, sizeof(record)), sizeof(record));
 	zassert_ok(fs_close(&file));
 	zassert_ok(kfsw_boot_record_image(image_a, false, true));
-	check(UINT32_MAX - 1U, KFSW_BOOT_REVERT_NONE, true);
+	check(UINT32_MAX - 1U, KFSW_BOOT_REVERT_NONE, true, 2U);
 	/* A nonempty directory blocks the temporary path; preserve the good file. */
 	zassert_ok(fs_mkdir(TEMP_PATH));
 	write_bad_file(TEMP_PATH "/block");
 	zassert_true(kfsw_boot_record_image(image_b, true, false) < 0);
-	check(UINT32_MAX, UINT8_MAX, false);
+	check(UINT32_MAX, UINT8_MAX, false, 2U);
 	zassert_ok(fs_unlink(TEMP_PATH "/block"));
 	zassert_ok(fs_unlink(TEMP_PATH));
 	zassert_ok(kfsw_boot_record_image(image_a, false, true));
-	check(UINT32_MAX - 1U, KFSW_BOOT_REVERT_NONE, true);
+	check(UINT32_MAX - 1U, KFSW_BOOT_REVERT_NONE, true, 2U);
 	zassert_ok(kfsw_boot_record_image(image_a, true, false));
 	zassert_ok(kfsw_boot_record_image(image_b, false, false));
-	check(1U, KFSW_BOOT_REVERT_NONE, true);
+	check(1U, KFSW_BOOT_REVERT_NONE, true, 2U);
 	zassert_ok(kfsw_boot_record_image(image_a, true, false));
-	check(0U, KFSW_BOOT_REVERT_REPLACED_UNKNOWN, true);
+	check(0U, KFSW_BOOT_REVERT_REPLACED_UNKNOWN, true, 2U);
+	zassert_ok(fs_unlink(RECORD_PATH));
+	/* A nonempty directory prevents quarantine; leave the rejected file intact. */
+	zassert_ok(fs_unlink(REJECTED_PATH));
+	zassert_ok(fs_mkdir(REJECTED_PATH));
+	write_bad_file(REJECTED_PATH "/block");
+	write_bad_file(RECORD_PATH);
+	zassert_equal(kfsw_boot_record_image(image_a, false, true), -EBADMSG);
+	check(UINT32_MAX, UINT8_MAX, false, 2U);
+	check_file(RECORD_PATH, "bad", 3U);
+	check_file(REJECTED_PATH "/block", "bad", 3U);
+	zassert_ok(fs_unlink(REJECTED_PATH "/block"));
+	zassert_ok(fs_unlink(REJECTED_PATH));
+	zassert_ok(fs_unlink(RECORD_PATH));
+
+	/* A record that cannot be read is not a rejected one: nothing is moved. */
+	struct fs_dirent entry;
+
+	zassert_ok(fs_mkdir(RECORD_PATH));
+	write_bad_file(RECORD_PATH "/block");
+	int result = kfsw_boot_record_image(image_a, false, true);
+
+	zassert_true((result < 0) && (result != -EBADMSG), "result %d", result);
+	check(UINT32_MAX, UINT8_MAX, false, 2U);
+	check_file(RECORD_PATH "/block", "bad", 3U);
+	zassert_equal(fs_stat(REJECTED_PATH, &entry), -ENOENT);
+	zassert_ok(fs_unlink(RECORD_PATH "/block"));
 	zassert_ok(fs_unlink(RECORD_PATH));
 }
 
@@ -93,40 +137,45 @@ ZTEST(boot_diagnostics, test_write_restart_recover_verify)
 	zassert_ok(kfsw_param_get("boot_trial_valid", &value));
 	zassert_equal(value.scalar.u8, 0U);
 	zassert_equal(kfsw_param_set("boot_trial_valid", &value), -EACCES);
+	zassert_ok(kfsw_param_get("boot_trial_quarantined", &value));
+	zassert_equal(value.scalar.u8, 0U);
+	zassert_equal(kfsw_param_set("boot_trial_quarantined", &value), -EACCES);
 
 	zassert_equal(kfsw_boot_diagnostics_start(), -ENOTSUP);
-	check(UINT32_MAX, UINT8_MAX, false);
+	check(UINT32_MAX, UINT8_MAX, false, 0U);
 	zassert_ok(kfsw_storage_init());
 	zassert_ok(kfsw_storage_mount());
 
 	if (fs_stat(RECORD_PATH, &entry) == 0) {
 		/* The restart runner invokes a new process against the same flash file. */
 		zassert_ok(kfsw_boot_record_image(image_a, false, true));
-		check(2U, KFSW_BOOT_REVERT_NONE, true);
+		check(2U, KFSW_BOOT_REVERT_NONE, true, 0U);
 		zassert_ok(kfsw_boot_record_image(image_b, true, false));
-		check(0U, KFSW_BOOT_REVERT_UNCONFIRMED_REPLACED, true);
+		check(0U, KFSW_BOOT_REVERT_UNCONFIRMED_REPLACED, true, 0U);
 		zassert_ok(kfsw_storage_unmount());
 		zassert_ok(kfsw_storage_mount());
 		zassert_ok(kfsw_boot_record_image(image_b, true, false));
-		check(0U, KFSW_BOOT_REVERT_UNCONFIRMED_REPLACED, true);
+		check(0U, KFSW_BOOT_REVERT_UNCONFIRMED_REPLACED, true, 0U);
 		zassert_ok(kfsw_boot_record_image(image_b, false, true));
-		check(1U, KFSW_BOOT_REVERT_UNCONFIRMED_REPLACED, true);
+		check(1U, KFSW_BOOT_REVERT_UNCONFIRMED_REPLACED, true, 0U);
 		zassert_ok(kfsw_boot_record_image(image_b, true, false));
-		check(0U, KFSW_BOOT_REVERT_UNCONFIRMED_REPLACED, true);
+		check(0U, KFSW_BOOT_REVERT_UNCONFIRMED_REPLACED, true, 0U);
 		printk("BOOT TRIAL RECOVER VERIFIED\n");
 	} else {
 		zassert_equal(kfsw_boot_record_image(NULL, false, true), -EINVAL);
 		zassert_ok(kfsw_storage_unmount());
 		zassert_equal(kfsw_boot_record_image(image_a, false, true), -ENODEV);
-		check(UINT32_MAX, UINT8_MAX, false);
+		check(UINT32_MAX, UINT8_MAX, false, 0U);
 		zassert_ok(kfsw_storage_mount());
 		write_bad_file(RECORD_PATH);
-		zassert_equal(kfsw_boot_record_image(image_a, false, true), -EBADMSG);
-		check(UINT32_MAX, UINT8_MAX, false);
-		zassert_ok(fs_unlink(RECORD_PATH));
+		zassert_ok(kfsw_boot_record_image(image_a, false, true));
+		check(1U, KFSW_BOOT_REVERT_NONE, true, 1U);
+		check_file(REJECTED_PATH, "bad", 3U);
+		zassert_ok(kfsw_param_get("boot_trial_quarantined", &value));
+		zassert_equal(value.scalar.u8, 1U);
 		test_record_errors();
 		zassert_ok(kfsw_boot_record_image(image_a, false, true));
-		check(1U, KFSW_BOOT_REVERT_NONE, true);
+		check(1U, KFSW_BOOT_REVERT_NONE, true, 2U);
 		/* An interrupted replacement leaves the previous good snapshot intact. */
 		write_bad_file(TEMP_PATH);
 		printk("BOOT TRIAL WRITE VERIFIED\n");

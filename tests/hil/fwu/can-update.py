@@ -20,6 +20,7 @@ import serial
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 FLIGHT = 2
 GROUND = 17
+MIN_TXQUEUELEN = 1000
 
 
 def require(text, expected):
@@ -92,6 +93,18 @@ def can_state(interface):
     return json.loads(result.stdout)[0]
 
 
+def check_can(state, interface):
+    data = state["linkinfo"]["info_data"]
+    if data.get("state") != "ERROR-ACTIVE" or data.get("bittiming", {}).get("bitrate") != 500000:
+        raise RuntimeError("CAN must be ERROR-ACTIVE at 500000 bit/s")
+    txqueuelen = state.get("txqlen", 0)
+    if txqueuelen < MIN_TXQUEUELEN:
+        raise RuntimeError(
+            f"{interface} txqueuelen is {txqueuelen}; needs {MIN_TXQUEUELEN}. "
+            "Run sudo bash k-fsw/tests/hil/stm32/nucleo-l496zg/can-up.sh 500000 normal "
+            f"for can0, or sudo ip link set dev {interface} txqueuelen {MIN_TXQUEUELEN}")
+
+
 def remote_revision(ground):
     text = ground.run(f"csp ident {FLIGHT}", "revision:")
     match = re.search(r"^revision: ([^\n]+)", text, re.MULTILINE)
@@ -140,9 +153,7 @@ def check_trial(ground, board, expected_revision):
 def run_test(arguments, output):
     repo = Path(__file__).resolve().parents[3]
     before = can_state(arguments.interface)
-    data = before["linkinfo"]["info_data"]
-    if data.get("state") != "ERROR-ACTIVE" or data.get("bittiming", {}).get("bitrate") != 500000:
-        raise RuntimeError("CAN must be ERROR-ACTIVE at 500000 bit/s")
+    check_can(before, arguments.interface)
     (output / "can-before.json").write_text(json.dumps(before, indent=2))
     image = arguments.image.resolve()
     (output / "image.sha256").write_text(hashlib.sha256(image.read_bytes()).hexdigest() + "\n")

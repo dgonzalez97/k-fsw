@@ -16,6 +16,8 @@ KGROUND_REPO_DIR="$(dirname "$KGROUND_TESTS_DIR")"
 KGROUND_WORKSPACE_ROOT="$(dirname "$KGROUND_REPO_DIR")"
 KGROUND_BUILD_ROOT="${KGROUND_BUILD_ROOT:-${KFSW_OUTPUT_ROOT:-$KGROUND_WORKSPACE_ROOT/build}/k-ground}"
 
+source "$KGROUND_TESTS_DIR/csp-version.sh"
+
 lossy_link=0
 interrupted=0
 bytes=256
@@ -26,6 +28,12 @@ if [[ "${1:-}" == --lossy ]]; then
 elif [[ "${1:-}" == --interrupted ]]; then
 	interrupted=1
 	bytes=32768
+	shift
+fi
+# Repeated runtime trials may reuse the images built by the first trial.
+build_nodes=1
+if [[ "${1:-}" == --no-build ]]; then
+	build_nodes=0
 	shift
 fi
 if [[ $# -ne 0 ]]; then
@@ -90,25 +98,34 @@ cp "$KGROUND_REPO_DIR/ground-station/nodes/kfsw-gnd-uhf.env" \
 	"$station_dir/nodes/kfsw-gnd-uhf.env"
 cp "$KGROUND_REPO_DIR/ground-station/nodes/kfsw-ops.env" \
 	"$station_dir/nodes/kfsw-ops.env"
-printf '%s\n' "KFSW_CSP_ROUTES='19/14 KISS'" \
+printf '%s\n' "KFSW_CSP_ROUTES='19 KISS'" \
 	>>"$station_dir/nodes/kfsw-gnd-uhf.env"
-printf '%s\n' "KFSW_CSP_ROUTES='16/14 KISS'" \
+printf '%s\n' "KFSW_CSP_ROUTES='16 KISS'" \
 	>>"$station_dir/nodes/kfsw-ops.env"
 
-KGROUND_STATION_DIR="$station_dir" \
-	"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-gnd-uhf
-KGROUND_STATION_DIR="$station_dir" \
-	"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-ops
+for node_file in kfsw-gnd-uhf kfsw-ops; do
+	printf '%s\n' "KFSW_CSP_VERSION=$csp_version" >>"$station_dir/nodes/$node_file.env"
+done
 
-node16_executable="$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16/zephyr/zephyr.exe"
-node19_executable="$KGROUND_BUILD_ROOT/kfsw-ops-node-19/zephyr/zephyr.exe"
+if [[ "$build_nodes" -eq 1 ]]; then
+	KGROUND_STATION_DIR="$station_dir" \
+		"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-gnd-uhf
+	KGROUND_STATION_DIR="$station_dir" \
+		"$KGROUND_REPO_DIR/tools/k-ground" build kfsw-ops
+fi
+
+node16_executable="$KGROUND_BUILD_ROOT/kfsw-gnd-uhf-node-16$csp_suffix/zephyr/zephyr.exe"
+node19_executable="$KGROUND_BUILD_ROOT/kfsw-ops-node-19$csp_suffix/zephyr/zephyr.exe"
 [[ -x "$node16_executable" ]] || fail "node 16 executable is missing"
 [[ -x "$node19_executable" ]] || fail "node 19 executable is missing"
 
 for node_config in kfsw-gnd-uhf-node-16 kfsw-ops-node-19; do
 	grep -Fq 'CONFIG_KFSW_FTP=y' \
-		"$KGROUND_BUILD_ROOT/$node_config/zephyr/.config" || \
+		"$KGROUND_BUILD_ROOT/$node_config$csp_suffix/zephyr/.config" || \
 		fail "$node_config did not compose the file-transfer service"
+	grep -Fxq "CONFIG_KFSW_CSP_VERSION_$csp_version=y" \
+		"$KGROUND_BUILD_ROOT/$node_config$csp_suffix/zephyr/.config" || \
+		fail "$node_config did not select CSP v$csp_version"
 done
 
 mkfifo "$work_dir/node16.in" "$work_dir/node19.in"
@@ -145,7 +162,7 @@ if [[ "$interrupted" -eq 1 ]]; then
 	# Forward everything, then go deaf long enough for both ends to give up
 	# on the transfer. --cut-for must outlast the file transfer timeout.
 	python3 "$KGROUND_REPO_DIR/tests/support/lossy-link.py" \
-		--left "$node16_pty" --right "$node19_pty" \
+		--left "$node16_pty" --right "$node19_pty" --csp-version "$csp_version" \
 		--drop-every 1000000000 --drop-bytes 0 \
 		--cut-after-get-data 4 --cut-for 20 \
 		--ready-file "$work_dir/bridge.ready" \
@@ -154,10 +171,10 @@ if [[ "$interrupted" -eq 1 ]]; then
 	wait_for_output "$work_dir/bridge.ready" "lossy link ready" "$bridge_pid" || \
 		fail "the cutting bridge did not become ready"
 elif [[ "$lossy_link" -eq 1 ]]; then
-	# Drop bytes in runs, like lost packets.
+	# Drop one complete upload data frame; its retry must reach the receiver.
 	python3 "$KGROUND_REPO_DIR/tests/support/lossy-link.py" \
-		--left "$node16_pty" --right "$node19_pty" \
-		--drop-every 9000 --drop-bytes 6 \
+		--left "$node16_pty" --right "$node19_pty" --csp-version "$csp_version" \
+		--drop-every 1000000000 --drop-bytes 0 --drop-put-data 4 \
 		--ftp-stats "$work_dir/ftp-stats.json" \
 		--ready-file "$work_dir/bridge.ready" \
 		>"$work_dir/socat.log" 2>&1 &
@@ -198,7 +215,9 @@ if [[ "$interrupted" -eq 1 ]]; then
 	wait_for_output "$work_dir/socat.log" "lossy link: forwarding again" \
 		"$bridge_pid" || fail "the bridge never came back"
 	printf '%s\n' 'ftp ls 19 /build' >&4
-	wait_for_output "$work_dir/node19.log" "down-copy.bin.part" "$node19_pid" || \
+	wait_for_output "$work_dir/node19.log" "entries: 2" "$node19_pid" || \
+		fail "the interrupted download did not list its partial and note"
+	grep -Fq "down-copy.bin.part" "$work_dir/node19.log" || \
 		fail "the interrupted download kept nothing to continue from"
 	grep -Fq "down-copy.bin.part.map" "$work_dir/node19.log" || \
 		fail "the partial was left without the note that names its file"
@@ -216,6 +235,9 @@ if [[ "$interrupted" -eq 1 ]]; then
 		fail "the second pass continued from nowhere"
 	grep -Fq "crc32: $source_crc" "$work_dir/node19.log" || \
 		fail "the stitched file is not the one node 16 holds"
+
+	wait_for_output "$work_dir/node19.log" "entries: 1" "$node19_pid" || \
+		fail "the completed download did not finish listing its file"
 
 	# Nothing of the transfer may outlive it.
 	after_last_listing="$(tr -d '\r' <"$work_dir/node19.log" |

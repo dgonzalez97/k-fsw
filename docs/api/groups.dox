@@ -45,6 +45,10 @@
  * kfsw_uart_visit() reports every configured interface and its counters;
  * kfsw_uart_test_peer() verifies and reports the UART selected for a node.
  *
+ * @defgroup kfsw_comms_can CAN
+ * @ingroup kfsw_comms
+ * @brief CAN configuration, interface state, bitrate selection and peer tests.
+ *
  * @defgroup kfsw_services K-FSW Services
  * @brief Services selected and started by the application.
  *
@@ -72,8 +76,9 @@
  * storage and the CSP router are ready. PUT and GET stream bounded chunks and
  * atomically commit received files.
  *
- * kfsw_ftp_list(), kfsw_ftp_stat(), and kfsw_ftp_mkdir() accept this node's own
- * CSP address and then run against local storage without a connection.
+ * kfsw_ftp_list(), kfsw_ftp_stat(), kfsw_ftp_mkdir() and kfsw_ftp_remove()
+ * accept this node's own CSP address and then run against local storage
+ * without a connection. The shell exposes removal as `ftp rm`.
  * kfsw_ftp_put() and kfsw_ftp_get() move a file between two nodes and return
  * -ENOTSUP for the local address.
  *

@@ -17,31 +17,32 @@ build options.
 | `kfsw-rotctl` | 20 | Antenna rotator control |
 
 The address says which link the ground node is on: 16 is reached over KISS and
-17 over CAN. A flight profile that carries both links can then name one route
-per link and never has to guess which one a ground address belongs to, which is
-what `nucleo-can.conf` does with `"3 CAN,17 CAN,16 KISS,0/0 KISS"`.
+17 over CAN. A flight profile that carries both links names one route per
+link, as `nucleo-can.conf` does with `"3 CAN,17 CAN,16 KISS,0/0 KISS"`.
 
-These are the reference settings. Each node file sets two addresses:
+Each node file sets:
 
-- `KFSW_CSP_NODE` is the node's own CSP address. Flight nodes use 1 to 15 and
-  ground nodes start at 16, so the two never collide; `tools/k-ground`
-  refuses a ground node below 16. It accepts up to 16382 under CSP 2 and up
-  to 30 under CSP 1.
-- `KFSW_CSP_VERSION=1` builds the node for CSP 1, to talk to a CSP 1
-  satellite; it is unset or 2 otherwise. A CSP 1 node gets its own
-  configuration file and build directory, with a `-csp1` suffix.
-- `KFSW_CSP_PEER` is the node at the other end of the serial link, the one
-  `comms uart test` pings when given no node. It is not a route: where packets go is
-  the route table, `KFSW_CSP_ROUTES`. On the firmware side the same number is
-  `CONFIG_KFSW_CSP_UART_PEER_ADDRESS`, which both ends have to agree on.
+| Variable | Meaning |
+| --- | --- |
+| `KFSW_ROLE` | Role name; must match the file name |
+| `KFSW_CSP_NODE` | The node's own address. `tools/k-ground` refuses a ground node below 16, and accepts up to 16382 under CSP 2 and 30 under CSP 1 |
+| `KFSW_CSP_PEER` | The node at the other end of the serial link, the one `comms uart test` pings when given no node. It becomes `CONFIG_KFSW_CSP_UART_PEER_ADDRESS` and is not a route |
+| `KFSW_CSP_ROUTES` | The route table, at most 99 characters |
+| `KFSW_CSP_VERSION` | `1` builds for a CSP 1 satellite; unset or `2` otherwise. A CSP 1 node gets its own configuration file and build directory, with a `-csp1` suffix |
+| `KFSW_RADIO_UHF` | `holybro` selects the radio module |
+| `KFSW_EXTRA_KCONFIG`, `KFSW_EXTRA_OVERLAY` | Extra Kconfig lines and a devicetree overlay |
 
-A bench usually needs its own variant of a role, for example the UHF gateway
-routed to flight node 2. Copy the role to a file ending in `-bench.env`, such
-as `kfsw-gnd-uhf-bench.env`; git ignores those, so device paths and bench
-routes stay on the machine they belong to.
+To make a bench variant of a role, for example the UHF gateway routed to
+flight node 2:
 
-The node file sets the role, name, prompt, address, peer, radio and build
-directory. Use `status` for node identity and `comms uhf status` for radio settings:
+1. Copy `nodes/kfsw-gnd-uhf.env` to `nodes/kfsw-gnd-uhf-bench.env`. Git
+   ignores `*-bench.env`, so device paths and bench routes stay on the
+   machine they belong to.
+2. Set `KFSW_ROLE=kfsw-gnd-uhf-bench` in it, and the peer and routes the
+   bench needs.
+3. Run it as `k-ground run kfsw-gnd-uhf-bench`.
+
+`status` shows the node identity and `comms uhf status` the radio settings:
 
 ```text
 kfsw-gnd-uhf# status
@@ -74,11 +75,16 @@ command -v socat
 `socat` is needed for the local CSP/KISS links (`sudo apt install socat`).
 See @ref getting_started for the workspace setup.
 
-The launcher uses `k-fsw/ground-station` and writes to `build/k-ground` by
-default. Each profile uses `<profile>-node-<node>` for its build directory and
-generated configuration basename, with `-csp1` appended for CSP v1. For example,
-`kfsw-gnd-uhf` uses `build/k-ground/kfsw-gnd-uhf-node-16`, keeping it separate
-from other profiles at node 16. To use other directories in the current shell:
+The launcher reads the station from `KGROUND_STATION_DIR` when it is set,
+otherwise from `./ground-station` when that holds the role's node file,
+otherwise from `k-fsw/ground-station`. It builds under `KGROUND_BUILD_ROOT`,
+which defaults to `$KFSW_OUTPUT_ROOT/k-ground` or `build/k-ground`. Each role
+builds in `<role>-node-<node>`, with `-csp1` appended for CSP 1, for example
+`build/k-ground/kfsw-gnd-uhf-node-16`. The generated Kconfig fragment of the
+same name is in `config/` under the build root. `k-ground` writes it to a
+temporary file and replaces it only when its contents change, so a repeated
+build does not rerun CMake; a failed write leaves the previous file in place.
+To use other directories in the current shell:
 
 ```bash
 export KGROUND_STATION_DIR="$PWD/ground-station"
@@ -112,12 +118,15 @@ for the gateway and
 [kfsw-gnd-can.env](https://github.com/dgonzalez97/k-fsw/blob/main/ground-station/nodes/kfsw-gnd-can.env)
 for one that adds Kconfig and an overlay.
 
-`KFSW_CSP_ROUTES` sets a route table, for example `'2 KISS'`, which means
-node 2 in either CSP version.
-`tools/k-ground` checks it and writes it to `CONFIG_KFSW_CSP_ROUTE_TABLE`;
-without it the node keeps `0/0 KISS` from `config/profiles/k-ground.conf`.
-`KFSW_EXTRA_KCONFIG` and `KFSW_EXTRA_OVERLAY` add Kconfig lines and a devicetree overlay, which is how
-`kfsw-gnd-can` enables CAN. `KFSW_RADIO_UHF=holybro` selects the radio module.
+`KFSW_CSP_ROUTES` such as `'2 KISS'` means node 2 in either CSP version.
+`tools/k-ground` checks its length and characters and writes it to
+`CONFIG_KFSW_CSP_ROUTE_TABLE`; without it the node keeps `0/0 KISS` from
+`config/profiles/k-ground.conf`. `kfsw-gnd-can` enables CAN through
+`KFSW_EXTRA_KCONFIG` and `KFSW_EXTRA_OVERLAY`.
+
+Ground nodes include FWU lite and host-file reading by default. From `kfsw-ops`,
+`fwu_lite send <node> /absolute/host/path` sends an image without extra Kconfig.
+See @ref firmware_update for validation and activation.
 
 To copy the reference configuration into your workspace:
 
@@ -125,8 +134,8 @@ To copy the reference configuration into your workspace:
 ./k-fsw/tools/k-ground init
 ```
 
-The launcher uses `./ground-station` when it exists, or `KGROUND_STATION_DIR`.
-`init` doesn't overwrite an existing directory.
+`init [directory]` creates `./ground-station` by default and refuses a path
+that already exists.
 
 ## Running
 
@@ -140,7 +149,18 @@ Start the UHF gateway and the operator shell in two terminals:
 ./k-fsw/tools/k-ground run kfsw-ops
 ```
 
-`run` connects the KISS PTYs of the two peers through a local socket:
+When the peer is a ground node (16 or above), `run` joins the KISS PTYs of
+the two peers through a Unix socket in `runtime/` under the build root. The
+options are:
+
+| Option | Effect |
+| --- | --- |
+| `--node N`, `--peer N` | Override the node file's addresses |
+| `--no-local-link` | Leave the PTY unconnected, for a serial bridge |
+| `-- ARGS` | Pass the rest to `zephyr.exe`, for example `--can-if=can0` |
+
+Without a `-flash=` argument, the node keeps its storage in
+`k-ground-storage.bin` in its build directory.
 
 ```text
 kfsw-ops# csp ping 16
@@ -153,7 +173,8 @@ rtt_ms: ...
 ```
 
 `k-ground demo` starts both and opens the operator shell. `k-ground test`
-checks both identities, prompts and ping directions:
+checks both identities, prompts and ping directions
+(`tests/k-ground-csp-smoke.sh`):
 
 ```bash
 ./k-fsw/tools/k-ground demo
@@ -202,6 +223,10 @@ entries: 1
 ```
 
 `tests/k-ground-ftp-smoke.sh` runs this sequence, including a missing file.
+
+After checking the copies, `ftp rm 16 /uplink/test.txt` removes the remote file.
+`ftp rm 16 /uplink` then removes the empty directory. Omit the node to remove
+a local file or empty directory.
 
 ## Telemetry in Yamcs
 
@@ -513,7 +538,8 @@ needs Rust.
 under Running above, give a gateway and an operator shell joined by a local
 link. Everything an operator does to a flight node is typed in the `kfsw-ops`
 shell with the node number first: `param get 2 boot_image`, `event tail 2 0`,
-`hk define 2 0 ...`, `ftp put 2 ...`, `csp reboot 2 <pin>`.
+`hk define 2 0 ...`, `ftp put 2 ...`, `csp reboot 2 <pin>`. A node left on
+Golden goes back to the application with the steps in @ref firmware_golden_return.
 
 ### A pass
 

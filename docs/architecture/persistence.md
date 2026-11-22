@@ -70,17 +70,24 @@ Four services use it: the parameter snapshot, the HK report definitions, the
 boot trial record and the table files. Each record has the same shape: a magic
 or version, big-endian fixed-width fields, and a trailing CRC32 that the
 loader checks before applying anything. A record that fails the check is
-reported and the compiled defaults stay.
+reported and the compiled defaults stay. Boot trial records are the exception:
+a record that fails its checks is renamed to `/kfsw/boot-trial.bad`,
+replacing the previous rejected record, followed by a fresh `KBT1` record. An
+error opening or reading it moves nothing.
+The read-only `boot_trial_quarantined` counter counts successful renames since
+startup. If the rename fails, the original record stays and the load error is
+returned with diagnostics invalid.
 
 The parameter snapshot holds every parameter flagged persistent, across all
 tables, by name. Loading skips names it does not know and types that changed,
 so an image built later keeps the values it still understands. It is written
-by `param save` and read once, at startup.
+by `param save`, or on every accepted change while `param_autosave` is set, and
+read once, at startup.
 
 ## Logs and files
 
 The journal (`/kfsw/journal.bin`) is a ring written by its own thread. It keeps
-boot reports and important events, not every log line, and it accepts losing
+boot reports and events of warning severity and above, not log lines, and it accepts losing
 the newest queued record in a power cut. `hk store` keeps each report's
 samples in a ring file of fixed-size slots under `/kfsw/hk`, overwritten
 oldest first.

@@ -11,3 +11,55 @@ tests:
       - native_sim/native/64
     integration_platforms:
       - native_sim/native/64
+  kfsw.comms.uart_duplicate_name.csp1:
+    tags:
+      - unit
+      - comms
+      - csp
+      - uart
+      - routing
+    platform_allow:
+      - native_sim/native/64
+    integration_platforms:
+      - native_sim/native/64
+    extra_configs:
+      - CONFIG_KFSW_CSP_VERSION_1=y
+  kfsw.comms.uart_open.success:
+    tags: [unit, comms, csp, uart]
+    platform_allow: [native_sim/native/64]
+    integration_platforms: [native_sim/native/64]
+    extra_args:
+      - UART_OPEN_FAILURE=0
+      - EXTRA_DTC_OVERLAY_FILE=partial.overlay
+  kfsw.comms.uart_open.first:
+    tags: [unit, comms, csp, uart]
+    platform_allow: [native_sim/native/64]
+    integration_platforms: [native_sim/native/64]
+    extra_args:
+      - UART_OPEN_FAILURE=1
+      - EXTRA_DTC_OVERLAY_FILE=partial.overlay
+  kfsw.comms.uart_open.second:
+    tags: [unit, comms, csp, uart]
+    platform_allow: [native_sim/native/64]
+    integration_platforms: [native_sim/native/64]
+    extra_args:
+      - UART_OPEN_FAILURE=2
+      - EXTRA_DTC_OVERLAY_FILE=partial.overlay
+  kfsw.comms.uart_open.codec_attach:
+    tags: [unit, comms, csp, uart]
+    platform_allow: [native_sim/native/64]
+    integration_platforms: [native_sim/native/64]
+    extra_args:
+      - UART_OPEN_FAILURE=3
+      - EXTRA_DTC_OVERLAY_FILE=partial.overlay
+    extra_configs:
+      - CONFIG_KFSW_CSP_UART_CODEC=y
+  kfsw.comms.uart_open.codec_check:
+    tags: [unit, comms, csp, uart]
+    platform_allow: [native_sim/native/64]
+    integration_platforms: [native_sim/native/64]
+    extra_args:
+      - UART_OPEN_FAILURE=4
+      - EXTRA_DTC_OVERLAY_FILE=partial.overlay
+    extra_configs:
+      - CONFIG_KFSW_CSP_UART_CODEC=y

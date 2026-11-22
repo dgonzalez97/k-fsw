@@ -38,13 +38,15 @@ A module defines one device or subsystem: its interface, state, parameters,
 and tests. The parameter core does not need to change.
 
 Examples in [`kfsw-modules`](https://github.com/dgonzalez97/kfsw-modules):
-a UHF radio, board buttons and LEDs, and an MCU temperature sensor.
+a UHF radio, board buttons and LEDs, an MCU temperature sensor, and
+`gpredict` pass tracking.
 
 ## Services
 
 - **Parameters:** named values with validation, remote access, callbacks and optional persistence.
 - **CSP:** communications router, with routes selecting UART/KISS or CAN links.
-- **Files:** upload, download, list and create directories, with CRC32 and RDP.
+- **Files:** upload, download, list, create directories and remove files or empty
+  directories (`ftp rm`), with CRC32 and RDP.
 - **Firmware update:** binaries over FTP, with MCUboot test,
   confirm, and rollback. FWU lite sends blocks over CSP without a filesystem.
 - **Commands and events:** a shell and remote commanding.

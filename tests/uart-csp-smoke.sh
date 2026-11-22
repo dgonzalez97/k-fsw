@@ -32,6 +32,10 @@ if [[ "$target" != "$ftdi_board" ]]; then
 	exit 0
 fi
 
+# The two physical transfers write 4 KiB and 16 KiB. LittleFS is
+# copy-on-write and needs spare blocks beyond the bytes themselves, so
+# asking for exactly 20 KB would pass a precheck and still fail the write.
+storage_needed_kb="${KFSW_UART_STORAGE_NEEDED_KB:-24}"
 debug_serial="${debug_serial:-$KFSW_SERIAL}"
 debug_baud="$KFSW_SERIAL_BAUD"
 nucleo_build_dir="$KFSW_BUILD_DIR"
@@ -436,6 +440,28 @@ wait_for_output "$work_dir/linux.log" "UART CSP test: PASS" "$linux_pid" || \
 	fail "KFSW-Linux UART transport test did not pass"
 
 if $have_storage; then
+	# This case writes 20 KiB into a 64 KiB filesystem and, until `ftp rm`
+	# existed, could not take it back. LittleFS also needs spare blocks to
+	# write, so on a board that already ran this case the 16 KiB stage failed
+	# and reported as a failed transfer rather than a full filesystem, which
+	# is a day of bench time to misread. Clear what this case wrote, then say
+	# plainly whether there is room. A path that is not there answers NOT
+	# FOUND, which is the expected answer on a clean board.
+	csp_exchange "$work_dir/linux.log" "$linux_pid" send_linux \
+		"ftp rm $node /hil/hil-4k.bin" >/dev/null || true
+	csp_exchange "$work_dir/linux.log" "$linux_pid" send_linux \
+		"ftp rm $node /hil/hil-16k.bin" >/dev/null || true
+	csp_exchange "$work_dir/linux.log" "$linux_pid" send_linux \
+		"param get $node free_kb" >/dev/null || \
+		fail "node $node did not answer for its free storage"
+	free_kb="$(sed -n "s/^$node:free_kb = \([0-9]\{1,\}\)$/\1/p" <<<"$CSP_REPLY" | tail -1)"
+	[[ "$free_kb" =~ ^[0-9]+$ ]] || \
+		fail "node $node reported no free storage figure"
+	if [[ "$free_kb" -lt "$storage_needed_kb" ]]; then
+		fail "node $node has ${free_kb} KB free and the transfers need about ${storage_needed_kb} KB with room for LittleFS to write. This is a full filesystem, not a broken link: remove files under /hil, or erase the storage partition."
+	fi
+	echo "FTP PHYSICAL PRECHECK: PASS free=${free_kb}KB needed=${storage_needed_kb}KB"
+
 	printf '%s\n' \
 		'ftp generate /build/hil-4k.bin 4096' \
 		'ftp mkdir 2 /hil' \

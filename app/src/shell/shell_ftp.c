@@ -32,7 +32,7 @@ static const struct {
 	{KFSW_FBO_FTP_PATH, "proc"},
 };
 
-/* Without a node, ls, stat and mkdir act on this node. */
+/* Without a node, ls, stat, mkdir and rm act on this node. */
 static int optional_node(const struct shell *sh, bool given, const char *text, uint16_t *node)
 {
 	struct kfsw_csp_info info;
@@ -157,6 +157,17 @@ static int ftp_mkdir(const struct shell *sh, uint16_t node, const char *path)
 	return 0;
 }
 
+static int ftp_rm(const struct shell *sh, uint16_t node, const char *path)
+{
+	int result = kfsw_ftp_remove(node, path);
+
+	if (result != 0) {
+		return print_ftp_error(sh, "rm", node, path, result);
+	}
+	shell_print(sh, "FTP rm %u %s: PASS", node, path);
+	return 0;
+}
+
 static int ftp_transfer(const struct shell *sh, bool upload, uint16_t node, const char *source,
 			const char *destination)
 {
@@ -207,6 +218,14 @@ static int cmd_ftp_mkdir(const struct shell *sh, size_t argc, char **argv)
 	int result = optional_node(sh, argc == 3U, argv[1], &node);
 
 	return (result == 0) ? ftp_mkdir(sh, node, argv[argc - 1U]) : result;
+}
+
+static int cmd_ftp_rm(const struct shell *sh, size_t argc, char **argv)
+{
+	uint16_t node;
+	int result = optional_node(sh, argc == 3U, argv[1], &node);
+
+	return (result == 0) ? ftp_rm(sh, node, argv[argc - 1U]) : result;
 }
 
 static int cmd_ftp_get(const struct shell *sh, size_t argc, char **argv)
@@ -279,6 +298,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 		      1),
 	SHELL_CMD_ARG(put, NULL, "Upload to a remote node: put <node> <local> <remote>",
 		      cmd_ftp_put, 4, 0),
+	SHELL_CMD_ARG(rm, NULL, "Remove a file or empty directory: rm [node] <path>", cmd_ftp_rm,
+		      2, 1),
 	SHELL_CMD_ARG(stat, NULL, "Show metadata: stat [node] <path>", cmd_ftp_stat, 2, 1),
 	SHELL_CMD_ARG(verify, NULL, "Compare two local files: verify <first> <second>",
 		      cmd_ftp_verify, 3, 0),

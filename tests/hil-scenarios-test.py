@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Software-only checks for HIL image selection and argument validation."""
+import argparse
+import importlib.util
 import os
 import pty
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
+from unittest import mock
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -275,6 +279,140 @@ echo '  iSerial 3 selected-probe'
         result = self.run_preflight("board-can")
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("a CAN interface with a board on it", result.stdout)
+
+    def test_can_queue_length(self):
+        for queue, expected in (("qlen 10", 1), ("qlen 1000", 0), ("qlen 2000", 0), ("", 1)):
+            with self.subTest(queue=queue):
+                BootSelection.tool(self.bin / "ip", f'''
+case "$*" in
+    '-brief link show type can') echo 'can0 UP' ;;
+    'link show can0' | '-details link show can0') echo 'can0: state UP {queue}' ;;
+    *) exit 1 ;;
+esac
+''')
+                for override in (False, True):
+                    if override:
+                        self.env["KFSW_CAN_INTERFACE"] = "can0"
+                    else:
+                        self.env.pop("KFSW_CAN_INTERFACE", None)
+                    result = self.run_preflight("board-can")
+                    self.assertEqual(result.returncode, expected, result.stdout)
+                    if expected:
+                        self.assertIn("txqueuelen of at least 1000", result.stdout)
+                        self.assertIn("can-up.sh 500000 normal", result.stdout)
+
+
+class CanQueue(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        spec = importlib.util.spec_from_file_location("can_update", REPO / "tests/hil/fwu/can-update.py")
+        cls.bench = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.bench)
+
+    def setUp(self):
+        self.state = {"txqlen": 1000, "linkinfo": {"info_data": {
+            "state": "ERROR-ACTIVE", "bittiming": {"bitrate": 500000}}}}
+
+    def test_sufficient_queue(self):
+        for queue in (1000, 2000):
+            self.state["txqlen"] = queue
+            self.bench.check_can(self.state, "can0")
+
+    def test_short_or_missing_queue(self):
+        for queue in (10, 0, None):
+            with self.subTest(queue=queue):
+                if queue is None:
+                    self.state.pop("txqlen")
+                else:
+                    self.state["txqlen"] = queue
+                with self.assertRaisesRegex(RuntimeError, "can0 txqueuelen is .*needs 1000.*can-up.sh"):
+                    self.bench.check_can(self.state, "can0")
+
+    def test_wrong_bitrate_or_state(self):
+        for key, value in (("bittiming", {"bitrate": 250000}), ("state", "BUS-OFF")):
+            with self.subTest(key=key):
+                self.setUp()
+                self.state["linkinfo"]["info_data"][key] = value
+                with self.assertRaisesRegex(RuntimeError, "CAN must be ERROR-ACTIVE at 500000 bit/s"):
+                    self.bench.check_can(self.state, "can0")
+
+    def test_rejection_precedes_upload_and_serial(self):
+        self.state["txqlen"] = 10
+        with mock.patch.object(self.bench, "can_state", return_value=self.state), \
+                mock.patch.object(self.bench.subprocess, "run") as run, \
+                mock.patch.object(self.bench.serial, "Serial") as serial:
+            with self.assertRaisesRegex(RuntimeError, "txqueuelen"):
+                self.bench.run_test(argparse.Namespace(interface="can0"), None)
+            run.assert_not_called()
+            serial.assert_not_called()
+
+    def test_acceptance_rejects_before_serial(self):
+        spec = importlib.util.spec_from_file_location(
+            "can_acceptance", REPO / "tests/hil/fwu/can-acceptance.py")
+        acceptance = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(acceptance)
+        self.state["txqlen"] = 10
+        with tempfile.TemporaryDirectory(prefix="kfsw-can-acceptance-") as work:
+            root = Path(work)
+            flash = root / "flash.bin"
+            flash.touch()
+            arguments = ["can-acceptance.py", "--ground", "ground", "--image", "image",
+                         "--flash", str(flash), "--serial", "/dev/serial/by-id/fixture",
+                         "--seconds", "0", "--interruptions", "--output", str(root / "output")]
+            # Input validation has its own tests; this one is about the CAN check's place.
+            with mock.patch.object(sys, "argv", arguments), \
+                    mock.patch.object(acceptance, "prepare_inputs",
+                                      return_value=({"ground.exe": b""}, {})), \
+                    mock.patch.object(acceptance.bench, "can_state", return_value=self.state), \
+                    mock.patch.object(acceptance.serial, "Serial") as serial, \
+                    mock.patch.object(acceptance.subprocess, "Popen") as process, \
+                    mock.patch.object(sys, "stderr") as stderr:
+                self.assertEqual(acceptance.main(), 1)
+                self.assertIn("txqueuelen", "".join(call.args[0] for call in stderr.write.call_args_list))
+                serial.assert_not_called()
+                process.assert_not_called()
+
+
+class CanBringup(unittest.TestCase):
+    def setUp(self):
+        self.work = tempfile.TemporaryDirectory(prefix="kfsw-can-up-")
+        self.addCleanup(self.work.cleanup)
+        self.root = Path(self.work.name)
+        self.calls = self.root / "calls"
+        BootSelection.tool(self.root / "ip", 'echo "$*" >>"$CAN_CALLS"')
+        BootSelection.tool(self.root / "cat", '''
+[[ "$*" == /sys/class/net/can0/tx_queue_len ]] || exit 1
+echo "$CAN_QUEUE"
+''')
+        self.env = dict(os.environ, PATH=f"{self.root}:{os.environ['PATH']}",
+                        CAN_CALLS=str(self.calls), CAN_QUEUE="1000")
+
+    def bring_up(self, mode="normal"):
+        return subprocess.run(["bash", str(REPO / "tests/hil/stm32/nucleo-l496zg/can-up.sh"),
+                               "500000", mode], env=self.env, text=True,
+                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=5)
+
+    def test_queue_set_before_interface_up(self):
+        result = self.bring_up()
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("can0 up at 500000 bps, normal, txqueuelen 1000", result.stdout)
+        calls = self.calls.read_text().splitlines()
+        self.assertLess(calls.index("link set can0 txqueuelen 1000"), calls.index("link set can0 up"))
+
+    def test_readback_failure_leaves_interface_down(self):
+        for queue in ("10", ""):
+            with self.subTest(queue=queue):
+                self.calls.write_text("")
+                self.env["CAN_QUEUE"] = queue
+                result = self.bring_up()
+                self.assertEqual(result.returncode, 1, result.stdout)
+                self.assertIn("expected 1000", result.stdout)
+                self.assertNotIn("link set can0 up", self.calls.read_text())
+
+    def test_down_does_not_set_queue(self):
+        result = self.bring_up("down")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(self.calls.read_text(), "link set can0 down\n")
 
 
 class UartArguments(unittest.TestCase):

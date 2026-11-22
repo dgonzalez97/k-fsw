@@ -370,7 +370,8 @@ def main():
             " `Built when` column names the condition that has to hold for it to"
             " be in an image.",
             "",
-            "Mode letters: `r` read only, `rw` writable, `b` kept across a reset,"
+            "Mode letters: `r` read only, `w` writable, `p` kept across a reset,"
+            " `b` write applied at next boot (without `b`, applied immediately),"
             " `c` operator configuration, `i` system identity, `d` diagnostic,"
             " `o` owner persists it, `l` applied live, `n` local writes only.",
             "",
@@ -633,9 +634,13 @@ def collect_parameters(workspace):
                         break
                     fields = designators(inner)
                     if "name" in fields:
+                        if any(fields.get(callback, "NULL") not in ("NULL", "0")
+                               for callback in ("apply", "changed", "changed_text", "changed_data")):
+                            fields["flags"] = (fields.get("flags", "0")
+                                               + " | KFSW_PARAM_FLAG_LIVE")
                         fields["offset"] = offset_text(fields.get("offset"), numbers)
                         entries.append(fields)
-                arrays[match.group(1)] = entries
+                arrays[(where, match.group(1))] = entries
 
             for match in re.finditer(
                 r"struct\s+kfsw_param_definition_set\s+(\w+)\s*=", text
@@ -647,6 +652,7 @@ def collect_parameters(workspace):
                         "table": resolve(fields.get("table"), defines),
                         "name": resolve(fields.get("name"), defines),
                         "holds": literal(fields.get("description", "")),
+                        "description": fields.get("description", ""),
                         "array": (fields.get("definitions") or "").strip(),
                         "file": where,
                         "guard": guard_at(text, match.start()),
@@ -657,7 +663,7 @@ def collect_parameters(workspace):
 
 FLAG_LETTERS = {
     "READ_ONLY": "r",
-    "PERSISTENT": "b",
+    "PERSISTENT": "p",
     "CONFIGURATION": "c",
     "SYSTEM_INFO": "i",
     "DEBUG": "d",
@@ -668,15 +674,16 @@ FLAG_LETTERS = {
 
 
 def flags_text(raw):
-    """The flags as letters, in the order FLAG_LETTERS declares them."""
+    """Shell write semantics followed by the additional metadata letters."""
     found = set(re.findall(r"KFSW_PARAM_FLAG_(\w+)", raw or ""))
-    if not found:
-        return "rw"
-    letters = [letter for name, letter in FLAG_LETTERS.items() if name in found]
+    text = "r" if "READ_ONLY" in found else "w"
+    if "PERSISTENT" in found:
+        text += "p"
+    if "READ_ONLY" not in found and "LIVE" not in found:
+        text += "b"
+    text += "".join(letter for name, letter in FLAG_LETTERS.items()
+                    if name in found and name not in ("READ_ONLY", "PERSISTENT"))
     unknown = sorted(found - set(FLAG_LETTERS))
-    text = "".join(letters)
-    if "r" not in text:
-        text = "rw" + text
     return text + ("+" + ",".join(unknown) if unknown else "")
 
 
@@ -685,7 +692,7 @@ def render_parameters(sets, arrays):
     out.append("| Table | Name | Params | Holds | Built when | Defined in |")
     out.append("| --- | --- | --- | --- | --- | --- |")
     for item in sorted(sets, key=lambda s: (str(s["table"]).zfill(3), s["name"])):
-        count = len(arrays.get(item["array"], []))
+        count = len(arrays.get((item["file"], item["array"]), []))
         gate = f"`{item['guard']}`" if item["guard"] else "always"
         out.append(
             f"| {item['table']} | `{item['name']}` | {count} | {cell(item['holds']) or '-'} "
@@ -698,7 +705,7 @@ def render_parameters(sets, arrays):
     out.append("| --- | --- | --- | --- | --- | --- | --- |")
     total = 0
     for item in sorted(sets, key=lambda s: (str(s["table"]).zfill(3), s["name"])):
-        for entry in arrays.get(item["array"], []):
+        for entry in arrays.get((item["file"], item["array"]), []):
             total += 1
             offset = entry.get("offset", "").rstrip("U")
             kind = TYPE_NAMES.get(entry.get("type", "").strip(), entry.get("type", ""))

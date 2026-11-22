@@ -2,12 +2,11 @@
 
 [TOC]
 
-Fault handling in K-FSW is not one service. Each mechanism watches one thing
-and does one thing when it goes wrong, and most of them do no more than tell
-the ground. The ones that act have a fixed order: report, then a command the
-operator wrote in advance, then a reset, and after enough unexplained resets,
-the recovery image. This page puts them on one page; @ref services has each
-one in detail.
+K-FSW has no single fault service. Each mechanism watches one thing and does
+one thing when it goes wrong, and most only tell the ground. The ones that act
+escalate in a fixed order: report, then a command the operator wrote in
+advance, then a reset, and after enough unexplained resets, the recovery
+image. @ref services describes each one.
 
 ```mermaid
 flowchart TD
@@ -26,6 +25,7 @@ flowchart TD
     GOLDEN["Golden installed"]
 
     MONITORS --> EVENT
+    LIMITS --> EVENT
     LIMITS --> ACTION
     HEALTH --> NOTE
     HEALTH -- "stops feeding" --> IWDG
@@ -53,8 +53,9 @@ publish.
 
 Limits (`KFSW_LIMITS`) watch numeric parameters. A rule names a parameter, a
 comparison, a bound, how many consecutive sweeps it must hold, and a command
-to release. The command goes through the file based operations scheduler, so
-the release is logged and can address another node. This is where a mission
+to release. A rule that fires records a `limits` event, and the command goes
+through the file based operations scheduler, so the release is logged and can
+address another node. This is where a mission
 writes its local recovery: switch off a load, change a mode, restart a
 subsystem. The rule file is uploaded like any other file, and nothing in the
 image has to change.
@@ -103,6 +104,22 @@ bootloader has had the chance to revert an unconfirmed update. A run that
 stays healthy for `CONFIG_KFSW_BOOT_BUDGET_STABLE_S` refills the count, so
 only startups that never became stable add up.
 
+A refused Golden ends the chain. The install checks the recovery image's own
+SHA-256 before it erases the secondary slot, so a damaged one is refused with
+the slot untouched; `tests/unit/services_golden` covers that case as
+`test_damaged_image_refused_before_the_slot_erase`. The node then keeps running
+the image that was failing to confirm, with no attempts left to spend and
+nothing further to try on its own.
+
+That is not a dead node. The flight image is still running and still
+commandable, so the ground can upload a new one and recover the node over the
+link. What the ground cannot repair is the golden partition itself. Nothing in
+the node ever writes it: the service only reads it, to check its digest, to
+copy it into the secondary slot, and for the scrub to compare a CRC32. It is
+written by a programmer, through `tools/golden.sh flash`, and by nothing else.
+So a damaged recovery image stays damaged until the board is in front of
+someone, and the scrub is how an operator learns that before it matters.
+
 Neither of those mechanisms exists in the recovery image: `KFSW_BOOT_BUDGET`
 depends on `!KFSW_GOLDEN_IMAGE`, so Golden compiles neither the spend at
 startup nor the stable-run refill. Golden spends no attempts and refills the
@@ -110,10 +127,16 @@ record once at its own startup, which is the retry for an install-time refill
 that failed.
 @ref firmware_update has the sequence.
 
-The persistent journal (`KFSW_JOURNAL`) keeps boot reports and important
-events in flash, and the trial diagnostics in `/kfsw/boot-trial.dat` count
+The persistent journal (`KFSW_JOURNAL`) keeps boot reports and events of
+warning severity and above in flash, and the trial diagnostics in `/kfsw/boot-trial.dat` count
 the unconfirmed boots of the running image. A ground station reads both at
 the next pass to learn what happened while nobody was listening.
+
+A trial record that fails its checks is renamed to `/kfsw/boot-trial.bad`,
+replacing the previous rejected record, before a fresh count starts. The
+read-only `boot_trial_quarantined` counter reports successful quarantines since
+startup. If the rename fails, the original record stays and diagnostics remain
+invalid.
 
 ## What is not here
 

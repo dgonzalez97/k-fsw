@@ -1,0 +1,3 @@
+&{/csp-kiss-uarts/duplicate} {
+	interface-name = "KISS_2";
+};

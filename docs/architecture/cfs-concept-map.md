@@ -5,9 +5,9 @@
 NASA's core Flight System (cFS) is the reference most flight software
 engineers know: the cFE core services, OSAL and PSP underneath, and a set of
 applications that talk over the Software Bus. K-FSW solves many of the same
-problems with a different shape. This page maps each cFS piece to what K-FSW
-has in its place, or says that it has nothing, and then explains the
-differences that change how you design with it.
+problems with a different shape. This page maps each cFS piece to its K-FSW
+counterpart, or says there is none, then covers the differences that change a
+design.
 
 ## The shape in one picture
 
@@ -140,17 +140,18 @@ items on Zephyr's system workqueue:
 
 | Priority | Runs there |
 | --- | --- |
-| System workqueue, cooperative | Health, watchdog keep-alive, resource monitor, scrub, limits, ground watchdog |
+| System workqueue, cooperative | Health, watchdog keep-alive, resource monitor, scrub, ground watchdog |
 | 0 | CSP router (`KFSW_CSP_ROUTER_PRIORITY`), the `main()` loop |
 | 1 | PARAM descriptor server |
 | 2 | Command server, FTP |
 | 3 | PARAM value server, HK server, remote execution, FWU lite, radio codec |
-| 4 | HK collector |
+| 4 | HK collector, limits (own workqueue) |
 | 5 and below | File based operations, the temperature example, the journal, the remote log server |
 
 These are the defaults in each repository's `Kconfig`. A priority follows how
-soon the work must run, not how important it is: the router is first because every service waits for it, and the HK
-collector is low because a late sample is still a sample. A work item on the
+soon the work must run, not how important it is: the router is first because
+every service waits for it, and the HK collector is low because a late sample
+is still a sample. A work item on the
 system workqueue must not block, because the watchdog keep-alive runs there
 too; a module that waits for hardware uses its own queue, as the temperature
 example does.

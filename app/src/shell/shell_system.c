@@ -154,9 +154,9 @@ static int cmd_version(const struct shell *sh, size_t argc, char **argv)
 	shell_print(sh, "Unit: %s", kfsw_boot_get_hardware_id());
 
 	kfsw_boot_get_diagnostics(&diagnostic);
-	shell_print(sh, "Boot trial: attempts=%u revert_reason=%u valid=%u",
+	shell_print(sh, "Boot trial: attempts=%u revert_reason=%u valid=%u quarantined=%u",
 		    (unsigned int)diagnostic.attempts, diagnostic.revert_reason,
-		    diagnostic.valid ? 1U : 0U);
+		    diagnostic.valid ? 1U : 0U, diagnostic.quarantined);
 
 	return 0;
 }
