@@ -63,6 +63,7 @@ Table 32 exposes read-only trial diagnostics. `version` prints them too.
 | `0x2c` | `boot_attempts` | Unconfirmed boots recorded for the running image; resets to zero on confirmation and saturates at `4294967294`. |
 | `0x29` | `boot_revert_reason` | Last observed revert: 0 none, 1 unconfirmed image replaced with revert pending, 2 unconfirmed image replaced without an observed pending revert. |
 | `0x2a` | `boot_trial_valid` | 1 when recovery and the current save succeeded; otherwise 0. |
+| `0x3d` | `boot_trial_quarantined` | Rejected records moved to `/kfsw/boot-trial.bad` since startup; saturates at 255 and resets on reboot. |
 
 The service identifies images by their signed SHA256 TLV and records a boot
 immediately after storage mount, in `/kfsw/boot-trial.dat`, separate from the
@@ -78,10 +79,21 @@ identity. Confirming the running image resets the attempt count and keeps the
 reason. A confirmation through `boot_confirmed` is saved at once; one through
 the MCUboot shell is seen at the next startup.
 
-Without MCUboot, including on native_sim, or when image identity, storage or
-snapshot validation fails, attempts reads `4294967295`, reason `255` and
-validity 0. A corrupt record is kept and reported invalid; the count does not
-restart at one.
+A record that fails its checks (size, magic, field range or CRC) is moved from
+`/kfsw/boot-trial.dat` to `/kfsw/boot-trial.bad`, replacing the previous
+rejected record. The error is logged once and `boot_trial_quarantined`
+increments. A fresh record starts at one for an unconfirmed image, or zero for
+a confirmed image. An error opening or reading the file moves nothing: the
+record may be sound, so it stays and diagnostics are invalid for that boot. If
+the rename fails, the rejected record stays in place and the original load
+error is returned.
+
+Without MCUboot, including on native_sim, or when image identity, storage,
+quarantine or saving fails, attempts reads `4294967295`, reason `255` and
+validity 0. The quarantine counter remains readable even when diagnostics are
+invalid. It is not persisted; the `.bad` file survives a reboot. A power cut
+between quarantine and the fresh save leaves `.bad` as evidence, and the next
+boot starts a fresh record.
 
 `tests/boot-diagnostics-restart.sh <zephyr.exe>` runs the native_sim ztest
 image twice against the same flash file. Power-cut and MCUboot rollback have

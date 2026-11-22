@@ -205,7 +205,7 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | 29 | `ftp` | 7 | File transfers and limits | always | `kfsw-services/src/ftp-parameters/ftp_table.c` |
 | 30 | `fwu` | 13 | Firmware update state and checks | always | `kfsw-services/src/fwu-parameters/fwu_table.c` |
 | 31 | `health` | 11 | Health monitor and watchdog feeds | always | `kfsw-services/src/health-parameters/health_table.c` |
-| 32 | `boot` | 13 | Running image, revisions, restarts | always | `kfsw-services/src/boot-parameters/boot_table.c` |
+| 32 | `boot` | 14 | Running image, revisions, restarts | always | `kfsw-services/src/boot-parameters/boot_table.c` |
 | 33 | `hk` | 14 | Housekeeping reports and counters | always | `kfsw-services/src/hk-parameters/hk_table.c` |
 | 34 | `fbo` | 19 | Procedure runs, progress and the time-tagged queue | always | `kfsw-services/src/fbo-parameters/fbo_table.c` |
 | 35 | `gndwdt` | 8 | Ground watchdog countdown | always | `kfsw-services/src/gndwdt-parameters/gndwdt_table.c` |
@@ -337,6 +337,7 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | `boot` | 0x2c | `boot_attempts` | u32 | r | - | Persisted unconfirmed boots of this image; UINT32_MAX invalid |
 | `boot` | 0x29 | `boot_revert_reason` | u8 | r | - | 0 none, 1 missed confirmation, 2 replaced unknown, 255 invalid |
 | `boot` | 0x2a | `boot_trial_valid` | u8 | r | - | Trial diagnostics were recovered and saved successfully |
+| `boot` | 0x3d | `boot_trial_quarantined` | u8 | r | - | Rejected trial records moved to boot-trial.bad since startup |
 | `boot` | 0x00 | `boot_image` | str | ri | - | Version of the running image, from the build |
 | `boot` | 0x40 | `boot_revisions` | str | ri | - | Short revision of each repository compiled into this image |
 | `boot` | 0x20 | `boot_count` | u32 | rp | - | Restarts recorded across the life of the node |

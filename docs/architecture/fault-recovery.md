@@ -132,6 +132,12 @@ warning severity and above in flash, and the trial diagnostics in `/kfsw/boot-tr
 the unconfirmed boots of the running image. A ground station reads both at
 the next pass to learn what happened while nobody was listening.
 
+A trial record that fails its checks is renamed to `/kfsw/boot-trial.bad`,
+replacing the previous rejected record, before a fresh count starts. The
+read-only `boot_trial_quarantined` counter reports successful quarantines since
+startup. If the rename fails, the original record stays and diagnostics remain
+invalid.
+
 ## What is not here
 
 There is no central fault manager and no spacecraft mode. A mission that

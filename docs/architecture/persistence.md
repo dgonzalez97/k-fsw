@@ -70,7 +70,13 @@ Four services use it: the parameter snapshot, the HK report definitions, the
 boot trial record and the table files. Each record has the same shape: a magic
 or version, big-endian fixed-width fields, and a trailing CRC32 that the
 loader checks before applying anything. A record that fails the check is
-reported and the compiled defaults stay.
+reported and the compiled defaults stay. Boot trial records are the exception:
+a record that fails its checks is renamed to `/kfsw/boot-trial.bad`,
+replacing the previous rejected record, followed by a fresh `KBT1` record. An
+error opening or reading it moves nothing.
+The read-only `boot_trial_quarantined` counter counts successful renames since
+startup. If the rename fails, the original record stays and the load error is
+returned with diagnostics invalid.
 
 The parameter snapshot holds every parameter flagged persistent, across all
 tables, by name. Loading skips names it does not know and types that changed,
