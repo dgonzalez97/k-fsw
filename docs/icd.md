@@ -204,7 +204,7 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | 28 | `command` | 7 | Command counters, timeout and echo | always | `kfsw-services/src/command-parameters/command_table.c` |
 | 29 | `ftp` | 7 | File transfers and limits | always | `kfsw-services/src/ftp-parameters/ftp_table.c` |
 | 30 | `fwu` | 13 | Firmware update state and checks | always | `kfsw-services/src/fwu-parameters/fwu_table.c` |
-| 31 | `health` | 11 | Health monitor and watchdog feeds | always | `kfsw-services/src/health-parameters/health_table.c` |
+| 31 | `health` | 15 | Health monitor and watchdog feeds | always | `kfsw-services/src/health-parameters/health_table.c` |
 | 32 | `boot` | 14 | Running image, revisions, restarts | always | `kfsw-services/src/boot-parameters/boot_table.c` |
 | 33 | `hk` | 14 | Housekeeping reports and counters | always | `kfsw-services/src/hk-parameters/hk_table.c` |
 | 34 | `fbo` | 19 | Procedure runs, progress and the time-tagged queue | always | `kfsw-services/src/fbo-parameters/fbo_table.c` |
@@ -332,6 +332,10 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | `health` | 0x24 | `health_app_since_ms` | u32 | r | ms | Since it last reported; 4294967295 when absent |
 | `health` | 0x28 | `health_csp_state` | u8 | r | - | 0 ok, 1 overdue, 2 absent |
 | `health` | 0x2c | `health_csp_since_ms` | u32 | r | ms | Since it last reported; 4294967295 when absent |
+| `health` | 0x30 | `health_kiss_state` | u8 | r | - | 0 ok, 1 overdue, 2 absent |
+| `health` | 0x34 | `health_kiss_since_ms` | u32 | r | ms | Since it last reported; 4294967295 when absent |
+| `health` | 0x38 | `health_can_state` | u8 | r | - | 0 ok, 1 overdue, 2 absent |
+| `health` | 0x3c | `health_can_since_ms` | u32 | r | ms | Since it last reported; 4294967295 when absent |
 | `boot` | 0x2b | `boot_attempts_left` | u8 | wpol | - | Attempts remaining; ground writes persist in early flash |
 | `boot` | 0x3c | `boot_attempts_max` | u8 | wpol | - | Boot attempt limit: 3, 5 or 10; raising never refills |
 | `boot` | 0x2c | `boot_attempts` | u32 | r | - | Persisted unconfirmed boots of this image; UINT32_MAX invalid |
