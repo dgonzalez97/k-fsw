@@ -289,7 +289,7 @@ jobs:
 
       - name: Validate all Robot suites and run software scenarios
         env:
-          KFSW_ROBOT_ACCEPTANCE: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && '0' || '1' }}
+          KFSW_ROBOT_ACCEPTANCE: '1'
         run: ./k-fsw/tools/ci/robot.sh
 
       - name: Check required software evidence
