@@ -34,6 +34,9 @@ For a focused native suite:
 
 ### Both native widths
 
+The [shared 64-bit state audit](64-bit-state.md) lists synchronization and
+thread ownership for service and platform timestamps, sequences and counters.
+
 Twister runs `native_sim/native/64` and the 32-bit `native_sim/native`. They
 differ in pointer width, type alignment and structure padding, which is where
 a vendored library's assumptions show up.
