@@ -1,3 +1,25 @@
 source "$(APPLICATION_SOURCE_DIR)/../../../app/Kconfig.csp_liveness"
 
+config KFSW_TEST_RECEIVERS
+	bool "Receiver snapshots instead of the self-ping-only test"
+
+config KFSW_TEST_RECEIVERS_UNOPENED
+	bool "Receivers never opened"
+	depends on KFSW_TEST_RECEIVERS
+
+config KFSW_CSP_KISS_UART
+	bool
+	default y if KFSW_TEST_RECEIVERS
+
+config KFSW_CSP_UART_INTERRUPT_DRIVEN
+	bool
+
+config CSP_UART_RX_THREAD_NUM
+	int
+	default 2
+
+config KFSW_CSP_CAN
+	bool
+	default y if KFSW_TEST_RECEIVERS
+
 source "Kconfig.zephyr"

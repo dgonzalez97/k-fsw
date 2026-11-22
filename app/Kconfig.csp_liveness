@@ -2,7 +2,7 @@
 # rest of the composition and needs the same defaults and ranges.
 
 config KFSW_CSP_LIVENESS
-	bool "Watch the CSP router with health"
+	bool "Watch the CSP router and receivers with health"
 	depends on KFSW_HEALTH
 	default y
 	help
@@ -10,6 +10,9 @@ config KFSW_CSP_LIVENESS
 	  runs. This carries a packet to this node's own address on a period and
 	  reports only when it arrives, so a router or connection pool that has
 	  stopped serving stops the watchdog being fed.
+	  Open polling KISS and CAN receivers report only while their loop-pass
+	  counters advance, even on a quiet link. Interrupt-driven KISS and UART
+	  codec workers are not supervised. Crypto is optional.
 
 if KFSW_CSP_LIVENESS
 
@@ -24,10 +27,13 @@ config KFSW_CSP_LIVENESS_TIMEOUT_MS
 	range 5 10000
 
 config KFSW_CSP_LIVENESS_DEADLINE_MS
-	int "Health deadline for the probe, in milliseconds"
+	int "Health deadline for the probe and receivers, in milliseconds"
 	default 8000
 	range 100 120000
 	help
 	  Several periods, so one lost probe on a busy node does not reset it.
+	  Measured from the last progress report, with up to one health check
+	  interval before feed suppression. Receiver sampling also includes the
+	  probe wait and system workqueue scheduling delays.
 
 endif # KFSW_CSP_LIVENESS

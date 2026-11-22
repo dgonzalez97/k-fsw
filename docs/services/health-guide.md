@@ -63,7 +63,9 @@ only once the component can report.
 #define KFSW_HEALTH_SLOTS(SLOT)                                                \
 	SLOT(app, 0)                                                           \
 	SLOT(csp, 1)                                                           \
-	SLOT(myservice, 2)
+	SLOT(kiss, 2)                                                          \
+	SLOT(can, 3)                                                           \
+	SLOT(myservice, 4)
 ```
 
 The index fixes the slot's offsets on the wire, so it is never reused or
@@ -176,3 +178,82 @@ healthy, both slots read ok and their age changes, a component that stops
 reporting resets the board, the next boot names the watchdog, and the slots
 read ok afterwards. It also checks that a component registered at run time
 creates no parameter, since a table that grew would move the wire offsets.
+
+## Quiet links and stalled receivers
+
+The `csp` component still probes this node through the router. Two more fixed
+slots cover opened receivers when `CONFIG_KFSW_CSP_LIVENESS=y`: `kiss` at slot
+2 for polling UART reception, and `can` at slot 3 for CAN. Each uses
+`CONFIG_KFSW_CSP_LIVENESS_DEADLINE_MS`, normally 8000 ms. Crypto is optional.
+
+The libcsp RX threads count every pass, including idle passes. `comms uart
+info` and `comms can info` print `rx_passes`. The wrapping count advances on a
+quiet link and freezes when the receiver stalls. Packet counters alone cannot
+make that distinction. The liveness work item reports `kiss` only when every
+watched polling receiver advances, and reports `can` independently. A receiver
+missing from a later snapshot remains an obligation. A receiver that never
+opened is a startup failure and is not registered; UART's `receiver_opened`
+signal is separate from `interface_started`, which can survive a failed open.
+
+Quiet links keep feeding indefinitely, including between ground passes. Ground
+contact expiry remains the separate 24 h ground watchdog. CAN bus-off alone
+is not a health fault: an external bus fault is not repaired by resetting the
+node, and resets consume boot attempts. Starvation that stops a receiver from
+running does count as a stall.
+
+The receiver sampling delay is the configured liveness period plus the
+self-ping wait and system workqueue scheduling delay. Health then evaluates
+its own deadlines on `health_interval_ms`. Feed suppression occurs after the
+last progress report exceeds its deadline, within one further health check
+interval under normal scheduling. This is a deadline plus one health sampling
+period from the last report, not a strict deadline from the suspend command.
+A final sample can still report progress made immediately before suspension.
+The shared system workqueue prevents an unconditional real-time bound.
+
+Interrupt-driven KISS on NUCLEO and Pico has no polling loop and no registered
+`kiss` component: its table slot reads absent. A silently disabled RX interrupt
+on a quiet link is an accepted coverage gap. The `app` component, router
+self-ping and 24 h ground watchdog provide the remaining coverage. The UART
+codec worker is also outside this supervision; successful receiver open does
+not prove that worker is healthy. Golden leaves CSP liveness off and retains
+its ground watchdog. Default Linux still leaves health and watchdog off.
+
+### Software fault injection
+
+Run `tests/kiss-rx-stall-smoke.sh` for a dedicated Linux diagnostics image with
+a counter watchdog, or `tests/can-rx-stall-smoke.sh` for vcan0 and ground node
+17. The latter reports NOT RUN when vcan0 is unavailable. Both leave the link
+quiet for more than three deadlines, check increasing feeds, discover the RX
+thread ID, suspend it, and check frozen progress and feeds with `faulted_by`
+naming the link. They report hosted reset evidence separately. A hosted result
+is software evidence only.
+
+### Hardware procedure
+
+HIL: NOT RUN until a human observes and records this procedure.
+
+Build NUCLEO-L496ZG with `config/profiles/nucleo-can.conf` and its overlay,
+plus `tests/hil/fwu/flight-diagnostics.conf`, `CONFIG_KERNEL_SHELL=y`,
+`CONFIG_THREAD_MONITOR=y`, `CONFIG_THREAD_NAME=y`, `CONFIG_INIT_STACKS=y` and
+`CONFIG_THREAD_STACK_INFO=y`. Thread suspend/resume commands are selected by
+this diagnostics configuration. It differs from the flight image.
+
+Use the human-confirmed ST-LINK `/dev/serial/by-id/...` console. CAN requires
+an external transceiver on PD0/PD1, termination and common ground, with PCAN
+`can0` at 500 kbit/s. KISS uses USART3 PD8 TX/PD9 RX, crossed FTDI wiring,
+common ground, 3.3 V logic and 115200 baud. Board node is 2, CAN peer 17,
+and KISS peer 1.
+
+1. Record image and dependency SHAs, device IDs, effective routes on both ends,
+   interfaces and the initial boot-budget state.
+2. Leave both links quiet for at least 30 seconds and more than three
+   deadlines. Confirm `state: ok`, `feeding: yes`, increasing `feeds`, no reset.
+3. Ping both ways on CAN and KISS. Record `tx/rx/txerr/rxerr/drop/frame`.
+4. Run `kernel thread list`, find `csp_rx_CAN`, and copy its hexadecimal ID.
+   Run `kernel thread suspend <hex-id>` once. Names are not accepted as IDs.
+5. Record frozen CAN `rx_passes`, `faulted_by: can`, `feeding: no`, stopped
+   feeds, IWDG reset, the second `@BOOT`, reset cause and recovery.
+6. Record actual boot-budget accounting. Repeat only with owner agreement,
+   because resets can exhaust the flight boot budget and enter Golden.
+7. Confirm the interrupt-driven `kiss` component is absent, including
+   `health_kiss_state=2` in table 31.

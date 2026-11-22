@@ -48,7 +48,16 @@ static bool check_context(const struct kfsw_uart_info *info, void *context)
 	unsigned int *count = context;
 
 	if (info->interface_started) {
+		bool failed_open = (UART_OPEN_FAILURE == 1 && *count == 0U) ||
+				   (UART_OPEN_FAILURE == 2 && *count == 1U);
+
 		zassert_not_null(csp_iflist_get_by_name(info->interface_name));
+		zassert_equal(info->receiver_opened, !failed_open);
+		if (failed_open) {
+			zassert_equal(info->rx_passes, 0U);
+		} else {
+			zassert_true(info->rx_passes > 0U);
+		}
 		(*count)++;
 	}
 	return true;
@@ -68,6 +77,8 @@ ZTEST(comms_uart_validation, test_open_result_is_stable)
 		expected = -ENODEV;
 	}
 	zassert_equal(kfsw_csp_init(), expected);
+	zassert_equal(csp_usart_rx_passes(NULL), 0U);
+	k_sleep(K_MSEC(20));
 	zassert_equal(open_calls, expected_contexts);
 	csp_iface_t *first = csp_iflist_get_by_name("KISS_1");
 	csp_iface_t *second = csp_iflist_get_by_name("KISS_2");
