@@ -466,13 +466,17 @@ The NUCLEO uses CAN1 on PD0/PD1 with an external transceiver, and a Linux node
 uses a SocketCAN interface. Both ends of the bus need the same bitrate; the
 profiles use 500 kbit/s.
 
-`can_speed` in table 1 changes the bitrate at run time: 125000, 250000,
-500000, 800000 or 1000000. The node stops the CAN interface and opens it again
-at the new rate, so a change made over CAN cuts the link until the other nodes
-follow. If the stop fails, the driver keeps the interface, its queue and its
-receive thread, and the node stays at the old rate. Read `can_speed` back
-after writing it: it reports the rate in use, and writing the value again
-retries the stop.
+`can_speed` in table 1 accepts 125000, 250000, 500000, 800000 or 1000000
+before the CSP router starts. While the router runs, parameter writes are
+refused and the active bitrate stays unchanged. The `kfsw_can_set_bitrate()`
+API returns `-EBUSY` for a change to an open interface while routing. Setting
+the API to the active bitrate succeeds without restarting the controller.
+
+Before routing, changing an open interface stops it and opens it again at the
+new rate. If stopping fails, the driver retains its resources and the bitrate
+stays unchanged. Every node on the bus must use the same bitrate. The normal
+application starts the router during boot, so select its bitrate through
+`CONFIG_KFSW_CSP_CAN_BITRATE` before building.
 
 Bring up a real SocketCAN adapter with:
 

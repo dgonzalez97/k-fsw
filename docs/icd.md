@@ -230,7 +230,7 @@ What a ground station or another node can ask this one to run over CSP. `Claim` 
 | `board` | 0x30 | `revision` | str | ri | - | Build revision, as reported by csp ident |
 | `board` | 0x02 | `csp_enabled` | u8 | ri | - | Whether CSP is composed into this build |
 | `board` | 0x05 | `can_enabled` | u8 | ri | - | Whether the CAN interface is composed |
-| `board` | 0x0c | `can_speed` | u32 | wl | - | CAN bitrate: 125000, 250000, 500000, 800000 or 1000000 |
+| `board` | 0x0c | `can_speed` | u32 | wl | - | CAN bps before routing: 125000, 250000, 500000, 800000, 1000000 |
 | `board` | 0x03 | `kiss_enabled` | u8 | ri | - | Whether the KISS interface is composed |
 | `board` | 0x04 | `reset_cause` | KFSW_PARAM_X32 | ri | - | Reset cause latched at boot |
 | `board` | 0x08 | `shell_enabled` | u8 | ri | - | Whether the debug shell is composed |
