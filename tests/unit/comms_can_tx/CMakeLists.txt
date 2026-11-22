@@ -9,6 +9,7 @@ list(APPEND ZEPHYR_EXTRA_MODULES
     "${KFSW_WORKSPACE_ROOT}/kfsw-platform"
     "${KFSW_WORKSPACE_ROOT}/kfsw-comms/third_party/libcsp"
     "${KFSW_WORKSPACE_ROOT}/kfsw-comms"
+    "${KFSW_WORKSPACE_ROOT}/kfsw-services"
 )
 
 set(CSP_REPRODUCIBLE_BUILDS ON CACHE BOOL "" FORCE)
@@ -19,5 +20,7 @@ set(CSP_USE_PROMISC OFF CACHE BOOL "" FORCE)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(kfsw_comms_can_tx_tests LANGUAGES C)
 
-target_sources(app PRIVATE src/main.c)
-target_link_libraries(app PRIVATE kfsw::comms)
+target_sources(app PRIVATE src/main.c ../../../app/src/parameters/board_table.c)
+target_include_directories(app PRIVATE ../../../app/src)
+target_link_libraries(app PRIVATE kfsw::comms kfsw::services)
+zephyr_link_libraries(-Wl,--wrap=z_impl_k_thread_join -Wl,--wrap=k_free)

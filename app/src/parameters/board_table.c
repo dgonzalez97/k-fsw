@@ -131,12 +131,15 @@ static void sample_can_speed(void *value)
  */
 static int validate_can_speed(const union kfsw_param_scalar *value)
 {
-	return kfsw_can_bitrate_supported(value->u32) ? 0 : -EINVAL;
+	struct kfsw_csp_info info;
+
+	if (!kfsw_can_bitrate_supported(value->u32)) {
+		return -EINVAL;
+	}
+	kfsw_csp_get_info(&info);
+	return info.router_running ? -EBUSY : 0;
 }
 
-/* Every node on the bus needs the same bitrate, so changing it over CAN
- * cuts the link until the other nodes follow.
- */
 static void changed_can_speed(const union kfsw_param_scalar *value)
 {
 	(void)kfsw_can_set_bitrate(value->u32);
@@ -217,7 +220,7 @@ static const struct kfsw_param_definition board_param_definitions[] = {
 		.offset = 0x0cU,
 		.type = KFSW_PARAM_U32,
 		.name = "can_speed",
-		.description = "CAN bitrate: 125000, 250000, 500000, 800000 or 1000000",
+		.description = "CAN bps before routing: 125000, 250000, 500000, 800000, 1000000",
 		.value = &board_can_speed,
 		.default_value = {.u32 = CONFIG_KFSW_CSP_CAN_BITRATE},
 		.sample = sample_can_speed,
