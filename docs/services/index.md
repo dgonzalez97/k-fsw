@@ -1048,7 +1048,16 @@ Commands are registered at build time as sets and the registry is fixed at
 startup. Duplicate IDs or names, missing handlers and too many arguments are
 rejected. Handlers run in the caller's thread under the command mutex. Remote
 requests use the command server thread; local calls use the shell or calling
-thread. Handlers do not run on the CSP router thread.
+thread. Handlers do not run on the CSP router thread. An invocation waits up to
+`CONFIG_KFSW_COMMAND_ADMISSION_MS` (500 ms by default) for the mutex, then returns
+`busy` without running its handler. The detail names the command observed in
+flight when the wait expires; that command may already have finished by the
+time the caller reads the reply. Handler execution time is not limited.
+The CSP server still serves one request at a time, so a running remote handler
+can delay accepting later requests.
+
+An FBO line refused as `busy` fails the procedure. A ticketed request retains
+that result, so trying again requires a new operation.
 
 A version 1 message has a 12-byte big-endian header: version, opcode, status,
 argument count, command ID, request ID and payload size. Type-length-value
