@@ -5,6 +5,12 @@
 
 static struct kfsw_command_retry_cache cache;
 static unsigned int invoked;
+static int handler_outcome;
+static enum kfsw_command_status handler_status;
+static K_SEM_DEFINE(other_ready, 0, 1);
+static K_SEM_DEFINE(other_release, 0, 1);
+static K_THREAD_STACK_DEFINE(other_stack, 2048);
+static struct k_thread other_thread;
 static struct kfsw_command_result result;
 static uint64_t ticket;
 static const uint8_t body[] = {KFSW_COMMAND_TYPE_U32, 0, 4, 0, 0, 0, 7};
@@ -16,9 +22,37 @@ static int handler(const struct kfsw_command_arg *args, size_t count,
 	ARG_UNUSED(count);
 	zassert_true(source->via_csp);
 	invoked++;
-	out->status = args[0].value.u32 == 7U ? KFSW_COMMAND_OK : KFSW_COMMAND_FAILED;
+	out->status = args[0].value.u32 == 7U ? handler_status : KFSW_COMMAND_FAILED;
 	strcpy(out->detail, "called");
-	return 0;
+	return handler_outcome;
+}
+
+static int blocking_handler(const struct kfsw_command_arg *args, size_t count,
+			    const struct kfsw_command_source *source,
+			    struct kfsw_command_result *out)
+{
+	ARG_UNUSED(args);
+	ARG_UNUSED(count);
+	ARG_UNUSED(source);
+	ARG_UNUSED(out);
+	k_sem_give(&other_ready);
+	return k_sem_take(&other_release, K_SECONDS(5));
+}
+
+static void other_entry(void *claim, void *unused_b, void *unused_c)
+{
+	struct kfsw_command_result out;
+
+	ARG_UNUSED(unused_b);
+	ARG_UNUSED(unused_c);
+	if (claim != NULL) {
+		zassert_ok(kfsw_command_claim_acquire(KFSW_COMMAND_CLAIM_EXCLUSIVE, "retry"));
+		k_sem_give(&other_ready);
+		zassert_ok(k_sem_take(&other_release, K_SECONDS(5)));
+		zassert_ok(kfsw_command_claim_release());
+	} else {
+		zassert_ok(kfsw_command_invoke_id(2, NULL, 0, NULL, &out));
+	}
 }
 
 static void *setup(void)
@@ -26,6 +60,7 @@ static void *setup(void)
 	static const enum kfsw_command_type types[] = {KFSW_COMMAND_TYPE_U32};
 	static const struct kfsw_command_definition commands[] = {
 		{.id = 1, .name = "count", .arg_count = 1, .arg_types = types, .handler = handler},
+		{.id = 2, .name = "block", .handler = blocking_handler},
 	};
 	static const struct kfsw_command_definition_set definitions = {
 		.commands = commands,
@@ -42,6 +77,10 @@ static void before(void *unused)
 	ARG_UNUSED(unused);
 	memset(&cache, 0, sizeof(cache));
 	invoked = 0;
+	handler_outcome = 0;
+	handler_status = KFSW_COMMAND_OK;
+	k_sem_reset(&other_ready);
+	k_sem_reset(&other_release);
 	request = (struct kfsw_command_message){.version = 2,
 						.opcode = KFSW_COMMAND_OP_PREPARE,
 						.command_id = 1,
@@ -76,6 +115,65 @@ ZTEST(command_retry, test_lost_result_does_not_repeat_handler)
 	zassert_equal(result.status, KFSW_COMMAND_OK);
 	zassert_equal(invoked, 1);
 	zassert_str_equal(result.detail, "called");
+}
+
+static void refused_then_retried(bool claim)
+{
+	prepare();
+	k_tid_t tid =
+		k_thread_create(&other_thread, other_stack, K_THREAD_STACK_SIZEOF(other_stack),
+				other_entry, claim ? &cache : NULL, NULL, NULL, 5, 0, K_NO_WAIT);
+
+	zassert_ok(k_sem_take(&other_ready, K_SECONDS(1)));
+	dispatch(30, 0, 1);
+	k_sem_give(&other_release);
+	zassert_ok(k_thread_join(tid, K_SECONDS(5)));
+	zassert_equal(result.status, KFSW_COMMAND_BUSY);
+	zassert_equal(ticket, 100);
+	zassert_equal(invoked, 0);
+	zassert_false(cache.entries[0].complete);
+
+	dispatch(30, 0, 2);
+	zassert_equal(result.status, KFSW_COMMAND_OK);
+	zassert_equal(ticket, 100);
+	dispatch(30, 0, 3);
+	zassert_equal(result.status, KFSW_COMMAND_OK);
+	zassert_equal(invoked, 1);
+}
+
+ZTEST(command_retry, test_admission_refusal_keeps_ticket_retryable)
+{
+	refused_then_retried(false);
+}
+
+ZTEST(command_retry, test_claim_refusal_keeps_ticket_retryable)
+{
+	refused_then_retried(true);
+}
+
+static void handler_busy_stays_cached(int outcome)
+{
+	prepare();
+	handler_outcome = outcome;
+	handler_status = KFSW_COMMAND_BUSY;
+	dispatch(30, 0, 1);
+	zassert_equal(result.status, KFSW_COMMAND_BUSY);
+	handler_outcome = 0;
+	handler_status = KFSW_COMMAND_OK;
+	dispatch(30, 0, 2);
+	zassert_equal(result.status, KFSW_COMMAND_BUSY);
+	zassert_str_equal(result.detail, "called");
+	zassert_equal(invoked, 1);
+}
+
+ZTEST(command_retry, test_handler_busy_stays_cached)
+{
+	handler_busy_stays_cached(0);
+}
+
+ZTEST(command_retry, test_handler_ebusy_stays_cached)
+{
+	handler_busy_stays_cached(-EBUSY);
 }
 
 ZTEST(command_retry, test_prepare_retry_keeps_ticket_and_deadline)
