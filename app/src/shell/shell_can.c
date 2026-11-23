@@ -43,6 +43,7 @@ static int cmd_can_info(const struct shell *sh, size_t argc, char **argv)
 	kfsw_can_get_info(&info);
 	shell_print(sh, "CAN interface: %s", info.ready ? info.interface_name : "-");
 	shell_print(sh, "ready: %s", info.ready ? "yes" : "no");
+	shell_print(sh, "rx_passes: %u", info.rx_passes);
 	shell_print(sh, "bitrate: %u", info.bitrate);
 	if (!info.ready) {
 		return 0;

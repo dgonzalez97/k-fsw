@@ -17,9 +17,15 @@ project(kfsw_app_csp_liveness_tests LANGUAGES C)
 # rather than brought up: no interfaces, no buffers, and a return value the
 # test chooses.
 target_sources(app PRIVATE
-    src/main.c
     "${KFSW_WORKSPACE_ROOT}/k-fsw/app/src/csp_liveness.c"
 )
+if(CONFIG_KFSW_TEST_RECEIVERS)
+    target_sources(app PRIVATE src/receivers.c)
+    zephyr_link_libraries(-Wl,--wrap=kfsw_platform_watchdog_release
+                         -Wl,--wrap=kfsw_platform_watchdog_feed)
+else()
+    target_sources(app PRIVATE src/main.c)
+endif()
 target_include_directories(app PRIVATE
     "${KFSW_WORKSPACE_ROOT}/k-fsw/app/src"
     "${KFSW_WORKSPACE_ROOT}/kfsw-comms/include"

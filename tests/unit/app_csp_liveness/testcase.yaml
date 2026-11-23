@@ -9,3 +9,18 @@ tests:
       - native_sim/native/64
     integration_platforms:
       - native_sim/native/64
+  kfsw.app.csp_liveness.receivers:
+    tags: [unit, app, health, csp]
+    platform_allow: [native_sim/native/64]
+    integration_platforms: [native_sim/native/64]
+    extra_configs:
+      - CONFIG_KFSW_TEST_RECEIVERS=y
+      - CONFIG_KFSW_HEALTH_INTERVAL_MS=50
+  kfsw.app.csp_liveness.unopened:
+    tags: [unit, app, health, csp]
+    platform_allow: [native_sim/native/64]
+    integration_platforms: [native_sim/native/64]
+    extra_configs:
+      - CONFIG_KFSW_TEST_RECEIVERS=y
+      - CONFIG_KFSW_TEST_RECEIVERS_UNOPENED=y
+      - CONFIG_KFSW_HEALTH_INTERVAL_MS=50

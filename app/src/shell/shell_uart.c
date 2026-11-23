@@ -22,6 +22,8 @@ static bool print_uart_info(const struct kfsw_uart_info *info, void *context)
 	shell_print(sh, "baudrate: %u", info->baudrate);
 	shell_print(sh, "configuration: 8N1, flow control none");
 	shell_print(sh, "ready: %s", info->ready ? "yes" : "no");
+	shell_print(sh, "receiver_opened: %s", info->receiver_opened ? "yes" : "no");
+	shell_print(sh, "rx_passes: %u", info->rx_passes);
 	shell_print(sh, "CSP interface: %s", info->interface_name);
 	shell_print(sh, "CSP node: %u/%u", info->node, info->prefix_length);
 	shell_print(sh, "CSP peer: %u", info->peer);

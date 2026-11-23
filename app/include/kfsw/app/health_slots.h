@@ -9,6 +9,8 @@
  */
 #define KFSW_HEALTH_SLOTS(SLOT)                                                                    \
 	SLOT(app, 0)                                                                               \
-	SLOT(csp, 1)
+	SLOT(csp, 1)                                                                               \
+	SLOT(kiss, 2)                                                                              \
+	SLOT(can, 3)
 
 #endif

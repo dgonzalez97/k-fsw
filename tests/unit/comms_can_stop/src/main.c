@@ -125,6 +125,33 @@ ZTEST(comms_can_stop, test_successful_stop_releases_context_and_slot)
 	zassert_equal(context_frees, 1U);
 }
 
+ZTEST(comms_can_stop, test_idle_progress_suspension_resume_and_reopen)
+{
+	csp_iface_t *iface = NULL;
+	struct k_thread *thread;
+	uint32_t passes;
+
+	zassert_equal(csp_can_rx_passes(NULL), 0U);
+	zassert_ok(open_interface(0U, "stop-a", &iface));
+	thread = live[0].thread;
+	passes = csp_can_rx_passes(iface);
+	k_sleep(K_MSEC(CSP_CAN_RX_IDLE_WAKE_MS + 20U));
+	zassert_not_equal(csp_can_rx_passes(iface), passes, "quiet bus must advance");
+	k_thread_suspend(thread);
+	passes = csp_can_rx_passes(iface);
+	k_sleep(K_MSEC(CSP_CAN_RX_IDLE_WAKE_MS + 20U));
+	zassert_equal(csp_can_rx_passes(iface), passes);
+	k_thread_resume(thread);
+	k_sleep(K_MSEC(CSP_CAN_RX_IDLE_WAKE_MS + 20U));
+	zassert_not_equal(csp_can_rx_passes(iface), passes);
+	zassert_ok(csp_can_stop(iface));
+	zassert_ok(open_interface(0U, "stop-a", &iface));
+	passes = csp_can_rx_passes(iface);
+	k_sleep(K_MSEC(CSP_CAN_RX_IDLE_WAKE_MS + 20U));
+	zassert_not_equal(csp_can_rx_passes(iface), passes);
+	zassert_ok(csp_can_stop(iface));
+}
+
 ZTEST(comms_can_stop, test_controller_stop_error_keeps_owned_resources)
 {
 	csp_iface_t *iface = NULL;
@@ -262,6 +289,7 @@ ZTEST(comms_can_stop, test_invalid_inputs_do_not_touch_controller)
 
 	zassert_equal(csp_can_stop(NULL), CSP_ERR_INVAL);
 	zassert_equal(csp_can_stop(&invalid), CSP_ERR_INVAL);
+	zassert_equal(csp_can_rx_passes(&invalid), 0U);
 	kfsw_can_get_info(&before);
 	zassert_equal(kfsw_can_set_bitrate(123U), -EINVAL);
 	kfsw_can_get_info(&after);
