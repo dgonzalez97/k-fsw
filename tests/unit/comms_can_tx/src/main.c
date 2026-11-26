@@ -311,6 +311,35 @@ ZTEST(comms_can_tx, test_failed_join_keeps_a_sendable_context_until_retry)
 	zassert_equal(fake_can_remove_rx_filter_fake.call_count, 1U);
 }
 
+ZTEST(comms_can_tx, test_stop_during_inflight_send_is_refused)
+{
+	csp_iface_t *iface = NULL;
+
+	zassert_ok(csp_can_open_and_add_interface(second_device, "tx-stop", 7U, 500000U, 0U, 0U,
+						  &iface));
+	tracked_context = iface->driver_data;
+	retain_context = true;
+	k_thread_create(&sender_thread, sender_stack, K_THREAD_STACK_SIZEOF(sender_stack),
+			send_in_thread, iface, NULL, NULL, K_PRIO_PREEMPT(1), 0, K_NO_WAIT);
+	zassert_ok(k_sem_take(&frame_queued, K_MSEC(TX_BOUND_MS)));
+
+	zassert_equal(csp_can_stop(iface), CSP_ERR_BUSY);
+	zassert_equal(fake_can_stop_fake.call_count, 0U);
+	zassert_equal(context_frees, 0U);
+	zassert_equal_ptr(csp_iflist_get_by_name("tx-stop"), iface);
+
+	pending_completion.status = 0;
+	complete_frame(&pending_completion);
+	zassert_ok(k_thread_join(&sender_thread, K_MSEC(TX_BOUND_MS)));
+	zassert_equal(sender_result, CSP_ERR_NONE);
+	zassert_true(sender_elapsed_ms < TX_BOUND_MS);
+
+	retain_context = false;
+	zassert_ok(csp_can_stop(iface));
+	zassert_equal(context_frees, 1U);
+	zassert_is_null(csp_iflist_get_by_name("tx-stop"));
+}
+
 ZTEST(comms_can_tx, test_invalid_bitrate_leaves_the_controller_unchanged)
 {
 	struct kfsw_can_info before;
